@@ -15,6 +15,11 @@
 
 営利を目的とせず、純粋に駅伝というスポーツの楽しさを共有したいという思いから、広告も一切入れておりません。皆さんの手でさらに面白い形に発展させていただければ嬉しいです。
 
+## サポートについて
+本リポジトリは「広告なし・無料であることの証明」および「ソースコードの公開」のみを目的としています。
+個人の趣味として、デジタル盆栽のようにマイペースに開発しているプロジェクトのため、**Issueでのバグ報告、Pull Request（コードの修正提案）、その他機能要望などのサポートは一切受け付けておりません**（GitHub上の各種受付機能もオフに設定しています）。
+あらかじめご了承ください。
+
 ---
 
 # Hakoniwa Ekiden SS (English)
@@ -32,5 +37,10 @@ I hope this code will be of some help to fellow developers and that we can all e
 
 ## License & Policy
 This project is licensed under the **MIT License**.
+
+## Support Policy
+This repository is published solely to share the source code and demonstrate that the app is completely free and ad-free.
+As this is a personal project developed at my own pace, **I do not accept bug reports, Pull Requests, or feature requests** (Issues and other communication features have been disabled for this repository). 
+Thank you for your understanding.
 
 The code is provided as-is and may be a bit messy, but please feel free to modify and use it for your own projects. Since this app was created purely for the love of the sport, there are no advertisements. I hope you find it useful in some way!

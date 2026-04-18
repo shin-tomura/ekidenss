@@ -1,16 +1,36 @@
-# ekiden
+# 箱庭小駅伝SS (Hakoniwa Ekiden SS)
 
-A new Flutter project.
+完全無料で広告なしの駅伝シミュレーションゲーム「箱庭小駅伝SS」のソースコードです。
+「みんなで駅伝ゲームを楽しみましょう！」という願いを込めて公開しています。
 
-## Getting Started
+## アプリ・関連リンク
+- **App Store:** [ダウンロードはこちら](https://apps.apple.com/app/%E7%AE%B1%E5%BA%AD%E5%B0%8F%E9%A7%85%E4%BC%9Dss/id6755650757)
+- **Google Play:** [ダウンロードはこちら](https://play.google.com/store/apps/details?id=jp.littlestar.hakoniwa.ekidenSS)
+- **公式サイト:** [箱庭小駅伝SS 公式](https://hakoniwa.littlestar.jp/index_ekiden.html)
 
-This project is a starting point for a Flutter application.
+## 公開の趣旨とライセンス
+本プロジェクトは **MITライセンス** で公開しています。
 
-A few resources to get you started if this is your first Flutter project:
+ソースコードは決して整ったものではなく、お恥ずかしい限りですが、何らかの形で開発の参考にしたり、お役に立てれば幸いです。コードが整理されていないため読み解くのは大変かもしれませんが、ご自由に改変・利用していただいて構いません。
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+営利を目的とせず、純粋に駅伝というスポーツの楽しさを共有したいという思いから、広告も一切入れておりません。皆さんの手でさらに面白い形に発展させていただければ嬉しいです。
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+---
+
+# Hakoniwa Ekiden SS (English)
+
+This is the source code for the free, ad-free ekiden simulation game "Hakoniwa Ekiden SS." 
+I hope this code will be of some help to fellow developers and that we can all enjoy ekiden games together!
+
+## App Links
+- **App Store:** [Download Link](https://apps.apple.com/app/%E7%AE%B1%E5%BA%AD%E5%B0%8F%E9%A7%85%E4%BC%9Dss/id6755650757)
+- **Google Play:** [Download Link](https://play.google.com/store/apps/details?id=jp.littlestar.hakoniwa.ekidenSS)
+- **Official Site:** [Official Page](https://hakoniwa.littlestar.jp/index_ekiden.html)
+
+## Language Support
+**Please Note:** This game is displayed entirely in **Japanese**. We apologize, but there is currently no English language support available.
+
+## License & Policy
+This project is licensed under the **MIT License**.
+
+The code is provided as-is and may be a bit messy, but please feel free to modify and use it for your own projects. Since this app was created purely for the love of the sport, there are no advertisements. I hope you find it useful in some way!

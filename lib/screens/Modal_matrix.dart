@@ -15,6 +15,22 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:screenshot/screenshot.dart';
 
+// 今季タイム一覧表の右端に追加する列（年間強化・能力）の定義
+class _ExtraColDef {
+  final String label;
+  final int flagIndex; // nouryokumieruflag の添字。-1 は常に表示
+  final int Function(SenshuData)? getValue; // 数値列（70・80・90で色付け）
+  final String Function(SenshuData)? getText; // 文字列（色付けなし）
+  final double width;
+  const _ExtraColDef(
+    this.label,
+    this.flagIndex, {
+    this.getValue,
+    this.getText,
+    this.width = 70,
+  });
+}
+
 class ModalUnivSenshuMatrixView extends StatefulWidget {
   final int targetUnivId;
   const ModalUnivSenshuMatrixView({super.key, required this.targetUnivId});
@@ -49,6 +65,45 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
   ];
 
   final List<int> _raceIndices = [6, 7, 8, 10, 11, 12, 13, 14, 15, 16];
+
+  // 追加列（表の右端に追加。画像出力には含めない）
+  final List<_ExtraColDef> _extraCols = [
+    _ExtraColDef(
+      '年間強化',
+      -1,
+      getText: (s) => TrainingMenu.getMenuString(s.kaifukuryoku),
+      width: 90,
+    ),
+    _ExtraColDef('安定感', -1, getValue: (s) => s.anteikan),
+    _ExtraColDef('長距離粘り', 2, getValue: (s) => s.choukyorinebari),
+    _ExtraColDef('スパート力', 3, getValue: (s) => s.spurtryoku),
+    _ExtraColDef('カリスマ', 4, getValue: (s) => s.karisuma),
+    _ExtraColDef('登り適性', 5, getValue: (s) => s.noboritekisei),
+    _ExtraColDef('下り適性', 6, getValue: (s) => s.kudaritekisei),
+    _ExtraColDef(
+      'アップダウン対応力',
+      7,
+      getValue: (s) => s.noborikudarikirikaenouryoku,
+    ),
+    _ExtraColDef('ロード適性', 8, getValue: (s) => s.tandokusou),
+    _ExtraColDef('ペース変動対応力', 9, getValue: (s) => s.paceagesagetaiouryoku),
+  ];
+
+  // 能力の見える化フラグ（読み取り専用のコピー）
+  List<int> _mieruflag = [];
+
+  bool _isExtraVisible(_ExtraColDef def) {
+    if (def.flagIndex < 0) return true;
+    if (def.flagIndex >= _mieruflag.length) return false;
+    return _mieruflag[def.flagIndex] == 1;
+  }
+
+  String _extraText(_ExtraColDef def, SenshuData senshu) {
+    if (!_isExtraVisible(def)) return '??';
+    if (def.getText != null) return def.getText!(senshu);
+    return '${def.getValue?.call(senshu) ?? ''}';
+  }
+
   final Map<int, Map<int, int>> _rankMap = {};
 
   final double _rowHeight = 75.0;
@@ -78,6 +133,9 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
         header.add('${_eventLabels[i]}(順位)');
         header.add(_eventLabels[i]);
       }
+      for (final def in _extraCols) {
+        header.add(def.label);
+      }
 
       List<List<dynamic>> rows = [header];
 
@@ -101,6 +159,9 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
             row.add("$m:${s.toString().padLeft(2, '0')}");
           }
         }
+        for (final def in _extraCols) {
+          row.add(_extraText(def, senshu));
+        }
         rows.add(row);
       }
 
@@ -117,7 +178,10 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
         ShareParams(
           files: [XFile(path)],
           subject: '$_univName 選手記録データ',
-          text: '$_univName の今季成績表(CSV)を共有します。',
+          text:
+              '$_univName の今季成績表(CSV)を共有します。\n'
+              '※能力値は1〜99で、数値が大きいほど優れています。「??」はまだ判明していない能力のため、値を推測しないでください。\n'
+              '※年間強化は、レース時に対応する能力を一時的に上乗せするもので、表の能力値そのものは変わりません（バランス：平均的に上乗せ、スピード：スパート力とペース変動対応力、距離走：長距離粘りとロード適性、登り：登り適性、下り：下り適性、アップダウン：アップダウン対応力）。',
           sharePositionOrigin: const Rect.fromLTWH(0, 0, 1, 1),
         ),
       );
@@ -477,6 +541,9 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
     final Ghensuu? currentGhensuu = ghensuuBox.getAt(0);
     if (currentGhensuu == null) return;
 
+    // 能力の見える化フラグを読み取る（コピーを持つだけで書き換えはしない）
+    _mieruflag = List<int>.from(currentGhensuu.nouryokumieruflag);
+
     //final int targetUnivId = currentGhensuu.hyojiunivnum;
 
     _univName = univBox.get(widget.targetUnivId)?.name ?? "";
@@ -539,11 +606,15 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
             child: TableView.builder(
               pinnedColumnCount: 1,
               pinnedRowCount: 1,
-              columnCount: _eventLabels.length,
+              columnCount: _eventLabels.length + _extraCols.length,
               rowCount: _sortedSenshu.length + 1,
               columnBuilder: (index) => TableSpan(
                 extent: FixedTableSpanExtent(
-                  index == 0 ? 100 : (index == 1 || index == 2 ? 60 : 90),
+                  index >= _eventLabels.length
+                      ? _extraCols[index - _eventLabels.length].width
+                      : (index == 0
+                            ? 100
+                            : (index == 1 || index == 2 ? 60 : 90)),
                 ),
               ),
               rowBuilder: (index) => TableSpan(
@@ -552,10 +623,21 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
               cellBuilder: (context, vicinity) {
                 if (vicinity.row == 0)
                   return _buildHeaderCell(
-                    _eventLabels[vicinity.column],
+                    vicinity.column < _eventLabels.length
+                        ? _eventLabels[vicinity.column]
+                        : _extraCols[vicinity.column - _eventLabels.length]
+                              .label,
                     vicinity.column,
                   );
                 final senshu = _sortedSenshu[vicinity.row - 1];
+
+                if (vicinity.column >= _eventLabels.length)
+                  return _buildExtraCell(
+                    senshu,
+                    _extraCols[vicinity.column - _eventLabels.length],
+                    vicinity.row,
+                    vicinity.column,
+                  );
 
                 if (vicinity.column == 0)
                   return _buildNameCell(senshu, vicinity.row);
@@ -620,7 +702,14 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
                     width: _seriesBorderWidth,
                   ),
                 )
-              : null,
+              : (colIdx == _eventLabels.length
+                    ? Border(
+                        left: BorderSide(
+                          color: _seriesBorderColor,
+                          width: _seriesBorderWidth,
+                        ),
+                      )
+                    : null),
         ),
         padding: const EdgeInsets.all(4),
         alignment: Alignment.center,
@@ -877,6 +966,92 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // 追加列のセル（見えない能力は「??」で表示し、色付けもしない）
+  TableViewCell _buildExtraCell(
+    SenshuData senshu,
+    _ExtraColDef def,
+    int rowIdx,
+    int colIdx,
+  ) {
+    final Color rowBg = rowIdx.isEven
+        ? Colors.transparent
+        : Colors.white.withOpacity(0.02);
+    final bool isFirstExtraCol = colIdx == _eventLabels.length;
+    final Border border = Border(
+      bottom: BorderSide(color: Colors.white.withOpacity(0.05)),
+      left: isFirstExtraCol
+          ? BorderSide(color: _seriesBorderColor, width: _seriesBorderWidth)
+          : BorderSide.none,
+    );
+
+    // 見えない能力
+    if (!_isExtraVisible(def)) {
+      return TableViewCell(
+        child: Container(
+          alignment: Alignment.center,
+          decoration: BoxDecoration(color: rowBg, border: border),
+          child: const Text(
+            '??',
+            style: TextStyle(color: Colors.grey, fontSize: 13),
+          ),
+        ),
+      );
+    }
+
+    // 文字列の列（年間強化など）
+    if (def.getText != null) {
+      return TableViewCell(
+        child: Container(
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 2),
+          decoration: BoxDecoration(color: rowBg, border: border),
+          child: AutoSizeText(
+            def.getText!(senshu),
+            maxLines: 1,
+            minFontSize: 8,
+            style: const TextStyle(color: Colors.white, fontSize: 12),
+          ),
+        ),
+      );
+    }
+
+    // 数値の列（能力値）
+    final int value = def.getValue?.call(senshu) ?? 0;
+    const Color baseColor = Colors.lightGreenAccent;
+    Color bgColor = rowBg;
+    Color textColor = Colors.white;
+    FontWeight fontWeight = FontWeight.normal;
+
+    if (value >= 90) {
+      bgColor = baseColor.withOpacity(0.35);
+      textColor = baseColor;
+      fontWeight = FontWeight.bold;
+    } else if (value >= 80) {
+      bgColor = baseColor.withOpacity(0.15);
+      textColor = baseColor;
+      fontWeight = FontWeight.bold;
+    } else if (value >= 70) {
+      bgColor = baseColor.withOpacity(0.07);
+      textColor = baseColor.withOpacity(0.9);
+      fontWeight = FontWeight.bold;
+    }
+
+    return TableViewCell(
+      child: Container(
+        alignment: Alignment.center,
+        decoration: BoxDecoration(color: bgColor, border: border),
+        child: Text(
+          "$value",
+          style: TextStyle(
+            color: textColor,
+            fontSize: 13,
+            fontWeight: fontWeight,
           ),
         ),
       ),

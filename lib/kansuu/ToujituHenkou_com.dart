@@ -550,7 +550,7 @@ Future<void> markManualToujituHenkou({
 }
 
 // ------------------------------------------------------------
-// 当日変更の表示用(確定直後の画面・当日変更選手一覧)
+// 当日変更の表示用(当日変更選手一覧)
 // ------------------------------------------------------------
 
 /// コンピュータ大学の当日変更の理由(表示用)。プレイヤーの大学ならnullを返す
@@ -558,6 +558,10 @@ Future<void> markManualToujituHenkou({
 ///   他大学変更で確定した大学 → 他大学変更
 ///   外れた選手の調子が0 → 体調不良のため
 ///   入った選手が当て馬で隠したエース → 当て馬から本来の選手へ
+///   外れた選手の調子が100 → 他大学変更
+///     (自動の当日変更は調子100の選手を当て馬戻し以外で外さないため。
+///      他大学変更の目印は1日分しか覚えていないので、正月駅伝で往路と復路の
+///      両方で他大学変更を使った場合の往路分もここで判定される)
 ///   それ以外 → 調子○○のため
 /// [kukan] 区間(0始まり)
 String? comToujituHenkouRiyuu({
@@ -582,58 +586,8 @@ String? comToujituHenkouRiyuu({
   }
   if (outPlayer.chousi == 0) return '体調不良のため';
   if (inPlayer.kazetaisei == kukan + 1) return '当て馬から本来の選手へ';
+  if (outPlayer.chousi >= 100) return '他大学変更';
   return '調子${outPlayer.chousi}のため';
-}
-
-/// その日のコンピュータ大学の当日変更を、表示用の文字列の一覧にする
-/// [day] 0=1日開催、1=正月駅伝往路、2=正月駅伝復路
-List<String> comToujituHenkouHyouji({
-  required Ghensuu gh,
-  required int racebangou,
-  required int day,
-  required List<UnivData> sortedUnivData,
-  required List<SenshuData> senshuList,
-}) {
-  final List<String> lines = [];
-  for (final univ in sortedUnivData) {
-    if (univ.id == gh.MYunivid) continue;
-    if (univ.taikaientryflag[racebangou] != 1) continue;
-    final List<SenshuData> team = senshuList
-        .where((s) => s.univid == univ.id)
-        .toList();
-    final List<SenshuData> outs =
-        team.where((s) {
-          final int e = _entry(s, racebangou);
-          return e <= -100 && _isTaishouKukan(racebangou, day, -e - 100);
-        }).toList()..sort(
-          (x, y) =>
-              _entry(y, racebangou).compareTo(_entry(x, racebangou)),
-        ); // 区間順(-100, -101, ...)
-    for (final out in outs) {
-      final int k = -_entry(out, racebangou) - 100;
-      SenshuData? inPlayer;
-      for (final s in team) {
-        if (_entry(s, racebangou) == k) {
-          inPlayer = s;
-          break;
-        }
-      }
-      if (inPlayer == null) continue;
-      final String? riyuu = comToujituHenkouRiyuu(
-        gh: gh,
-        racebangou: racebangou,
-        univid: univ.id,
-        kukan: k,
-        outPlayer: out,
-        inPlayer: inPlayer,
-      );
-      lines.add(
-        '${univ.name} ${k + 1}区 ${out.name}(${out.gakunen}年)→'
-        '${inPlayer.name}(${inPlayer.gakunen}年)${riyuu != null ? '（$riyuu）' : ''}',
-      );
-    }
-  }
-  return lines;
 }
 
 // ------------------------------------------------------------

@@ -11,7 +11,6 @@ import 'package:ekiden/screens/Modal_kukanentry.dart';
 //import 'package:ekiden/screens/Modal_senshu.dart';
 import 'package:ekiden/screens/Modal_kukanhaiti2.dart';
 import 'package:ekiden/screens/Modal_TodayChangeList.dart';
-import 'package:ekiden/kansuu/ToujituHenkou_com.dart';
 import 'package:ekiden/screens/Modal_courseshoukai.dart';
 import 'package:ekiden/screens/Modal_kukanresult350.dart';
 import 'package:ekiden/screens/Modal_tuukajuni.dart';
@@ -516,22 +515,6 @@ class _Mode0280Content extends State<Mode0280Content> {
                 String kakutokustr = "";
                 kakutokustr = "${_kakutokugoldsilver()}";
 
-                // コンピュータ大学の当日変更(当日変更の確定直後に発表する)
-                final bool kakuteiChokugo = widget.ghensuu.mode == 343;
-                List<String> comHenkouLines = [];
-                if (kakuteiChokugo) {
-                  final List<SenshuData> senshuList = box.values.toList();
-                  comHenkouLines = comToujituHenkouHyouji(
-                    gh: widget.ghensuu,
-                    racebangou: raceIdx,
-                    day: raceIdx == 2
-                        ? (widget.ghensuu.nowracecalckukan >= 5 ? 2 : 1)
-                        : 0,
-                    sortedUnivData: allUnivData,
-                    senshuList: senshuList,
-                  );
-                }
-
                 // ListViewの中に説明文と見出しを組み込む
                 return ListView(
                   children: [
@@ -859,39 +842,6 @@ class _Mode0280Content extends State<Mode0280Content> {
                           ),
                         ),
                       ),
-                    // コンピュータ大学の当日変更の発表
-                    if (kakuteiChokugo) ...[
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 10,
-                          horizontal: 16,
-                        ),
-                        color: Colors.white.withOpacity(0.05),
-                        child: const Text(
-                          "コンピュータ大学の当日変更",
-                          style: TextStyle(
-                            color: Colors.cyanAccent,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                        child: Text(
-                          comHenkouLines.isEmpty
-                              ? "コンピュータ大学の当日変更はありませんでした。"
-                              : comHenkouLines.join("\n"),
-                          style: const TextStyle(
-                            color: HENSUU.textcolor,
-                            fontSize: 13,
-                            height: 1.6,
-                          ),
-                        ),
-                      ),
-                    ],
-
                     // 説明文
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),

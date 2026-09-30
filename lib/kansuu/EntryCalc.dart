@@ -53,6 +53,7 @@ Future<List<int>> EntryCalc({
   */
   final startTime = DateTime.now();
   print("EntryCalcに入った");
+  entryShisouTimeCache.clear(); // 区間エントリー後処理で使い回す試走タイム
 
   final albumBox = Hive.box<Album>('albumBox');
   // Boxからデータを読み込む
@@ -521,6 +522,8 @@ Future<List<int>> EntryCalc({
                 kantoku,
               );
               trialTimesCache[playerId]![kukanIndex] = time;
+              // 区間エントリー後処理(戦略的エントリー)で使い回す
+              entryShisouTimeCache[playerId * 100 + kukanIndex] = time;
             }
           }
           // 2. 動的計画法による最適配置の探索（ビットマスクを使用）
@@ -1435,6 +1438,7 @@ Future<List<int>> EntryCalc({
     sortedUnivData: sortedUnivData,
     sortedSenshuData: sortedSenshuData,
   );
+  entryShisouTimeCache.clear(); // 使い終わったら消す(大会当日には使わない)
 
   // 区間エントリーの整合性チェックと自動修復(区間空白・区間重複の防止)
   await kukanSeigouseiShuufuku(

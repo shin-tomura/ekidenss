@@ -8,6 +8,7 @@ import 'package:ekiden/senshu_gakuren_data.dart'; // SenshuDataクラスのイ�
 import 'package:ekiden/constants.dart'; // TEISUUクラスをインポート
 import 'package:ekiden/kansuu/FindFastestTeam.dart';
 import 'package:ekiden/kansuu/FindFastest2.dart';
+import 'package:ekiden/kansuu/ToujituHenkou_com.dart';
 import 'package:ekiden/kansuu/TrialTime.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ekiden/Shuudansou.dart';
@@ -1426,6 +1427,14 @@ Future<List<int>> EntryCalc({
       }
     }
   }
+
+  // コンピュータ大学の区間エントリー後処理(体調不良者の除外・当て馬エントリー)
+  await comEntryAtoshori(
+    racebangou: racebangou,
+    gh: gh,
+    sortedUnivData: sortedUnivData,
+    sortedSenshuData: sortedSenshuData,
+  );
 
   // 区間内順位算出
   for (int i = 0; i < sortedSenshuData.length; i++) {

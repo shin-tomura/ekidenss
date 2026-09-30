@@ -14,6 +14,7 @@ import 'package:ekiden/Shuudansou.dart';
 import 'package:ekiden/album.dart';
 import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/kansuu/univkosei.dart';
+import 'package:ekiden/kansuu/ToujituHenkou_com.dart';
 
 String _timeToMinuteSecondString(double time) {
   if (time == TEISUU.DEFAULTTIME) {
@@ -194,6 +195,27 @@ Future<void> RaceCalc({
     noborikudari_kirikaekaisuu =
         gh[0].noborikudarikirikaekaisuu_taikai_kukangoto[racebangou][gh[0]
             .nowracecalckukan];
+  }
+
+  // コンピュータ大学の当日変更(当日変更画面を通らなかった場合はここで実行)
+  if ((racebangou >= 0 && racebangou <= 2) || racebangou == 5) {
+    if (gh[0].nowracecalckukan == 0) {
+      await comToujituHenkou(
+        racebangou: racebangou,
+        day: racebangou == 2 ? 1 : 0,
+        gh: gh,
+        sortedUnivData: sortedunivdata,
+        sortedSenshuData: sortedsenshudata,
+      );
+    } else if (racebangou == 2 && gh[0].nowracecalckukan == 5) {
+      await comToujituHenkou(
+        racebangou: racebangou,
+        day: 2,
+        gh: gh,
+        sortedUnivData: sortedunivdata,
+        sortedSenshuData: sortedsenshudata,
+      );
+    }
   }
 
   if (gh[0].nowracecalckukan == 0) {

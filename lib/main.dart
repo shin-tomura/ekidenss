@@ -908,13 +908,26 @@ Future<void> main() async {
       }
     }
 
+    {
+      //バージョンアップに伴い付け足す処理を書く
+      final checkversionValue = int.tryParse(sortedUnivData[7].name_tanshuku);
+      if (checkversionValue == null ||
+          checkversionValue < 21780 ||
+          checkversionValue > 999999999) {
+        final kantokuBox = Hive.box<KantokuData>('kantokuBox');
+        final KantokuData kantoku = kantokuBox.get('KantokuData')!;
+        kantoku.yobiint2[21] = 1; //コンピュータチームの体調不良発生ON
+        await kantoku.save();
+      }
+    }
+
     //1.4.3からバージョン番号保存することにした(この処理は一連の処理の中で1番最後にすること)
     //save_load_screenの中の _importFromSlot の中にもあるので、そちらも変更すること！
     final versionValue = int.tryParse(sortedUnivData[7].name_tanshuku);
     if (versionValue == null ||
-        versionValue < 21770 ||
+        versionValue < 21780 ||
         versionValue > 999999999) {
-      sortedUnivData[7].name_tanshuku = "21770"; //バージョン番号
+      sortedUnivData[7].name_tanshuku = "21780"; //バージョン番号
       await sortedUnivData[7].save();
     }
 
@@ -1192,6 +1205,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       kantoku.yobiint2[12] = 2; //Sと比べての金銀支給量倍率
       kantoku.yobiint2[13] = 0; //長距離タイム全体抑制値
       kantoku.yobiint2[16] = 4; //強化練習強度
+      kantoku.yobiint2[21] = 1; //コンピュータチームの体調不良発生ON
       await kantoku.save();
 
       for (int i_univ = 0; i_univ < TEISUU.UNIVSUU; i_univ++) {
@@ -1443,6 +1457,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       kantoku.yobiint2[12] = 2; //Sと比べての金銀支給量倍率
       kantoku.yobiint2[13] = 0; //長距離タイム全体抑制値
       kantoku.yobiint2[16] = 4; //強化練習強度
+      kantoku.yobiint2[21] = 1; //コンピュータチームの体調不良発生ON
       await kantoku.save();
 
       for (int i_univ = 0; i_univ < TEISUU.UNIVSUU; i_univ++) {

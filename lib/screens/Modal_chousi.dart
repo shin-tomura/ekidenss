@@ -34,6 +34,7 @@ class _ModalConditionSettingsState extends State<ModalConditionSettings> {
   late double _illnessTimePenalty; // yobiint2[11] (1-10) <- **新規追加**
   // ▲ 新規追加する設定項目用のローカル状態
   late bool _computerIllnessEnabled; // yobiint2[21] (1=ON/0=OFF)
+  late double _atemaKakuritu; // yobiint2[34] (0-100) 当て馬エントリー確率
 
   @override
   void initState() {
@@ -63,6 +64,21 @@ class _ModalConditionSettingsState extends State<ModalConditionSettings> {
     // ▲ 新規追加項目のローカル状態を初期化
     // yobiint2[21]が1の時ON（発生する）、0の時OFF（発生しない）
     _computerIllnessEnabled = kantoku.yobiint2[21] == 1;
+    // yobiint2[34] コンピュータチームの当て馬エントリー確率 (0-100)
+    _atemaKakuritu = (kantoku.yobiint2.length > 34 ? kantoku.yobiint2[34] : 0)
+        .toDouble()
+        .clamp(0, 100);
+  }
+
+  /// コンピュータチームの当て馬エントリー確率 (`yobiint2[34]`) の値を変更し、Hiveに保存
+  void _updateAtemaKakuritu(double sliderValue) async {
+    if (kantoku.yobiint2.length <= 34) return;
+    final int newValue = sliderValue.toInt().clamp(0, 100);
+    setState(() {
+      _atemaKakuritu = newValue.toDouble();
+      kantoku.yobiint2[34] = newValue;
+    });
+    await kantoku.save();
   }
 
   /// コンピュータチームの体調不良発生設定 (`yobiint2[21]`) の値を変更し、Hiveに保存
@@ -229,6 +245,7 @@ class _ModalConditionSettingsState extends State<ModalConditionSettings> {
     Color activeColor = Colors.purple,
     bool isStabilitySetting = false, // 安定感設定かどうかのフラグ
     bool isIllnessPenaltySetting = false, // 体調不良悪化設定かどうかのフラグ
+    String? valueText, // 現在の設定値の表示文字列(指定時はこちらを優先)
   }) {
     // スライダーのラベル表示を調整
     final String labelText = isStabilitySetting
@@ -267,7 +284,7 @@ class _ModalConditionSettingsState extends State<ModalConditionSettings> {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
           child: Text(
-            _getProbabilityText(currentValue),
+            valueText ?? _getProbabilityText(currentValue),
             style: TextStyle(
               color: currentValue == min
                   ? Colors.greenAccent
@@ -528,7 +545,7 @@ class _ModalConditionSettingsState extends State<ModalConditionSettings> {
                     _buildSettingSwitch_ComteamTaichoufuryou(
                       title: 'コンピュータチームの体調不良発生スイッチ',
                       description:
-                          'ONにすると、プレイヤーチームと同様にコンピュータのチームの選手にも一定確率で体調不良が発生するようになります。ただ、コンピュータのチームは自動では当日変更してこないので、もし、このスイッチをONにする場合には、箱庭モードで、あなたが他大学の当日変更まで面倒をみる必要が出てくるかもしれません。',
+                          'ONにすると、プレイヤーチームと同様にコンピュータのチームの選手にも一定確率で体調不良が発生するようになります。コンピュータのチームは、区間エントリー時には体調不良の選手を区間から外し、大会当日に体調不良者が出た場合には補欠との当日変更で対応します。なお、箱庭モードの「他大学変更」で当日変更を確定した大学は、その日の自動の当日変更を行いません。',
                       currentValue: _computerIllnessEnabled,
                       onChanged: _updateComputerIllnessEnabled,
                       activeColor: Colors.orange,
@@ -576,7 +593,7 @@ class _ModalConditionSettingsState extends State<ModalConditionSettings> {
                     _buildSettingSlider(
                       title: '区間エントリー時 体調不良確率',
                       description:
-                          '区間エントリー時に、選手が体調不良（調子に悪影響）になってしまう確率です。体調不良の場合、調子は各選手の安定感とは関係なく、一律でのタイム悪化となります。なお、この設定はプレイヤーのチームの選手のみに関係し、コンピュータのチームには体調不良者は出ません。',
+                          '区間エントリー時に、選手が体調不良（調子に悪影響）になってしまう確率です。体調不良の場合、調子は各選手の安定感とは関係なく、一律でのタイム悪化となります。なお、コンピュータのチームの選手には、「コンピュータチームの体調不良発生スイッチ」がONの場合にのみ体調不良が発生します。',
                       currentValue: _sectionIllnessProb,
                       min: 0,
                       max: 20, // 20まで
@@ -612,7 +629,7 @@ class _ModalConditionSettingsState extends State<ModalConditionSettings> {
                     _buildSettingSlider(
                       title: '当日突発的体調不良確率',
                       description:
-                          '大会当日に急な体調不良を起こし、調子が落ちてしまう確率です（ピーキング成功者も対象）。体調不良の場合、調子は各選手の安定感とは関係なく、一律でのタイム悪化となります。なお、この設定はプレイヤーのチームの選手のみに関係し、コンピュータのチームには体調不良者は出ません。',
+                          '大会当日に急な体調不良を起こし、調子が落ちてしまう確率です（ピーキング成功者も対象）。体調不良の場合、調子は各選手の安定感とは関係なく、一律でのタイム悪化となります。なお、コンピュータのチームの選手には、「コンピュータチームの体調不良発生スイッチ」がONの場合にのみ体調不良が発生します。',
                       currentValue: _suddenIllnessProb,
                       min: 0,
                       max: 20, // 20まで
@@ -683,6 +700,25 @@ class _ModalConditionSettingsState extends State<ModalConditionSettings> {
                     ),
                     // ▲ 安定感 最低保証値設定
                   ],
+
+                  // コンピュータチームの当て馬エントリー確率 (yobiint2[34]: 0-100)
+                  _buildSettingSlider(
+                    title: 'コンピュータチームの当て馬エントリー確率',
+                    description:
+                        'コンピュータのチームが、エースを補欠として隠し、別の選手を当て馬として区間エントリーしておき、大会当日の当日変更でエースを本来の区間に戻す作戦をとる確率です(大学ごと・大会ごとに判定)。隠す人数は、10月駅伝1人、11月駅伝2人、正月駅伝3人、カスタム駅伝は区間数に応じて1〜3人です。0%の場合は当て馬エントリーを行いません。',
+                    currentValue: _atemaKakuritu,
+                    min: 0,
+                    max: 100,
+                    divisions: 10, // 10%刻み
+                    onChanged: (newValue) {
+                      setState(() => _atemaKakuritu = newValue);
+                    },
+                    onChangeEnd: _updateAtemaKakuritu,
+                    minLabel: '0% (やらない)',
+                    maxLabel: '100% (毎回)',
+                    activeColor: Colors.teal,
+                    valueText: '現在の設定値: ${_atemaKakuritu.toInt()}%',
+                  ),
 
                   const SizedBox(height: 16),
                   ElevatedButton(

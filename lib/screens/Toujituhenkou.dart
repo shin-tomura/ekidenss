@@ -15,6 +15,7 @@ import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/screens/AllToujitu.dart';
 import 'package:ekiden/screens/Modal_kukanhaiti2.dart';
 import 'package:ekiden/screens/Modal_Taichoufuryou.dart';
+import 'package:ekiden/kansuu/ToujituHenkou_com.dart';
 
 // --- 当日変更画面ウィジェット ---
 
@@ -359,6 +360,9 @@ class _ToujitsuHenkouScreenState extends State<ToujitsuHenkouScreen> {
         // ✨ await をつけて呼び出す
         await _kukannaiJunSaikeisan(currentGhensuu, sortedSenshuData);
       }
+
+      // コンピュータ大学の当日変更(プレイヤーの確定後に反映)
+      await comToujituHenkouAfterPlayer(currentGhensuu!, day: 0);
 
       // 3. 成功メッセージ表示と画面遷移
       if (mounted) {

@@ -11,6 +11,7 @@ import 'package:ekiden/screens/Modal_matrix.dart';
 import 'package:ekiden/screens/Modal_matrix2.dart';
 import 'package:ekiden/screens/Modal_matrix3.dart';
 import 'package:ekiden/screens/Modal_Taichoufuryou.dart';
+import 'package:ekiden/kansuu/ToujituHenkou_com.dart';
 
 class AllToujitsuHenkouScreen extends StatefulWidget {
   // targetGroup: 0 = 通常 または 正月駅伝(往路1-5区), 1 = 正月駅伝(復路6-10区)
@@ -259,6 +260,13 @@ class _AllToujitsuHenkouScreenState extends State<AllToujitsuHenkouScreen> {
 
       setState(() => _isProcessing = true);
       final int raceIdx = currentGhensuu!.hyojiracebangou;
+
+      // 手動で当日変更した大学として記録(自動の当日変更をしない)
+      await markManualToujituHenkou(
+        currentGhensuu: currentGhensuu!,
+        univid: selectedUnivId!,
+        targetGroup: widget.targetGroup,
+      );
 
       // 1. 選手の入れ替え保存
       for (var entry in changeMap.entries) {

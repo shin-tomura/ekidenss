@@ -207,6 +207,14 @@ Future<void> RaceCalc({
         sortedUnivData: sortedunivdata,
         sortedSenshuData: sortedsenshudata,
       );
+      // 区間エントリーの整合性チェックと自動修復(区間空白・区間重複の防止)
+      await kukanSeigouseiShuufuku(
+        racebangou: racebangou,
+        gh: gh,
+        sortedUnivData: sortedunivdata,
+        sortedSenshuData: sortedsenshudata,
+        kukannaiJuniSaikeisan: true,
+      );
     } else if (racebangou == 2 && gh[0].nowracecalckukan == 5) {
       await comToujituHenkou(
         racebangou: racebangou,
@@ -214,6 +222,15 @@ Future<void> RaceCalc({
         gh: gh,
         sortedUnivData: sortedunivdata,
         sortedSenshuData: sortedsenshudata,
+      );
+      // 区間エントリーの整合性チェックと自動修復(復路のみ)
+      await kukanSeigouseiShuufuku(
+        racebangou: racebangou,
+        gh: gh,
+        sortedUnivData: sortedunivdata,
+        sortedSenshuData: sortedsenshudata,
+        kaishiKukan: 5,
+        kukannaiJuniSaikeisan: true,
       );
     }
   }

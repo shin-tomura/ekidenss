@@ -1436,6 +1436,14 @@ Future<List<int>> EntryCalc({
     sortedSenshuData: sortedSenshuData,
   );
 
+  // 区間エントリーの整合性チェックと自動修復(区間空白・区間重複の防止)
+  await kukanSeigouseiShuufuku(
+    racebangou: racebangou,
+    gh: gh,
+    sortedUnivData: sortedUnivData,
+    sortedSenshuData: sortedSenshuData,
+  );
+
   // 区間内順位算出
   for (int i = 0; i < sortedSenshuData.length; i++) {
     for (

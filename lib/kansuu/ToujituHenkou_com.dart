@@ -24,6 +24,8 @@ import 'package:hive_flutter/hive_flutter.dart';
 //     交代人数の上限はプレイヤーと同じ(区間数6以下2人、8以下3人、それ以上6人、
 //     正月駅伝は往路4人・復路4人、合計6人)
 // ・箱庭モードの「他大学変更」で確定した大学は、その日の自動当日変更をしない
+// ・区間エントリーの整合性チェックと自動修復(全大学、学連選抜は除く)
+//     区間エントリー決定後とレース計算開始時に、1区間に走者がちょうど1人になるよう直す
 //
 // KantokuData.yobiint2 の使用番号
 //   [34] 当て馬エントリー確率(0〜100、初期値0)
@@ -490,4 +492,113 @@ Future<void> markManualToujituHenkou({
   }
   kantoku.yobiint2[manualToujituMaskIndex] |= (1 << univid);
   await kantoku.save();
+}
+
+// ------------------------------------------------------------
+// 区間エントリーの整合性チェックと自動修復
+// ------------------------------------------------------------
+
+/// 各大学で「1区間に走者がちょうど1人」になるように直す(区間空白・区間重複の防止)
+/// ・区間番号が区間数以上の選手は補欠に戻す
+/// ・重複している区間は、一番速い見込みの選手を残して他を補欠に戻す
+/// ・空白の区間は、補欠(体調不良でない選手→体調不良の選手→エントリー外の選手の順)から
+///   一番速い見込みの選手で埋める。当日変更で外れた選手は使わない
+/// [kaishiKukan] この区間以降だけを対象にする(正月駅伝の復路開始時は5)
+/// [kukannaiJuniSaikeisan] 修復した場合に区間内順位を再計算するか
+Future<void> kukanSeigouseiShuufuku({
+  required int racebangou,
+  required List<Ghensuu> gh,
+  required List<UnivData> sortedUnivData,
+  required List<SenshuData> sortedSenshuData,
+  int kaishiKukan = 0,
+  bool kukannaiJuniSaikeisan = false,
+}) async {
+  if (!_isEkiden(racebangou)) return;
+  final KantokuData? kantoku = Hive.box<KantokuData>(
+    'kantokuBox',
+  ).get('KantokuData');
+  if (kantoku == null) return;
+
+  final int kukansuu = gh[0].kukansuu_taikaigoto[racebangou];
+  // 試走タイムは表示中の大会のコースで計算されるので、違う場合は基本走力で代用する
+  final bool shisouTimeOk = gh[0].hyojiracebangou == racebangou;
+  final mitumori = _Mitumori(gh[0], sortedSenshuData, sortedUnivData, kantoku);
+  Future<double> hyouka(SenshuData s, int k) async =>
+      shisouTimeOk ? await mitumori.time(s, k) : s.a;
+  Future<SenshuData?> ichibanHayai(List<SenshuData> kouho, int k) async {
+    SenshuData? best;
+    double bestAtai = double.infinity;
+    for (final s in kouho) {
+      final double atai = await hyouka(s, k);
+      if (atai < bestAtai) {
+        bestAtai = atai;
+        best = s;
+      }
+    }
+    return best;
+  }
+
+  bool shuufukuAri = false;
+  for (final univ in sortedUnivData) {
+    if (univ.taikaientryflag[racebangou] != 1) continue;
+    await _yasumi();
+    final List<SenshuData> team = sortedSenshuData
+        .where((s) => s.univid == univ.id)
+        .toList();
+    final Set<SenshuData> henkouari = {};
+
+    // 区間番号が範囲外の選手は補欠に戻す
+    for (final s in team) {
+      final int e = _entry(s, racebangou);
+      if (e >= kukansuu) {
+        print('区間修復: ${univ.name} ${s.name} 区間番号${e + 1}が範囲外のため補欠に戻す');
+        _setEntry(s, racebangou, -1);
+        henkouari.add(s);
+      }
+    }
+
+    for (int k = kaishiKukan; k < kukansuu; k++) {
+      final List<SenshuData> runners = team
+          .where((s) => _entry(s, racebangou) == k)
+          .toList();
+      if (runners.length > 1) {
+        // 区間重複: 一番速い見込みの選手を残す
+        final SenshuData? nokosu = await ichibanHayai(runners, k);
+        for (final s in runners) {
+          if (s == nokosu) continue;
+          print('区間修復: ${univ.name} ${k + 1}区の重複 ${s.name} を補欠に戻す');
+          _setEntry(s, racebangou, -1);
+          henkouari.add(s);
+        }
+      } else if (runners.isEmpty) {
+        // 区間空白: 補欠で埋める
+        List<SenshuData> kouho = team
+            .where((s) => _entry(s, racebangou) == -1 && s.chousi != 0)
+            .toList();
+        if (kouho.isEmpty) {
+          kouho = team.where((s) => _entry(s, racebangou) == -1).toList();
+        }
+        if (kouho.isEmpty) {
+          kouho = team.where((s) => _entry(s, racebangou) == -2).toList();
+        }
+        final SenshuData? umeru = await ichibanHayai(kouho, k);
+        if (umeru != null) {
+          print('区間修復: ${univ.name} ${k + 1}区の空白に ${umeru.name} を配置');
+          _setEntry(umeru, racebangou, k);
+          henkouari.add(umeru);
+        } else {
+          print('区間修復: ${univ.name} ${k + 1}区の空白を埋められる選手がいない');
+        }
+      }
+    }
+
+    for (final s in henkouari) {
+      await s.save();
+    }
+    if (henkouari.isNotEmpty) shuufukuAri = true;
+  }
+
+  if (shuufukuAri && kukannaiJuniSaikeisan) {
+    await _kukannaiJunSaikeisan(racebangou, kukansuu, sortedSenshuData);
+  }
 }

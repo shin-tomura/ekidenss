@@ -19,7 +19,8 @@ import 'package:hive_flutter/hive_flutter.dart';
 //     温存する選手は、基本走力の上位5人のうち「どの区間でも走れる」選手を優先する
 //       (元の区間の日の区間のうち、チーム内で見込みタイムが3番以内の区間の数が多い順。
 //        同じなら基本走力順)
-//     温存した選手には kazetaisei に使う日の印を付ける(1=1日開催・正月駅伝往路、2=正月駅伝復路)
+//     温存した選手には kazetaisei に使う日の印を負の値で付ける(-1=1日開催・正月駅伝往路、-2=正月駅伝復路)
+//     (kazetaiseiは新入生の作成時に1〜99の乱数が入る(風耐性の名残)ため、取り違えないよう負の値にしている)
 // ・当日変更: プレイヤーの当日変更確定後(当日変更画面を通らない場合はレース計算開始時)
 //     優先度1: 体調不良の走者を補欠と交代(補欠のほうが速い見込みの場合)
 //     優先度2: 温存したエースを、その日の区間のうち見込みタイムが最も縮まる区間に起用する(戦略的変更)
@@ -85,15 +86,20 @@ int _goukeiJougen(int racebangou, int kukansuu) {
 const int _senryakuKouhoSuu = 5;
 
 /// 温存した選手に付ける使う日の印(kazetaisei)
-/// 1=1日開催・正月駅伝往路、2=正月駅伝復路
+/// -1=1日開催・正月駅伝往路、-2=正月駅伝復路
+/// kazetaiseiには新入生の作成時に1〜99の乱数が入る(風耐性の名残)ので、
+/// それと取り違えないよう負の値にしている
 int _onzonHi(int racebangou, int kukan) =>
-    (racebangou == 2 && kukan >= 5) ? 2 : 1;
+    (racebangou == 2 && kukan >= 5) ? -2 : -1;
+
+/// 戦略的エントリーで温存した選手か(負の値の印が付いている)
+bool _isOnzon(SenshuData s) => s.kazetaisei < 0;
 
 /// その日に戦略的変更で起用できる温存選手か
 /// (正月駅伝の往路で起用しなかった選手は復路でも候補にする)
 bool _onzonKiyouKanou(SenshuData s, int racebangou, int day) {
-  if (s.kazetaisei == 0) return false;
-  if (racebangou == 2 && day == 1) return s.kazetaisei == 1;
+  if (!_isOnzon(s)) return false;
+  if (racebangou == 2 && day == 1) return s.kazetaisei == -1;
   return true;
 }
 
@@ -282,9 +288,10 @@ Future<void> comEntryAtoshori({
         .toList();
     final Set<SenshuData> henkouari = {};
 
-    // 戦略的エントリー用の「使う日」の印をクリア
+    // 戦略的エントリー用の「使う日」の印(負の値)をクリア
+    // (正の値は風耐性の名残なので触らない)
     for (final s in team) {
-      if (s.kazetaisei != 0) {
+      if (_isOnzon(s)) {
         s.kazetaisei = 0;
         henkouari.add(s);
       }
@@ -377,7 +384,7 @@ Future<void> comEntryAtoshori({
               (s) =>
                   _entry(s, racebangou) == -1 &&
                   s.chousi != 0 &&
-                  s.kazetaisei == 0, // 温存したエースは代わりの選手にしない
+                  !_isOnzon(s), // 温存したエースは代わりの選手にしない
             )
             .toList();
         final SenshuData? kawari = await mitumori.fastest(subs, k);
@@ -499,7 +506,7 @@ Future<void> comToujituHenkou({
           yuusen = 2; // 体調不良の走者の交代
         } else if (onzon) {
           yuusen = 1; // 温存したエースを起用する(戦略的変更)
-        } else if (sub.kazetaisei != 0) {
+        } else if (_isOnzon(sub)) {
           continue; // 正月駅伝の復路用に温存した選手は、往路では体調不良の交代にだけ使う
         } else if (gain >= genzai * 0.003) {
           yuusen = 0; // 調子の悪い走者より補欠のほうが明らかに速い
@@ -670,7 +677,7 @@ String? comToujituHenkouRiyuu({
     return '他大学変更';
   }
   if (outPlayer.chousi == 0) return '体調不良のため';
-  if (inPlayer.kazetaisei != 0) return '戦略的変更';
+  if (inPlayer.kazetaisei < 0) return '戦略的変更';
   if (outPlayer.chousi >= 100) return '他大学変更';
   return '調子${outPlayer.chousi}のため';
 }

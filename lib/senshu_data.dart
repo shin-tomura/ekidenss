@@ -77,7 +77,7 @@ class SenshuData extends HiveObject {
   @HiveField(33)
   int karisuma; //4
   @HiveField(34)
-  int kazetaisei; //これを当日変更を前提にした区間配置ロジックで使用する圧縮・解凍用の格納場所として流用
+  int kazetaisei; //これを当日変更を前提にした区間配置ロジックで使用する圧縮・解凍用の格納場所として流用。新入生の作成時に1〜99の乱数が入る(風耐性の名残)。1.7.8からは、コンピュータ大学の戦略的エントリーで温存した選手の印として負の値を使う(-1=1日開催・正月駅伝往路で起用、-2=正月駅伝復路で起用。区間エントリー時に負の値だけ0に戻す)
   @HiveField(35)
   int atusataisei; //レーダーチャート表示用各指標格納用
   @HiveField(36)

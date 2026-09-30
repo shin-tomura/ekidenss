@@ -13,8 +13,16 @@ import 'package:hive_flutter/hive_flutter.dart';
 // ・支給量はプレイヤーと同じ式(難易度・金銀支給量倍率yobiint2[12]も共通)
 // ・「極」「天」モードでもコンピュータ大学への支給は絞らない
 // ・支給のたびに10%で金、90%で銀(プレイヤーと同じ)
-// ・振り分け先は留学生を除く基本走力(a、小さいほど良い)上位10人。
-//   主力の上から順番に+10ずつ配る。10未満の端数と、配りきれない余りは捨てる。
+// ・振り分け先は留学生を除く10人(基本走力はa、小さいほど良い)
+//     主力枠7人: 基本走力の上位7人(全学年)
+//     下級生枠3人: 主力枠に入らなかった1・2年生のうち基本走力の上位3人
+//       (1・2年生が足りない分は、主力枠の続きの選手で埋める)
+//   「主力2人→下級生1人」の順番で並べ、上から順番に+10ずつ配る
+//   (配る量が少ないときでも下級生に届くように)。
+//   10未満の端数と、配りきれない余りは捨てる。
+// ・夏合宿(7月15日)より後の支給では4年生を除く
+//   (プレイヤーは秋以降に獲得した金銀を翌年の夏合宿でしか使えず、
+//    今の4年生には使えないため)
 // ・金: 駅伝男(konjou)優先、次に平常心(heijousin)
 // ・銀: 年間強化練習メニュー(kaifukuryoku)に対応する能力
 //     1スピード→スパート力・ペース変動対応力(低いほうから)
@@ -58,6 +66,7 @@ Future<void> comGoldSilverTeiki({
       univName: univ.name,
       eventLabel: '春の定期支給',
       ryou: ryou,
+      yonenseiNozoku: false,
       sortedSenshuData: sortedSenshuData,
       random: random,
     );
@@ -79,6 +88,7 @@ Future<void> comGoldSilverMokuhyouTassei({
     return;
   }
   final random = Random();
+  final bool yonenseiNozoku = _natsuGasshukuYoriAto(gh[0]);
   for (final univ in sortedUnivData) {
     if (univ.id == gh[0].MYunivid) continue;
     if (mokuhyouBangou != 9 &&
@@ -97,10 +107,17 @@ Future<void> comGoldSilverMokuhyouTassei({
       univName: univ.name,
       eventLabel: '目標達成(${_taikaiMei(mokuhyouBangou)})',
       ryou: ryou,
+      yonenseiNozoku: yonenseiNozoku,
       sortedSenshuData: sortedSenshuData,
       random: random,
     );
   }
+}
+
+/// 今日が夏合宿(7月15日)より後かどうか(年度は4月始まり)
+bool _natsuGasshukuYoriAto(Ghensuu gh) {
+  if (gh.month >= 8 || gh.month <= 3) return true;
+  return gh.month == 7 && gh.day > 15;
 }
 
 /// デバッグログ用の大会名
@@ -266,6 +283,7 @@ Future<void> _comKinGinShiyou({
   required String univName, // デバッグログ用
   required String eventLabel, // デバッグログ用
   required int ryou,
+  required bool yonenseiNozoku, // trueなら4年生を振り分け先から除く
   required List<SenshuData> sortedSenshuData,
   required Random random,
 }) async {
@@ -273,18 +291,13 @@ Future<void> _comKinGinShiyou({
   if (kaisuu <= 0) return;
   final bool kin = random.nextInt(100) < 10;
 
-  // 主力: 留学生を除き、基本走力(a)が小さい順に上位10人
-  final List<SenshuData> shuryoku =
-      sortedSenshuData
-          .where((s) => s.univid == univid && s.hirou != 1)
-          .toList()
-        ..sort((x, y) {
-          final int c = x.a.compareTo(y.a);
-          return c != 0 ? c : x.id.compareTo(y.id);
-        });
-  if (shuryoku.length > 10) {
-    shuryoku.removeRange(10, shuryoku.length);
-  }
+  final Set<int> kakyuuseiWakuIds = {}; // デバッグログ用
+  final List<SenshuData> shuryoku = _furiwakeSaki(
+    univid,
+    yonenseiNozoku,
+    sortedSenshuData,
+    kakyuuseiWakuIds,
+  );
   if (shuryoku.isEmpty) return;
 
   // デバッグログ用に変化前の能力値を控えておく
@@ -341,12 +354,78 @@ Future<void> _comKinGinShiyou({
             ? '年間強化:バランス→抽選で${TrainingMenu.getMenuString(menuMap[s.id]!)}  '
             : '年間強化:${TrainingMenu.getMenuString(s.kaifukuryoku)}  ';
       }
-      print('[COM金銀]   ${s.name}(${s.gakunen}年) $menuStr${henka.join(' / ')}');
+      final String waku = kakyuuseiWakuIds.contains(s.id) ? '[下級生枠]' : '';
+      print(
+        '[COM金銀]   $waku${s.name}(${s.gakunen}年) $menuStr${henka.join(' / ')}',
+      );
     }
   }
 }
 
-/// 主力の上から順番に1回(+10)ずつ配る。
+const int _shuryokuWakuSuu = 7; // 主力枠の人数
+const int _kakyuuseiWakuSuu = 3; // 下級生枠の人数
+
+/// 金銀の振り分け先(配る順番に並べたもの)
+///   主力枠7人: 留学生を除き、基本走力(a)が小さい順
+///   下級生枠3人: 主力枠に入らなかった1・2年生を基本走力が小さい順
+///     (1・2年生が足りない分は、主力枠の続きの選手で埋める)
+///   並び順は「主力2人→下級生1人」の繰り返し
+/// [kakyuuseiWakuIds] 下級生枠に入った1・2年生のIDを入れて返す(デバッグログ用)
+List<SenshuData> _furiwakeSaki(
+  int univid,
+  bool yonenseiNozoku,
+  List<SenshuData> sortedSenshuData,
+  Set<int> kakyuuseiWakuIds,
+) {
+  final List<SenshuData> kouho =
+      sortedSenshuData
+          .where(
+            (s) =>
+                s.univid == univid &&
+                s.hirou != 1 &&
+                !(yonenseiNozoku && s.gakunen >= 4),
+          )
+          .toList()
+        ..sort((x, y) {
+          final int c = x.a.compareTo(y.a);
+          return c != 0 ? c : x.id.compareTo(y.id);
+        });
+
+  final List<SenshuData> shuryokuWaku = kouho.take(_shuryokuWakuSuu).toList();
+  final List<SenshuData> nokori = kouho.skip(_shuryokuWakuSuu).toList();
+  final List<SenshuData> kakyuuseiWaku = nokori
+      .where((s) => s.gakunen <= 2)
+      .take(_kakyuuseiWakuSuu)
+      .toList();
+  // 1・2年生が足りない分は、主力枠の続きの選手で埋める
+  if (kakyuuseiWaku.length < _kakyuuseiWakuSuu) {
+    kakyuuseiWaku.addAll(
+      nokori
+          .where((s) => !kakyuuseiWaku.contains(s))
+          .take(_kakyuuseiWakuSuu - kakyuuseiWaku.length)
+          .toList(),
+    );
+  }
+  kakyuuseiWakuIds.addAll(
+    kakyuuseiWaku.where((s) => s.gakunen <= 2).map((s) => s.id),
+  );
+
+  // 「主力2人→下級生1人」の順番に並べる
+  final List<SenshuData> narabi = [];
+  int si = 0;
+  int ki = 0;
+  while (si < shuryokuWaku.length || ki < kakyuuseiWaku.length) {
+    for (int n = 0; n < 2 && si < shuryokuWaku.length; n++) {
+      narabi.add(shuryokuWaku[si++]);
+    }
+    if (ki < kakyuuseiWaku.length) {
+      narabi.add(kakyuuseiWaku[ki++]);
+    }
+  }
+  return narabi;
+}
+
+/// 振り分け先の上から順番に1回(+10)ずつ配る。
 /// 上限で使えない選手は飛ばし、全員使えなくなったら残りは捨てる。
 /// 戻り値は実際に使った回数
 int _junbanniKubaru(

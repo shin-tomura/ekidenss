@@ -19,7 +19,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 //       (1・2年生が足りない分は、主力枠の続きの選手で埋める)
 //   「主力2人→下級生1人」の順番で並べ、上から順番に+10ずつ配る
 //   (配る量が少ないときでも下級生に届くように)。
-//   10未満の端数と、配りきれない余りは捨てる。
+//   能力が上限の選手は飛ばして次の選手へ回す。
 // ・夏合宿(7月15日)より後の支給では4年生を除く
 //   (プレイヤーは秋以降に獲得した金銀を翌年の夏合宿でしか使えず、
 //    今の4年生には使えないため)
@@ -29,8 +29,13 @@ import 'package:hive_flutter/hive_flutter.dart';
 //     2距離走→長距離粘り・ロード適性(低いほうから)
 //     3登り→登り適性、4下り→下り適性、5アップダウン→アップダウン対応力
 //     0バランス→支給のたびに1〜5からランダムに選ぶ(kaifukuryoku自体は変えない)
-// ・カリスマには使わない
+// ・カリスマ・安定感には使わない
 // ・能力値が89以下の場合のみ+10(プレイヤーの金銀特訓と同じ上限)
+// ・10人全員の対象の能力が上限で使い切れない場合
+//     金: 使えなかった金(10未満の端数も含む)を銀に交換する(金1→銀2、プレイヤーの金銀交換と同じ)
+//     銀: 10人の先頭から、メニュー外の能力(カリスマ・安定感を除く7つのうち
+//         上限でないもの)からランダムに1つずつ上げる
+//     それでも使い切れない分と、銀の10未満の端数は捨てる
 // ------------------------------------------------------------
 
 /// KantokuData.yobiint2 の使用番号: コンピュータ大学の金銀使用フラグ(0=ON(初期値)、1=OFF)
@@ -287,8 +292,7 @@ Future<void> _comKinGinShiyou({
   required List<SenshuData> sortedSenshuData,
   required Random random,
 }) async {
-  final int kaisuu = ryou ~/ 10; // 10未満の端数は捨てる
-  if (kaisuu <= 0) return;
+  if (ryou <= 0) return;
   final bool kin = random.nextInt(100) < 10;
 
   final Set<int> kakyuuseiWakuIds = {}; // デバッグログ用
@@ -307,17 +311,33 @@ Future<void> _comKinGinShiyou({
 
   final Set<SenshuData> henkouari = {};
   final Set<SenshuData> jougen = {}; // 順番が回ってきたが上限で使えなかった選手(デバッグログ用)
-  final Map<int, int> menuMap = {};
-  int tsukatta = 0;
+  final Map<int, Set<int>> menugai = {}; // メニュー外で上げた能力の番号(デバッグログ用)
+  final Map<int, int> menuMap = {}; // 銀で使うメニュー(バランスの選手は抽選)
+
+  // 金
+  int kinTsukatta = 0;
+  int koukanKin = 0; // 銀に交換した金
+  int ginRyou = 0;
   if (kin) {
-    tsukatta = _junbanniKubaru(
+    kinTsukatta = _junbanniKubaru(
       shuryoku,
-      kaisuu,
+      ryou ~/ 10,
       _kinTokkun,
       henkouari,
       jougen,
     );
+    // 使えなかった金(10未満の端数も含む)は銀に交換する(金1→銀2)
+    koukanKin = ryou - kinTsukatta * 10;
+    ginRyou = koukanKin * 2;
   } else {
+    ginRyou = ryou;
+  }
+
+  // 銀(交換した銀も含む)
+  final int ginKaisuu = ginRyou ~/ 10; // 10未満の端数は捨てる
+  int ginTsukatta = 0;
+  int menugaiTsukatta = 0;
+  if (ginKaisuu > 0) {
     // バランスの選手は、この支給で使うメニューをランダムに決める
     for (final s in shuryoku) {
       int menu = s.kaifukuryoku;
@@ -326,13 +346,25 @@ Future<void> _comKinGinShiyou({
       }
       menuMap[s.id] = menu;
     }
-    tsukatta = _junbanniKubaru(
+    // まずメニューの能力に使う
+    ginTsukatta = _junbanniKubaru(
       shuryoku,
-      kaisuu,
+      ginKaisuu,
       (s) => _ginTokkun(s, menuMap[s.id]!),
       henkouari,
       jougen,
     );
+    // 10人全員がメニューの能力で上限なら、先頭からメニュー外の能力に使う
+    final int nokori = ginKaisuu - ginTsukatta;
+    if (nokori > 0) {
+      menugaiTsukatta = _junbanniKubaru(
+        shuryoku,
+        nokori,
+        (s) => _menugaiTokkun(s, random, menugai),
+        henkouari,
+        jougen,
+      );
+    }
   }
   for (final s in henkouari) {
     await s.save();
@@ -341,23 +373,42 @@ Future<void> _comKinGinShiyou({
   // デバッグ実行時のみ、VS Codeのデバッグコンソールに使用結果を出す
   // (デバッグコンソールの絞り込み欄に「COM金銀」と入れると、この行だけ表示できる)
   if (kDebugMode) {
+    final List<String> naiyou = [];
+    if (kin) {
+      naiyou.add('金$kinTsukatta回使用');
+      if (koukanKin > 0) {
+        naiyou.add('使えなかった金$koukanKinを銀$ginRyouに交換');
+      }
+    }
+    if (ginRyou > 0) {
+      final int ginGoukei = ginTsukatta + menugaiTsukatta;
+      naiyou.add(
+        '銀$ginGoukei回使用'
+        '${menugaiTsukatta > 0 ? '(うちメニュー外$menugaiTsukatta回)' : ''}'
+        '(捨て${ginRyou - ginGoukei * 10})',
+      );
+    }
     print(
       '[COM金銀] $eventLabel $univName ${kin ? '金' : '銀'}$ryou → '
-      '$tsukatta回使用(捨て${ryou - tsukatta * 10})',
+      '${naiyou.join('、')}',
     );
     for (final s in shuryoku) {
       final List<int> mae = maeNouryoku[s.id]!;
       final List<int> ato = _nouryokuList(s);
+      final Set<int> menugaiBangou = menugai[s.id] ?? {};
       final List<String> henka = [];
       for (int i = 0; i < mae.length; i++) {
         if (mae[i] != ato[i]) {
-          henka.add('${_nouryokuMei[i]} ${mae[i]}→${ato[i]}');
+          henka.add(
+            '${_nouryokuMei[i]} ${mae[i]}→${ato[i]}'
+            '${menugaiBangou.contains(i) ? '(メニュー外)' : ''}',
+          );
         }
       }
       // 能力が上がらず、順番も回ってこなかった選手は出さない
       if (henka.isEmpty && !jougen.contains(s)) continue;
       String menuStr = '';
-      if (!kin) {
+      if (menuMap.containsKey(s.id)) {
         final bool balance = s.kaifukuryoku < 1 || s.kaifukuryoku > 5;
         menuStr = balance
             ? '年間強化:バランス→抽選で${TrainingMenu.getMenuString(menuMap[s.id]!)}  '
@@ -472,6 +523,49 @@ bool _kinTokkun(SenshuData s) {
     return true;
   }
   return false;
+}
+
+/// メニュー外の銀特訓: 上限でない能力の中からランダムに1つ上げる
+/// 対象は長距離粘り・スパート力・登り適性・下り適性・アップダウン対応力・
+/// ロード適性・ペース変動対応力(カリスマ・安定感は除く)
+/// 番号は _nouryokuMei / _nouryokuList と同じ(2〜8)
+bool _menugaiTokkun(
+  SenshuData s,
+  Random random,
+  Map<int, Set<int>> menugai,
+) {
+  final List<int> nouryoku = _nouryokuList(s);
+  final List<int> kouho = [
+    for (int i = 2; i <= 8; i++)
+      if (nouryoku[i] <= 89) i,
+  ];
+  if (kouho.isEmpty) return false;
+  final int bangou = kouho[random.nextInt(kouho.length)];
+  switch (bangou) {
+    case 2:
+      s.choukyorinebari += 10;
+      break;
+    case 3:
+      s.spurtryoku += 10;
+      break;
+    case 4:
+      s.noboritekisei += 10;
+      break;
+    case 5:
+      s.kudaritekisei += 10;
+      break;
+    case 6:
+      s.noborikudarikirikaenouryoku += 10;
+      break;
+    case 7:
+      s.tandokusou += 10;
+      break;
+    case 8:
+      s.paceagesagetaiouryoku += 10;
+      break;
+  }
+  menugai.putIfAbsent(s.id, () => <int>{}).add(bangou);
+  return true;
 }
 
 /// 銀特訓: 年間強化メニューに対応する能力

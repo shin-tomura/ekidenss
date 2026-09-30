@@ -24,6 +24,7 @@ import 'package:ekiden/kiroku.dart';
 import 'package:ekiden/constants.dart';
 import 'package:ekiden/kansuu/RetireNew.dart';
 import 'package:ekiden/kansuu/goldsilverTeikiKakutoku.dart';
+import 'package:ekiden/kansuu/goldsilver_com.dart';
 import 'package:ekiden/kansuu/SenshuShokiti.dart';
 import 'package:ekiden/kansuu/asset_loader.dart';
 import 'package:ekiden/kansuu/ShozokusakiKettei_By_Univmeisei.dart';
@@ -1642,6 +1643,13 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     print('Current Date: $currentMonth/$currentDay');
 
     await Kyouka_com(gh: gh, sortedSenshuData: sortedSenshuData);
+
+    // コンピュータ大学の金銀使用(春の定期支給分)
+    await comGoldSilverTeiki(
+      gh: gh,
+      sortedUnivData: sortedUnivData,
+      sortedSenshuData: sortedSenshuData,
+    );
 
     if (skip.skipflag == 0) {
       ghensuu.mode = 1111;

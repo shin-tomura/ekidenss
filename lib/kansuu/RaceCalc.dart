@@ -228,11 +228,10 @@ Future<void> RaceCalc({
       int tempSetting = 0;
       tempSetting = abilityValues[AbilityType.nagakyoriNebari] ?? 0;
       if (sortedsenshudata[senshuid].hirou == 1) tempSetting = 5;
-      int set_nebari = 150 - tempSetting * 10;
-      set_nebari =
-          ((set_nebari.toDouble() / 100.0) *
-                  sortedsenshudata[senshuid].choukyorinebari.toDouble())
-              .toInt();
+      int set_nebari = jitsuryokuHakkiNouryoku(
+        sortedsenshudata[senshuid].choukyorinebari,
+        tempSetting,
+      );
       if (trainingNum == 2) {
         //set_nebari += kyoudo * 7 ~/ 2;
         set_nebari += kyoudo * 4 ~/ 2;
@@ -242,11 +241,10 @@ Future<void> RaceCalc({
       if (set_nebari < 1) set_nebari = 1;
       tempSetting = abilityValues[AbilityType.spurtPower] ?? 0;
       if (sortedsenshudata[senshuid].hirou == 1) tempSetting = 5;
-      int set_spurt = 150 - tempSetting * 10;
-      set_spurt =
-          ((set_spurt.toDouble() / 100.0) *
-                  sortedsenshudata[senshuid].spurtryoku.toDouble())
-              .toInt();
+      int set_spurt = jitsuryokuHakkiNouryoku(
+        sortedsenshudata[senshuid].spurtryoku,
+        tempSetting,
+      );
       if (trainingNum == 1) {
         set_spurt += kyoudo * 7 ~/ 2;
       } else if (trainingNum == 0) {
@@ -263,11 +261,10 @@ Future<void> RaceCalc({
       if (set_karisuma < 1) set_karisuma = 1;*/
       tempSetting = abilityValues[AbilityType.noboriTekisei] ?? 0;
       if (sortedsenshudata[senshuid].hirou == 1) tempSetting = 5;
-      int set_nobori = 150 - tempSetting * 10;
-      set_nobori =
-          ((set_nobori.toDouble() / 100.0) *
-                  sortedsenshudata[senshuid].noboritekisei.toDouble())
-              .toInt();
+      int set_nobori = jitsuryokuHakkiNouryoku(
+        sortedsenshudata[senshuid].noboritekisei,
+        tempSetting,
+      );
       if (trainingNum == 3) {
         set_nobori += kyoudo * 7;
       } else if (trainingNum == 0) {
@@ -276,11 +273,10 @@ Future<void> RaceCalc({
       if (set_nobori < 1) set_nobori = 1;
       tempSetting = abilityValues[AbilityType.kudariTekisei] ?? 0;
       if (sortedsenshudata[senshuid].hirou == 1) tempSetting = 5;
-      int set_kudari = 150 - tempSetting * 10;
-      set_kudari =
-          ((set_kudari.toDouble() / 100.0) *
-                  sortedsenshudata[senshuid].kudaritekisei.toDouble())
-              .toInt();
+      int set_kudari = jitsuryokuHakkiNouryoku(
+        sortedsenshudata[senshuid].kudaritekisei,
+        tempSetting,
+      );
       if (trainingNum == 4) {
         set_kudari += kyoudo * 7;
       } else if (trainingNum == 0) {
@@ -289,12 +285,10 @@ Future<void> RaceCalc({
       if (set_kudari < 1) set_kudari = 1;
       tempSetting = abilityValues[AbilityType.upDownTaiouryoku] ?? 0;
       if (sortedsenshudata[senshuid].hirou == 1) tempSetting = 5;
-      int set_updown = 150 - tempSetting * 10;
-      set_updown =
-          ((set_updown.toDouble() / 100.0) *
-                  sortedsenshudata[senshuid].noborikudarikirikaenouryoku
-                      .toDouble())
-              .toInt();
+      int set_updown = jitsuryokuHakkiNouryoku(
+        sortedsenshudata[senshuid].noborikudarikirikaenouryoku,
+        tempSetting,
+      );
       if (trainingNum == 5) {
         set_updown += kyoudo * 7;
       } else if (trainingNum == 0) {
@@ -303,11 +297,10 @@ Future<void> RaceCalc({
       if (set_updown < 1) set_updown = 1;
       tempSetting = abilityValues[AbilityType.roadTekisei] ?? 0;
       if (sortedsenshudata[senshuid].hirou == 1) tempSetting = 5;
-      int set_road = 150 - tempSetting * 10;
-      set_road =
-          ((set_road.toDouble() / 100.0) *
-                  sortedsenshudata[senshuid].tandokusou.toDouble())
-              .toInt();
+      int set_road = jitsuryokuHakkiNouryoku(
+        sortedsenshudata[senshuid].tandokusou,
+        tempSetting,
+      );
       if (trainingNum == 2) {
         //set_road += kyoudo * 7 ~/ 2;
         set_road += kyoudo * 4 ~/ 2;
@@ -317,11 +310,10 @@ Future<void> RaceCalc({
       if (set_road < 1) set_road = 1;
       tempSetting = abilityValues[AbilityType.paceHendoTaiouryoku] ?? 0;
       if (sortedsenshudata[senshuid].hirou == 1) tempSetting = 5;
-      int set_pacehendou = 150 - tempSetting * 10;
-      set_pacehendou =
-          ((set_pacehendou.toDouble() / 100.0) *
-                  sortedsenshudata[senshuid].paceagesagetaiouryoku.toDouble())
-              .toInt();
+      int set_pacehendou = jitsuryokuHakkiNouryoku(
+        sortedsenshudata[senshuid].paceagesagetaiouryoku,
+        tempSetting,
+      );
       if (trainingNum == 1) {
         set_pacehendou += kyoudo * 7 ~/ 2;
       } else if (trainingNum == 0) {

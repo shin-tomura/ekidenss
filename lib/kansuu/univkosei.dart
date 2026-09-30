@@ -113,3 +113,23 @@ Future<void> resetAbilityTo100Percent(
     '格納された圧縮値: $compressedValue (Hex: ${compressedValue.toRadixString(16)})',
   );
 }
+
+/// 実力発揮度設定(0-9)を反映した能力値を返す関数。
+/// RaceCalc.dart / RaceCalc_gakuren.dart / TrialTime.dart から共通で呼び出す。
+///
+/// 倍率は (150 - 設定値×10)% (設定0で150%、5で100%、9で60%)。
+/// 設定0〜4(100%超え)の場合は、倍率を掛けた後の値に下限値を保証する。
+///   設定0→90、設定1→80、設定2→70、設定3→60、設定4→50
+/// 年間強化練習の上乗せは、この関数の戻り値に対して呼び出し側で加算する。
+///
+/// @param nouryoku 選手の能力値
+/// @param setting 実力発揮度設定(0-9)。留学生は呼び出し側で5にしている。
+int jitsuryokuHakkiNouryoku(int nouryoku, int setting) {
+  int atai = (((150 - setting * 10).toDouble() / 100.0) * nouryoku.toDouble())
+      .toInt();
+  if (setting >= 0 && setting <= 4) {
+    final int kagen = 90 - setting * 10;
+    if (atai < kagen) atai = kagen;
+  }
+  return atai;
+}

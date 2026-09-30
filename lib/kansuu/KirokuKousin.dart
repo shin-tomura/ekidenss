@@ -15,6 +15,7 @@ import 'package:ekiden/skip.dart';
 import 'package:ekiden/toukei.dart';
 import 'package:ekiden/kansuu/ChartPanelSenshu.dart';
 import 'package:ekiden/kansuu/ChartPanelUniv.dart';
+import 'package:ekiden/kansuu/goldsilver_com.dart';
 
 String _timeToMinuteSecondString(double time) {
   if (time == TEISUU.DEFAULTTIME) {
@@ -725,6 +726,16 @@ Future<void> kirokuKousin({
       }
       await sortedunivdata[gh[0].MYunivid].save(); // UnivData の変更を保存
     } // 学内大会記録ループ終端
+  }
+
+  // コンピュータ大学の目標順位達成時の金銀使用
+  if (racebangou >= 0 && racebangou <= 5) {
+    await comGoldSilverMokuhyouTassei(
+      mokuhyouBangou: racebangou,
+      gh: gh,
+      sortedUnivData: sortedunivdata,
+      sortedSenshuData: sortedsenshudata,
+    );
   }
 
   // 目標順位達成の場合のご褒美
@@ -2325,6 +2336,14 @@ Future<void> kirokuKousin({
         print(
           "自分の大学は対校戦総合で: ${sortedunivdata[gh[0].MYunivid].juni_race[9][0] + 1}位",
         );*/
+
+        // コンピュータ大学の目標順位達成時の金銀使用(対校戦総合)
+        await comGoldSilverMokuhyouTassei(
+          mokuhyouBangou: 9,
+          gh: gh,
+          sortedUnivData: sortedunivdata,
+          sortedSenshuData: sortedsenshudata,
+        );
 
         // 目標順位達成の場合のご褒美
         kantoku.yobiint2[1] = 0;

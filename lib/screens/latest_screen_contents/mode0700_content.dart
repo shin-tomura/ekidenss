@@ -3125,9 +3125,9 @@ class _Mode0700ContentState extends State<Mode0700Content> {
               idJunUnivData[senshu.univid]
                       .mokuhyojuniwositamawatteruflag[mokuhyoJuniFlagIndex] ==
                   1)
-            const Text(
-              "チーム目標順位を下回っていたことによる前半突っ込みでのタイム悪化あり",
-              style: TextStyle(color: HENSUU.textcolor),
+            Text(
+              "チーム目標順位を下回っていた(${_mokuhyouKonkyo(idJunUnivData[senshu.univid], ghensuu.hyojiracebangou, iKukan)})ことによる前半突っ込みでのタイム悪化あり",
+              style: const TextStyle(color: HENSUU.textcolor),
             )
           else if (mokuhyoJuniFlagIndex >= 0 &&
               idJunUnivData.length > senshu.univid &&
@@ -3138,9 +3138,9 @@ class _Mode0700ContentState extends State<Mode0700Content> {
               idJunUnivData[senshu.univid]
                       .mokuhyojuniwositamawatteruflag[mokuhyoJuniFlagIndex] <
                   0)
-            const Text(
-              "チーム目標順位を上回っていたことによるほっと一息でのタイム悪化あり",
-              style: TextStyle(color: HENSUU.textcolor),
+            Text(
+              "チーム目標順位を上回っていた(${_mokuhyouKonkyo(idJunUnivData[senshu.univid], ghensuu.hyojiracebangou, iKukan)})ことによるほっと一息でのタイム悪化あり",
+              style: const TextStyle(color: HENSUU.textcolor),
             ),
         ],
       );
@@ -3501,4 +3501,15 @@ class _Mode0700ContentState extends State<Mode0700Content> {
       ],
     );
   }
+}
+
+/// 目標順位による補正の根拠(例: 襷を受けた時点で5位・目標3位)
+/// 判定は襷を受けた時点(前の区間の終了時点)の通過順位と目標順位で行っている
+String _mokuhyouKonkyo(UnivData univ, int racebangou, int kukan) {
+  if (kukan <= 0 ||
+      univ.tuukajuni_taikai.length < kukan ||
+      univ.mokuhyojuni.length <= racebangou) {
+    return '';
+  }
+  return '襷を受けた時点で${univ.tuukajuni_taikai[kukan - 1] + 1}位・目標${univ.mokuhyojuni[racebangou] + 1}位';
 }

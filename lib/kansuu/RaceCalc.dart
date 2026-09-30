@@ -934,7 +934,7 @@ Future<void> RaceCalc({
                 final sontokutime =
                     sortedsenshudata[senshuid].time_taikai_total - lasttime;
                 sortedsenshudata[senshuid].string_racesetumei +=
-                    "目標順位下回って突っ込み補正:${sontokutime.isNegative ? '' : '+'}${sontokutime.toStringAsFixed(1)}秒\n";
+                    "目標順位下回って突っ込み補正(${_mokuhyouKonkyo(sortedunivdata[sortedsenshudata[senshuid].univid], racebangou, gh[0].nowracecalckukan)}):${sontokutime.isNegative ? '' : '+'}${sontokutime.toStringAsFixed(1)}秒\n";
                 //atai_hosei[senshuid][13] = sontokutime;
                 atai_hosei[senshuid][9] = sontokutime;
               } else if (sortedunivdata[sortedsenshudata[senshuid].univid]
@@ -952,7 +952,7 @@ Future<void> RaceCalc({
                 final sontokutime =
                     sortedsenshudata[senshuid].time_taikai_total - lasttime;
                 sortedsenshudata[senshuid].string_racesetumei +=
-                    "目標順位上回って一息補正:${sontokutime.isNegative ? '' : '+'}${sontokutime.toStringAsFixed(1)}秒\n";
+                    "目標順位上回って一息補正(${_mokuhyouKonkyo(sortedunivdata[sortedsenshudata[senshuid].univid], racebangou, gh[0].nowracecalckukan)}):${sontokutime.isNegative ? '' : '+'}${sontokutime.toStringAsFixed(1)}秒\n";
                 //atai_hosei[senshuid][13] = sontokutime;
                 atai_hosei[senshuid][9] = sontokutime;
               }
@@ -1599,4 +1599,15 @@ Future<void> RaceCalc({
   final endTime = DateTime.now();
   final timeInterval = endTime.difference(startTime).inMicroseconds / 1000000.0;
   print("RaceCalc処理時間: ${_timeToMinuteSecondString(timeInterval)}経過");
+}
+
+/// 目標順位による補正の根拠(例: 襷を受けた時点5位/目標3位)
+/// 判定は襷を受けた時点(前の区間の終了時点)の通過順位と目標順位で行っている
+String _mokuhyouKonkyo(UnivData univ, int racebangou, int kukan) {
+  if (kukan <= 0 ||
+      univ.tuukajuni_taikai.length < kukan ||
+      univ.mokuhyojuni.length <= racebangou) {
+    return '';
+  }
+  return '襷を受けた時点${univ.tuukajuni_taikai[kukan - 1] + 1}位/目標${univ.mokuhyojuni[racebangou] + 1}位';
 }

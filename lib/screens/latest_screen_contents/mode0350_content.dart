@@ -1860,12 +1860,12 @@ class _Mode0350ContentState extends State<Mode0350Content> {
                         idjununivdata[currentGhensuu.MYunivid]
                                 .mokuhyojuniwositamawatteruflag[i_kukan - 1] ==
                             1) {
-                      sijiResult = "チーム目標順位を下回っていたことによる前半突っ込みでのタイム悪化あり";
+                      sijiResult = "チーム目標順位を下回っていた(${_mokuhyouKonkyo(idjununivdata[currentGhensuu.MYunivid], currentGhensuu.hyojiracebangou, i_kukan)})ことによる前半突っ込みでのタイム悪化あり";
                     } else if (i_kukan > 0 &&
                         idjununivdata[currentGhensuu.MYunivid]
                                 .mokuhyojuniwositamawatteruflag[i_kukan - 1] <
                             0) {
-                      sijiResult = "チーム目標順位を上回っていたことによるほっと一息でのタイム悪化あり";
+                      sijiResult = "チーム目標順位を上回っていた(${_mokuhyouKonkyo(idjununivdata[currentGhensuu.MYunivid], currentGhensuu.hyojiracebangou, i_kukan)})ことによるほっと一息でのタイム悪化あり";
                     }
                   }
 
@@ -2014,12 +2014,12 @@ class _Mode0350ContentState extends State<Mode0350Content> {
                         idjununivdata[currentGhensuu.MYunivid]
                                 .mokuhyojuniwositamawatteruflag[i_kukan - 1] ==
                             1) {
-                      sijiResult = "チーム目標順位を下回っていたことによる前半突っ込みでのタイム悪化あり";
+                      sijiResult = "チーム目標順位を下回っていた(${_mokuhyouKonkyo(idjununivdata[currentGhensuu.MYunivid], currentGhensuu.hyojiracebangou, i_kukan)})ことによる前半突っ込みでのタイム悪化あり";
                     } else if (i_kukan > 0 &&
                         idjununivdata[currentGhensuu.MYunivid]
                                 .mokuhyojuniwositamawatteruflag[i_kukan - 1] <
                             0) {
-                      sijiResult = "チーム目標順位を上回っていたことによるほっと一息でのタイム悪化あり";
+                      sijiResult = "チーム目標順位を上回っていた(${_mokuhyouKonkyo(idjununivdata[currentGhensuu.MYunivid], currentGhensuu.hyojiracebangou, i_kukan)})ことによるほっと一息でのタイム悪化あり";
                     }
                   }
 
@@ -2331,4 +2331,15 @@ class ProgressView extends StatelessWidget {
       ],
     );
   }
+}
+
+/// 目標順位による補正の根拠(例: 襷を受けた時点で5位・目標3位)
+/// 判定は襷を受けた時点(前の区間の終了時点)の通過順位と目標順位で行っている
+String _mokuhyouKonkyo(UnivData univ, int racebangou, int kukan) {
+  if (kukan <= 0 ||
+      univ.tuukajuni_taikai.length < kukan ||
+      univ.mokuhyojuni.length <= racebangou) {
+    return '';
+  }
+  return '襷を受けた時点で${univ.tuukajuni_taikai[kukan - 1] + 1}位・目標${univ.mokuhyojuni[racebangou] + 1}位';
 }

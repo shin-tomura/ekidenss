@@ -2586,6 +2586,13 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             List<SenshuData> sortedSenshuData = senshuDataBox.values.toList();
             sortedSenshuData.sort((a, b) => a.id.compareTo(b.id));
             for (var senshu in sortedSenshuData) {
+              // すでに往路(1〜5区)を走り終えた選手と、往路の当日変更で外れた選手は、
+              // 復路では走らないので、復路前の調子の抽選から除外する
+              final int oujiEntry = senshu.entrykukan_race[gh[0]
+                  .hyojiracebangou][senshu.gakunen - 1];
+              if ((oujiEntry >= 0 && oujiEntry <= 4) || oujiEntry <= -100) {
+                continue;
+              }
               if (senshu.chousi < 100) {
                 if (random.nextInt(100) < kantoku.yobiint2[4]) {
                   senshu.chousi = 100;

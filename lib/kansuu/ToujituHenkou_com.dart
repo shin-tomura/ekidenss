@@ -1,4 +1,5 @@
 import 'dart:math'; // Randomクラスを使用するため
+import 'package:flutter/foundation.dart'; // kDebugMode
 import 'package:ekiden/ghensuu.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/senshu_data.dart';
@@ -84,6 +85,35 @@ int _atemaNinzuu(int racebangou, int kukansuu) {
   if (kukansuu <= 6) return 1;
   if (kukansuu <= 8) return 2;
   return 3;
+}
+
+/// デバッグログ用の大会名(正月駅伝は往路・復路も付ける)
+String _taikaiMei(int racebangou, [int day = 0]) {
+  String mei;
+  switch (racebangou) {
+    case 0:
+      mei = '10月駅伝';
+      break;
+    case 1:
+      mei = '11月駅伝';
+      break;
+    case 2:
+      mei = '正月駅伝';
+      break;
+    case 5:
+      mei = 'カスタム駅伝';
+      break;
+    default:
+      mei = '大会$racebangou';
+  }
+  if (day == 1) mei += '(往路)';
+  if (day == 2) mei += '(復路)';
+  return mei;
+}
+
+/// デバッグ実行時のみログを出す(ストア版では出さない)
+void _debugLog(String message) {
+  if (kDebugMode) print(message);
 }
 
 /// 調子によるタイム補正の倍率(RaceCalcの調子補正と同じ式)
@@ -238,6 +268,10 @@ Future<void> comEntryAtoshori({
       _setEntry(sub, racebangou, k);
       henkouari.add(runner);
       henkouari.add(sub);
+      _debugLog(
+        '[COM区間エントリー] ${_taikaiMei(racebangou)} ${univ.name} ${k + 1}区 '
+        '${runner.name}(${runner.gakunen}年)→${sub.name}(${sub.gakunen}年)(体調不良のため)',
+      );
     }
 
     // ③ 当て馬エントリー
@@ -275,6 +309,10 @@ Future<void> comEntryAtoshori({
         _setEntry(atema, racebangou, k);
         henkouari.add(ace);
         henkouari.add(atema);
+        _debugLog(
+          '[COM当て馬] ${_taikaiMei(racebangou)} ${univ.name} ${k + 1}区 '
+          'エース${ace.name}(${ace.gakunen}年)を補欠に隠し、当て馬${atema.name}(${atema.gakunen}年)を登録',
+        );
       }
     }
 
@@ -332,7 +370,14 @@ Future<void> comToujituHenkou({
   for (final univ in sortedUnivData) {
     if (univ.id == gh[0].MYunivid) continue;
     if (univ.taikaientryflag[racebangou] != 1) continue;
-    if ((manualMask >> univ.id) & 1 == 1) continue; // 手動で当日変更した大学
+    if ((manualMask >> univ.id) & 1 == 1) {
+      // 手動で当日変更した大学
+      _debugLog(
+        '[COM当日変更] ${_taikaiMei(racebangou, day)} ${univ.name} '
+        'は他大学変更で確定済みのため、自動の当日変更なし',
+      );
+      continue;
+    }
     await _yasumi();
 
     final List<SenshuData> team = sortedSenshuData
@@ -402,6 +447,16 @@ Future<void> comToujituHenkou({
       kakuteiSub.add(c.sub.id);
       nokori--;
       henkouAri = true;
+      final String riyuu = c.yuusen == 2
+          ? '体調不良のため'
+          : (c.yuusen == 1
+                ? '当て馬から本来の選手へ'
+                : '調子${c.runner.chousi}のため');
+      _debugLog(
+        '[COM当日変更] ${_taikaiMei(racebangou, day)} ${univ.name} ${c.kukan + 1}区 '
+        '${c.runner.name}(${c.runner.gakunen}年)→${c.sub.name}(${c.sub.gakunen}年)'
+        '($riyuu 見込み-${c.gain.toStringAsFixed(1)}秒)',
+      );
     }
   }
 
@@ -551,7 +606,7 @@ Future<void> kukanSeigouseiShuufuku({
     for (final s in team) {
       final int e = _entry(s, racebangou);
       if (e >= kukansuu) {
-        print('区間修復: ${univ.name} ${s.name} 区間番号${e + 1}が範囲外のため補欠に戻す');
+        _debugLog('[区間修復] ${univ.name} ${s.name} 区間番号${e + 1}が範囲外のため補欠に戻す');
         _setEntry(s, racebangou, -1);
         henkouari.add(s);
       }
@@ -566,7 +621,7 @@ Future<void> kukanSeigouseiShuufuku({
         final SenshuData? nokosu = await ichibanHayai(runners, k);
         for (final s in runners) {
           if (s == nokosu) continue;
-          print('区間修復: ${univ.name} ${k + 1}区の重複 ${s.name} を補欠に戻す');
+          _debugLog('[区間修復] ${univ.name} ${k + 1}区の重複 ${s.name} を補欠に戻す');
           _setEntry(s, racebangou, -1);
           henkouari.add(s);
         }
@@ -583,11 +638,11 @@ Future<void> kukanSeigouseiShuufuku({
         }
         final SenshuData? umeru = await ichibanHayai(kouho, k);
         if (umeru != null) {
-          print('区間修復: ${univ.name} ${k + 1}区の空白に ${umeru.name} を配置');
+          _debugLog('[区間修復] ${univ.name} ${k + 1}区の空白に ${umeru.name} を配置');
           _setEntry(umeru, racebangou, k);
           henkouari.add(umeru);
         } else {
-          print('区間修復: ${univ.name} ${k + 1}区の空白を埋められる選手がいない');
+          _debugLog('[区間修復] ${univ.name} ${k + 1}区の空白を埋められる選手がいない');
         }
       }
     }

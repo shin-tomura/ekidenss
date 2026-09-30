@@ -1,4 +1,6 @@
 import 'dart:math'; // Randomクラスを使用するため
+import 'package:flutter/foundation.dart'; // kDebugMode
+import 'package:ekiden/constants.dart'; // TrainingMenu
 import 'package:ekiden/ghensuu.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/senshu_data.dart';
@@ -53,6 +55,8 @@ Future<void> comGoldSilverTeiki({
         _teikiKakutokusuu(univ, gh[0].kazeflag) * kantoku.yobiint2[12];
     await _comKinGinShiyou(
       univid: univ.id,
+      univName: univ.name,
+      eventLabel: '春の定期支給',
       ryou: ryou,
       sortedSenshuData: sortedSenshuData,
       random: random,
@@ -90,12 +94,60 @@ Future<void> comGoldSilverMokuhyouTassei({
         kantoku.yobiint2[12];
     await _comKinGinShiyou(
       univid: univ.id,
+      univName: univ.name,
+      eventLabel: '目標達成(${_taikaiMei(mokuhyouBangou)})',
       ryou: ryou,
       sortedSenshuData: sortedSenshuData,
       random: random,
     );
   }
 }
+
+/// デバッグログ用の大会名
+String _taikaiMei(int bangou) {
+  switch (bangou) {
+    case 0:
+      return '10月駅伝';
+    case 1:
+      return '11月駅伝';
+    case 2:
+      return '正月駅伝';
+    case 3:
+      return '11月駅伝予選';
+    case 4:
+      return '正月駅伝予選';
+    case 5:
+      return 'カスタム駅伝';
+    case 9:
+      return '対校戦総合';
+    default:
+      return '大会$bangou';
+  }
+}
+
+// デバッグログ用: 金銀で上がる能力の名前と値
+const List<String> _nouryokuMei = [
+  '駅伝男',
+  '平常心',
+  '長距離粘り',
+  'スパート力',
+  '登り適性',
+  '下り適性',
+  'アップダウン対応力',
+  'ロード適性',
+  'ペース変動対応力',
+];
+List<int> _nouryokuList(SenshuData s) => [
+  s.konjou,
+  s.heijousin,
+  s.choukyorinebari,
+  s.spurtryoku,
+  s.noboritekisei,
+  s.kudaritekisei,
+  s.noborikudarikirikaenouryoku,
+  s.tandokusou,
+  s.paceagesagetaiouryoku,
+];
 
 /// 春の定期支給量(goldsilverTeikiKakutokuと同じ式)
 int _teikiKakutokusuu(UnivData univ, int kazeflag) {
@@ -211,6 +263,8 @@ int _getSeedRank(int raceIdx) {
 /// 1大学分の金銀使用(10%で金、90%で銀)
 Future<void> _comKinGinShiyou({
   required int univid,
+  required String univName, // デバッグログ用
+  required String eventLabel, // デバッグログ用
   required int ryou,
   required List<SenshuData> sortedSenshuData,
   required Random random,
@@ -233,12 +287,18 @@ Future<void> _comKinGinShiyou({
   }
   if (shuryoku.isEmpty) return;
 
+  // デバッグログ用に変化前の能力値を控えておく
+  final Map<int, List<int>> maeNouryoku = {
+    for (final s in shuryoku) s.id: _nouryokuList(s),
+  };
+
   final Set<SenshuData> henkouari = {};
+  final Map<int, int> menuMap = {};
+  int tsukatta = 0;
   if (kin) {
-    _junbanniKubaru(shuryoku, kaisuu, _kinTokkun, henkouari);
+    tsukatta = _junbanniKubaru(shuryoku, kaisuu, _kinTokkun, henkouari);
   } else {
     // バランスの選手は、この支給で使うメニューをランダムに決める
-    final Map<int, int> menuMap = {};
     for (final s in shuryoku) {
       int menu = s.kaifukuryoku;
       if (menu < 1 || menu > 5) {
@@ -246,7 +306,7 @@ Future<void> _comKinGinShiyou({
       }
       menuMap[s.id] = menu;
     }
-    _junbanniKubaru(
+    tsukatta = _junbanniKubaru(
       shuryoku,
       kaisuu,
       (s) => _ginTokkun(s, menuMap[s.id]!),
@@ -256,11 +316,40 @@ Future<void> _comKinGinShiyou({
   for (final s in henkouari) {
     await s.save();
   }
+
+  // デバッグ実行時のみ、VS Codeのデバッグコンソールに使用結果を出す
+  // (デバッグコンソールの絞り込み欄に「COM金銀」と入れると、この行だけ表示できる)
+  if (kDebugMode) {
+    print(
+      '[COM金銀] $eventLabel $univName ${kin ? '金' : '銀'}$ryou → '
+      '$tsukatta回使用(捨て${ryou - tsukatta * 10})',
+    );
+    for (final s in shuryoku) {
+      final List<int> mae = maeNouryoku[s.id]!;
+      final List<int> ato = _nouryokuList(s);
+      final List<String> henka = [];
+      for (int i = 0; i < mae.length; i++) {
+        if (mae[i] != ato[i]) {
+          henka.add('${_nouryokuMei[i]} ${mae[i]}→${ato[i]}');
+        }
+      }
+      if (henka.isEmpty) continue;
+      String menuStr = '';
+      if (!kin) {
+        final bool balance = s.kaifukuryoku < 1 || s.kaifukuryoku > 5;
+        menuStr = balance
+            ? '年間強化:バランス→抽選で${TrainingMenu.getMenuString(menuMap[s.id]!)}  '
+            : '年間強化:${TrainingMenu.getMenuString(s.kaifukuryoku)}  ';
+      }
+      print('[COM金銀]   ${s.name}(${s.gakunen}年) $menuStr${henka.join(' / ')}');
+    }
+  }
 }
 
 /// 主力の上から順番に1回(+10)ずつ配る。
 /// 上限で使えない選手は飛ばし、全員使えなくなったら残りは捨てる。
-void _junbanniKubaru(
+/// 戻り値は実際に使った回数
+int _junbanniKubaru(
   List<SenshuData> shuryoku,
   int kaisuu,
   bool Function(SenshuData) tokkun,
@@ -280,6 +369,7 @@ void _junbanniKubaru(
     }
     idx = (idx + 1) % shuryoku.length;
   }
+  return kaisuu - nokori;
 }
 
 /// 金特訓: 駅伝男優先、次に平常心

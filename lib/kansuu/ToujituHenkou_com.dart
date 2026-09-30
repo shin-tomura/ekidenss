@@ -117,6 +117,7 @@ class _Mitumori {
     final int key = s.id * 100 + kukan;
     final double? cached = _cache[key];
     if (cached != null) return cached;
+    await _yasumi(); // フリーズ対策
     double t = await runTrialCalculation(
       s.id,
       kukan,
@@ -408,11 +409,15 @@ Future<void> comToujituHenkou({
 }
 
 /// 区間内順位の再計算(当日変更画面の _kukannaiJunSaikeisan と同じ内容)
+/// 値が変わった選手だけ保存して、保存回数を減らしている
 Future<void> _kukannaiJunSaikeisan(
   int racebangou,
   int kukansuu,
   List<SenshuData> sortedSenshuData,
 ) async {
+  final Map<int, List<int>> maeNoJuni = {
+    for (final s in sortedSenshuData) s.id: List<int>.from(s.kukannaijuni),
+  };
   for (final s in sortedSenshuData) {
     for (int i = 0; i < TEISUU.SUU_KOJINBESTKIROKUSHURUISUU; i++) {
       s.kukannaijuni[i] = TEISUU.DEFAULTJUNI;
@@ -432,7 +437,15 @@ Future<void> _kukannaiJunSaikeisan(
     }
   }
   for (final s in sortedSenshuData) {
-    await s.save();
+    final List<int> mae = maeNoJuni[s.id]!;
+    bool kawatta = mae.length != s.kukannaijuni.length;
+    for (int i = 0; !kawatta && i < mae.length; i++) {
+      if (mae[i] != s.kukannaijuni[i]) kawatta = true;
+    }
+    if (kawatta) {
+      await _yasumi(); // フリーズ対策
+      await s.save();
+    }
   }
 }
 

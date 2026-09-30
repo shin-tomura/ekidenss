@@ -151,12 +151,17 @@ class _ToujitsuBHenkouScreenState extends State<ToujitsuBHenkouScreen> {
     Ghensuu currentGhensuu,
     List<SenshuData> idJunSenshuData,
   ) async {
+    // 変更前の区間内順位を控えておく(順位が変わった選手だけ保存するため)
+    final Map<int, List<int>> maeNoJuni = {
+      for (var senshu in idJunSenshuData)
+        senshu.id: List<int>.from(senshu.kukannaijuni),
+    };
+
     // まずすべての選手の区間内順位をリセット
     for (var senshu in idJunSenshuData) {
       for (int i = 0; i < TEISUU.SUU_KOJINBESTKIROKUSHURUISUU; i++) {
         senshu.kukannaijuni[i] = TEISUU.DEFAULTJUNI;
       }
-      await senshu.save(); // SenshuDataの変更を保存
     }
 
     // 各区間について、エントリーされた選手をフィルタリングし、タイムでソートして順位を付ける
@@ -187,8 +192,25 @@ class _ToujitsuBHenkouScreenState extends State<ToujitsuBHenkouScreen> {
 
         for (int iJuni = 0; iJuni < timeJunSenshuData.length; iJuni++) {
           timeJunSenshuData[iJuni].kukannaijuni[iKirokubangou] = iJuni;
-          await timeJunSenshuData[iJuni].save(); // SenshuDataの変更を保存
         }
+      }
+    }
+
+    // 区間内順位が変わった選手だけ保存
+    for (var senshu in idJunSenshuData) {
+      final List<int> mae = maeNoJuni[senshu.id]!;
+      bool kawatta = mae.length != senshu.kukannaijuni.length;
+      for (int i = 0; !kawatta && i < mae.length; i++) {
+        if (mae[i] != senshu.kukannaijuni[i]) kawatta = true;
+      }
+      if (kawatta) {
+        // フリーズ対策
+        final now = DateTime.now();
+        if (now.difference(Chousa.lastGapTime).inSeconds >= 1) {
+          await Future.delayed(const Duration(milliseconds: 50));
+          Chousa.lastGapTime = DateTime.now();
+        }
+        await senshu.save(); // SenshuDataの変更を保存
       }
     }
   }

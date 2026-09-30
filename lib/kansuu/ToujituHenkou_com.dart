@@ -550,6 +550,93 @@ Future<void> markManualToujituHenkou({
 }
 
 // ------------------------------------------------------------
+// 当日変更の表示用(確定直後の画面・当日変更選手一覧)
+// ------------------------------------------------------------
+
+/// コンピュータ大学の当日変更の理由(表示用)。プレイヤーの大学ならnullを返す
+/// 理由は今のデータから判断する
+///   他大学変更で確定した大学 → 他大学変更
+///   外れた選手の調子が0 → 体調不良のため
+///   入った選手が当て馬で隠したエース → 当て馬から本来の選手へ
+///   それ以外 → 調子○○のため
+/// [kukan] 区間(0始まり)
+String? comToujituHenkouRiyuu({
+  required Ghensuu gh,
+  required int racebangou,
+  required int univid,
+  required int kukan,
+  required SenshuData outPlayer,
+  required SenshuData inPlayer,
+}) {
+  if (univid == gh.MYunivid) return null;
+  final int day = racebangou == 2 ? (kukan < 5 ? 1 : 2) : 0;
+  final KantokuData? kantoku = Hive.box<KantokuData>(
+    'kantokuBox',
+  ).get('KantokuData');
+  if (kantoku != null &&
+      kantoku.yobiint2.length > manualToujituMaskIndex &&
+      kantoku.yobiint2[manualToujituCodeIndex] ==
+          _toujituCode(gh.year, racebangou, day) &&
+      (kantoku.yobiint2[manualToujituMaskIndex] >> univid) & 1 == 1) {
+    return '他大学変更';
+  }
+  if (outPlayer.chousi == 0) return '体調不良のため';
+  if (inPlayer.kazetaisei == kukan + 1) return '当て馬から本来の選手へ';
+  return '調子${outPlayer.chousi}のため';
+}
+
+/// その日のコンピュータ大学の当日変更を、表示用の文字列の一覧にする
+/// [day] 0=1日開催、1=正月駅伝往路、2=正月駅伝復路
+List<String> comToujituHenkouHyouji({
+  required Ghensuu gh,
+  required int racebangou,
+  required int day,
+  required List<UnivData> sortedUnivData,
+  required List<SenshuData> senshuList,
+}) {
+  final List<String> lines = [];
+  for (final univ in sortedUnivData) {
+    if (univ.id == gh.MYunivid) continue;
+    if (univ.taikaientryflag[racebangou] != 1) continue;
+    final List<SenshuData> team = senshuList
+        .where((s) => s.univid == univ.id)
+        .toList();
+    final List<SenshuData> outs =
+        team.where((s) {
+          final int e = _entry(s, racebangou);
+          return e <= -100 && _isTaishouKukan(racebangou, day, -e - 100);
+        }).toList()..sort(
+          (x, y) =>
+              _entry(y, racebangou).compareTo(_entry(x, racebangou)),
+        ); // 区間順(-100, -101, ...)
+    for (final out in outs) {
+      final int k = -_entry(out, racebangou) - 100;
+      SenshuData? inPlayer;
+      for (final s in team) {
+        if (_entry(s, racebangou) == k) {
+          inPlayer = s;
+          break;
+        }
+      }
+      if (inPlayer == null) continue;
+      final String? riyuu = comToujituHenkouRiyuu(
+        gh: gh,
+        racebangou: racebangou,
+        univid: univ.id,
+        kukan: k,
+        outPlayer: out,
+        inPlayer: inPlayer,
+      );
+      lines.add(
+        '${univ.name} ${k + 1}区 ${out.name}(${out.gakunen}年)→'
+        '${inPlayer.name}(${inPlayer.gakunen}年)${riyuu != null ? '（$riyuu）' : ''}',
+      );
+    }
+  }
+  return lines;
+}
+
+// ------------------------------------------------------------
 // 区間エントリーの整合性チェックと自動修復
 // ------------------------------------------------------------
 

@@ -4,6 +4,7 @@ import 'package:ekiden/ghensuu.dart';
 import 'package:ekiden/constants.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/senshu_data.dart';
+import 'package:ekiden/kansuu/ToujituHenkou_com.dart';
 
 // 当日変更選手一覧を表示するウィジェット
 class ModalTodayChangeListView extends StatefulWidget {
@@ -89,6 +90,15 @@ class _ModalTodayChangeListViewState extends State<ModalTodayChangeListView> {
           'kukan': originalKukan, // 1-indexed
           'original': originalSenshu,
           'new': newSenshu,
+          // コンピュータ大学の当日変更の理由(プレイヤーの大学はnull)
+          'riyuu': comToujituHenkouRiyuu(
+            gh: currentGhensuu,
+            racebangou: raceBangou,
+            univid: univid,
+            kukan: originalKukan - 1,
+            outPlayer: originalSenshu,
+            inPlayer: newSenshu,
+          ),
         });
       }
     }
@@ -173,6 +183,7 @@ class _ModalTodayChangeListViewState extends State<ModalTodayChangeListView> {
                         final int kukan = change['kukan'];
                         final SenshuData original = change['original'];
                         final SenshuData newSenshu = change['new'];
+                        final String? riyuu = change['riyuu'];
 
                         return Padding(
                           padding: const EdgeInsets.only(
@@ -180,7 +191,8 @@ class _ModalTodayChangeListViewState extends State<ModalTodayChangeListView> {
                             bottom: 4.0,
                           ),
                           child: Text(
-                            '${kukan}区　${_formatSenshu(original)} → ${_formatSenshu(newSenshu)}',
+                            '${kukan}区　${_formatSenshu(original)} → ${_formatSenshu(newSenshu)}'
+                            '${riyuu != null ? '（$riyuu）' : ''}',
                             style: TextStyle(
                               color: HENSUU.textcolor,
                               fontSize: HENSUU.fontsize_honbun,

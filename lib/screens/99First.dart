@@ -128,6 +128,21 @@ class _FirstScreen extends State<FirstScreen> {
                         ),
                       ),
                     ],
+                    // 起動時の巻き戻しに失敗した場合のお知らせ
+                    if (ShoriGuard.restoreErrorMessage != null) ...[
+                      const SizedBox(height: 24),
+                      const Text(
+                        '前回、処理の途中でアプリが終了していたため処理前の状態に戻そうとしましたが、'
+                        '失敗しました。お手数ですが、アプリを一度終了してから、もう一度起動してください'
+                        '(起動時にもう一度戻します)。',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.redAccent,
+                          fontSize: 13,
+                          height: 1.6,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 60),
 
                     // メイン：続きから再開

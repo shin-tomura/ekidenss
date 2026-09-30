@@ -66,18 +66,20 @@ class _ModalTodayChangeListViewState extends State<ModalTodayChangeListView> {
 
       // 変更後の選手を見つける
       // 変更後の選手は、raceBangouにおいて、元の区間(originalKukan - 1)を走る選手 (0-indexed)
-      final SenshuData? newSenshu = senshudataBox.values.firstWhere(
-        (s) {
-          // 同じ大学で、元の区間(originalKukan - 1)を走る選手を見つける
-          return s.univid == univid &&
-              s.entrykukan_race.length > raceBangou &&
-              s.entrykukan_race[raceBangou].length > s.gakunen - 1 &&
-              s.entrykukan_race[raceBangou][s.gakunen - 1] ==
-                  (originalKukan - 1); // 0-indexed区間
-        },
-        //orElse: () =>
-        //    const SenshuData(), // 見つからなかった場合はデフォルト値を返す (ID=0と想定)
-      );
+      // (見つからない場合はnullにして、エラーにせず飛ばす)
+      SenshuData? newSenshu;
+      for (final s in senshudataBox.values) {
+        // 同じ大学で、元の区間(originalKukan - 1)を走る選手を見つける
+        if (s.univid == univid &&
+            s.entrykukan_race.length > raceBangou &&
+            s.entrykukan_race[raceBangou].length > s.gakunen - 1 &&
+            s.entrykukan_race[raceBangou][s.gakunen - 1] ==
+                (originalKukan - 1)) {
+          // 0-indexed区間
+          newSenshu = s;
+          break;
+        }
+      }
 
       // 交代した選手がいる場合のみリストに追加
       // newSenshu.id > 0 は SenshuData() ではないことを意味する（IDが1以上と仮定）

@@ -513,17 +513,20 @@ Future<List<int>> EntryCalc({
               kukanIndex < NUMBER_OF_KUKAN;
               kukanIndex++
             ) {
-              final double time = await runTrialCalculation(
+              // 乱数なしの試走タイム
+              final double time0 = await runTrialCalculation(
                 playerId,
                 kukanIndex,
                 gh[0],
                 sortedSenshuData,
                 sortedUnivData,
                 kantoku,
+                nigosu: false,
               );
-              trialTimesCache[playerId]![kukanIndex] = time;
-              // 区間エントリー後処理(戦略的エントリー)で使い回す
-              entryShisouTimeCache[playerId * 100 + kukanIndex] = time;
+              // 最適配置には、今まで通り±0.5%の乱数をかけた値を使う
+              trialTimesCache[playerId]![kukanIndex] = shisouTimeNigosu(time0);
+              // 区間エントリー後処理(戦略的エントリー)では乱数なしの値を使い回す
+              entryShisouTimeCache[playerId * 100 + kukanIndex] = time0;
             }
           }
           // 2. 動的計画法による最適配置の探索（ビットマスクを使用）

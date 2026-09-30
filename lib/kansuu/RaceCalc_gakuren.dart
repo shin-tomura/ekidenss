@@ -592,7 +592,9 @@ Future<void> RaceCalc_gakuren({
       }
 
       //調子補正
-      if (racebangou <= 2 || racebangou == 5 && kantoku.yobiint2[2] != 0) {
+      // 駅伝(10月・11月・正月・カスタム)で、調子のタイムへの影響度が0%でない場合のみ
+      // (影響度0%なら体調不良も含めて補正しない)
+      if ((racebangou <= 2 || racebangou == 5) && kantoku.yobiint2[2] != 0) {
         if (gakurensenshudata[senshuid].chousi == 0) {
           tanihosei = (kantoku.yobiint2[11].toDouble() / 100.0) / 100.0;
           temphosei = (100 - 0) * tanihosei;

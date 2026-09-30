@@ -16,15 +16,26 @@ import 'package:ekiden/kansuu/univkosei.dart';
 import 'package:ekiden/kantoku_data.dart';
 
 // このメソッドは、各区間の走破タイム（秒単位のdouble型）を計算します。
+/// 試走タイムに±0.5%の乱数をかける(答えをそのまま見せないための濁し)
+double shisouTimeNigosu(double time) {
+  const double minPercentage = -0.005;
+  const double maxPercentage = 0.005;
+  final double randomPercentage =
+      Random().nextDouble() * (maxPercentage - minPercentage) + minPercentage;
+  return time * (1 + randomPercentage);
+}
+
+/// [nigosu] falseにすると±0.5%の乱数をかけない(コンピュータ大学の当日変更などの判断用)
 Future<double> runTrialCalculation(
   int senshuid,
   int i_kukan,
   Ghensuu currentGhensuu,
   List<SenshuData> sortedsenshudata,
   List<UnivData> sortedUnivData,
-  KantokuData kantoku,
+  KantokuData kantoku, {
   //Ghensuu currentGhensuu,
-) async {
+  bool nigosu = true,
+}) async {
   if (senshuid < 0 || senshuid >= sortedsenshudata.length) {
     senshuid = 0;
   }
@@ -356,13 +367,10 @@ Future<double> runTrialCalculation(
       currentGhensuu.hyojiracebangou <= 5) {}
 
   //答えをそのまま見せるわけにはいかないので濁す処理
-  double minPercentage = -0.005;
-  double maxPercentage = 0.005;
-  double randomPercentage =
-      Random().nextDouble() * (maxPercentage - minPercentage) + minPercentage;
-
   // kotaeTimeにランダムな値を加える
-  kotaetime = kotaetime * (1 + randomPercentage);
+  if (nigosu) {
+    kotaetime = shisouTimeNigosu(kotaetime);
+  }
 
   // 値を返します
   //await Future.delayed(const Duration(milliseconds: 500));

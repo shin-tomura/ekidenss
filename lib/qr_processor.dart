@@ -414,7 +414,7 @@ class SettingsQrProcessor {
           kantoku.yobiint2[i] = yobiint2_2_11[i - 2] as int;
         }
         if (kantoku.yobiint2[2] < 0 || kantoku.yobiint2[2] > 100) {
-          kantoku.yobiint2[13] = 25;
+          kantoku.yobiint2[2] = 25;
         }
         if (kantoku.yobiint2[3] < 0 || kantoku.yobiint2[3] > 100) {
           kantoku.yobiint2[3] = 70;

@@ -4103,7 +4103,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         // 処理中にエラーが発生した場合は、再起動を促す画面を表示する
         final String? shoriError = ShoriGuard.errorMessage.value;
         if (shoriError != null) {
+          // keyを付けて別のMaterialAppとして作り直す(開いていた画面の下に隠れないように、
+          // 画面の積み重ねごと入れ替える)
           return MaterialApp(
+            key: const ValueKey('shoriError'),
             theme: appTheme,
             home: Scaffold(body: ShoriErrorScreen(message: shoriError)),
           );

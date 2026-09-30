@@ -144,6 +144,8 @@ void _debugLog(String message) {
 
 /// 調子によるタイム補正の倍率(RaceCalcの調子補正と同じ式)
 double _chousiKeisuu(SenshuData s, KantokuData kantoku) {
+  // 調子のタイムへの影響度が0%なら、体調不良も含めて補正しない(RaceCalcと同じ)
+  if (kantoku.yobiint2[2] == 0) return 1.0;
   if (s.chousi == 0) {
     return 1.0 + kantoku.yobiint2[11].toDouble() / 100.0;
   }
@@ -161,7 +163,7 @@ Future<void> _yasumi() async {
   }
 }
 
-/// 区間エントリー時に EntryCalc が計算した試走タイム(調子補正なし)
+/// 区間エントリー時に EntryCalc が計算した試走タイム(調子補正なし・乱数なし)
 /// キーは 選手ID*100+区間。EntryCalcの開始時と区間エントリー後処理の後に消す
 /// (区間エントリー後処理で同じ計算をやり直さないための使い回し用)
 final Map<int, double> entryShisouTimeCache = {};
@@ -190,6 +192,7 @@ class _Mitumori {
     double? t = shisouTime?[key];
     if (t == null) {
       await _yasumi(); // フリーズ対策
+      // 判断がぶれないよう、±0.5%の乱数(濁し)をかけない試走タイムを使う
       t = await runTrialCalculation(
         s.id,
         kukan,
@@ -197,6 +200,7 @@ class _Mitumori {
         sortedSenshuData,
         sortedUnivData,
         kantoku,
+        nigosu: false,
       );
     }
     t *= _chousiKeisuu(s, kantoku);
@@ -279,7 +283,6 @@ Future<void> comEntryAtoshori({
   );
 
   for (final univ in sortedUnivData) {
-    if (univ.id == gh[0].MYunivid) continue;
     if (univ.taikaientryflag[racebangou] != 1) continue;
     await _yasumi();
 
@@ -290,11 +293,18 @@ Future<void> comEntryAtoshori({
 
     // 戦略的エントリー用の「使う日」の印(負の値)をクリア
     // (正の値は風耐性の名残なので触らない)
+    // プレイヤーの大学も消す(途中で大学を変えた場合に、コンピュータ時代の印が残らないように)
     for (final s in team) {
       if (_isOnzon(s)) {
         s.kazetaisei = 0;
         henkouari.add(s);
       }
+    }
+    if (univ.id == gh[0].MYunivid) {
+      for (final s in henkouari) {
+        await s.save();
+      }
+      continue;
     }
 
     // ① 体調不良の選手を区間から外す
@@ -346,8 +356,9 @@ Future<void> comEntryAtoshori({
       final Map<int, int> hanyousei = {};
       final Map<int, int> kukanKazu = {};
       for (final c in kouho) {
+        // 正月駅伝は、元の区間の日(1〜5区なら往路、6〜10区なら復路)の区間で数える
         final int day = racebangou == 2
-            ? _onzonHi(racebangou, _entry(c, racebangou))
+            ? (_entry(c, racebangou) < 5 ? 1 : 2)
             : 0;
         int kazu = 0;
         int taishou = 0;
@@ -723,7 +734,8 @@ Future<void> kukanSeigouseiShuufuku({
         best = s;
       }
     }
-    return best;
+    // 見込みタイムが計算できない場合(区間距離0などで全員NaN)でも、区間を空にしないよう先頭を選ぶ
+    return best ?? (kouho.isNotEmpty ? kouho.first : null);
   }
 
   bool shuufukuAri = false;

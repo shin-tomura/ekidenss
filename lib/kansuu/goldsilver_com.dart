@@ -306,10 +306,17 @@ Future<void> _comKinGinShiyou({
   };
 
   final Set<SenshuData> henkouari = {};
+  final Set<SenshuData> jougen = {}; // 順番が回ってきたが上限で使えなかった選手(デバッグログ用)
   final Map<int, int> menuMap = {};
   int tsukatta = 0;
   if (kin) {
-    tsukatta = _junbanniKubaru(shuryoku, kaisuu, _kinTokkun, henkouari);
+    tsukatta = _junbanniKubaru(
+      shuryoku,
+      kaisuu,
+      _kinTokkun,
+      henkouari,
+      jougen,
+    );
   } else {
     // バランスの選手は、この支給で使うメニューをランダムに決める
     for (final s in shuryoku) {
@@ -324,6 +331,7 @@ Future<void> _comKinGinShiyou({
       kaisuu,
       (s) => _ginTokkun(s, menuMap[s.id]!),
       henkouari,
+      jougen,
     );
   }
   for (final s in henkouari) {
@@ -346,7 +354,8 @@ Future<void> _comKinGinShiyou({
           henka.add('${_nouryokuMei[i]} ${mae[i]}→${ato[i]}');
         }
       }
-      if (henka.isEmpty) continue;
+      // 能力が上がらず、順番も回ってこなかった選手は出さない
+      if (henka.isEmpty && !jougen.contains(s)) continue;
       String menuStr = '';
       if (!kin) {
         final bool balance = s.kaifukuryoku < 1 || s.kaifukuryoku > 5;
@@ -355,9 +364,8 @@ Future<void> _comKinGinShiyou({
             : '年間強化:${TrainingMenu.getMenuString(s.kaifukuryoku)}  ';
       }
       final String waku = kakyuuseiWakuIds.contains(s.id) ? '[下級生枠]' : '';
-      print(
-        '[COM金銀]   $waku${s.name}(${s.gakunen}年) $menuStr${henka.join(' / ')}',
-      );
+      final String kekka = henka.isEmpty ? '（上限のため使えず）' : henka.join(' / ');
+      print('[COM金銀]   $waku${s.name}(${s.gakunen}年) $menuStr$kekka');
     }
   }
 }
@@ -433,6 +441,7 @@ int _junbanniKubaru(
   int kaisuu,
   bool Function(SenshuData) tokkun,
   Set<SenshuData> henkouari,
+  Set<SenshuData> jougen, // 上限で使えなかった選手を入れて返す(デバッグログ用)
 ) {
   int idx = 0;
   int nokori = kaisuu;
@@ -445,6 +454,7 @@ int _junbanniKubaru(
       henkouari.add(s);
     } else {
       renzokuShippai++;
+      jougen.add(s);
     }
     idx = (idx + 1) % shuryoku.length;
   }

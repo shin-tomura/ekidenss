@@ -2050,7 +2050,9 @@ class _ModalMieruNouryokuResetState extends State<ModalMieruNouryokuReset> {
                       ) {
                         currentGhensuu.nouryokumieruflag[i] = 0;
                       }
-                      //currentGhensuu.nouryokumieruflag[4] = 1;
+                      //駅伝男と平常心は最初から見える能力なので、リセット後も見える状態に戻す
+                      currentGhensuu.nouryokumieruflag[0] = 1;
+                      currentGhensuu.nouryokumieruflag[1] = 1;
                     });
                     await currentGhensuu.save(); // Hiveに保存
                     Navigator.pop(context); // モーダルを閉じる

@@ -12,10 +12,10 @@ import 'package:hive_flutter/hive_flutter.dart';
 //
 // ・支給量はプレイヤーと同じ式(金銀支給量倍率yobiint2[12]も共通)
 // ・支給レベルは大学ごとに設定できる(yobiint2[38]・[39]に1大学1桁で格納)
-//     0標準: プレイヤーの難易度(鬼・難・普・易)の支給量。「極」「天」は適用しない
-//     1鬼・2難・3普・4易: その難易度の支給量
-//     5極鬼・6極難・7極普・8極易: 春の定期支給のみ(目標達成時はなし)
-//     9天: 支給なし
+//     0鬼(初期値)・1難・2普・3易: その難易度の支給量
+//     4極鬼・5極難・6極普・7極易: 春の定期支給のみ(目標達成時はなし)
+//     8天: 支給なし
+//     9プレイヤーと同じ: プレイヤーの難易度(鬼・難・普・易)の支給量。「極」「天」は適用しない
 // ・支給のたびに10%で金、90%で銀(プレイヤーと同じ)
 // ・振り分け先は留学生を除く10人(基本走力はa、小さいほど良い)
 //     主力枠7人: 基本走力の上位7人(全学年)
@@ -62,9 +62,8 @@ const int comGoldSilverLevelIndex0 = 38;
 const int comGoldSilverLevelIndex1 = 39;
 const int comGoldSilverLevelKetasuu = 15; // 1つに格納する大学数
 
-/// 支給レベルの名前(0〜9)
+/// 支給レベルの名前(0〜9)。0(鬼)が初期値
 const List<String> comGoldSilverLevelMei = [
-  '標準',
   '鬼',
   '難',
   '普',
@@ -74,7 +73,9 @@ const List<String> comGoldSilverLevelMei = [
   '極普',
   '極易',
   '天',
+  'プレイヤーと同じ',
 ];
+const int _levelPlayerToOnaji = 9; // プレイヤーと同じ
 
 /// 難易度(kazeflag 0〜3)の名前
 const List<String> _kazeflagMei = ['鬼', '難', '普', '易'];
@@ -113,29 +114,29 @@ void comGoldSilverLevelSettei(List<int> yobiint2, int univid, int level) {
   yobiint2[idx] = v + (level - mae) * p;
 }
 
-/// 支給レベルの表示名(標準は今のプレイヤーの難易度も付ける 例: 標準(今は鬼))
+/// 支給レベルの表示名(プレイヤーと同じは今のプレイヤーの難易度も付ける 例: プレイヤーと同じ(今は易))
 String comGoldSilverLevelHyouji(int level, int playerKazeflag) {
   if (level < 0 || level > 9) return '';
-  if (level == 0) {
+  if (level == _levelPlayerToOnaji) {
     final String mei = (playerKazeflag >= 0 && playerKazeflag <= 3)
         ? _kazeflagMei[playerKazeflag]
         : '';
-    return '標準(今は$mei)';
+    return 'プレイヤーと同じ(今は$mei)';
   }
   return comGoldSilverLevelMei[level];
 }
 
 /// 支給レベルから支給量の計算に使う難易度(kazeflag 0鬼〜3易)
 int _levelKazeflag(int level, int playerKazeflag) {
-  if (level >= 1 && level <= 4) return level - 1;
-  if (level >= 5 && level <= 8) return level - 5;
-  return playerKazeflag;
+  if (level >= 0 && level <= 3) return level;
+  if (level >= 4 && level <= 7) return level - 4;
+  return playerKazeflag; // プレイヤーと同じ(天は支給しないので使わない)
 }
 
 /// 支給レベルから難易度モード(0通常、1極=定期支給のみ、2天=支給なし)
 int _levelMode(int level) {
-  if (level >= 5 && level <= 8) return 1;
-  if (level == 9) return 2;
+  if (level >= 4 && level <= 7) return 1;
+  if (level == 8) return 2;
   return 0;
 }
 

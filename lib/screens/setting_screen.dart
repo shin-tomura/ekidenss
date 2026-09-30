@@ -19,6 +19,7 @@ import 'package:ekiden/screens/Modal_shumihihyouji.dart';
 import 'package:ekiden/screens/Modal_TrainingEffect.dart';
 import 'package:ekiden/screens/Modal_TimeChousei.dart';
 import 'package:ekiden/settings_qr_page.dart';
+import 'package:ekiden/screens/HenkouRireki_screen.dart';
 import 'package:ekiden/screens/Modal_courseshoukai_kiten.dart';
 import 'package:ekiden/screens/Modal_custom.dart';
 import 'package:ekiden/screens/Modal_courseedit_kiten.dart';
@@ -882,6 +883,25 @@ class _SettingScreenState extends State<SettingScreen> {
                     ? 'App Storeでアップデートを確認'
                     : 'Google Playでアップデートを確認',
                 style: const TextStyle(
+                  color: Colors.blue, // リンクの色
+                  decoration: TextDecoration.underline, // 下線
+                ),
+              ),
+            ),
+            const SizedBox(height: 8), // 適度な余白
+            // 変更履歴(ToDo.txtの箱庭小駅伝SSの部分を表示)
+            InkWell(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const HenkouRirekiScreen(),
+                  ),
+                );
+              },
+              child: const Text(
+                '変更履歴',
+                style: TextStyle(
                   color: Colors.blue, // リンクの色
                   decoration: TextDecoration.underline, // 下線
                 ),

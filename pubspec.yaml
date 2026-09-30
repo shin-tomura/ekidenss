@@ -98,6 +98,7 @@ flutter:
     - lib/assets/data/name_ryuugakusei.txt # ここに追記
     - lib/assets/icon/icon_ss1024.png
     - lib/assets/gazou/
+    - ToDo.txt # 変更履歴画面で表示する
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
 

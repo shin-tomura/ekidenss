@@ -136,6 +136,11 @@ class SettingsQrProcessor {
       data['k_yobiint2_14'] = kantoku.yobiint2[14];
       // 年間強化練習効果設定(int)
       data['k_yobiint2_16'] = kantoku.yobiint2[16];
+      // コンピュータ金銀使用設定(int) [33]ON/OFF、[38]・[39]大学ごとの支給レベル
+      data['k_yobiint2_33'] = kantoku.yobiint2[33];
+      data['k_yobiint2_38_39'] = kantoku.yobiint2.sublist(38, 40);
+      // 戦略的エントリー確率(int) (調子関連設定の画面にある設定)
+      data['k_yobiint2_34'] = kantoku.yobiint2[34];
     } else if (department == SettingsDepartment.octoberTime) {
       //区間ごとタイム調整(int)
       data['k_yobiint5_30_39_time'] = kantoku.yobiint5.sublist(30, 40);
@@ -454,6 +459,28 @@ class SettingsQrProcessor {
       kantoku.yobiint2[16] = dataMap['k_yobiint2_16'] as int;
       if (kantoku.yobiint2[16] < 0 || kantoku.yobiint2[16] > 5) {
         kantoku.yobiint2[16] = 4;
+      }
+      // 以下は1.7.8で追加した設定。古いQRコードには含まれないので、
+      // 含まれていない場合や範囲外の値の場合は、今の設定のままにする
+      // コンピュータ金銀使用ON/OFF(int) kantoku.yobiint2[33] (0=ON、1=OFF)
+      final dynamic yobiint2_33 = dataMap['k_yobiint2_33'];
+      if (yobiint2_33 is int && (yobiint2_33 == 0 || yobiint2_33 == 1)) {
+        kantoku.yobiint2[33] = yobiint2_33;
+      }
+      // 戦略的エントリー確率(int) kantoku.yobiint2[34] (0〜100)
+      final dynamic yobiint2_34 = dataMap['k_yobiint2_34'];
+      if (yobiint2_34 is int && yobiint2_34 >= 0 && yobiint2_34 <= 100) {
+        kantoku.yobiint2[34] = yobiint2_34;
+      }
+      // 大学ごとの金銀支給レベル(int) kantoku.yobiint2[38]・[39] (1大学1桁、15桁まで)
+      final dynamic yobiint2_38_39 = dataMap['k_yobiint2_38_39'];
+      if (yobiint2_38_39 is List && yobiint2_38_39.length == 2) {
+        for (int i = 0; i < 2; i++) {
+          final dynamic v = yobiint2_38_39[i];
+          if (v is int && v >= 0 && v < 1000000000000000) {
+            kantoku.yobiint2[38 + i] = v;
+          }
+        }
       }
       // 育成力(int) & 名声(int) & 留学生受け入れ設定(int) (UnivData 0から29)
       final List<dynamic> ikuseiryokuList = dataMap['ud_ikuseiryoku'] ?? [];

@@ -10,8 +10,12 @@ import 'package:hive_flutter/hive_flutter.dart';
 // ------------------------------------------------------------
 // コンピュータ大学の金銀使用
 //
-// ・支給量はプレイヤーと同じ式(難易度・金銀支給量倍率yobiint2[12]も共通)
-// ・「極」「天」モードでもコンピュータ大学への支給は絞らない
+// ・支給量はプレイヤーと同じ式(金銀支給量倍率yobiint2[12]も共通)
+// ・支給レベルは大学ごとに設定できる(yobiint2[38]・[39]に1大学1桁で格納)
+//     0標準: プレイヤーの難易度(鬼・難・普・易)の支給量。「極」「天」は適用しない
+//     1鬼・2難・3普・4易: その難易度の支給量
+//     5極鬼・6極難・7極普・8極易: 春の定期支給のみ(目標達成時はなし)
+//     9天: 支給なし
 // ・支給のたびに10%で金、90%で銀(プレイヤーと同じ)
 // ・振り分け先は留学生を除く10人(基本走力はa、小さいほど良い)
 //     主力枠7人: 基本走力の上位7人(全学年)
@@ -49,6 +53,92 @@ bool isComGoldSilverOn(KantokuData kantoku) {
   return kantoku.yobiint2[comGoldSilverFlagIndex] == 0;
 }
 
+/// KantokuData.yobiint2 の使用番号: 大学ごとの金銀支給レベル
+/// 1大学1桁(0〜9)で、[38]に大学0〜14、[39]に大学15〜29を格納する
+/// 大学idを15で割った余りが桁の位置(0なら一の位、1なら十の位…)。
+/// Hiveは整数をdoubleで保存するため、正確に残せる2の53乗(約9000兆)未満に
+/// 収まるよう、1つあたり15桁までにしている
+const int comGoldSilverLevelIndex0 = 38;
+const int comGoldSilverLevelIndex1 = 39;
+const int comGoldSilverLevelKetasuu = 15; // 1つに格納する大学数
+
+/// 支給レベルの名前(0〜9)
+const List<String> comGoldSilverLevelMei = [
+  '標準',
+  '鬼',
+  '難',
+  '普',
+  '易',
+  '極鬼',
+  '極難',
+  '極普',
+  '極易',
+  '天',
+];
+
+/// 難易度(kazeflag 0〜3)の名前
+const List<String> _kazeflagMei = ['鬼', '難', '普', '易'];
+
+int _juu(int n) {
+  int p = 1;
+  for (int i = 0; i < n; i++) {
+    p *= 10;
+  }
+  return p;
+}
+
+/// 大学の金銀支給レベル(0〜9)を取り出す
+int comGoldSilverLevel(KantokuData kantoku, int univid) {
+  if (univid < 0 || univid >= comGoldSilverLevelKetasuu * 2) return 0;
+  final int idx = univid < comGoldSilverLevelKetasuu
+      ? comGoldSilverLevelIndex0
+      : comGoldSilverLevelIndex1;
+  if (kantoku.yobiint2.length <= idx) return 0;
+  final int v = kantoku.yobiint2[idx];
+  if (v < 0) return 0;
+  return (v ~/ _juu(univid % comGoldSilverLevelKetasuu)) % 10;
+}
+
+/// 大学の金銀支給レベル(0〜9)をyobiint2のリストに書き込む(保存は呼び出し側で行う)
+void comGoldSilverLevelSettei(List<int> yobiint2, int univid, int level) {
+  if (univid < 0 || univid >= comGoldSilverLevelKetasuu * 2) return;
+  if (level < 0 || level > 9) return;
+  final int idx = univid < comGoldSilverLevelKetasuu
+      ? comGoldSilverLevelIndex0
+      : comGoldSilverLevelIndex1;
+  if (yobiint2.length <= idx) return;
+  final int p = _juu(univid % comGoldSilverLevelKetasuu);
+  final int v = yobiint2[idx] < 0 ? 0 : yobiint2[idx];
+  final int mae = (v ~/ p) % 10;
+  yobiint2[idx] = v + (level - mae) * p;
+}
+
+/// 支給レベルの表示名(標準は今のプレイヤーの難易度も付ける 例: 標準(今は鬼))
+String comGoldSilverLevelHyouji(int level, int playerKazeflag) {
+  if (level < 0 || level > 9) return '';
+  if (level == 0) {
+    final String mei = (playerKazeflag >= 0 && playerKazeflag <= 3)
+        ? _kazeflagMei[playerKazeflag]
+        : '';
+    return '標準(今は$mei)';
+  }
+  return comGoldSilverLevelMei[level];
+}
+
+/// 支給レベルから支給量の計算に使う難易度(kazeflag 0鬼〜3易)
+int _levelKazeflag(int level, int playerKazeflag) {
+  if (level >= 1 && level <= 4) return level - 1;
+  if (level >= 5 && level <= 8) return level - 5;
+  return playerKazeflag;
+}
+
+/// 支給レベルから難易度モード(0通常、1極=定期支給のみ、2天=支給なし)
+int _levelMode(int level) {
+  if (level >= 5 && level <= 8) return 1;
+  if (level == 9) return 2;
+  return 0;
+}
+
 /// 春の定期支給分(4月15日の年間強化メニュー決定直後に呼ぶ)
 Future<void> comGoldSilverTeiki({
   required List<Ghensuu> gh,
@@ -64,11 +154,19 @@ Future<void> comGoldSilverTeiki({
   final random = Random();
   for (final univ in sortedUnivData) {
     if (univ.id == gh[0].MYunivid) continue;
+    final int level = comGoldSilverLevel(kantoku, univ.id);
+    final String univName =
+        '${univ.name}(${comGoldSilverLevelHyouji(level, gh[0].kazeflag)})';
+    if (_levelMode(level) == 2) {
+      if (kDebugMode) print('[COM金銀] 春の定期支給 $univName → 支給なし');
+      continue;
+    }
     final int ryou =
-        _teikiKakutokusuu(univ, gh[0].kazeflag) * kantoku.yobiint2[12];
+        _teikiKakutokusuu(univ, _levelKazeflag(level, gh[0].kazeflag)) *
+        kantoku.yobiint2[12];
     await _comKinGinShiyou(
       univid: univ.id,
-      univName: univ.name,
+      univName: univName,
       eventLabel: '春の定期支給',
       ryou: ryou,
       yonenseiNozoku: false,
@@ -104,12 +202,28 @@ Future<void> comGoldSilverMokuhyouTassei({
         univ.mokuhyojuni[mokuhyouBangou]) {
       continue;
     }
+    final int level = comGoldSilverLevel(kantoku, univ.id);
+    final String univName =
+        '${univ.name}(${comGoldSilverLevelHyouji(level, gh[0].kazeflag)})';
+    if (_levelMode(level) != 0) {
+      // 極・天は目標達成時の支給なし
+      if (kDebugMode) {
+        print(
+          '[COM金銀] 目標達成(${_taikaiMei(mokuhyouBangou)}) $univName → 支給なし',
+        );
+      }
+      continue;
+    }
     final int ryou =
-        _mokuhyouTasseiRyou(univ, mokuhyouBangou, gh[0].kazeflag) *
+        _mokuhyouTasseiRyou(
+          univ,
+          mokuhyouBangou,
+          _levelKazeflag(level, gh[0].kazeflag),
+        ) *
         kantoku.yobiint2[12];
     await _comKinGinShiyou(
       univid: univ.id,
-      univName: univ.name,
+      univName: univName,
       eventLabel: '目標達成(${_taikaiMei(mokuhyouBangou)})',
       ryou: ryou,
       yonenseiNozoku: yonenseiNozoku,

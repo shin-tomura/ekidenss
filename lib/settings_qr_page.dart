@@ -231,7 +231,8 @@ class _SettingsQrPageState extends State<SettingsQrPage> {
             '・調子関連設定(コンピュータチームの体調不良発生スイッチは除く)\n'
             '・金銀支給量倍率設定\n'
             '・記録会時期設定\n'
-            '・年間強化練習効果設定\n',
+            '・年間強化練習効果設定\n'
+            '・コンピュータ金銀使用設定(ON/OFF・大学ごとの支給レベル)\n',
 
             style: TextStyle(color: Colors.white70, fontSize: 14),
           ),

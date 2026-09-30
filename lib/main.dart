@@ -26,6 +26,7 @@ import 'package:ekiden/kansuu/RetireNew.dart';
 import 'package:ekiden/kansuu/goldsilverTeikiKakutoku.dart';
 import 'package:ekiden/kansuu/goldsilver_com.dart';
 import 'package:ekiden/kansuu/ShoriGuard.dart';
+import 'package:ekiden/kansuu/NameListKoushin.dart';
 import 'package:ekiden/kansuu/SenshuShokiti.dart';
 import 'package:ekiden/kansuu/asset_loader.dart';
 import 'package:ekiden/kansuu/ShozokusakiKettei_By_Univmeisei.dart';
@@ -923,6 +924,9 @@ Future<void> main() async {
         await kantoku.save();
       }
     }
+
+    // 下の名前のリストが1.7.7以前の古いリストのままなら新しいリストに置き換える(中身で判定するので版番号に関係なく1回だけ)
+    await nameAtoListKoushin();
 
     //1.4.3からバージョン番号保存することにした(この処理は一連の処理の中で1番最後にすること)
     //save_load_screenの中の _importFromSlot の中にもあるので、そちらも変更すること！

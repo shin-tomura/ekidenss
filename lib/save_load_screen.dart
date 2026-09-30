@@ -19,6 +19,7 @@ import 'package:ekiden/kansuu/univkosei.dart';
 import 'package:ekiden/kansuu/ChartPanelSenshu.dart';
 import 'package:ekiden/kansuu/ChartPanelUniv.dart';
 import 'package:ekiden/kansuu/ShoriGuard.dart';
+import 'package:ekiden/kansuu/NameListKoushin.dart';
 //import 'dart:io';
 //import 'package:path_provider/path_provider.dart';
 
@@ -743,6 +744,9 @@ class _SaveLoadScreenState extends State<SaveLoadScreen> {
           await kantoku.save();
         }
       }
+
+      // 下の名前のリストが1.7.7以前の古いリストのままなら新しいリストに置き換える(中身で判定するので版番号に関係なく1回だけ)
+      await nameAtoListKoushin();
 
       //1.4.3からバージョン番号保存することにした(この処理は一連の処理の中で1番最後にすること)
       //mainの中にもあるので、そちらも変更すること！

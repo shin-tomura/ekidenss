@@ -61,7 +61,20 @@ Future<void> SenshuShokitiSetteiByGakunen(
     // 学年で処理を分岐
     if (targetGakunen == 0 || senshu.gakunen == targetGakunen) {
       final int r_mae = random.nextInt(TEISUU.SUU_NAMEMAE);
-      final int r_ato = random.nextInt(TEISUU.SUU_NAMEATO);
+      int r_ato = random.nextInt(TEISUU.SUU_NAMEATO);
+      // 名字が3文字以上の場合は、3文字以上の下の名前にならないよう選び直す(長くなりすぎないように)
+      if (r_mae < ghensuu.name_mae.length &&
+          ghensuu.name_mae[r_mae].runes.length >= 3) {
+        for (
+          int i = 0;
+          i < 20 &&
+              r_ato < ghensuu.name_ato.length &&
+              ghensuu.name_ato[r_ato].runes.length >= 3;
+          i++
+        ) {
+          r_ato = random.nextInt(TEISUU.SUU_NAMEATO);
+        }
+      }
 
       // name_maeとname_atoリストから名前を選び、結合して設定
       // Swiftコードは `gh[0].name_mae[r_mae]` だったので、Dartでは `ghensuu.name_mae[r_mae]`

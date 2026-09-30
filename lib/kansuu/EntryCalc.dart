@@ -1428,7 +1428,7 @@ Future<List<int>> EntryCalc({
     }
   }
 
-  // コンピュータ大学の区間エントリー後処理(体調不良者の除外・当て馬エントリー)
+  // コンピュータ大学の区間エントリー後処理(体調不良者の除外・戦略的エントリー)
   await comEntryAtoshori(
     racebangou: racebangou,
     gh: gh,

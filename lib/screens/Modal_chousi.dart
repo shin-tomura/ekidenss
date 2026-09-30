@@ -34,7 +34,7 @@ class _ModalConditionSettingsState extends State<ModalConditionSettings> {
   late double _illnessTimePenalty; // yobiint2[11] (1-10) <- **新規追加**
   // ▲ 新規追加する設定項目用のローカル状態
   late bool _computerIllnessEnabled; // yobiint2[21] (1=ON/0=OFF)
-  late double _atemaKakuritu; // yobiint2[34] (0-100) 当て馬エントリー確率
+  late double _senryakuKakuritu; // yobiint2[34] (0-100) 戦略的エントリー確率
 
   @override
   void initState() {
@@ -64,18 +64,18 @@ class _ModalConditionSettingsState extends State<ModalConditionSettings> {
     // ▲ 新規追加項目のローカル状態を初期化
     // yobiint2[21]が1の時ON（発生する）、0の時OFF（発生しない）
     _computerIllnessEnabled = kantoku.yobiint2[21] == 1;
-    // yobiint2[34] コンピュータチームの当て馬エントリー確率 (0-100)
-    _atemaKakuritu = (kantoku.yobiint2.length > 34 ? kantoku.yobiint2[34] : 0)
+    // yobiint2[34] コンピュータチームの戦略的エントリー確率 (0-100)
+    _senryakuKakuritu = (kantoku.yobiint2.length > 34 ? kantoku.yobiint2[34] : 0)
         .toDouble()
         .clamp(0, 100);
   }
 
-  /// コンピュータチームの当て馬エントリー確率 (`yobiint2[34]`) の値を変更し、Hiveに保存
-  void _updateAtemaKakuritu(double sliderValue) async {
+  /// コンピュータチームの戦略的エントリー確率 (`yobiint2[34]`) の値を変更し、Hiveに保存
+  void _updateSenryakuKakuritu(double sliderValue) async {
     if (kantoku.yobiint2.length <= 34) return;
     final int newValue = sliderValue.toInt().clamp(0, 100);
     setState(() {
-      _atemaKakuritu = newValue.toDouble();
+      _senryakuKakuritu = newValue.toDouble();
       kantoku.yobiint2[34] = newValue;
     });
     await kantoku.save();
@@ -701,23 +701,23 @@ class _ModalConditionSettingsState extends State<ModalConditionSettings> {
                     // ▲ 安定感 最低保証値設定
                   ],
 
-                  // コンピュータチームの当て馬エントリー確率 (yobiint2[34]: 0-100)
+                  // コンピュータチームの戦略的エントリー確率 (yobiint2[34]: 0-100)
                   _buildSettingSlider(
-                    title: 'コンピュータチームの当て馬エントリー確率',
+                    title: 'コンピュータチームの戦略的エントリー確率',
                     description:
-                        'コンピュータのチームが、エースを補欠として隠し、別の選手を当て馬として区間エントリーしておき、大会当日の当日変更でエースを本来の区間に戻す作戦をとる確率です(大学ごと・大会ごとに判定)。隠す人数は、10月駅伝1人、11月駅伝2人、正月駅伝3人、カスタム駅伝は区間数に応じて1〜3人です。0%の場合は当て馬エントリーを行いません。',
-                    currentValue: _atemaKakuritu,
+                        'コンピュータのチームが、主力選手をいったん補欠に登録しておき、大会当日の当日変更で本来の区間に起用する作戦をとる確率です(大学ごと・大会ごとに判定)。対象の人数は、10月駅伝1人、11月駅伝2人、正月駅伝3人、カスタム駅伝は区間数に応じて1〜3人です。0%の場合は戦略的エントリーを行いません。',
+                    currentValue: _senryakuKakuritu,
                     min: 0,
                     max: 100,
                     divisions: 10, // 10%刻み
                     onChanged: (newValue) {
-                      setState(() => _atemaKakuritu = newValue);
+                      setState(() => _senryakuKakuritu = newValue);
                     },
-                    onChangeEnd: _updateAtemaKakuritu,
+                    onChangeEnd: _updateSenryakuKakuritu,
                     minLabel: '0% (やらない)',
                     maxLabel: '100% (毎回)',
                     activeColor: Colors.teal,
-                    valueText: '現在の設定値: ${_atemaKakuritu.toInt()}%',
+                    valueText: '現在の設定値: ${_senryakuKakuritu.toInt()}%',
                   ),
 
                   const SizedBox(height: 16),

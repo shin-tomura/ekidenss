@@ -12,14 +12,14 @@ import 'package:hive_flutter/hive_flutter.dart';
 // コンピュータ大学の区間エントリー後処理と当日変更
 //
 // ・区間エントリー時: 体調不良(調子0)の選手を区間から外し、補欠と入れ替える
-// ・区間エントリー時: 当て馬エントリー(設定の確率で実施)
-//     エース(基本走力aの上位)を補欠に隠し、空いた区間に補欠を当て馬として入れる
-//     隠した人数: 10月駅伝1人、11月駅伝2人、正月駅伝3人、
-//                 カスタム駅伝は区間数6以下1人、8以下2人、それ以上3人
-//     隠したエースの本来の区間は kazetaisei に(区間番号+1)で保存する
+// ・区間エントリー時: 戦略的エントリー(設定の確率で実施)
+//     エース(基本走力aの上位)をいったん補欠に登録して温存し、空いた区間には補欠の選手を登録する
+//     温存する人数: 10月駅伝1人、11月駅伝2人、正月駅伝3人、
+//                   カスタム駅伝は区間数6以下1人、8以下2人、それ以上3人
+//     温存したエースの本来の区間は kazetaisei に(区間番号+1)で保存する
 // ・当日変更: プレイヤーの当日変更確定後(当日変更画面を通らない場合はレース計算開始時)
 //     優先度1: 体調不良の走者を補欠と交代(補欠のほうが速い見込みの場合)
-//     優先度2: 当て馬で隠したエースを本来の区間に戻す
+//     優先度2: 温存したエースを本来の区間に起用する(戦略的変更)
 //     優先度3: 調子が100未満の走者で、補欠のほうが明らかに速い見込み(0.3%以上)の場合に交代
 //     見込みタイムは試走タイム(TrialTime)に当日の調子補正を加えたもの
 //     交代人数の上限はプレイヤーと同じ(区間数6以下2人、8以下3人、それ以上6人、
@@ -29,14 +29,14 @@ import 'package:hive_flutter/hive_flutter.dart';
 //     区間エントリー決定後とレース計算開始時に、1区間に走者がちょうど1人になるよう直す
 //
 // KantokuData.yobiint2 の使用番号
-//   [34] 当て馬エントリー確率(0〜100、初期値0)
+//   [34] 戦略的エントリー確率(0〜100、初期値0)
 //   [35] コンピュータ当日変更の実行済みコード(年*100+大会番号*10+日)
 //   [36] 手動当日変更マスクのコード(年*100+大会番号*10+日)
 //   [37] 手動当日変更した大学のビットマスク
 // 日: 0=1日開催、1=正月駅伝往路、2=正月駅伝復路
 // ------------------------------------------------------------
 
-const int atemaKakurituIndex = 34;
+const int senryakuKakurituIndex = 34;
 const int comToujituDoneIndex = 35;
 const int manualToujituCodeIndex = 36;
 const int manualToujituMaskIndex = 37;
@@ -77,8 +77,8 @@ int _goukeiJougen(int racebangou, int kukansuu) {
   return _hiGotoJougen(racebangou, kukansuu);
 }
 
-/// 当て馬で隠す人数
-int _atemaNinzuu(int racebangou, int kukansuu) {
+/// 戦略的エントリーで温存する人数
+int _senryakuNinzuu(int racebangou, int kukansuu) {
   if (racebangou == 0) return 1;
   if (racebangou == 1) return 2;
   if (racebangou == 2) return 3;
@@ -226,8 +226,8 @@ Future<void> comEntryAtoshori({
 
   final random = Random();
   final int kukansuu = gh[0].kukansuu_taikaigoto[racebangou];
-  final int atemaKakuritu = kantoku.yobiint2.length > atemaKakurituIndex
-      ? kantoku.yobiint2[atemaKakurituIndex]
+  final int senryakuKakuritu = kantoku.yobiint2.length > senryakuKakurituIndex
+      ? kantoku.yobiint2[senryakuKakurituIndex]
       : 0;
   final mitumori = _Mitumori(gh[0], sortedSenshuData, sortedUnivData, kantoku);
 
@@ -241,7 +241,7 @@ Future<void> comEntryAtoshori({
         .toList();
     final Set<SenshuData> henkouari = {};
 
-    // 当て馬用の「本来の区間」をクリア
+    // 戦略的エントリー用の「本来の区間」をクリア
     for (final s in team) {
       if (s.kazetaisei != 0) {
         s.kazetaisei = 0;
@@ -274,8 +274,8 @@ Future<void> comEntryAtoshori({
       );
     }
 
-    // ③ 当て馬エントリー
-    if (atemaKakuritu > 0 && random.nextInt(100) < atemaKakuritu) {
+    // ③ 戦略的エントリー
+    if (senryakuKakuritu > 0 && random.nextInt(100) < senryakuKakuritu) {
       final List<SenshuData> runners =
           team
               .where(
@@ -290,7 +290,7 @@ Future<void> comEntryAtoshori({
               return c != 0 ? c : x.id.compareTo(y.id);
             });
       final List<SenshuData> aces = runners
-          .take(_atemaNinzuu(racebangou, kukansuu))
+          .take(_senryakuNinzuu(racebangou, kukansuu))
           .toList();
       for (final ace in aces) {
         final int k = _entry(ace, racebangou);
@@ -299,19 +299,19 @@ Future<void> comEntryAtoshori({
               (s) =>
                   _entry(s, racebangou) == -1 &&
                   s.chousi != 0 &&
-                  s.kazetaisei == 0, // 隠したエースは当て馬にしない
+                  s.kazetaisei == 0, // 温存したエースは代わりの選手にしない
             )
             .toList();
-        final SenshuData? atema = await mitumori.fastest(subs, k);
-        if (atema == null) break;
+        final SenshuData? kawari = await mitumori.fastest(subs, k);
+        if (kawari == null) break;
         _setEntry(ace, racebangou, -1);
         ace.kazetaisei = k + 1; // 本来の区間
-        _setEntry(atema, racebangou, k);
+        _setEntry(kawari, racebangou, k);
         henkouari.add(ace);
-        henkouari.add(atema);
+        henkouari.add(kawari);
         _debugLog(
-          '[COM当て馬] ${_taikaiMei(racebangou)} ${univ.name} ${k + 1}区 '
-          'エース${ace.name}(${ace.gakunen}年)を補欠に隠し、当て馬${atema.name}(${atema.gakunen}年)を登録',
+          '[COM戦略的エントリー] ${_taikaiMei(racebangou)} ${univ.name} ${k + 1}区 '
+          'エース${ace.name}(${ace.gakunen}年)を補欠に温存し、${kawari.name}(${kawari.gakunen}年)を登録',
         );
       }
     }
@@ -402,7 +402,7 @@ Future<void> comToujituHenkou({
     final List<_Kouho> kouho = [];
     for (final runner in runners) {
       final int k = _entry(runner, racebangou);
-      // 調子100の走者は、当て馬で隠したエースを戻す場合のみ交代を検討する
+      // 調子100の走者は、温存したエースを起用する場合のみ交代を検討する
       final List<SenshuData> kentouSubs = runner.chousi < 100
           ? subs
           : subs.where((s) => s.kazetaisei == k + 1).toList();
@@ -415,7 +415,7 @@ Future<void> comToujituHenkou({
         if (runner.chousi == 0) {
           yuusen = 2; // 体調不良の走者の交代
         } else if (sub.kazetaisei == k + 1) {
-          yuusen = 1; // 当て馬で隠したエースを本来の区間に戻す
+          yuusen = 1; // 温存したエースを本来の区間に起用する(戦略的変更)
         } else if (gain >= genzai * 0.003) {
           yuusen = 0; // 調子の悪い走者より補欠のほうが明らかに速い
         } else {
@@ -450,7 +450,7 @@ Future<void> comToujituHenkou({
       final String riyuu = c.yuusen == 2
           ? '体調不良のため'
           : (c.yuusen == 1
-                ? '当て馬から本来の選手へ'
+                ? '戦略的変更'
                 : '調子${c.runner.chousi}のため');
       _debugLog(
         '[COM当日変更] ${_taikaiMei(racebangou, day)} ${univ.name} ${c.kukan + 1}区 '
@@ -557,9 +557,9 @@ Future<void> markManualToujituHenkou({
 /// 理由は今のデータから判断する
 ///   他大学変更で確定した大学 → 他大学変更
 ///   外れた選手の調子が0 → 体調不良のため
-///   入った選手が当て馬で隠したエース → 当て馬から本来の選手へ
+///   入った選手が戦略的エントリーで温存したエース → 戦略的変更
 ///   外れた選手の調子が100 → 他大学変更
-///     (自動の当日変更は調子100の選手を当て馬戻し以外で外さないため。
+///     (自動の当日変更は調子100の選手を戦略的変更以外で外さないため。
 ///      他大学変更の目印は1日分しか覚えていないので、正月駅伝で往路と復路の
 ///      両方で他大学変更を使った場合の往路分もここで判定される)
 ///   それ以外 → 調子○○のため
@@ -585,7 +585,7 @@ String? comToujituHenkouRiyuu({
     return '他大学変更';
   }
   if (outPlayer.chousi == 0) return '体調不良のため';
-  if (inPlayer.kazetaisei == kukan + 1) return '当て馬から本来の選手へ';
+  if (inPlayer.kazetaisei == kukan + 1) return '戦略的変更';
   if (outPlayer.chousi >= 100) return '他大学変更';
   return '調子${outPlayer.chousi}のため';
 }

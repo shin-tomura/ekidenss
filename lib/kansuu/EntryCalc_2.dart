@@ -453,7 +453,7 @@ Future<List<int>> EntryCalc_2({
         }
 
         // -----------------------------------------------------------
-        // Step 2: 当て馬作戦 (公式発表オーダー) の作成
+        // Step 2: 戦略的エントリー (公式発表オーダー) の作成
         // -----------------------------------------------------------
 
         int hiddenCount = (maxChangeTotal / 2).floor();
@@ -465,12 +465,12 @@ Future<List<int>> EntryCalc_2({
             .where((s) => !assignedIds.contains(s.id))
             .toList();
 
-        // レギュラーはタイムが良い順に（隠しエース候補）
+        // レギュラーはタイムが良い順に（温存するエース候補）
         idealRegulars.sort(
           (a, b) => a.time_bestkiroku[1].compareTo(b.time_bestkiroku[1]),
         );
 
-        // 隠すエースを決定
+        // 温存するエースを決定
         List<SenshuData> hiddenAces = idealRegulars.take(hiddenCount).toList();
 
         // エースが抜けたことによって空く区間のリストを作成
@@ -481,9 +481,9 @@ Future<List<int>> EntryCalc_2({
           }
         });
 
-        // 当て馬の決定ロジック (適性考慮)
+        // 代わりに区間に登録する選手の決定ロジック (適性考慮)
         // 空いた区間に対して、補欠(idealSubs)の中から最も適性が高い選手を割り当てる
-        Map<int, SenshuData> dummyAllocation = {}; // 区間 -> 当て馬
+        Map<int, SenshuData> dummyAllocation = {}; // 区間 -> 代わりに登録する選手
         List<SenshuData> availableDummies = List.from(idealSubs); // 候補リスト
 
         for (int kukan in vacantKukans) {
@@ -502,7 +502,7 @@ Future<List<int>> EntryCalc_2({
           availableDummies.remove(bestDummy);
         }
 
-        // 選ばれた当て馬リスト
+        // 選ばれた代わりの選手リスト
         List<SenshuData> dummies = dummyAllocation.values.toList();
 
         // 発表用区間の設定と保存
@@ -515,9 +515,9 @@ Future<List<int>> EntryCalc_2({
 
           // 公式発表(entrykukan)の決定
           if (hiddenAces.contains(senshu)) {
-            kukan = -1; // エース隠し (補欠へ)
+            kukan = -1; // エース温存 (補欠へ)
           } else if (dummies.contains(senshu)) {
-            // 当て馬配置 (適性を考慮して割り当てられた区間へ)
+            // 代わりの選手の配置 (適性を考慮して割り当てられた区間へ)
             int assignedDummyKukan = -1;
             dummyAllocation.forEach((k, v) {
               if (v == senshu) assignedDummyKukan = k;

@@ -12,6 +12,7 @@ import 'package:ekiden/screens/Modal_matrix2.dart';
 import 'package:ekiden/screens/Modal_matrix3.dart';
 import 'package:ekiden/screens/Modal_Taichoufuryou.dart';
 import 'package:ekiden/kansuu/ToujituHenkou_com.dart';
+import 'package:ekiden/kansuu/ShoriGuard.dart';
 
 class AllToujitsuHenkouScreen extends StatefulWidget {
   // targetGroup: 0 = 通常 または 正月駅伝(往路1-5区), 1 = 正月駅伝(復路6-10区)
@@ -283,6 +284,9 @@ class _AllToujitsuHenkouScreenState extends State<AllToujitsuHenkouScreen> {
       setState(() => _isProcessing = true);
       final int raceIdx = currentGhensuu!.hyojiracebangou;
 
+      // 処理前スナップショット(途中で終了しても処理前の状態に戻せるように)
+      await ShoriGuard.begin('他大学の当日変更');
+
       // 手動で当日変更した大学として記録(自動の当日変更をしない)
       await markManualToujituHenkou(
         currentGhensuu: currentGhensuu!,
@@ -313,8 +317,11 @@ class _AllToujitsuHenkouScreenState extends State<AllToujitsuHenkouScreen> {
         senshudataBox.values.toList(),
       );
 
+      await ShoriGuard.end();
       _showSnackBar('保存と順位の再計算が完了しました。');
       _refreshSenshuData(selectedUnivId!);
+    } catch (e) {
+      ShoriGuard.reportError('他大学の当日変更', e);
     } finally {
       if (mounted) setState(() => _isProcessing = false);
     }

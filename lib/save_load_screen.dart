@@ -18,6 +18,7 @@ import 'dart:math'; // Randomクラスを使用するため
 import 'package:ekiden/kansuu/univkosei.dart';
 import 'package:ekiden/kansuu/ChartPanelSenshu.dart';
 import 'package:ekiden/kansuu/ChartPanelUniv.dart';
+import 'package:ekiden/kansuu/ShoriGuard.dart';
 //import 'dart:io';
 //import 'package:path_provider/path_provider.dart';
 
@@ -410,6 +411,9 @@ class _SaveLoadScreenState extends State<SaveLoadScreen> {
       // データ読み込み＆上書きフェーズ
       // =======================================================
 
+      // 処理前スナップショット(途中で終了しても読み込み前の状態に戻せるように)
+      await ShoriGuard.begin('保存ゲームの読み込み');
+
       print('---- [START] データ読み込み＆上書きフェーズ (Boxは閉じない) ----');
       for (var boxName in kActiveBoxNames) {
         final slotBoxName = _getSlotBoxName(boxName, targetSlot);
@@ -750,10 +754,12 @@ class _SaveLoadScreenState extends State<SaveLoadScreen> {
         await sortedUnivData[7].save();
       }
 
+      await ShoriGuard.end();
       _showSnackbar('スロット $targetSlot から読み込みました！ ✅');
       // UIの再描画と画面操作を、システム処理が完全に安定するまで遅延させる
     } catch (e) {
       _showSnackbar('読み込みに失敗しました: $e', isError: true);
+      ShoriGuard.reportError('保存ゲームの読み込み', e);
       print('読み込み失敗 (データコピー): $e');
     }
   }

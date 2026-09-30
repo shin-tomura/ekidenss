@@ -25,6 +25,7 @@ import 'package:ekiden/constants.dart';
 import 'package:ekiden/kansuu/RetireNew.dart';
 import 'package:ekiden/kansuu/goldsilverTeikiKakutoku.dart';
 import 'package:ekiden/kansuu/goldsilver_com.dart';
+import 'package:ekiden/kansuu/ShoriGuard.dart';
 import 'package:ekiden/kansuu/SenshuShokiti.dart';
 import 'package:ekiden/kansuu/asset_loader.dart';
 import 'package:ekiden/kansuu/ShozokusakiKettei_By_Univmeisei.dart';
@@ -122,6 +123,8 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   print("通過1");
   await Hive.initFlutter();
+  // 前回、処理の途中で終了していた場合は、Boxを開く前に処理前の状態に戻す
+  await ShoriGuard.restoreIfInterrupted();
   print("通過2");
   final prefs = await SharedPreferences.getInstance();
 
@@ -1007,6 +1010,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     super.initState();
     // WidgetsBindingObserver を登録
     WidgetsBinding.instance.addObserver(this);
+    ShoriGuard.errorMessage.addListener(_onShoriError);
 
     _ghensuuBox = Hive.box<Ghensuu>('ghensuuBox');
     _senshuBox = Hive.box<SenshuData>('senshuBox');
@@ -1021,6 +1025,30 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   }
 
   bool _isMode10Processing = false; // mode 10 の処理が実行中かどうかのフラグ
+  bool _shoriGuardBusy = false; // 処理前スナップショット付きの処理が実行中かどうかのフラグ
+
+  // 処理中にエラーが起きたらエラー画面を表示するために再描画する
+  void _onShoriError() {
+    if (mounted) setState(() {});
+  }
+
+  /// 処理 mode を「処理前スナップショット → 処理 → 完了」の形で実行する
+  /// 途中でアプリが終了した場合や例外が出た場合は、次の起動時に処理前の状態に戻る
+  Future<void> _runGuarded(String label, Future<void> Function() body) async {
+    if (_shoriGuardBusy || _isMode10Processing) return;
+    _shoriGuardBusy = true;
+    try {
+      await ShoriGuard.begin(label);
+      await body();
+      await ShoriGuard.end();
+    } catch (e) {
+      ShoriGuard.reportError(label, e);
+    } finally {
+      _shoriGuardBusy = false;
+      // 処理中に次の mode の呼び出しが見送られていても、ここで再描画して呼び直す
+      if (mounted) setState(() {});
+    }
+  }
   // アプリのライフサイクル状態が変更されたときに呼び出される
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -1029,12 +1057,14 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
     if (state == AppLifecycleState.paused) {
       // アプリがバックグラウンドに移行したときに保存処理を実行
-      print('App is paused. Saving data...');
-      _saveAllHiveBoxes();
+      // 全データの保存し直しは廃止(個々の変更は都度保存済み。処理の途中で終了した場合は
+      // 処理前スナップショットから戻すため、ここで大量に書き込む必要はない)
+      //print('App is paused. Saving data...');
+      //_saveAllHiveBoxes();
     } else if (state == AppLifecycleState.detached) {
       // アプリが終了する直前（iOSではあまり発生しないがAndroidではあり得る）
-      print('App is detached. Saving data and closing boxes...');
-      _saveAllHiveBoxes();
+      //print('App is detached. Saving data and closing boxes...');
+      //_saveAllHiveBoxes();
       // Hive Boxを閉じる（通常はアプリ終了時に自動的に行われるが、明示的に行うことも可能）
       // await _ghensuuBox.close(); // 必要であれば
       // await _senshuBox.close();  // 必要であれば
@@ -1042,7 +1072,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     }
   }
 
-  // 全てのHive Boxのデータを保存する関数
+  // 全てのHive Boxのデータを保存する関数(現在は未使用)
+  // ignore: unused_element
   Future<void> _saveAllHiveBoxes() async {
     try {
       // Ghensuu Boxの保存
@@ -1111,6 +1142,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   void dispose() {
     // WidgetsBindingObserver の登録を解除
     WidgetsBinding.instance.removeObserver(this);
+    ShoriGuard.errorMessage.removeListener(_onShoriError);
     // Boxを閉じる（アプリ終了時に自動的に閉じられることが多いですが、明示的に行うことも可能）
     // _ghensuuBox.close();
     // _senshuBox.close();
@@ -4061,6 +4093,15 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         // 共通テーマを適用
         final ThemeData appTheme = buildAppTheme(); // ★共通テーマを取得★
 
+        // 処理中にエラーが発生した場合は、再起動を促す画面を表示する
+        final String? shoriError = ShoriGuard.errorMessage.value;
+        if (shoriError != null) {
+          return MaterialApp(
+            theme: appTheme,
+            home: Scaffold(body: ShoriErrorScreen(message: shoriError)),
+          );
+        }
+
         // ★★★ ADD/MODIFY/DELETE START ★★★
         // --- ゲーム進行管理ロジックの開始 ---
         // gamenflagの更新とは独立してmodeをチェックし、処理を実行します。
@@ -4120,7 +4161,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         } else if (currentGhensuu.mode == 9005 && !_isMode10Processing) {
           // フラグを追加
           WidgetsBinding.instance.addPostFrameCallback((_) async {
-            await _runMode9005Processing(currentGhensuu);
+            await _runGuarded(
+              '学内順位計算',
+              () => _runMode9005Processing(currentGhensuu),
+            );
           });
           return MaterialApp(
             theme: appTheme, // ★テーマを適用★
@@ -4164,7 +4208,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         } else if (currentGhensuu.mode == 101010 && !_isMode10Processing) {
           // フラグを追加
           WidgetsBinding.instance.addPostFrameCallback((_) async {
-            await _runMode101010Processing(currentGhensuu);
+            await _runGuarded(
+              '名声と育成力を維持したリセット',
+              () => _runMode101010Processing(currentGhensuu),
+            );
           });
           return MaterialApp(
             theme: appTheme, // ★テーマを適用★
@@ -4244,7 +4291,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         } else if (currentGhensuu.mode == 1100 && !_isMode10Processing) {
           // フラグを追加
           WidgetsBinding.instance.addPostFrameCallback((_) async {
-            await _runMode1100Processing(currentGhensuu);
+            await _runGuarded(
+              'COMチーム強化練習設定',
+              () => _runMode1100Processing(currentGhensuu),
+            );
           });
           return MaterialApp(
             theme: appTheme,
@@ -4288,7 +4338,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         } else if (currentGhensuu.mode == 120 && !_isMode10Processing) {
           // フラグを追加
           WidgetsBinding.instance.addPostFrameCallback((_) async {
-            await _runMode0120Processing(currentGhensuu);
+            await _runGuarded(
+              '1次エントリー選手選考',
+              () => _runMode0120Processing(currentGhensuu),
+            );
           });
           return MaterialApp(
             theme: appTheme,
@@ -4332,7 +4385,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         } else if (currentGhensuu.mode == 200 && !_isMode10Processing) {
           // フラグを追加
           WidgetsBinding.instance.addPostFrameCallback((_) async {
-            await _runMode0200Processing(currentGhensuu);
+            await _runGuarded(
+              'エントリー選手選考',
+              () => _runMode0200Processing(currentGhensuu),
+            );
           });
           return MaterialApp(
             theme: appTheme,
@@ -4376,7 +4432,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         } else if (currentGhensuu.mode == 400 && !_isMode10Processing) {
           // フラグを追加
           WidgetsBinding.instance.addPostFrameCallback((_) async {
-            await _runMode0400Processing(currentGhensuu);
+            await _runGuarded(
+              'レース計算',
+              () => _runMode0400Processing(currentGhensuu),
+            );
           });
           return MaterialApp(
             theme: appTheme,
@@ -4420,7 +4479,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         } else if (currentGhensuu.mode == 600 && !_isMode10Processing) {
           // フラグを追加
           WidgetsBinding.instance.addPostFrameCallback((_) async {
-            await _runMode0600Processing(currentGhensuu);
+            await _runGuarded(
+              '記録更新',
+              () => _runMode0600Processing(currentGhensuu),
+            );
           });
           return MaterialApp(
             theme: appTheme,
@@ -4464,7 +4526,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         } else if (currentGhensuu.mode == 2000 && !_isMode10Processing) {
           // フラグを追加
           WidgetsBinding.instance.addPostFrameCallback((_) async {
-            await _runMode2000Processing(currentGhensuu);
+            await _runGuarded(
+              '卒業・入学',
+              () => _runMode2000Processing(currentGhensuu),
+            );
           });
           return MaterialApp(
             theme: appTheme,
@@ -4512,7 +4577,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
           // フラグを追加
           WidgetsBinding.instance.addPostFrameCallback((_) async {
-            await _runMode5555Processing(currentGhensuu);
+            await _runGuarded(
+              '日付更新',
+              () => _runMode5555Processing(currentGhensuu),
+            );
           });
           return MaterialApp(
             theme: appTheme,

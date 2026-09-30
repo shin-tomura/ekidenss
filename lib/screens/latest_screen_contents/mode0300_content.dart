@@ -27,6 +27,7 @@ import 'package:ekiden/screens/Modal_matrix2.dart';
 import 'package:ekiden/screens/Modal_matrix3.dart';
 import 'package:ekiden/screens/All0300.dart';
 import 'package:ekiden/screens/Modal_Taichoufuryou.dart';
+import 'package:ekiden/kansuu/ShoriGuard.dart';
 
 String _getCombinedDifficultyText(KantokuData kantoku, Ghensuu currentGhensuu) {
   // 難易度モードを取得 (0:通常, 1:極, 2:天)
@@ -817,6 +818,8 @@ class _ModalCourseEditViewState extends State<ModalCourseEditView> {
     }
 
     try {
+      // 処理前スナップショット(途中で終了しても処理前の状態に戻せるように)
+      await ShoriGuard.begin('コース編集の保存');
       await currentGhensuu.save();
 
       final ghensuuBox = Hive.box<Ghensuu>('ghensuuBox');
@@ -834,6 +837,7 @@ class _ModalCourseEditViewState extends State<ModalCourseEditView> {
         sortedUnivData: sortedUnivData,
         sortedSenshuData: sortedSenshuData,
       );
+      await ShoriGuard.end();
       String kukanstring = "区間配置の検討順は\n";
       for (int i = 0; i < kukanIDs.length; i++) {
         kukanstring = kukanstring + "${kukanIDs[i] + 1}区 ";
@@ -851,6 +855,7 @@ class _ModalCourseEditViewState extends State<ModalCourseEditView> {
       // モーダル画面全体を閉じる
       Navigator.of(context).pop();
     } catch (e) {
+      ShoriGuard.reportError('コース編集の保存', e);
       // エラー発生時もローディングダイアログを閉じる
       Navigator.of(context).pop();
 
@@ -1075,6 +1080,8 @@ class _ModalCourseEditViewState extends State<ModalCourseEditView> {
     setState(() {});
 
     try {
+      // 処理前スナップショット(途中で終了しても処理前の状態に戻せるように)
+      await ShoriGuard.begin('コース編集の保存');
       await currentGhensuu.save();
 
       final ghensuuBox = Hive.box<Ghensuu>('ghensuuBox');
@@ -1092,6 +1099,7 @@ class _ModalCourseEditViewState extends State<ModalCourseEditView> {
         sortedUnivData: sortedUnivData,
         sortedSenshuData: sortedSenshuData,
       );
+      await ShoriGuard.end();
       String kukanstring = "区間配置の検討順は\n";
       for (int i = 0; i < kukanIDs.length; i++) {
         kukanstring = kukanstring + "${kukanIDs[i] + 1}区 ";
@@ -1110,6 +1118,7 @@ class _ModalCourseEditViewState extends State<ModalCourseEditView> {
       // モーダル画面全体を閉じる
       Navigator.of(context).pop();
     } catch (e) {
+      ShoriGuard.reportError('コース編集の保存', e);
       // ローディングダイアログを閉じる
       Navigator.of(context).pop();
 

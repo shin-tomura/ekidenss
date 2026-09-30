@@ -3,6 +3,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/ghensuu.dart';
 import 'package:ekiden/save_load_screen.dart';
+import 'package:ekiden/kansuu/ShoriGuard.dart';
 
 class FirstScreen extends StatefulWidget {
   const FirstScreen({super.key});
@@ -113,6 +114,20 @@ class _FirstScreen extends State<FirstScreen> {
                         height: 1.6,
                       ),
                     ),
+                    // 前回、処理の途中で終了していた場合のお知らせ
+                    if (ShoriGuard.restoredLabel != null) ...[
+                      const SizedBox(height: 24),
+                      Text(
+                        '前回は「${ShoriGuard.restoredLabel}」の処理中にアプリが終了したため、'
+                        '処理前の状態に戻しました。『続きから再開』を選ぶと、その処理からやり直します。',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: Colors.orangeAccent,
+                          fontSize: 13,
+                          height: 1.6,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 60),
 
                     // メイン：続きから再開

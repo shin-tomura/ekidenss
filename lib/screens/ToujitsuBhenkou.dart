@@ -19,6 +19,7 @@ import 'package:ekiden/screens/AllToujitu.dart';
 import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/screens/Modal_Taichoufuryou.dart';
 import 'package:ekiden/kansuu/ToujituHenkou_com.dart';
+import 'package:ekiden/kansuu/ShoriGuard.dart';
 
 // --- 当日変更画面ウィジェット ---
 
@@ -333,6 +334,9 @@ class _ToujitsuBHenkouScreenState extends State<ToujitsuBHenkouScreen> {
         _isProcessing = true;
       });
 
+      // 処理前スナップショット(途中で終了しても処理前の状態に戻せるように)
+      await ShoriGuard.begin('当日変更の確定');
+
       // 2. 変更後のデータの永続化
       if (changeCount > 0) {
         final int myUnivId = currentGhensuu!.MYunivid;
@@ -398,8 +402,10 @@ class _ToujitsuBHenkouScreenState extends State<ToujitsuBHenkouScreen> {
         ).showSnackBar(const SnackBar(content: Text('当日変更を確定し、データを保存しました。')));
         */
       }
+      await ShoriGuard.end();
     } catch (e) {
       debugPrint('データの永続化中にエラーが発生しました: $e');
+      ShoriGuard.reportError('当日変更の確定', e);
       if (mounted) {
         ScaffoldMessenger.of(
           context,

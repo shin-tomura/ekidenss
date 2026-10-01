@@ -33,7 +33,8 @@ import 'package:hive_flutter/hive_flutter.dart';
 // ・金: 駅伝男(konjou)優先、次に平常心(heijousin)
 // ・銀: 銀の使い道(大学ごとに設定、yobiint2[40]・[41]に1大学1桁で格納)に従う
 //     0個人の練習メニュー通り(初期値): 各選手の年間強化練習メニュー(kaifukuryoku)
-//       に対応する能力。バランスの選手は支給のたびに1〜5からランダムに選ぶ
+//       に対応する能力。バランスの選手は順番が回ってくるたびに、能力が上限でない
+//       メニュー(1〜5)からランダムに選ぶ
 //       (kaifukuryoku自体は変えない)
 //     1〜5(大学方針): 10人全員がその練習メニューに対応する能力
 //   練習メニューに対応する能力
@@ -711,7 +712,8 @@ Future<List<int>> _comKinGinShiyou({
   final Set<SenshuData> henkouari = {};
   final Set<SenshuData> jougen = {}; // 順番が回ってきたが上限で使えなかった選手(デバッグログ用)
   final Map<int, Set<int>> menugai = {}; // メニュー外で上げた能力の番号(デバッグログ用)
-  final Map<int, int> menuMap = {}; // 銀で使うメニュー(大学方針、なければ個人の練習メニュー。バランスの選手は抽選)
+  final Map<int, int> menuMap = {}; // 銀で使うメニュー(大学方針、なければ個人の練習メニュー。バランスの選手は0)
+  final Map<int, List<int>> balanceChuusen = {}; // バランスの選手が抽選で選んだメニュー(デバッグログ用)
   final bool daigakuHoushin =
       ginHoushin >= 1 && ginHoushin <= comGinHoushinMax;
 
@@ -737,11 +739,11 @@ Future<List<int>> _comKinGinShiyou({
   int menugaiTsukatta = 0;
   if (ginKaisuu > 0) {
     // 大学方針があれば10人全員その能力に使う
-    // なければ個人の練習メニュー通り(バランスの選手は、この夏合宿で使うメニューをランダムに決める)
+    // なければ個人の練習メニュー通り(バランスの選手は0にしておき、順番が回ってくるたびに抽選する)
     for (final s in shuryoku) {
       int menu = daigakuHoushin ? ginHoushin : s.kaifukuryoku;
       if (menu < 1 || menu > 5) {
-        menu = random.nextInt(5) + 1;
+        menu = 0;
       }
       menuMap[s.id] = menu;
     }
@@ -749,7 +751,9 @@ Future<List<int>> _comKinGinShiyou({
     ginTsukatta = _junbanniKubaru(
       shuryoku,
       ginKaisuu,
-      (s) => _ginTokkun(s, menuMap[s.id]!),
+      (s) => menuMap[s.id] == 0
+          ? _balanceGinTokkun(s, random, balanceChuusen)
+          : _ginTokkun(s, menuMap[s.id]!),
       henkouari,
       jougen,
     );
@@ -813,8 +817,11 @@ Future<List<int>> _comKinGinShiyou({
         if (daigakuHoushin) {
           menuStr = '大学方針:${TrainingMenu.getMenuString(ginHoushin)}  ';
         } else if (balance) {
-          menuStr =
-              '年間強化:バランス→抽選で${TrainingMenu.getMenuString(menuMap[s.id]!)}  ';
+          final List<int> chuusen = balanceChuusen[s.id] ?? [];
+          menuStr = chuusen.isEmpty
+              ? '年間強化:バランス  '
+              : '年間強化:バランス→抽選で'
+                    '${chuusen.map(TrainingMenu.getMenuString).join('・')}  ';
         } else {
           menuStr = '年間強化:${TrainingMenu.getMenuString(s.kaifukuryoku)}  ';
         }
@@ -966,6 +973,42 @@ bool _menugaiTokkun(
   }
   menugai.putIfAbsent(s.id, () => <int>{}).add(bangou);
   return true;
+}
+
+/// メニュー(1〜5)に対応する能力が、すべて上限(90以上)かどうか
+bool _menuJougen(SenshuData s, int menu) {
+  switch (menu) {
+    case 1: // スピード
+      return s.spurtryoku > 89 && s.paceagesagetaiouryoku > 89;
+    case 2: // 距離走
+      return s.choukyorinebari > 89 && s.tandokusou > 89;
+    case 3: // 登り
+      return s.noboritekisei > 89;
+    case 4: // 下り
+      return s.kudaritekisei > 89;
+    case 5: // アップダウン
+      return s.noborikudarikirikaenouryoku > 89;
+    default:
+      return true;
+  }
+}
+
+/// バランスの選手の銀特訓: 順番が回ってくるたびに、能力が上限でないメニュー(1〜5)から
+/// ランダムに1つ選んで上げる(全部上限なら使えない)
+/// メニュー1〜5でカリスマ・安定感以外の7つの能力をすべて含むので、メニュー外の能力は残らない
+bool _balanceGinTokkun(
+  SenshuData s,
+  Random random,
+  Map<int, List<int>> balanceChuusen, // 抽選で選んだメニュー(デバッグログ用)
+) {
+  final List<int> kouho = [
+    for (int menu = 1; menu <= 5; menu++)
+      if (!_menuJougen(s, menu)) menu,
+  ];
+  if (kouho.isEmpty) return false;
+  final int menu = kouho[random.nextInt(kouho.length)];
+  balanceChuusen.putIfAbsent(s.id, () => <int>[]).add(menu);
+  return _ginTokkun(s, menu);
 }
 
 /// 銀特訓: 年間強化メニューに対応する能力

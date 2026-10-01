@@ -928,6 +928,25 @@ Future<void> main() async {
     // 下の名前のリストが1.7.7以前の古いリストのままなら新しいリストに置き換える(中身で判定するので版番号に関係なく1回だけ)
     await nameAtoListKoushin();
 
+    {
+      //バージョンアップに伴い付け足す処理を書く
+      //1.7.9でコンピュータ大学の春の金銀定期支給を4月15日から4月5日(プレイヤーと同じ時期)に移したので、
+      //4月5日の処理の後、4月15日の処理の前のセーブデータでは、今年度の分をここで一度だけ支給する
+      //save_load_screenの中の _importFromSlot の中にもあるので、そちらも変更すること！
+      final checkversionValue = int.tryParse(sortedUnivData[7].name_tanshuku);
+      if (checkversionValue == null ||
+          checkversionValue < 21790 ||
+          checkversionValue > 999999999) {
+        final Ghensuu? gh = ghensuuBox.getAt(0);
+        if (gh != null &&
+            gh.month == 4 &&
+            ((gh.day == 5 && gh.mode != 2000) ||
+                (gh.day == 15 && gh.mode == 1100))) {
+          await comGoldSilverTeiki(gh: [gh], sortedUnivData: sortedUnivData);
+        }
+      }
+    }
+
     //1.4.3からバージョン番号保存することにした(この処理は一連の処理の中で1番最後にすること)
     //save_load_screenの中の _importFromSlot の中にもあるので、そちらも変更すること！
     final versionValue = int.tryParse(sortedUnivData[7].name_tanshuku);
@@ -1694,9 +1713,6 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     print('Current Date: $currentMonth/$currentDay');
 
     await Kyouka_com(gh: gh, sortedSenshuData: sortedSenshuData);
-
-    // コンピュータ大学の金銀獲得(春の定期支給分、夏合宿まで保有する)
-    await comGoldSilverTeiki(gh: gh, sortedUnivData: sortedUnivData);
 
     if (skip.skipflag == 0) {
       ghensuu.mode = 1111;
@@ -2989,6 +3005,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     if (kantoku.yobiint2[0] != 2) {
       await goldsilverTeikiKakutoku(ghensuu, sortedUnivData);
     }
+    // コンピュータ大学の金銀獲得(春の定期支給分、プレイヤーと同じ時期。夏合宿まで保有する)
+    // (プレイヤーの難易度モードの「天」に関係なく、大学ごとの支給レベルで支給する)
+    await comGoldSilverTeiki(gh: [ghensuu], sortedUnivData: sortedUnivData);
 
     // 7. 念の為セーブ (goldsilverTeikiKakutoku内でsaveChangesが呼び出される場合も同様)
     // ここでも、goldsilverTeikiKakutoku内でghensuuオブジェクトがsave()を呼ぶように設計するのが一般的です。

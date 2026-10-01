@@ -20,6 +20,7 @@ import 'package:ekiden/kansuu/ChartPanelSenshu.dart';
 import 'package:ekiden/kansuu/ChartPanelUniv.dart';
 import 'package:ekiden/kansuu/ShoriGuard.dart';
 import 'package:ekiden/kansuu/NameListKoushin.dart';
+import 'package:ekiden/kansuu/goldsilver_com.dart';
 //import 'dart:io';
 //import 'package:path_provider/path_provider.dart';
 
@@ -747,6 +748,25 @@ class _SaveLoadScreenState extends State<SaveLoadScreen> {
 
       // 下の名前のリストが1.7.7以前の古いリストのままなら新しいリストに置き換える(中身で判定するので版番号に関係なく1回だけ)
       await nameAtoListKoushin();
+
+      {
+        //バージョンアップに伴い付け足す処理を書く
+        //1.7.9でコンピュータ大学の春の金銀定期支給を4月15日から4月5日(プレイヤーと同じ時期)に移したので、
+        //4月5日の処理の後、4月15日の処理の前のセーブデータでは、今年度の分をここで一度だけ支給する
+        //mainの中にもあるので、そちらも変更すること！
+        final checkversionValue = int.tryParse(sortedUnivData[7].name_tanshuku);
+        if (checkversionValue == null ||
+            checkversionValue < 21790 ||
+            checkversionValue > 999999999) {
+          final Ghensuu? gh = Hive.box<Ghensuu>('ghensuuBox').getAt(0);
+          if (gh != null &&
+              gh.month == 4 &&
+              ((gh.day == 5 && gh.mode != 2000) ||
+                  (gh.day == 15 && gh.mode == 1100))) {
+            await comGoldSilverTeiki(gh: [gh], sortedUnivData: sortedUnivData);
+          }
+        }
+      }
 
       //1.4.3からバージョン番号保存することにした(この処理は一連の処理の中で1番最後にすること)
       //mainの中にもあるので、そちらも変更すること！

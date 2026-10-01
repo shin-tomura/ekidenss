@@ -44,6 +44,14 @@ Future<void> SenshuShokitiSetteiByGakunen(
   Box<SenshuData> senshuBox = Hive.box<SenshuData>('senshuBox');
   // Box内の全ての値をリストとして取得します
   final allSenshu = senshuBox.values.toList();
+  // 在籍中の選手(今回名前を作り直さない選手)のフルネーム。
+  // 新しく作る名前がこれと同じにならないようにする(同時期に同じ名前の選手がいないように)。
+  // 新規ゲーム開始時(targetGakunen == 0)は全員作り直すので空
+  final Set<String> zaisekiNames = {
+    if (targetGakunen != 0)
+      for (final s in allSenshu)
+        if (s.gakunen != targetGakunen) s.name,
+  };
   // 取得した全ての選手データをループ処理します
   for (var senshu in allSenshu) {
     /*for (final entry in senshuBox.toMap().entries) {
@@ -60,19 +68,33 @@ Future<void> SenshuShokitiSetteiByGakunen(
 
     // 学年で処理を分岐
     if (targetGakunen == 0 || senshu.gakunen == targetGakunen) {
-      final int r_mae = random.nextInt(TEISUU.SUU_NAMEMAE);
-      int r_ato = random.nextInt(TEISUU.SUU_NAMEATO);
-      // 名字が3文字以上の場合は、3文字以上の下の名前にならないよう選び直す(長くなりすぎないように)
-      if (r_mae < ghensuu.name_mae.length &&
-          ghensuu.name_mae[r_mae].runes.length >= 3) {
-        for (
-          int i = 0;
-          i < 20 &&
-              r_ato < ghensuu.name_ato.length &&
-              ghensuu.name_ato[r_ato].runes.length >= 3;
-          i++
-        ) {
-          r_ato = random.nextInt(TEISUU.SUU_NAMEATO);
+      int r_mae = 0;
+      int r_ato = 0;
+      // 在籍中の選手と名字・名前の両方が同じになったら選び直す(最大50回)
+      for (int tries = 0; tries < 50; tries++) {
+        r_mae = random.nextInt(TEISUU.SUU_NAMEMAE);
+        r_ato = random.nextInt(TEISUU.SUU_NAMEATO);
+        // 名字が3文字以上の場合は、3文字以上の下の名前にならないよう選び直す(長くなりすぎないように)
+        if (r_mae < ghensuu.name_mae.length &&
+            ghensuu.name_mae[r_mae].runes.length >= 3) {
+          for (
+            int i = 0;
+            i < 20 &&
+                r_ato < ghensuu.name_ato.length &&
+                ghensuu.name_ato[r_ato].runes.length >= 3;
+            i++
+          ) {
+            r_ato = random.nextInt(TEISUU.SUU_NAMEATO);
+          }
+        }
+        if (r_mae >= ghensuu.name_mae.length ||
+            r_ato >= ghensuu.name_ato.length) {
+          break; // 範囲外は下のエラー処理に任せる
+        }
+        if (!zaisekiNames.contains(
+          '${ghensuu.name_mae[r_mae]} ${ghensuu.name_ato[r_ato]}',
+        )) {
+          break;
         }
       }
 
@@ -81,6 +103,7 @@ Future<void> SenshuShokitiSetteiByGakunen(
       // ただし、リストのインデックス範囲外アクセスを防ぐためにチェックを加えるのが安全です
       if (r_mae < ghensuu.name_mae.length && r_ato < ghensuu.name_ato.length) {
         senshu.name = '${ghensuu.name_mae[r_mae]} ${ghensuu.name_ato[r_ato]}';
+        zaisekiNames.add(senshu.name); // 同じ回に作る他の選手とも重ならないように
         //print(' -count=${count} ID ${senshu.id}: 名前を ${senshu.name} に設定しました。');
       } else {
         print(' - ID ${senshu.id}: 名前生成エラー: インデックスが範囲外です。');

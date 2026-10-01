@@ -9,6 +9,7 @@ import 'album.dart'; // Album
 import 'univ_data.dart'; // UnivData
 import 'ghensuu.dart'; // Ghensuu
 import 'qr_data_model.dart';
+import 'kansuu/scout_com.dart'; // コンピュータスカウト設定の確認
 
 // 読み込み時に複数枚のデータを一時的に保持する状態管理クラス
 class QrReceiveState {
@@ -143,6 +144,9 @@ class SettingsQrProcessor {
       data['k_yobiint2_40_41'] = kantoku.yobiint2.sublist(40, 42);
       // 戦略的エントリー確率(int) (調子関連設定の画面にある設定)
       data['k_yobiint2_34'] = kantoku.yobiint2[34];
+      // コンピュータスカウト設定(int) [58]ON/OFF・積極性・ラウンド回数、
+      // [59]・[60]大学ごとのスカウト方針、[61]・[62]大学ごとの性格
+      data['k_yobiint2_58_62'] = kantoku.yobiint2.sublist(58, 63);
     } else if (department == SettingsDepartment.octoberTime) {
       //区間ごとタイム調整(int)
       data['k_yobiint5_30_39_time'] = kantoku.yobiint5.sublist(30, 40);
@@ -491,6 +495,24 @@ class SettingsQrProcessor {
           final dynamic v = yobiint2_40_41[i];
           if (v is int && v >= 0 && v < 1000000000000000) {
             kantoku.yobiint2[40 + i] = v;
+          }
+        }
+      }
+      // 以下は1.7.9で追加した設定。古いQRコードには含まれないので、
+      // 含まれていない場合や範囲外の値の場合は、今の設定のままにする
+      // コンピュータスカウト設定(int) kantoku.yobiint2[58]〜[62]
+      //   [58]ON/OFF・積極性・ラウンド回数、[59]・[60]大学ごとのスカウト方針(1大学1桁、15桁まで)、
+      //   [61]・[62]大学ごとの性格(1大学1桁、15桁まで)
+      final dynamic yobiint2_58_62 = dataMap['k_yobiint2_58_62'];
+      if (yobiint2_58_62 is List && yobiint2_58_62.length == 5) {
+        final dynamic settei = yobiint2_58_62[0];
+        if (settei is int && comScoutSetteiTadashii(settei)) {
+          kantoku.yobiint2[58] = settei;
+        }
+        for (int i = 1; i < 5; i++) {
+          final dynamic v = yobiint2_58_62[i];
+          if (v is int && v >= 0 && v < 1000000000000000) {
+            kantoku.yobiint2[58 + i] = v;
           }
         }
       }

@@ -29,6 +29,7 @@ import 'package:ekiden/screens/ModalChartSenshu.dart';
 import 'package:ekiden/kansuu/ChartPanelUniv.dart';
 import 'package:ekiden/screens/tradeScreen.dart';
 import 'package:ekiden/screens/Modal_comGoldSilver.dart';
+import 'package:ekiden/screens/Modal_comScout.dart';
 //import 'package:ekiden/kansuu/kojinBestKirokuJuniKettei.dart';
 // Modal views (placeholders for now, you'll need to create these files)
 //import 'package:ekiden/modals/modal_univ_name_henshuu_view.dart';
@@ -4864,6 +4865,40 @@ class _UnivScreenState extends State<UnivScreen> {
           },
           child: Text(
             "コンピュータ金銀使用",
+            style: TextStyle(
+              color: const Color.fromARGB(255, 0, 255, 0),
+              decoration: TextDecoration.underline,
+              decorationColor: HENSUU.textcolor,
+            ),
+          ),
+        ),
+        TextButton(
+          onPressed: () {
+            showGeneralDialog(
+              context: context,
+              barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+              barrierDismissible: true, // 背景タップで閉じられるようにする
+              barrierLabel: 'コンピュータスカウト', // アクセシビリティ用ラベル
+              transitionDuration: const Duration(
+                milliseconds: 300,
+              ), // アニメーション時間
+              pageBuilder: (context, animation, secondaryAnimation) {
+                return const ModalComScout();
+              },
+              transitionBuilder:
+                  (context, animation, secondaryAnimation, child) {
+                    return FadeTransition(
+                      opacity: CurvedAnimation(
+                        parent: animation,
+                        curve: Curves.easeOut,
+                      ),
+                      child: child,
+                    );
+                  },
+            );
+          },
+          child: Text(
+            "コンピュータスカウト",
             style: TextStyle(
               color: const Color.fromARGB(255, 0, 255, 0),
               decoration: TextDecoration.underline,

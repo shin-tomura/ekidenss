@@ -25,6 +25,7 @@ import 'package:ekiden/constants.dart';
 import 'package:ekiden/kansuu/RetireNew.dart';
 import 'package:ekiden/kansuu/goldsilverTeikiKakutoku.dart';
 import 'package:ekiden/kansuu/goldsilver_com.dart';
+import 'package:ekiden/kansuu/scout_com.dart';
 import 'package:ekiden/kansuu/ShoriGuard.dart';
 import 'package:ekiden/kansuu/NameListKoushin.dart';
 import 'package:ekiden/kansuu/SenshuShokiti.dart';
@@ -3016,9 +3017,12 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     // 8. gh[0].mode=8888 の設定
     //ghensuu.mode = 8888;
     if (skip.skipflag == 0) {
-      ghensuu.scoutChances = 3;
+      // 新入生スカウトの回数(コンピュータスカウトONなら設定のラウンド回数、OFFなら今まで通り3回)
+      ghensuu.scoutChances = comScoutChances(kantoku);
       ghensuu.mode = 9000;
     } else {
+      // スキップ中は、コンピュータスカウトがONならコンピュータの大学だけで全ラウンドを行う
+      await comScoutSkip(gh: ghensuu);
       ghensuu.mode = 5555;
     }
 

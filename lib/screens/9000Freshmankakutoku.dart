@@ -7,7 +7,9 @@ import 'package:ekiden/senshu_data.dart'; // SenshuDataクラスのパスを適�
 import 'package:ekiden/univ_data.dart'; // UnivDataクラスのパスを適宜修正
 import 'package:ekiden/constants.dart'; // HENSUUクラスのパスを適宜修正
 import 'dart:math';
-//import 'package:ekiden/kantoku_data.dart';
+import 'package:ekiden/kantoku_data.dart';
+import 'package:ekiden/kansuu/scout_com.dart';
+import 'package:ekiden/kansuu/ShoriGuard.dart';
 //import 'package:ekiden/kansuu/kojinBestKirokuJuniKettei.dart';
 
 enum SortCriterion {
@@ -70,6 +72,9 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
   };
 
   bool _isLoading = true; // ★追加：ローディング状態管理用
+  String _loadingMessage = 'スカウト名簿を作成中...'; // 読み込み中に出す文
+  bool _comScoutOn = false; // コンピュータスカウトがONなら、ラウンド制で交渉する
+  int _roundSuu = 3; // ラウンド回数(ONのとき。何ラウンド目かの表示用)
 
   @override
   void initState() {
@@ -78,6 +83,13 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
     _senshuBox = Hive.box<SenshuData>('senshuBox');
     _univBox = Hive.box<UnivData>('univBox');
     _ghensuu = _ghensuuBox.getAt(0);
+    final KantokuData? kantoku = Hive.box<KantokuData>(
+      'kantokuBox',
+    ).get('KantokuData');
+    if (kantoku != null) {
+      _comScoutOn = isComScoutOn(kantoku);
+      _roundSuu = comScoutKaisuu(kantoku);
+    }
 
     // ★追加: フィルターマップの初期化 (全て0で初期化)
     _abilityFilters = Map.fromIterable(
@@ -90,7 +102,10 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
 
   /// 獲得候補の新入生リストを初期化し、交渉成功確率を計算・格納する
   void _initializeScoutingData() async {
-    setState(() => _isLoading = true);
+    setState(() {
+      _isLoading = true;
+      _loadingMessage = 'スカウト名簿を作成中...';
+    });
 
     final myUnivId = _ghensuu?.MYunivid;
 
@@ -395,6 +410,11 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
     if (_ghensuu!.scoutChances <= 0) {
       return;
     }
+    // コンピュータスカウトがONなら、コンピュータの大学と同じラウンドで一斉に判定する
+    if (_comScoutOn) {
+      await _negotiateRound(freshman);
+      return;
+    }
 
     // 成功確率を取得
     double successRate;
@@ -427,6 +447,165 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
     } else {
       _showAcquireFailureDialog(freshman);
     }
+  }
+
+  /// 今が何ラウンド目か(1から)
+  int _roundBangou() {
+    final int bangou = _roundSuu - _ghensuu!.scoutChances + 1;
+    return bangou < 1 ? 1 : bangou;
+  }
+
+  /// コンピュータスカウトONのときの交渉(プレイヤーとコンピュータの大学が同じラウンドで交渉する)
+  Future<void> _negotiateRound(SenshuData freshman) async {
+    // 成功率(画面に出している値と同じ。1%未満は0.1%)
+    double successRate;
+    if (freshman.kegaflag == -1) {
+      successRate = 0.001;
+    } else if (freshman.kegaflag < 0) {
+      successRate = 0.0;
+    } else {
+      successRate = freshman.kegaflag / 100.0;
+    }
+    final int roundBangou = _roundBangou();
+    setState(() {
+      _isLoading = true;
+      _loadingMessage = 'ラウンド$roundBangouの結果を判定中...';
+    });
+    List<ComScoutKekka> kekka = [];
+    try {
+      // 処理前スナップショット(途中で終了しても処理前の状態に戻せるように)
+      await ShoriGuard.begin('新入生スカウト');
+      kekka = await comScoutRound(
+        gh: _ghensuu!,
+        roundBangou: roundBangou,
+        playerTarget: freshman,
+        playerSeikouritsu: successRate,
+      );
+      _ghensuu!.scoutChances--;
+      await _ghensuu!.save();
+      await ShoriGuard.end();
+    } catch (e) {
+      ShoriGuard.reportError('新入生スカウト', e);
+      return;
+    }
+    // リストの再初期化
+    _initializeScoutingData();
+    if (!mounted) return;
+    await _showKekkaDialog('ラウンド$roundBangouの結果', [
+      ...comScoutKekkaBun(kekka, _ghensuu!.MYunivid),
+    ]);
+  }
+
+  /// スカウトを終える(コンピュータスカウトONなら、残りのラウンドと放出を先に済ませる)
+  Future<void> _scoutShuuryou() async {
+    if (_comScoutOn) {
+      final int nokori = _ghensuu!.scoutChances;
+      final int hajime = _roundBangou();
+      setState(() {
+        _isLoading = true;
+        _loadingMessage = nokori > 0 ? '残りのラウンドを判定中...' : '放出を判定中...';
+      });
+      final List<String> bun = [];
+      try {
+        // 処理前スナップショット(途中で終了しても処理前の状態に戻せるように)
+        await ShoriGuard.begin('新入生スカウト');
+        // 残りのラウンドはコンピュータの大学だけで行う
+        for (int i = 0; i < nokori; i++) {
+          final List<ComScoutKekka> kekka = await comScoutRound(
+            gh: _ghensuu!,
+            roundBangou: hajime + i,
+          );
+          final List<String> roundBun = comScoutKekkaBun(
+            kekka,
+            _ghensuu!.MYunivid,
+          );
+          bun.add('― ラウンド${hajime + i} ―');
+          bun.addAll(roundBun.isEmpty ? ['(移籍はありませんでした)'] : roundBun);
+        }
+        _ghensuu!.scoutChances = 0;
+        await _ghensuu!.save();
+        // 新入生が5人を超えたコンピュータの大学の放出
+        final List<ComScoutKekka> houshutsu = await comScoutHoushutsu(
+          gh: _ghensuu!,
+        );
+        if (houshutsu.isNotEmpty) {
+          bun.add('― 放出 ―');
+          bun.addAll(comScoutKekkaBun(houshutsu, _ghensuu!.MYunivid));
+        }
+        await ShoriGuard.end();
+      } catch (e) {
+        ShoriGuard.reportError('新入生スカウト', e);
+        return;
+      }
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      if (bun.isNotEmpty) {
+        await _showKekkaDialog(
+          nokori > 0 ? '残りのラウンドと放出の結果' : '放出の結果',
+          bun,
+        );
+      }
+      if (!mounted) return;
+    }
+
+    // 自大学の新入生を抽出
+    final myFreshmen = _senshuBox.values
+        .where((s) => s.univid == _ghensuu!.MYunivid && s.gakunen == 1)
+        .toList();
+
+    if (myFreshmen.length > TEISUU.NINZUU_1GAKUNEN_INUNIV) {
+      setState(() => _ghensuu!.mode = 9003);
+    } else {
+      setState(() => _ghensuu!.mode = 9005);
+    }
+
+    await _ghensuu!.save();
+  }
+
+  /// ラウンドの結果を表示するダイアログ(閉じるまで待つ)
+  Future<void> _showKekkaDialog(String title, List<String> lines) {
+    return showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(title, style: const TextStyle(color: Colors.black)),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (lines.isEmpty)
+                  const Text(
+                    '(移籍はありませんでした)',
+                    style: TextStyle(color: Colors.black),
+                  ),
+                for (final String line in lines)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Text(
+                      line,
+                      style: TextStyle(
+                        color: Colors.black,
+                        fontWeight: line.startsWith('【')
+                            ? FontWeight.bold
+                            : FontWeight.normal,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   /// 強奪失敗時のダイアログを表示する
@@ -584,7 +763,7 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
               const CircularProgressIndicator(color: Colors.blueAccent),
               const SizedBox(height: 24),
               Text(
-                'スカウト名簿を作成中...',
+                _loadingMessage,
                 style: TextStyle(
                   color: HENSUU.textcolor,
                   fontSize: 16,
@@ -1027,37 +1206,39 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
         border: const Border(top: BorderSide(color: Colors.white10)),
       ),
       child: SafeArea(
-        child: ElevatedButton(
-          onPressed: _ghensuu!.scoutChances > 0
-              ? () => _showExitConfirmationDialog()
-              : () async {
-                  // 自大学の新入生を抽出
-                  final myFreshmen = _senshuBox.values
-                      .where(
-                        (s) => s.univid == _ghensuu!.MYunivid && s.gakunen == 1,
-                      )
-                      .toList();
-
-                  if (myFreshmen.length > TEISUU.NINZUU_1GAKUNEN_INUNIV) {
-                    setState(() => _ghensuu!.mode = 9003);
-                  } else {
-                    setState(() => _ghensuu!.mode = 9005);
-                  }
-
-                  await _ghensuu!.save();
-                },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.blue,
-            foregroundColor: Colors.black,
-            minimumSize: const Size(double.infinity, 50),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // コンピュータスカウトONのときのお知らせ
+            if (_comScoutOn)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(
+                  'コンピュータスカウトON: 交渉するたびに、コンピュータの大学も同じラウンドで交渉します(あなたの大学の新入生も狙われます)',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: HENSUU.fontsize_honbun - 2,
+                  ),
+                ),
+              ),
+            ElevatedButton(
+              onPressed: _ghensuu!.scoutChances > 0
+                  ? () => _showExitConfirmationDialog()
+                  : () => _scoutShuuryou(),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.black,
+                minimumSize: const Size(double.infinity, 50),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: const Text(
+                "スカウト終了",
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
             ),
-          ),
-          child: const Text(
-            "スカウト終了",
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          ),
+          ],
         ),
       ),
     );
@@ -1626,9 +1807,11 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
               fontWeight: FontWeight.bold,
             ),
           ),
-          content: const Text(
-            '本当にイベントを終了しますか？',
-            style: TextStyle(color: Colors.black),
+          content: Text(
+            _comScoutOn
+                ? '本当にイベントを終了しますか？\n\n残りのラウンドは、コンピュータの大学だけで行います。'
+                : '本当にイベントを終了しますか？',
+            style: const TextStyle(color: Colors.black),
           ),
           actions: [
             TextButton(
@@ -1646,31 +1829,8 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
                 // この pop() が実行されるまで、次の行には進まない。
                 Navigator.of(context).pop();
 
-                // 自大学の新入生を抽出
-                final myFreshmen = _senshuBox.values
-                    .where(
-                      (s) => s.univid == _ghensuu!.MYunivid && s.gakunen == 1,
-                    )
-                    .toList();
-
-                if (myFreshmen.length > TEISUU.NINZUU_1GAKUNEN_INUNIV) {
-                  setState(() {
-                    _ghensuu!.mode = 9003;
-                  });
-                } else {
-                  setState(() {
-                    _ghensuu!.mode = 9005;
-                    /*if (kantoku.yobiint2[0] != 2) {
-                      _ghensuu!.mode = 8888;
-                    } else {
-                      _ghensuu!.mode = 100;
-                    }*/
-                  });
-                }
-                // 画面遷移後も、_ghensuuの更新と保存は続けて実行されます
-                // setState() は pop() の後に呼び出しても問題ありません
-
-                await _ghensuu!.save();
+                // 放出の画面か次の処理へ(コンピュータスカウトONなら、残りのラウンドと放出を先に済ませる)
+                await _scoutShuuryou();
               },
               child: const Text('OK'), // ローディング表示のロジックを削除
             ),

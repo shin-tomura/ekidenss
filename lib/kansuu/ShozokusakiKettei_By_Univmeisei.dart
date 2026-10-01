@@ -183,6 +183,11 @@ Future<void> ShozokusakiKettei_By_Univmeisei({
   if (names.isEmpty) {
     print('Error: name_ryuugakusei.txt is empty or not found.');
   }
+  // 在籍中の留学生(全大学)の名前と、ここで決めた名前は避ける(同時期に同じ名前の留学生がいないように)
+  final Set<String> shiyouChuuNames = {
+    for (final s in sortedSenshuData)
+      if (s.hirou == 1) s.name,
+  };
   for (int i = 0; i < sortedunivdata.length; i++) {
     if (sortedunivdata[i].r >= 1 && nowsuu_ryuugakusei[i] == 0) {
       for (int ii = nyuugakuji5000_senshudata.length - 1; ii >= 0; ii--) {
@@ -191,9 +196,19 @@ Future<void> ShozokusakiKettei_By_Univmeisei({
             nyuugakuji5000_senshudata[ii].univid == i) {
           nyuugakuji5000_senshudata[ii].hirou = 1;
           nyuugakuji5000_senshudata[ii].seichoutype = 1;
-          final int randomIndex = random.nextInt(names.length);
-          final String namestring = names[randomIndex];
-          nyuugakuji5000_senshudata[ii].name = namestring;
+          final List<String> kouhoNames = names
+              .where((n) => !shiyouChuuNames.contains(n))
+              .toList();
+          // 候補が残らない場合(通常は起こらない)は全体から選ぶ
+          final List<String> erabuNames = kouhoNames.isNotEmpty
+              ? kouhoNames
+              : names;
+          if (erabuNames.isNotEmpty) {
+            final String namestring =
+                erabuNames[random.nextInt(erabuNames.length)];
+            nyuugakuji5000_senshudata[ii].name = namestring;
+            shiyouChuuNames.add(namestring);
+          }
           nyuugakuji5000_senshudata[ii].kiroku_nyuugakuji_5000 =
               TEISUU.DEFAULTTIME;
           nyuugakuji5000_senshudata[ii].time_bestkiroku[0] = TEISUU.DEFAULTTIME;

@@ -948,6 +948,23 @@ Future<void> main() async {
       }
     }
 
+    {
+      //バージョンアップに伴い付け足す処理を書く
+      //1.7.9のコンピュータスカウト(新入生は全員進路未定で、最後に確定しなかった選手が志望先を選ぶ)に
+      //合わせて、スカウト画面の途中のセーブデータでは、自大学の新入生を確定扱いにする
+      //(1.7.8の交渉で獲得した選手が、最後の志望で入れ替わらないように)
+      //save_load_screenの中の _importFromSlot の中にもあるので、そちらも変更すること！
+      final checkversionValue = int.tryParse(sortedUnivData[7].name_tanshuku);
+      if (checkversionValue == null ||
+          checkversionValue < 21790 ||
+          checkversionValue > 999999999) {
+        final Ghensuu? gh = ghensuuBox.getAt(0);
+        if (gh != null && gh.mode == 9000) {
+          await comScoutIkouKakutei(gh: gh);
+        }
+      }
+    }
+
     //1.4.3からバージョン番号保存することにした(この処理は一連の処理の中で1番最後にすること)
     //save_load_screenの中の _importFromSlot の中にもあるので、そちらも変更すること！
     final versionValue = int.tryParse(sortedUnivData[7].name_tanshuku);

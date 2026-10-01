@@ -21,6 +21,7 @@ import 'package:ekiden/kansuu/ChartPanelUniv.dart';
 import 'package:ekiden/kansuu/ShoriGuard.dart';
 import 'package:ekiden/kansuu/NameListKoushin.dart';
 import 'package:ekiden/kansuu/goldsilver_com.dart';
+import 'package:ekiden/kansuu/scout_com.dart';
 //import 'dart:io';
 //import 'package:path_provider/path_provider.dart';
 
@@ -764,6 +765,22 @@ class _SaveLoadScreenState extends State<SaveLoadScreen> {
               ((gh.day == 5 && gh.mode != 2000) ||
                   (gh.day == 15 && gh.mode == 1100))) {
             await comGoldSilverTeiki(gh: [gh], sortedUnivData: sortedUnivData);
+          }
+        }
+      }
+
+      {
+        //バージョンアップに伴い付け足す処理を書く
+        //1.7.9のコンピュータスカウトに合わせて、スカウト画面の途中のセーブデータでは、
+        //自大学の新入生を確定扱いにする(mainの中の同じ処理の説明を参照)
+        //mainの中にもあるので、そちらも変更すること！
+        final checkversionValue = int.tryParse(sortedUnivData[7].name_tanshuku);
+        if (checkversionValue == null ||
+            checkversionValue < 21790 ||
+            checkversionValue > 999999999) {
+          final Ghensuu? gh = Hive.box<Ghensuu>('ghensuuBox').getAt(0);
+          if (gh != null && gh.mode == 9000) {
+            await comScoutIkouKakutei(gh: gh);
           }
         }
       }

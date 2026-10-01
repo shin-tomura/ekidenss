@@ -75,6 +75,9 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
   String _loadingMessage = 'スカウト名簿を作成中...'; // 読み込み中に出す文
   bool _comScoutOn = false; // コンピュータスカウトがONなら、ラウンド制で交渉する
   int _roundSuu = 3; // ラウンド回数(ONのとき。何ラウンド目かの表示用)
+  int _waku = TEISUU.NINZUU_1GAKUNEN_INUNIV; // 自大学の日本人の新入生の枠(ONのとき)
+  int _ryuugakuseiSuu = 0; // 自大学に入学する留学生の新入生の人数(ONのとき)
+  int _kakuteiSuu = 0; // 自大学に確定した新入生の人数(ONのとき)
 
   @override
   void initState() {
@@ -110,6 +113,12 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
     final myUnivId = _ghensuu?.MYunivid;
 
     if (myUnivId == null) {
+      return;
+    }
+
+    // コンピュータスカウトONなら、全員「進路未定」の名簿にする
+    if (_comScoutOn) {
+      await _initializeScoutingDataOn(myUnivId);
       return;
     }
 
@@ -157,6 +166,57 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
     /*if (mounted) {
       setState(() {});
     }*/
+  }
+
+  /// コンピュータスカウトONのときの名簿
+  /// 新入生は全員「進路未定」として出し、仮の振り分けの大学は見せない(自大学の分も)
+  /// 交渉で確定した選手だけ、確定した大学を出す。留学生は交渉の対象外なので出さない
+  Future<void> _initializeScoutingDataOn(int myUnivId) async {
+    final List<SenshuData> shinnyuusei = _senshuBox.values
+        .where((s) => s.gakunen == 1)
+        .toList();
+    _ryuugakuseiSuu = shinnyuusei
+        .where((s) => s.univid == myUnivId && s.hirou == 1)
+        .length;
+    _waku = comScoutWaku(shinnyuusei, myUnivId);
+    _myFreshmen = shinnyuusei
+        .where(
+          (s) => s.hirou != 1 && comScoutKettei(s) && s.univid == myUnivId,
+        )
+        .toList();
+    _targetFreshmen = shinnyuusei
+        .where(
+          (s) => s.hirou != 1 && !(comScoutKettei(s) && s.univid == myUnivId),
+        )
+        .toList();
+    _kakuteiSuu = _myFreshmen.length;
+
+    // 進路未定の選手の成功率をkegaflagに入れる(決まった選手は目印のまま)
+    final Map<int, double> seikouritsu = comScoutSeikouritsuIchiran(
+      univid: myUnivId,
+    );
+    for (final SenshuData s in _targetFreshmen) {
+      if (comScoutKettei(s)) continue;
+      final double r = seikouritsu[s.id] ?? 0.001;
+      s.kegaflag = r < 0.01 ? -1 : (r * 100).round();
+      await s.save();
+    }
+
+    _sortFreshmenLists();
+
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  /// 選手の状態の表示(ONのとき。進路未定・○○大学に確定など)
+  String _jyoutaiMoji(SenshuData s) {
+    if (!comScoutKettei(s)) return '進路未定';
+    final String mei = _univBox.get(s.univid)?.name ?? '不明';
+    if (s.univid == _ghensuu!.MYunivid) {
+      return comScoutKakutei(s) ? 'あなたの大学に確定' : 'あなたの大学に入学(志望)';
+    }
+    return comScoutKakutei(s) ? '$mei大学に確定' : '$mei大学に入学(志望)';
   }
 
   /// 選手リストを現在の並び替え条件に基づいてソートする
@@ -343,7 +403,11 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
       case SortCriterion.univid:
         compareFunction = (a, b) {
           // 昇順ソート
-          final unividComparison = a.univid.compareTo(b.univid);
+          // (コンピュータスカウトONのときは、決まった大学の順。進路未定は先頭。
+          //  仮の振り分けの大学が分からないように)
+          final int ka = !_comScoutOn || comScoutKettei(a) ? a.univid : -1;
+          final int kb = !_comScoutOn || comScoutKettei(b) ? b.univid : -1;
+          final unividComparison = ka.compareTo(kb);
           if (unividComparison != 0) {
             return unividComparison;
           } else {
@@ -356,6 +420,13 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
 
     _myFreshmen.sort(compareFunction);
     _targetFreshmen.sort(compareFunction);
+    // コンピュータスカウトONのときは、進路未定の選手を先に並べる(並べ替えの順は保つ)
+    if (_comScoutOn) {
+      _targetFreshmen = [
+        ..._targetFreshmen.where((s) => !comScoutKettei(s)),
+        ..._targetFreshmen.where(comScoutKettei),
+      ];
+    }
   }
 
   /// 交渉成功確率を計算し、選手の`kegaflag`に格納する
@@ -496,14 +567,16 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
     ]);
   }
 
-  /// スカウトを終える(コンピュータスカウトONなら、残りのラウンドと放出を先に済ませる)
+  /// スカウトを終える(コンピュータスカウトONなら、残りのラウンドと最後の志望を先に済ませる)
+  /// そのあと、自大学の新入生が5人を超えていれば放出の画面へ(ONでは、1.7.8から引き継いだ
+  /// 途中のスカウトで5人を超えた場合だけ)
   Future<void> _scoutShuuryou() async {
     if (_comScoutOn) {
       final int nokori = _ghensuu!.scoutChances;
       final int hajime = _roundBangou();
       setState(() {
         _isLoading = true;
-        _loadingMessage = nokori > 0 ? '残りのラウンドを判定中...' : '放出を判定中...';
+        _loadingMessage = nokori > 0 ? '残りのラウンドを判定中...' : '進学先を決めています...';
       });
       final List<String> bun = [];
       try {
@@ -520,18 +593,16 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
             _ghensuu!.MYunivid,
           );
           bun.add('― ラウンド${hajime + i} ―');
-          bun.addAll(roundBun.isEmpty ? ['(移籍はありませんでした)'] : roundBun);
+          bun.addAll(roundBun.isEmpty ? ['(確定した選手はいませんでした)'] : roundBun);
         }
         _ghensuu!.scoutChances = 0;
         await _ghensuu!.save();
-        // 新入生が5人を超えたコンピュータの大学の放出
-        final List<ComScoutKekka> houshutsu = await comScoutHoushutsu(
-          gh: _ghensuu!,
+        // 確定しなかった選手が、自ら志望して進学先を選ぶ
+        final Map<int, int> shigan = await comScoutShigan(gh: _ghensuu!);
+        bun.add('― あなたの大学に入学する新入生 ―');
+        bun.addAll(
+          comScoutNyuugakuBun(myUnivid: _ghensuu!.MYunivid, shigan: shigan),
         );
-        if (houshutsu.isNotEmpty) {
-          bun.add('― 放出 ―');
-          bun.addAll(comScoutKekkaBun(houshutsu, _ghensuu!.MYunivid));
-        }
         await ShoriGuard.end();
       } catch (e) {
         ShoriGuard.reportError('新入生スカウト', e);
@@ -541,7 +612,7 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
       setState(() => _isLoading = false);
       if (bun.isNotEmpty) {
         await _showKekkaDialog(
-          nokori > 0 ? '残りのラウンドと放出の結果' : '放出の結果',
+          nokori > 0 ? '残りのラウンドと入学する新入生' : '入学する新入生',
           bun,
         );
       }
@@ -576,7 +647,7 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
               children: [
                 if (lines.isEmpty)
                   const Text(
-                    '(移籍はありませんでした)',
+                    '(確定した選手はいませんでした)',
                     style: TextStyle(color: Colors.black),
                   ),
                 for (final String line in lines)
@@ -867,6 +938,9 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
     String rateStr = freshman.kegaflag == -2
         ? '0%'
         : (freshman.kegaflag == -1 ? '1%未満' : '${freshman.kegaflag}%');
+    // コンピュータスカウトONで進学先が決まった選手は、成功率の代わりに「決定」
+    final bool kettei = _comScoutOn && comScoutKettei(freshman);
+    if (kettei) rateStr = '決定';
 
     return Card(
       // 自校なら濃い紺色、他校なら深いグレー
@@ -939,9 +1013,9 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
                           ),
                         ),
                       ] else ...[
-                        const Text(
-                          '成功率',
-                          style: TextStyle(
+                        Text(
+                          kettei ? '状態' : '成功率',
+                          style: const TextStyle(
                             color: Colors.white54,
                             fontSize: HENSUU.fontsize_honbun - 2,
                           ),
@@ -997,9 +1071,11 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
                         overflow: TextOverflow.ellipsis,
                       ),
                       Text(
-                        isMyUniv
-                            ? 'あなたの大学に入学予定'
-                            : '本来の進路: ${targetUniv?.name ?? "不明"}',
+                        _comScoutOn
+                            ? _jyoutaiMoji(freshman)
+                            : (isMyUniv
+                                  ? 'あなたの大学に入学予定'
+                                  : '本来の進路: ${targetUniv?.name ?? "不明"}'),
                         style: TextStyle(
                           color: isMyUniv
                               ? Colors.amber.withOpacity(0.5)
@@ -1010,12 +1086,15 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
                     ],
                   ),
                 ),
-                if (!isMyUniv && freshman.hirou != 1)
+                if (!isMyUniv && freshman.hirou != 1 && !kettei)
                   SizedBox(
                     height: 36,
                     width: 90,
                     child: ElevatedButton(
-                      onPressed: _ghensuu!.scoutChances > 0
+                      // コンピュータスカウトONのときは、日本人の新入生の枠がいっぱいなら交渉できない
+                      onPressed:
+                          _ghensuu!.scoutChances > 0 &&
+                              (!_comScoutOn || _kakuteiSuu < _waku)
                           ? () => _showConfirmationDialog(freshman)
                           : null,
                       style: ElevatedButton.styleFrom(
@@ -1214,7 +1293,10 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
               Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Text(
-                  'コンピュータスカウトON: 交渉するたびに、コンピュータの大学も同じラウンドで交渉します(あなたの大学の新入生も狙われます)',
+                  'コンピュータスカウトON: 新入生は全員「進路未定」です。交渉するたびに、コンピュータの大学も同じラウンドで交渉し、成功した大学に確定します。確定しなかった選手は、最後に自ら志望して進学先を選びます。\n'
+                  'あなたの大学の日本人の新入生の枠: $_waku人(確定 $_kakuteiSuu人)'
+                  '${_ryuugakuseiSuu > 0 ? '　※留学生が$_ryuugakuseiSuu人入学します' : ''}'
+                  '${_kakuteiSuu >= _waku ? '　枠がいっぱいのため、これ以上は交渉できません' : ''}',
                   style: TextStyle(
                     color: Colors.white70,
                     fontSize: HENSUU.fontsize_honbun - 2,
@@ -1809,7 +1891,7 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
           ),
           content: Text(
             _comScoutOn
-                ? '本当にイベントを終了しますか？\n\n残りのラウンドは、コンピュータの大学だけで行います。'
+                ? '本当にイベントを終了しますか？\n\n残りのラウンドは、コンピュータの大学だけで行います。そのあと、確定しなかった選手が自ら志望して進学先を選びます。'
                 : '本当にイベントを終了しますか？',
             style: const TextStyle(color: Colors.black),
           ),
@@ -1829,7 +1911,7 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
                 // この pop() が実行されるまで、次の行には進まない。
                 Navigator.of(context).pop();
 
-                // 放出の画面か次の処理へ(コンピュータスカウトONなら、残りのラウンドと放出を先に済ませる)
+                // 放出の画面か次の処理へ(コンピュータスカウトONなら、残りのラウンドと最後の志望を先に済ませる)
                 await _scoutShuuryou();
               },
               child: const Text('OK'), // ローディング表示のロジックを削除

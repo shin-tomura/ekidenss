@@ -8,32 +8,13 @@ import 'package:ekiden/kansuu/ikusei_ryuugakusei.dart';
 import 'package:flutter/services.dart';
 // 必要に応じて他のモデルや定数ファイルのインポートを追加してください
 
-/// 大学の名声に基づいて選手を各大学に割り当てる関数
-///
-/// [sortedunivdata]: ID順にソートされた大学データのリスト。
-/// [nyuugakuji5000_senshudata]: 入学時5000mの記録でソートされた選手データのリスト。
-/// [gakunen]: 割り当てを行う学年。
-///
-/// この関数は、渡されたリスト内のSenshuDataオブジェクトの
-/// プロパティ（主にunivid）を変更します。
-/// 変更を永続化するには、この関数を呼び出した後にHive Boxに保存し直す必要があります。
-Future<void> ShozokusakiKettei_By_Univmeisei({
+/// 新入生の振り分けで使う、大学ごとの抽選の重み(大学idの位置)
+/// (名声と、新入生の振り分けの名声トップ3優遇の設定 spurtryokuseichousisuu3 から決める)
+/// コンピュータスカウトの「自ら志望して入学」でも同じ重みを使う
+List<int> shozokuChuusenOmomi({
   required List<UnivData> sortedunivdata,
-  required List<SenshuData> nyuugakuji5000_senshudata,
-  required int gakunen,
   required Ghensuu ghensuu,
-}) async {
-  print('ShozokusakiKettei_By_Univmeisei: 大学所属先決定処理を開始 (学年: $gakunen)...');
-
-  // 変数の初期化
-  List<int> ketteisuu = List.filled(TEISUU.UNIVSUU, 0);
-  int totalrandmotosuu = 0;
-  List<int> randmotosuu = List.filled(TEISUU.UNIVSUU, 0);
-  int suu = 0;
-  int temp_total = 0;
-
-  final _random = Random(); // 乱数ジェネレータのインスタンス
-
+}) {
   // 名声に基づいて大学リストを降順にソートする
   // 元のリストを変更しないよう、コピーを作成してソート
   List<UnivData> sortedByMeiseiUnivData = List.from(sortedunivdata);
@@ -113,6 +94,40 @@ Future<void> ShozokusakiKettei_By_Univmeisei({
       }
     }
   }
+  return temp_meisei;
+}
+
+/// 大学の名声に基づいて選手を各大学に割り当てる関数
+///
+/// [sortedunivdata]: ID順にソートされた大学データのリスト。
+/// [nyuugakuji5000_senshudata]: 入学時5000mの記録でソートされた選手データのリスト。
+/// [gakunen]: 割り当てを行う学年。
+///
+/// この関数は、渡されたリスト内のSenshuDataオブジェクトの
+/// プロパティ（主にunivid）を変更します。
+/// 変更を永続化するには、この関数を呼び出した後にHive Boxに保存し直す必要があります。
+Future<void> ShozokusakiKettei_By_Univmeisei({
+  required List<UnivData> sortedunivdata,
+  required List<SenshuData> nyuugakuji5000_senshudata,
+  required int gakunen,
+  required Ghensuu ghensuu,
+}) async {
+  print('ShozokusakiKettei_By_Univmeisei: 大学所属先決定処理を開始 (学年: $gakunen)...');
+
+  // 変数の初期化
+  List<int> ketteisuu = List.filled(TEISUU.UNIVSUU, 0);
+  int totalrandmotosuu = 0;
+  List<int> randmotosuu = List.filled(TEISUU.UNIVSUU, 0);
+  int suu = 0;
+  int temp_total = 0;
+
+  final _random = Random(); // 乱数ジェネレータのインスタンス
+
+  // 各大学の抽選確率(名声トップ3の優遇を含む)
+  final List<int> temp_meisei = shozokuChuusenOmomi(
+    sortedunivdata: sortedunivdata,
+    ghensuu: ghensuu,
+  );
 
   // 選手を大学に割り当てるメインループ
   for (int i = 0; i < TEISUU.SENSHUSUU_TOTAL; i++) {

@@ -1695,12 +1695,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
     await Kyouka_com(gh: gh, sortedSenshuData: sortedSenshuData);
 
-    // コンピュータ大学の金銀使用(春の定期支給分)
-    await comGoldSilverTeiki(
-      gh: gh,
-      sortedUnivData: sortedUnivData,
-      sortedSenshuData: sortedSenshuData,
-    );
+    // コンピュータ大学の金銀獲得(春の定期支給分、夏合宿まで保有する)
+    await comGoldSilverTeiki(gh: gh, sortedUnivData: sortedUnivData);
 
     if (skip.skipflag == 0) {
       ghensuu.mode = 1111;
@@ -2309,6 +2305,12 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           gakunen: gakunen,
         );
       }
+      // コンピュータ大学の金銀使用(保有している金銀を夏の成長の直後に使う。プレイヤーも成長の後に金銀特訓する)
+      await comGoldSilverNatsuGasshuku(
+        gh: gh,
+        sortedUnivData: sortedUnivData,
+        sortedSenshuData: sortedSenshuData,
+      );
     } else if (currentMonth == 7 && currentDay == 25) {
       // クロカン1万結果計算
       await RaceCalc(

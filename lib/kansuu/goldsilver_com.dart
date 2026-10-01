@@ -17,6 +17,11 @@ import 'package:hive_flutter/hive_flutter.dart';
 //     8天: 支給なし
 //     9プレイヤーと同じ: プレイヤーの難易度(鬼・難・普・易)の支給量。「極」「天」は適用しない
 // ・支給のたびに10%で金、90%で銀(プレイヤーと同じ)
+// ・支給された金銀はすぐには使わず、大学ごとに保有しておき、
+//   夏合宿(7月15日、夏の成長の直後)にまとめて使う(プレイヤーと同じ時期)
+//   (秋以降に獲得した分は翌年の夏合宿で使う)
+//   保有量は1の位まで持つ(yobiint2[42]〜[57])ので、支給量の10未満の端数も捨てない
+// ・夏合宿の時点でOFFの場合と、プレイヤーの大学(移籍先)の保有分は、使わずに0にする
 // ・振り分け先は留学生を除く10人(基本走力はa、小さいほど良い)
 //     主力枠7人: 基本走力の上位7人(全学年)
 //     下級生枠3人: 主力枠に入らなかった1・2年生のうち基本走力の上位3人
@@ -24,9 +29,6 @@ import 'package:hive_flutter/hive_flutter.dart';
 //   「主力2人→下級生1人」の順番で並べ、上から順番に+10ずつ配る
 //   (配る量が少ないときでも下級生に届くように)。
 //   能力が上限の選手は飛ばして次の選手へ回す。
-// ・夏合宿(7月15日)より後の支給では4年生を除く
-//   (プレイヤーは秋以降に獲得した金銀を翌年の夏合宿でしか使えず、
-//    今の4年生には使えないため)
 // ・金: 駅伝男(konjou)優先、次に平常心(heijousin)
 // ・銀: 銀の使い道(大学ごとに設定、yobiint2[40]・[41]に1大学1桁で格納)に従う
 //     0個人の練習メニュー通り(初期値): 各選手の年間強化練習メニュー(kaifukuryoku)
@@ -39,12 +41,12 @@ import 'package:hive_flutter/hive_flutter.dart';
 //     3登り→登り適性、4下り→下り適性、5アップダウン→アップダウン対応力
 // ・カリスマ・安定感には使わない
 // ・能力値が89以下の場合のみ+10(プレイヤーの金銀特訓と同じ上限)
-// ・金: 10人全員の対象の能力が上限で使い切れなかった分と、10未満の端数は、
-//   上限に関係なくいつも銀に交換する(金1→銀2、プレイヤーの金銀交換と同じ)
+// ・金: 10人全員の対象の能力が上限で使い切れなかった分は、銀に交換する
+//   (金1→銀2、プレイヤーの金銀交換と同じ)。10未満の端数は金のまま翌年に持ち越す
 // ・銀: 10人全員のメニュー(大学方針)の能力が上限で使い切れない場合は、10人の先頭から、
 //   メニュー外の能力(カリスマ・安定感を除く7つのうち上限でないもの)から
 //   ランダムに1つずつ上げる
-// ・それでも使い切れない分と、銀の10未満の端数は捨てる
+// ・それでも使い切れない分は捨てる。銀の10未満の端数は翌年に持ち越す
 // ------------------------------------------------------------
 
 /// KantokuData.yobiint2 の使用番号: コンピュータ大学の金銀使用フラグ(0=ON(初期値)、1=OFF)
@@ -182,6 +184,141 @@ String comGinHoushinMei(int houshin) {
   return '個人の練習メニュー通り';
 }
 
+/// KantokuData.yobiint2 の使用番号: 大学ごとの金銀の保有量(夏合宿で使うまで保有する)
+/// 保有量は「10単位の回数」と「10未満の端数」に分けて格納する
+///   [42]〜[47] 銀の回数(1大学3桁、1つの番号に5大学。[42]に大学0〜4、[43]に大学5〜9…)
+///   [48]〜[53] 金の回数(同じ形式)
+///   [54]・[55] 銀の端数(1大学1桁、[54]に大学0〜14、[55]に大学15〜29)
+///   [56]・[57] 金の端数(同じ形式)
+/// 保有量 = 回数×10+端数(上限9999)。どの番号も15桁以内に収まる
+const int comGinHoyuuKaisuuIndex = 42;
+const int comKinHoyuuKaisuuIndex = 48;
+const int comGinHoyuuHasuuIndex = 54;
+const int comKinHoyuuHasuuIndex = 56;
+const int _hoyuuKaisuuHaba = 3; // 回数の1大学あたりの桁数
+const int _hoyuuKaisuuKosuu = 5; // 回数を1つの番号に格納する大学数
+const int _hoyuuHasuuKosuu = 15; // 端数を1つの番号に格納する大学数
+const int comHoyuuMax = 9999; // 保有量の上限(回数999・端数9)
+
+/// 1大学haba桁で詰めた値から、大学の値を取り出す
+/// [idxHajime]から順に、1つの番号にkosuu大学分を格納している
+/// (大学idをkosuuで割った商が番号のずれ、余りが桁の位置)
+int _tsumetaAtaiYomu(
+  List<int> yobiint2,
+  int idxHajime,
+  int kosuu,
+  int haba,
+  int univid,
+) {
+  if (univid < 0 || univid >= TEISUU.UNIVSUU) return 0;
+  final int idx = idxHajime + univid ~/ kosuu;
+  if (yobiint2.length <= idx) return 0;
+  final int v = yobiint2[idx];
+  if (v < 0) return 0;
+  return (v ~/ _juu(haba * (univid % kosuu))) % _juu(haba);
+}
+
+/// 1大学haba桁で詰めた値に、大学の値を書き込む(保存は呼び出し側で行う)
+/// 桁に入らない値は、0〜(haba桁の最大)に収める
+void _tsumetaAtaiKaku(
+  List<int> yobiint2,
+  int idxHajime,
+  int kosuu,
+  int haba,
+  int univid,
+  int atai,
+) {
+  if (univid < 0 || univid >= TEISUU.UNIVSUU) return;
+  final int idx = idxHajime + univid ~/ kosuu;
+  if (yobiint2.length <= idx) return;
+  final int a = atai.clamp(0, _juu(haba) - 1);
+  final int p = _juu(haba * (univid % kosuu));
+  final int v = yobiint2[idx] < 0 ? 0 : yobiint2[idx];
+  final int mae = (v ~/ p) % _juu(haba);
+  yobiint2[idx] = v + (a - mae) * p;
+}
+
+/// 保有量(回数×10+端数)を取り出す
+int _hoyuuYomu(List<int> yobiint2, int kaisuuIdx, int hasuuIdx, int univid) {
+  final int kaisuu = _tsumetaAtaiYomu(
+    yobiint2,
+    kaisuuIdx,
+    _hoyuuKaisuuKosuu,
+    _hoyuuKaisuuHaba,
+    univid,
+  );
+  final int hasuu = _tsumetaAtaiYomu(
+    yobiint2,
+    hasuuIdx,
+    _hoyuuHasuuKosuu,
+    1,
+    univid,
+  );
+  return kaisuu * 10 + hasuu;
+}
+
+/// 保有量を回数と端数に分けて書き込む(0〜9999に収める。保存は呼び出し側で行う)
+void _hoyuuKaku(
+  List<int> yobiint2,
+  int kaisuuIdx,
+  int hasuuIdx,
+  int univid,
+  int ryou,
+) {
+  final int r = ryou.clamp(0, comHoyuuMax);
+  _tsumetaAtaiKaku(
+    yobiint2,
+    kaisuuIdx,
+    _hoyuuKaisuuKosuu,
+    _hoyuuKaisuuHaba,
+    univid,
+    r ~/ 10,
+  );
+  _tsumetaAtaiKaku(yobiint2, hasuuIdx, _hoyuuHasuuKosuu, 1, univid, r % 10);
+}
+
+/// 大学が保有している金の量
+int comKinHoyuu(KantokuData kantoku, int univid) {
+  return _hoyuuYomu(
+    kantoku.yobiint2,
+    comKinHoyuuKaisuuIndex,
+    comKinHoyuuHasuuIndex,
+    univid,
+  );
+}
+
+/// 大学が保有している銀の量
+int comGinHoyuu(KantokuData kantoku, int univid) {
+  return _hoyuuYomu(
+    kantoku.yobiint2,
+    comGinHoyuuKaisuuIndex,
+    comGinHoyuuHasuuIndex,
+    univid,
+  );
+}
+
+/// 大学が保有している金の量を書き込む(保存は呼び出し側で行う)
+void _kinHoyuuSettei(List<int> yobiint2, int univid, int ryou) {
+  _hoyuuKaku(
+    yobiint2,
+    comKinHoyuuKaisuuIndex,
+    comKinHoyuuHasuuIndex,
+    univid,
+    ryou,
+  );
+}
+
+/// 大学が保有している銀の量を書き込む(保存は呼び出し側で行う)
+void _ginHoyuuSettei(List<int> yobiint2, int univid, int ryou) {
+  _hoyuuKaku(
+    yobiint2,
+    comGinHoyuuKaisuuIndex,
+    comGinHoyuuHasuuIndex,
+    univid,
+    ryou,
+  );
+}
+
 /// 支給レベルの表示名(プレイヤーと同じは今のプレイヤーの難易度も付ける 例: プレイヤーと同じ(今は易))
 String comGoldSilverLevelHyouji(int level, int playerKazeflag) {
   if (level < 0 || level > 9) return '';
@@ -209,10 +346,10 @@ int _levelMode(int level) {
 }
 
 /// 春の定期支給分(4月15日の年間強化メニュー決定直後に呼ぶ)
+/// 獲得した金銀は保有しておき、夏合宿で使う
 Future<void> comGoldSilverTeiki({
   required List<Ghensuu> gh,
   required List<UnivData> sortedUnivData,
-  required List<SenshuData> sortedSenshuData,
 }) async {
   final KantokuData? kantoku = Hive.box<KantokuData>(
     'kantokuBox',
@@ -233,26 +370,25 @@ Future<void> comGoldSilverTeiki({
     final int ryou =
         _teikiKakutokusuu(univ, _levelKazeflag(level, gh[0].kazeflag)) *
         kantoku.yobiint2[12];
-    await _comKinGinShiyou(
+    _comKinGinKakutoku(
+      kantoku: kantoku,
       univid: univ.id,
       univName: univName,
       eventLabel: '春の定期支給',
       ryou: ryou,
-      yonenseiNozoku: false,
-      ginHoushin: comGinHoushin(kantoku, univ.id),
-      sortedSenshuData: sortedSenshuData,
       random: random,
     );
   }
+  await kantoku.save();
 }
 
 /// 目標順位達成分(KirokuKousinから呼ぶ)
 /// [mokuhyouBangou] 0〜5: 各駅伝・予選の番号(racebangou)、9: 対校戦総合
+/// 獲得した金銀は保有しておき、夏合宿で使う(夏合宿より後に獲得した分は翌年の夏合宿)
 Future<void> comGoldSilverMokuhyouTassei({
   required int mokuhyouBangou,
   required List<Ghensuu> gh,
   required List<UnivData> sortedUnivData,
-  required List<SenshuData> sortedSenshuData,
 }) async {
   final KantokuData? kantoku = Hive.box<KantokuData>(
     'kantokuBox',
@@ -261,7 +397,6 @@ Future<void> comGoldSilverMokuhyouTassei({
     return;
   }
   final random = Random();
-  final bool yonenseiNozoku = _natsuGasshukuYoriAto(gh[0]);
   for (final univ in sortedUnivData) {
     if (univ.id == gh[0].MYunivid) continue;
     if (mokuhyouBangou != 9 &&
@@ -291,23 +426,97 @@ Future<void> comGoldSilverMokuhyouTassei({
           _levelKazeflag(level, gh[0].kazeflag),
         ) *
         kantoku.yobiint2[12];
-    await _comKinGinShiyou(
+    _comKinGinKakutoku(
+      kantoku: kantoku,
       univid: univ.id,
       univName: univName,
       eventLabel: '目標達成(${_taikaiMei(mokuhyouBangou)})',
       ryou: ryou,
-      yonenseiNozoku: yonenseiNozoku,
-      ginHoushin: comGinHoushin(kantoku, univ.id),
-      sortedSenshuData: sortedSenshuData,
       random: random,
+    );
+  }
+  await kantoku.save();
+}
+
+/// 1大学分の金銀の獲得(10%で金、90%で銀)
+/// すぐには使わず、保有量に加える(保存は呼び出し側で行う)
+void _comKinGinKakutoku({
+  required KantokuData kantoku,
+  required int univid,
+  required String univName, // デバッグログ用
+  required String eventLabel, // デバッグログ用
+  required int ryou,
+  required Random random,
+}) {
+  if (ryou <= 0) return;
+  final bool kin = random.nextInt(100) < 10;
+  if (kin) {
+    _kinHoyuuSettei(
+      kantoku.yobiint2,
+      univid,
+      comKinHoyuu(kantoku, univid) + ryou,
+    );
+  } else {
+    _ginHoyuuSettei(
+      kantoku.yobiint2,
+      univid,
+      comGinHoyuu(kantoku, univid) + ryou,
+    );
+  }
+  // デバッグ実行時のみ、VS Codeのデバッグコンソールに獲得結果を出す
+  if (kDebugMode) {
+    print(
+      '[COM金銀] $eventLabel $univName ${kin ? '金' : '銀'}$ryou獲得 → '
+      '保有 金${comKinHoyuu(kantoku, univid)} 銀${comGinHoyuu(kantoku, univid)}',
     );
   }
 }
 
-/// 今日が夏合宿(7月15日)より後かどうか(年度は4月始まり)
-bool _natsuGasshukuYoriAto(Ghensuu gh) {
-  if (gh.month >= 8 || gh.month <= 3) return true;
-  return gh.month == 7 && gh.day > 15;
+/// 夏合宿分(7月15日の夏の成長の直後に呼ぶ)
+/// 保有している金銀をまとめて使い、10未満の端数だけを翌年に持ち越す
+/// OFFの場合と、プレイヤーの大学(移籍先)の保有分は、使わずに0にする
+Future<void> comGoldSilverNatsuGasshuku({
+  required List<Ghensuu> gh,
+  required List<UnivData> sortedUnivData,
+  required List<SenshuData> sortedSenshuData,
+}) async {
+  final KantokuData? kantoku = Hive.box<KantokuData>(
+    'kantokuBox',
+  ).get('KantokuData');
+  if (kantoku == null) return;
+  final bool on = isComGoldSilverOn(kantoku);
+  final random = Random();
+  for (final univ in sortedUnivData) {
+    final int kin = comKinHoyuu(kantoku, univ.id);
+    final int gin = comGinHoyuu(kantoku, univ.id);
+    if (kin == 0 && gin == 0) continue;
+    if (!on || univ.id == gh[0].MYunivid) {
+      _kinHoyuuSettei(kantoku.yobiint2, univ.id, 0);
+      _ginHoyuuSettei(kantoku.yobiint2, univ.id, 0);
+      if (kDebugMode) {
+        print(
+          '[COM金銀] 夏合宿 ${univ.name} 保有 金$kin 銀$gin → '
+          '${on ? 'プレイヤーの大学' : 'OFF'}のため使わずに0にする',
+        );
+      }
+      continue;
+    }
+    final int level = comGoldSilverLevel(kantoku, univ.id);
+    final String univName =
+        '${univ.name}(${comGoldSilverLevelHyouji(level, gh[0].kazeflag)})';
+    final List<int> mochikoshi = await _comKinGinShiyou(
+      univid: univ.id,
+      univName: univName,
+      kinRyou: kin,
+      ginRyou: gin,
+      ginHoushin: comGinHoushin(kantoku, univ.id),
+      sortedSenshuData: sortedSenshuData,
+      random: random,
+    );
+    _kinHoyuuSettei(kantoku.yobiint2, univ.id, mochikoshi[0]);
+    _ginHoyuuSettei(kantoku.yobiint2, univ.id, mochikoshi[1]);
+  }
+  await kantoku.save();
 }
 
 /// デバッグログ用の大会名
@@ -467,28 +676,30 @@ int _getSeedRank(int raceIdx) {
   }
 }
 
-/// 1大学分の金銀使用(10%で金、90%で銀)
-Future<void> _comKinGinShiyou({
+/// 1大学分の金銀使用(夏合宿で、保有している金と銀をまとめて使う)
+/// 戻り値は翌年に持ち越す量 [金, 銀](ふつうは10未満の端数)
+Future<List<int>> _comKinGinShiyou({
   required int univid,
   required String univName, // デバッグログ用
-  required String eventLabel, // デバッグログ用
-  required int ryou,
-  required bool yonenseiNozoku, // trueなら4年生を振り分け先から除く
+  required int kinRyou, // 保有している金
+  required int ginRyou, // 保有している銀
   required int ginHoushin, // 銀の使い道(0個人の練習メニュー通り、1〜5大学方針)
   required List<SenshuData> sortedSenshuData,
   required Random random,
 }) async {
-  if (ryou <= 0) return;
-  final bool kin = random.nextInt(100) < 10;
+  final int kinKaisuu = kinRyou ~/ 10;
+  final int kinHasuu = kinRyou % 10; // 金の10未満の端数は金のまま持ち越す
+  // 金も銀も10未満なら、使わずにそのまま持ち越す
+  if (kinKaisuu == 0 && ginRyou < 10) return [kinRyou, ginRyou];
 
   final Set<int> kakyuuseiWakuIds = {}; // デバッグログ用
   final List<SenshuData> shuryoku = _furiwakeSaki(
     univid,
-    yonenseiNozoku,
     sortedSenshuData,
     kakyuuseiWakuIds,
   );
-  if (shuryoku.isEmpty) return;
+  // 振り分け先の選手がいなければ、使わずにそのまま持ち越す
+  if (shuryoku.isEmpty) return [kinRyou, ginRyou];
 
   // デバッグログ用に変化前の能力値を控えておく
   final Map<int, List<int>> maeNouryoku = {
@@ -504,30 +715,27 @@ Future<void> _comKinGinShiyou({
 
   // 金
   int kinTsukatta = 0;
-  int koukanKin = 0; // 銀に交換した金
-  int ginRyou = 0;
-  if (kin) {
+  if (kinKaisuu > 0) {
     kinTsukatta = _junbanniKubaru(
       shuryoku,
-      ryou ~/ 10,
+      kinKaisuu,
       _kinTokkun,
       henkouari,
       jougen,
     );
-    // 使えなかった金(10未満の端数も含む)は銀に交換する(金1→銀2)
-    koukanKin = ryou - kinTsukatta * 10;
-    ginRyou = koukanKin * 2;
-  } else {
-    ginRyou = ryou;
   }
+  // 使えなかった金は銀に交換する(金1→銀2)
+  final int koukanKin = (kinKaisuu - kinTsukatta) * 10;
+  final int ginGoukei = ginRyou + koukanKin * 2;
 
   // 銀(交換した銀も含む)
-  final int ginKaisuu = ginRyou ~/ 10; // 10未満の端数は捨てる
+  final int ginKaisuu = ginGoukei ~/ 10;
+  final int ginHasuu = ginGoukei % 10; // 銀の10未満の端数は持ち越す
   int ginTsukatta = 0;
   int menugaiTsukatta = 0;
   if (ginKaisuu > 0) {
     // 大学方針があれば10人全員その能力に使う
-    // なければ個人の練習メニュー通り(バランスの選手は、この支給で使うメニューをランダムに決める)
+    // なければ個人の練習メニュー通り(バランスの選手は、この夏合宿で使うメニューをランダムに決める)
     for (final s in shuryoku) {
       int menu = daigakuHoushin ? ginHoushin : s.kaifukuryoku;
       if (menu < 1 || menu > 5) {
@@ -563,22 +771,23 @@ Future<void> _comKinGinShiyou({
   // (デバッグコンソールの絞り込み欄に「COM金銀」と入れると、この行だけ表示できる)
   if (kDebugMode) {
     final List<String> naiyou = [];
-    if (kin) {
+    if (kinKaisuu > 0) {
       naiyou.add('金$kinTsukatta回使用');
       if (koukanKin > 0) {
-        naiyou.add('使えなかった金$koukanKinを銀$ginRyouに交換');
+        naiyou.add('使えなかった金$koukanKinを銀${koukanKin * 2}に交換');
       }
     }
-    if (ginRyou > 0) {
-      final int ginGoukei = ginTsukatta + menugaiTsukatta;
+    if (ginKaisuu > 0) {
+      final int ginShiyouKaisuu = ginTsukatta + menugaiTsukatta;
       naiyou.add(
-        '銀$ginGoukei回使用'
+        '銀$ginShiyouKaisuu回使用'
         '${menugaiTsukatta > 0 ? '(うちメニュー外$menugaiTsukatta回)' : ''}'
-        '(捨て${ginRyou - ginGoukei * 10})',
+        '(捨て${(ginKaisuu - ginShiyouKaisuu) * 10})',
       );
     }
+    naiyou.add('持ち越し 金$kinHasuu 銀$ginHasuu');
     print(
-      '[COM金銀] $eventLabel $univName ${kin ? '金' : '銀'}$ryou → '
+      '[COM金銀] 夏合宿 $univName 保有 金$kinRyou 銀$ginRyou → '
       '${naiyou.join('、')}',
     );
     for (final s in shuryoku) {
@@ -613,6 +822,7 @@ Future<void> _comKinGinShiyou({
       print('[COM金銀]   $waku${s.name}(${s.gakunen}年) $menuStr$kekka');
     }
   }
+  return [kinHasuu, ginHasuu];
 }
 
 const int _shuryokuWakuSuu = 7; // 主力枠の人数
@@ -626,18 +836,12 @@ const int _kakyuuseiWakuSuu = 3; // 下級生枠の人数
 /// [kakyuuseiWakuIds] 下級生枠に入った1・2年生のIDを入れて返す(デバッグログ用)
 List<SenshuData> _furiwakeSaki(
   int univid,
-  bool yonenseiNozoku,
   List<SenshuData> sortedSenshuData,
   Set<int> kakyuuseiWakuIds,
 ) {
   final List<SenshuData> kouho =
       sortedSenshuData
-          .where(
-            (s) =>
-                s.univid == univid &&
-                s.hirou != 1 &&
-                !(yonenseiNozoku && s.gakunen >= 4),
-          )
+          .where((s) => s.univid == univid && s.hirou != 1)
           .toList()
         ..sort((x, y) {
           final int c = x.a.compareTo(y.a);

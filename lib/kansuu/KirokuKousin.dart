@@ -728,13 +728,12 @@ Future<void> kirokuKousin({
     } // 学内大会記録ループ終端
   }
 
-  // コンピュータ大学の目標順位達成時の金銀使用
+  // コンピュータ大学の目標順位達成時の金銀獲得(夏合宿まで保有する)
   if (racebangou >= 0 && racebangou <= 5) {
     await comGoldSilverMokuhyouTassei(
       mokuhyouBangou: racebangou,
       gh: gh,
       sortedUnivData: sortedunivdata,
-      sortedSenshuData: sortedsenshudata,
     );
   }
 
@@ -2337,12 +2336,11 @@ Future<void> kirokuKousin({
           "自分の大学は対校戦総合で: ${sortedunivdata[gh[0].MYunivid].juni_race[9][0] + 1}位",
         );*/
 
-        // コンピュータ大学の目標順位達成時の金銀使用(対校戦総合)
+        // コンピュータ大学の目標順位達成時の金銀獲得(対校戦総合、夏合宿まで保有する)
         await comGoldSilverMokuhyouTassei(
           mokuhyouBangou: 9,
           gh: gh,
           sortedUnivData: sortedunivdata,
-          sortedSenshuData: sortedsenshudata,
         );
 
         // 目標順位達成の場合のご褒美

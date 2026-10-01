@@ -47,28 +47,61 @@ class _ModalComGoldSilverState extends State<ModalComGoldSilver> {
     await kantoku.save();
   }
 
+  // 画面からはみ出さないプルダウン(番号0〜の項目を表示名の順に並べる)
+  // ・入る幅があれば、いちばん長い項目に合わせた幅にする(今までと同じ見た目)
+  // ・スマホの文字を大きくしていて入らない場合は、入る幅まで縮め、
+  //   選んでいる項目の文字は「…」で省略する(開いた一覧の項目は折り返して全部表示)
+  Widget _hamidasanaiDropdown({
+    required int value,
+    required List<String> hyoujiMei,
+    required ValueChanged<int> onChanged,
+  }) {
+    return IntrinsicWidth(
+      child: DropdownButton<int>(
+        value: value,
+        isExpanded: true,
+        dropdownColor: Colors.grey[900],
+        style: TextStyle(
+          color: HENSUU.textcolor,
+          fontSize: HENSUU.fontsize_honbun,
+        ),
+        items: [
+          for (int i = 0; i < hyoujiMei.length; i++)
+            DropdownMenuItem<int>(value: i, child: Text(hyoujiMei[i])),
+        ],
+        // 選んでいる項目の表示(縦は中央、入らなければ「…」で省略)
+        selectedItemBuilder: (context) => [
+          for (final String mei in hyoujiMei)
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: Text(
+                mei,
+                maxLines: 1,
+                softWrap: false,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+        ],
+        onChanged: (int? v) {
+          if (v != null) onChanged(v);
+        },
+      ),
+    );
+  }
+
   // 支給レベルのプルダウン
   Widget _levelDropdown({
     required int value,
     required int playerKazeflag,
     required ValueChanged<int> onChanged,
   }) {
-    return DropdownButton<int>(
+    return _hamidasanaiDropdown(
       value: value,
-      dropdownColor: Colors.grey[900],
-      style: TextStyle(
-        color: HENSUU.textcolor,
-        fontSize: HENSUU.fontsize_honbun,
+      hyoujiMei: List.generate(
+        comGoldSilverLevelMei.length,
+        (level) => comGoldSilverLevelHyouji(level, playerKazeflag),
       ),
-      items: List.generate(comGoldSilverLevelMei.length, (level) {
-        return DropdownMenuItem<int>(
-          value: level,
-          child: Text(comGoldSilverLevelHyouji(level, playerKazeflag)),
-        );
-      }),
-      onChanged: (int? v) {
-        if (v != null) onChanged(v);
-      },
+      onChanged: onChanged,
     );
   }
 
@@ -96,22 +129,10 @@ class _ModalComGoldSilverState extends State<ModalComGoldSilver> {
     required int value,
     required ValueChanged<int> onChanged,
   }) {
-    return DropdownButton<int>(
+    return _hamidasanaiDropdown(
       value: value,
-      dropdownColor: Colors.grey[900],
-      style: TextStyle(
-        color: HENSUU.textcolor,
-        fontSize: HENSUU.fontsize_honbun,
-      ),
-      items: List.generate(comGinHoushinMax + 1, (houshin) {
-        return DropdownMenuItem<int>(
-          value: houshin,
-          child: Text(comGinHoushinMei(houshin)),
-        );
-      }),
-      onChanged: (int? v) {
-        if (v != null) onChanged(v);
-      },
+      hyoujiMei: List.generate(comGinHoushinMax + 1, comGinHoushinMei),
+      onChanged: onChanged,
     );
   }
 
@@ -342,6 +363,7 @@ class _ModalComGoldSilverState extends State<ModalComGoldSilver> {
                             overflow: TextOverflow.ellipsis,
                           ),
                           // 見出しとプルダウンは組にして、画面が狭いときは組ごと折り返す
+                          // (1組でも入らないときは、プルダウンを縮めて文字を「…」で省略する)
                           Wrap(
                             crossAxisAlignment: WrapCrossAlignment.center,
                             spacing: 16,
@@ -351,16 +373,18 @@ class _ModalComGoldSilverState extends State<ModalComGoldSilver> {
                                 children: [
                                   _komidashi("支給レベル"),
                                   const SizedBox(width: 6),
-                                  _levelDropdown(
-                                    value: comGoldSilverLevel(
-                                      currentKantoku,
-                                      univ.id,
-                                    ),
-                                    playerKazeflag: playerKazeflag,
-                                    onChanged: (v) => _updateLevel(
-                                      currentKantoku,
-                                      [univ.id],
-                                      v,
+                                  Flexible(
+                                    child: _levelDropdown(
+                                      value: comGoldSilverLevel(
+                                        currentKantoku,
+                                        univ.id,
+                                      ),
+                                      playerKazeflag: playerKazeflag,
+                                      onChanged: (v) => _updateLevel(
+                                        currentKantoku,
+                                        [univ.id],
+                                        v,
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -370,15 +394,17 @@ class _ModalComGoldSilverState extends State<ModalComGoldSilver> {
                                 children: [
                                   _komidashi("銀の使い道"),
                                   const SizedBox(width: 6),
-                                  _houshinDropdown(
-                                    value: comGinHoushin(
-                                      currentKantoku,
-                                      univ.id,
-                                    ),
-                                    onChanged: (v) => _updateHoushin(
-                                      currentKantoku,
-                                      [univ.id],
-                                      v,
+                                  Flexible(
+                                    child: _houshinDropdown(
+                                      value: comGinHoushin(
+                                        currentKantoku,
+                                        univ.id,
+                                      ),
+                                      onChanged: (v) => _updateHoushin(
+                                        currentKantoku,
+                                        [univ.id],
+                                        v,
+                                      ),
                                     ),
                                   ),
                                 ],

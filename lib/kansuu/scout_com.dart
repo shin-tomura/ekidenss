@@ -36,7 +36,7 @@ import 'package:ekiden/kantoku_data.dart';
 //         補強ポイント(重み2)。来年も残る1〜3年生に、登り適性・下り適性・アップダウン対応力が
 //         70以上の選手が2人いなければ、その能力を補強ポイントにする
 //       1スピード重視(スパート力・ペース変動対応力)、2距離重視(長距離粘り・ロード適性)、
-//       3登り重視、4下り重視、5アップダウン重視、6メンタル重視(駅伝男・平常心・安定感)、
+//       3登り重視、4下り重視、5アップダウン重視、6駅伝男重視(駅伝男だけ)、
 //       7タイム重視
 //       (1〜5は年間強化練習メニュー・銀の使い道と同じ番号)
 //     自校の新入生(留学生を除く)のいちばん低い点数より点数が高い選手だけを狙う
@@ -79,7 +79,7 @@ const List<String> comScoutHoushinMei = [
   '登り重視',
   '下り重視',
   'アップダウン重視',
-  'メンタル重視',
+  '駅伝男重視',
   'タイム重視',
 ];
 
@@ -270,10 +270,8 @@ class _Mekiki {
       case 5: // アップダウン重視
         atai.add([s.noborikudarikirikaenouryoku, 1]);
         break;
-      case 6: // メンタル重視
+      case 6: // 駅伝男重視(駅伝男だけ)
         atai.add([s.konjou, 1]);
-        atai.add([s.heijousin, 1]);
-        atai.add([s.anteikan, 1]);
         break;
       default: // 自動
         atai.add([s.choukyorinebari, 2]);

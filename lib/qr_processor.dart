@@ -136,9 +136,11 @@ class SettingsQrProcessor {
       data['k_yobiint2_14'] = kantoku.yobiint2[14];
       // 年間強化練習効果設定(int)
       data['k_yobiint2_16'] = kantoku.yobiint2[16];
-      // コンピュータ金銀使用設定(int) [33]ON/OFF、[38]・[39]大学ごとの支給レベル
+      // コンピュータ金銀使用設定(int) [33]ON/OFF、[38]・[39]大学ごとの支給レベル、
+      // [40]・[41]大学ごとの銀の使い道
       data['k_yobiint2_33'] = kantoku.yobiint2[33];
       data['k_yobiint2_38_39'] = kantoku.yobiint2.sublist(38, 40);
+      data['k_yobiint2_40_41'] = kantoku.yobiint2.sublist(40, 42);
       // 戦略的エントリー確率(int) (調子関連設定の画面にある設定)
       data['k_yobiint2_34'] = kantoku.yobiint2[34];
     } else if (department == SettingsDepartment.octoberTime) {
@@ -479,6 +481,16 @@ class SettingsQrProcessor {
           final dynamic v = yobiint2_38_39[i];
           if (v is int && v >= 0 && v < 1000000000000000) {
             kantoku.yobiint2[38 + i] = v;
+          }
+        }
+      }
+      // 大学ごとの銀の使い道(int) kantoku.yobiint2[40]・[41] (1大学1桁、15桁まで)
+      final dynamic yobiint2_40_41 = dataMap['k_yobiint2_40_41'];
+      if (yobiint2_40_41 is List && yobiint2_40_41.length == 2) {
+        for (int i = 0; i < 2; i++) {
+          final dynamic v = yobiint2_40_41[i];
+          if (v is int && v >= 0 && v < 1000000000000000) {
+            kantoku.yobiint2[40 + i] = v;
           }
         }
       }

@@ -28,16 +28,20 @@ import 'package:hive_flutter/hive_flutter.dart';
 //   (プレイヤーは秋以降に獲得した金銀を翌年の夏合宿でしか使えず、
 //    今の4年生には使えないため)
 // ・金: 駅伝男(konjou)優先、次に平常心(heijousin)
-// ・銀: 年間強化練習メニュー(kaifukuryoku)に対応する能力
+// ・銀: 銀の使い道(大学ごとに設定、yobiint2[40]・[41]に1大学1桁で格納)に従う
+//     0個人の練習メニュー通り(初期値): 各選手の年間強化練習メニュー(kaifukuryoku)
+//       に対応する能力。バランスの選手は支給のたびに1〜5からランダムに選ぶ
+//       (kaifukuryoku自体は変えない)
+//     1〜5(大学方針): 10人全員がその練習メニューに対応する能力
+//   練習メニューに対応する能力
 //     1スピード→スパート力・ペース変動対応力(低いほうから)
 //     2距離走→長距離粘り・ロード適性(低いほうから)
 //     3登り→登り適性、4下り→下り適性、5アップダウン→アップダウン対応力
-//     0バランス→支給のたびに1〜5からランダムに選ぶ(kaifukuryoku自体は変えない)
 // ・カリスマ・安定感には使わない
 // ・能力値が89以下の場合のみ+10(プレイヤーの金銀特訓と同じ上限)
 // ・金: 10人全員の対象の能力が上限で使い切れなかった分と、10未満の端数は、
 //   上限に関係なくいつも銀に交換する(金1→銀2、プレイヤーの金銀交換と同じ)
-// ・銀: 10人全員のメニューの能力が上限で使い切れない場合は、10人の先頭から、
+// ・銀: 10人全員のメニュー(大学方針)の能力が上限で使い切れない場合は、10人の先頭から、
 //   メニュー外の能力(カリスマ・安定感を除く7つのうち上限でないもの)から
 //   ランダムに1つずつ上げる
 // ・それでも使い切れない分と、銀の10未満の端数は捨てる
@@ -89,30 +93,93 @@ int _juu(int n) {
   return p;
 }
 
-/// 大学の金銀支給レベル(0〜9)を取り出す
-int comGoldSilverLevel(KantokuData kantoku, int univid) {
+/// 1大学1桁で詰めた値(大学0〜14は[idx0]、15〜29は[idx1])から、大学の桁(0〜9)を取り出す
+int _univKetaYomu(List<int> yobiint2, int idx0, int idx1, int univid) {
   if (univid < 0 || univid >= comGoldSilverLevelKetasuu * 2) return 0;
-  final int idx = univid < comGoldSilverLevelKetasuu
-      ? comGoldSilverLevelIndex0
-      : comGoldSilverLevelIndex1;
-  if (kantoku.yobiint2.length <= idx) return 0;
-  final int v = kantoku.yobiint2[idx];
+  final int idx = univid < comGoldSilverLevelKetasuu ? idx0 : idx1;
+  if (yobiint2.length <= idx) return 0;
+  final int v = yobiint2[idx];
   if (v < 0) return 0;
   return (v ~/ _juu(univid % comGoldSilverLevelKetasuu)) % 10;
 }
 
-/// 大学の金銀支給レベル(0〜9)をyobiint2のリストに書き込む(保存は呼び出し側で行う)
-void comGoldSilverLevelSettei(List<int> yobiint2, int univid, int level) {
+/// 1大学1桁で詰めた値に、大学の桁(0〜9)を書き込む(保存は呼び出し側で行う)
+void _univKetaKaku(
+  List<int> yobiint2,
+  int idx0,
+  int idx1,
+  int univid,
+  int keta,
+) {
   if (univid < 0 || univid >= comGoldSilverLevelKetasuu * 2) return;
-  if (level < 0 || level > 9) return;
-  final int idx = univid < comGoldSilverLevelKetasuu
-      ? comGoldSilverLevelIndex0
-      : comGoldSilverLevelIndex1;
+  if (keta < 0 || keta > 9) return;
+  final int idx = univid < comGoldSilverLevelKetasuu ? idx0 : idx1;
   if (yobiint2.length <= idx) return;
   final int p = _juu(univid % comGoldSilverLevelKetasuu);
   final int v = yobiint2[idx] < 0 ? 0 : yobiint2[idx];
   final int mae = (v ~/ p) % 10;
-  yobiint2[idx] = v + (level - mae) * p;
+  yobiint2[idx] = v + (keta - mae) * p;
+}
+
+/// 大学の金銀支給レベル(0〜9)を取り出す
+int comGoldSilverLevel(KantokuData kantoku, int univid) {
+  return _univKetaYomu(
+    kantoku.yobiint2,
+    comGoldSilverLevelIndex0,
+    comGoldSilverLevelIndex1,
+    univid,
+  );
+}
+
+/// 大学の金銀支給レベル(0〜9)をyobiint2のリストに書き込む(保存は呼び出し側で行う)
+void comGoldSilverLevelSettei(List<int> yobiint2, int univid, int level) {
+  _univKetaKaku(
+    yobiint2,
+    comGoldSilverLevelIndex0,
+    comGoldSilverLevelIndex1,
+    univid,
+    level,
+  );
+}
+
+/// KantokuData.yobiint2 の使用番号: 大学ごとの銀の使い道
+/// 支給レベルと同じく1大学1桁で、[40]に大学0〜14、[41]に大学15〜29を格納する
+///   0: 個人の練習メニュー通り(初期値)
+///   1スピード・2距離走・3登り・4下り・5アップダウン: 10人全員がその能力に使う
+///   (番号は年間強化練習メニュー(kaifukuryoku)と同じ)
+const int comGinHoushinIndex0 = 40;
+const int comGinHoushinIndex1 = 41;
+const int comGinHoushinMax = 5; // 選べる番号の最大
+
+/// 大学の銀の使い道(0〜5)を取り出す(範囲外の値は0=個人の練習メニュー通り)
+int comGinHoushin(KantokuData kantoku, int univid) {
+  final int h = _univKetaYomu(
+    kantoku.yobiint2,
+    comGinHoushinIndex0,
+    comGinHoushinIndex1,
+    univid,
+  );
+  return (h >= 1 && h <= comGinHoushinMax) ? h : 0;
+}
+
+/// 大学の銀の使い道(0〜5)をyobiint2のリストに書き込む(保存は呼び出し側で行う)
+void comGinHoushinSettei(List<int> yobiint2, int univid, int houshin) {
+  if (houshin < 0 || houshin > comGinHoushinMax) return;
+  _univKetaKaku(
+    yobiint2,
+    comGinHoushinIndex0,
+    comGinHoushinIndex1,
+    univid,
+    houshin,
+  );
+}
+
+/// 銀の使い道の表示名
+String comGinHoushinMei(int houshin) {
+  if (houshin >= 1 && houshin <= comGinHoushinMax) {
+    return TrainingMenu.getMenuString(houshin);
+  }
+  return '個人の練習メニュー通り';
 }
 
 /// 支給レベルの表示名(プレイヤーと同じは今のプレイヤーの難易度も付ける 例: プレイヤーと同じ(今は易))
@@ -172,6 +239,7 @@ Future<void> comGoldSilverTeiki({
       eventLabel: '春の定期支給',
       ryou: ryou,
       yonenseiNozoku: false,
+      ginHoushin: comGinHoushin(kantoku, univ.id),
       sortedSenshuData: sortedSenshuData,
       random: random,
     );
@@ -229,6 +297,7 @@ Future<void> comGoldSilverMokuhyouTassei({
       eventLabel: '目標達成(${_taikaiMei(mokuhyouBangou)})',
       ryou: ryou,
       yonenseiNozoku: yonenseiNozoku,
+      ginHoushin: comGinHoushin(kantoku, univ.id),
       sortedSenshuData: sortedSenshuData,
       random: random,
     );
@@ -405,6 +474,7 @@ Future<void> _comKinGinShiyou({
   required String eventLabel, // デバッグログ用
   required int ryou,
   required bool yonenseiNozoku, // trueなら4年生を振り分け先から除く
+  required int ginHoushin, // 銀の使い道(0個人の練習メニュー通り、1〜5大学方針)
   required List<SenshuData> sortedSenshuData,
   required Random random,
 }) async {
@@ -428,7 +498,9 @@ Future<void> _comKinGinShiyou({
   final Set<SenshuData> henkouari = {};
   final Set<SenshuData> jougen = {}; // 順番が回ってきたが上限で使えなかった選手(デバッグログ用)
   final Map<int, Set<int>> menugai = {}; // メニュー外で上げた能力の番号(デバッグログ用)
-  final Map<int, int> menuMap = {}; // 銀で使うメニュー(バランスの選手は抽選)
+  final Map<int, int> menuMap = {}; // 銀で使うメニュー(大学方針、なければ個人の練習メニュー。バランスの選手は抽選)
+  final bool daigakuHoushin =
+      ginHoushin >= 1 && ginHoushin <= comGinHoushinMax;
 
   // 金
   int kinTsukatta = 0;
@@ -454,9 +526,10 @@ Future<void> _comKinGinShiyou({
   int ginTsukatta = 0;
   int menugaiTsukatta = 0;
   if (ginKaisuu > 0) {
-    // バランスの選手は、この支給で使うメニューをランダムに決める
+    // 大学方針があれば10人全員その能力に使う
+    // なければ個人の練習メニュー通り(バランスの選手は、この支給で使うメニューをランダムに決める)
     for (final s in shuryoku) {
-      int menu = s.kaifukuryoku;
+      int menu = daigakuHoushin ? ginHoushin : s.kaifukuryoku;
       if (menu < 1 || menu > 5) {
         menu = random.nextInt(5) + 1;
       }
@@ -526,9 +599,14 @@ Future<void> _comKinGinShiyou({
       String menuStr = '';
       if (menuMap.containsKey(s.id)) {
         final bool balance = s.kaifukuryoku < 1 || s.kaifukuryoku > 5;
-        menuStr = balance
-            ? '年間強化:バランス→抽選で${TrainingMenu.getMenuString(menuMap[s.id]!)}  '
-            : '年間強化:${TrainingMenu.getMenuString(s.kaifukuryoku)}  ';
+        if (daigakuHoushin) {
+          menuStr = '大学方針:${TrainingMenu.getMenuString(ginHoushin)}  ';
+        } else if (balance) {
+          menuStr =
+              '年間強化:バランス→抽選で${TrainingMenu.getMenuString(menuMap[s.id]!)}  ';
+        } else {
+          menuStr = '年間強化:${TrainingMenu.getMenuString(s.kaifukuryoku)}  ';
+        }
       }
       final String waku = kakyuuseiWakuIds.contains(s.id) ? '[下級生枠]' : '';
       final String kekka = henka.isEmpty ? '（上限のため使えず）' : henka.join(' / ');

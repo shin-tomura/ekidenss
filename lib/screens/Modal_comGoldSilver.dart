@@ -9,6 +9,7 @@ import 'package:ekiden/kansuu/goldsilver_com.dart';
 /// コンピュータ大学の金銀使用 設定画面
 /// KantokuData.yobiint2[33] (0=ON(初期値)、1=OFF)
 /// KantokuData.yobiint2[38]・[39] 大学ごとの金銀支給レベル(1大学1桁)
+/// KantokuData.yobiint2[40]・[41] 大学ごとの銀の使い道(1大学1桁)
 class ModalComGoldSilver extends StatefulWidget {
   const ModalComGoldSilver({super.key});
 
@@ -19,6 +20,7 @@ class ModalComGoldSilver extends StatefulWidget {
 class _ModalComGoldSilverState extends State<ModalComGoldSilver> {
   late Box<KantokuData> _kantokuBox;
   int _ikkatsuLevel = 0; // 一括設定で選んでいるレベル
+  int _ikkatsuHoushin = 0; // 一括設定で選んでいる銀の使い道
 
   @override
   void initState() {
@@ -67,6 +69,91 @@ class _ModalComGoldSilverState extends State<ModalComGoldSilver> {
       onChanged: (int? v) {
         if (v != null) onChanged(v);
       },
+    );
+  }
+
+  // 大学ごとの銀の使い道を変更し、Hiveに保存する関数(univids の大学をまとめて変更)
+  Future<void> _updateHoushin(
+    KantokuData kantoku,
+    List<int> univids,
+    int houshin,
+  ) async {
+    final List<int> updatedYobiint2 = List.from(kantoku.yobiint2);
+    if (updatedYobiint2.length <= comGinHoushinIndex1) {
+      return;
+    }
+    for (final int id in univids) {
+      comGinHoushinSettei(updatedYobiint2, id, houshin);
+    }
+    setState(() {
+      kantoku.yobiint2 = updatedYobiint2;
+    });
+    await kantoku.save();
+  }
+
+  // 銀の使い道のプルダウン
+  Widget _houshinDropdown({
+    required int value,
+    required ValueChanged<int> onChanged,
+  }) {
+    return DropdownButton<int>(
+      value: value,
+      dropdownColor: Colors.grey[900],
+      style: TextStyle(
+        color: HENSUU.textcolor,
+        fontSize: HENSUU.fontsize_honbun,
+      ),
+      items: List.generate(comGinHoushinMax + 1, (houshin) {
+        return DropdownMenuItem<int>(
+          value: houshin,
+          child: Text(comGinHoushinMei(houshin)),
+        );
+      }),
+      onChanged: (int? v) {
+        if (v != null) onChanged(v);
+      },
+    );
+  }
+
+  // プルダウンの前に付ける小さな見出し
+  Widget _komidashi(String text) {
+    return Text(
+      text,
+      style: TextStyle(
+        color: HENSUU.textcolor.withOpacity(0.7),
+        fontSize: HENSUU.fontsize_honbun - 2,
+      ),
+    );
+  }
+
+  // 一括設定の行(「全大学の○○を [▼] にする」)
+  Widget _ikkatsuGyou({
+    required String koumoku,
+    required Widget dropdown,
+    required VoidCallback onPressed,
+  }) {
+    return Wrap(
+      alignment: WrapAlignment.center,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 12,
+      children: [
+        Text(
+          "全大学の$koumokuを",
+          style: TextStyle(
+            color: HENSUU.textcolor,
+            fontSize: HENSUU.fontsize_honbun,
+          ),
+        ),
+        dropdown,
+        ElevatedButton(
+          onPressed: onPressed,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.blue,
+            foregroundColor: Colors.white,
+          ),
+          child: const Text("にする"),
+        ),
+      ],
     );
   }
 
@@ -132,7 +219,7 @@ class _ModalComGoldSilverState extends State<ModalComGoldSilver> {
                       border: Border.all(color: Colors.grey.withOpacity(0.3)),
                     ),
                     child: Text(
-                      "【コンピュータ大学の金銀使用】\n\nONにすると、コンピュータの大学も金銀を獲得し、選手の能力強化に使うようになります。\n\n獲得量はプレイヤーと同じ式で、春の定期支給(4月中旬)と目標順位達成時に獲得します。支給レベルは下の一覧で大学ごとに設定できます(初期値は鬼)。「極○」は春の定期支給のみ、「天」は支給なしです。「プレイヤーと同じ」はプレイヤーの「難易度変更」の設定(鬼・難しいなど)と同じ支給量で、難易度モードの「極」「天」は適用されません。金銀支給量倍率は全大学に適用されます。\n\n金銀は、留学生を除く各大学の選手10人(基本走力の上位7人と、それ以外の1・2年生のうち基本走力の上位3人)に順番に使われます。夏合宿より後に獲得した分は、4年生には使われません。金は駅伝男、次に平常心に使われ、銀は各選手の年間強化練習メニューに対応する能力に使われます。対象の能力が全員上限の場合は、使えない金は銀に交換(金1→銀2)され、銀はほかの能力(カリスマ・安定感を除く)に使われます。",
+                      "【コンピュータ大学の金銀使用】\n\nONにすると、コンピュータの大学も金銀を獲得し、選手の能力強化に使うようになります。\n\n獲得量はプレイヤーと同じ式で、春の定期支給(4月中旬)と目標順位達成時に獲得します。支給レベルは下の一覧で大学ごとに設定できます(初期値は鬼)。「極○」は春の定期支給のみ、「天」は支給なしです。「プレイヤーと同じ」はプレイヤーの「難易度変更」の設定(鬼・難しいなど)と同じ支給量で、難易度モードの「極」「天」は適用されません。金銀支給量倍率は全大学に適用されます。\n\n金銀は、留学生を除く各大学の選手10人(基本走力の上位7人と、それ以外の1・2年生のうち基本走力の上位3人)に順番に使われます。夏合宿より後に獲得した分は、4年生には使われません。金は駅伝男、次に平常心に使われます。銀は大学ごとの「銀の使い道」に従って使われます。「個人の練習メニュー通り」(初期値)では各選手の年間強化練習メニューに対応する能力に使われ、スピード・距離走・登り・下り・アップダウンのどれかを選ぶと、10人全員がその練習メニューに対応する能力に使います。対象の能力が全員上限の場合は、使えない金は銀に交換(金1→銀2)され、銀はほかの能力(カリスマ・安定感を除く)に使われます。",
                       style: TextStyle(
                         color: HENSUU.textcolor,
                         fontSize: HENSUU.fontsize_honbun,
@@ -189,9 +276,9 @@ class _ModalComGoldSilverState extends State<ModalComGoldSilver> {
                   const Divider(color: Colors.grey),
                   const SizedBox(height: 16),
 
-                  // 大学ごとの支給レベル
+                  // 大学ごとの支給レベルと銀の使い道
                   Text(
-                    "大学ごとの支給レベル",
+                    "大学ごとの支給レベルと銀の使い道",
                     style: TextStyle(
                       color: HENSUU.textcolor,
                       fontSize: HENSUU.fontsize_honbun,
@@ -200,61 +287,103 @@ class _ModalComGoldSilverState extends State<ModalComGoldSilver> {
                   ),
                   const SizedBox(height: 8),
                   // 一括設定
-                  Wrap(
-                    alignment: WrapAlignment.center,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    spacing: 12,
-                    children: [
-                      Text(
-                        "全大学を",
-                        style: TextStyle(
-                          color: HENSUU.textcolor,
-                          fontSize: HENSUU.fontsize_honbun,
-                        ),
-                      ),
-                      _levelDropdown(
-                        value: _ikkatsuLevel,
-                        playerKazeflag: playerKazeflag,
-                        onChanged: (v) => setState(() => _ikkatsuLevel = v),
-                      ),
-                      ElevatedButton(
-                        onPressed: () {
-                          _updateLevel(
-                            currentKantoku,
-                            comUnivs.map((u) => u.id).toList(),
-                            _ikkatsuLevel,
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue,
-                          foregroundColor: Colors.white,
-                        ),
-                        child: const Text("にする"),
-                      ),
-                    ],
+                  _ikkatsuGyou(
+                    koumoku: "支給レベル",
+                    dropdown: _levelDropdown(
+                      value: _ikkatsuLevel,
+                      playerKazeflag: playerKazeflag,
+                      onChanged: (v) => setState(() => _ikkatsuLevel = v),
+                    ),
+                    onPressed: () {
+                      _updateLevel(
+                        currentKantoku,
+                        comUnivs.map((u) => u.id).toList(),
+                        _ikkatsuLevel,
+                      );
+                    },
+                  ),
+                  _ikkatsuGyou(
+                    koumoku: "銀の使い道",
+                    dropdown: _houshinDropdown(
+                      value: _ikkatsuHoushin,
+                      onChanged: (v) => setState(() => _ikkatsuHoushin = v),
+                    ),
+                    onPressed: () {
+                      _updateHoushin(
+                        currentKantoku,
+                        comUnivs.map((u) => u.id).toList(),
+                        _ikkatsuHoushin,
+                      );
+                    },
                   ),
                   const SizedBox(height: 8),
-                  // 大学ごとの設定
+                  // 大学ごとの設定(1行目に大学名、2行目に支給レベルと銀の使い道)
                   for (final UnivData univ in comUnivs)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 2.0),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              univ.name,
-                              style: TextStyle(
-                                color: HENSUU.textcolor,
-                                fontSize: HENSUU.fontsize_honbun,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 6.0),
+                      decoration: BoxDecoration(
+                        border: Border(
+                          bottom: BorderSide(
+                            color: Colors.grey.withOpacity(0.3),
                           ),
-                          _levelDropdown(
-                            value: comGoldSilverLevel(currentKantoku, univ.id),
-                            playerKazeflag: playerKazeflag,
-                            onChanged: (v) =>
-                                _updateLevel(currentKantoku, [univ.id], v),
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            univ.name,
+                            style: TextStyle(
+                              color: HENSUU.textcolor,
+                              fontSize: HENSUU.fontsize_honbun,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          // 見出しとプルダウンは組にして、画面が狭いときは組ごと折り返す
+                          Wrap(
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 16,
+                            children: [
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  _komidashi("支給レベル"),
+                                  const SizedBox(width: 6),
+                                  _levelDropdown(
+                                    value: comGoldSilverLevel(
+                                      currentKantoku,
+                                      univ.id,
+                                    ),
+                                    playerKazeflag: playerKazeflag,
+                                    onChanged: (v) => _updateLevel(
+                                      currentKantoku,
+                                      [univ.id],
+                                      v,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  _komidashi("銀の使い道"),
+                                  const SizedBox(width: 6),
+                                  _houshinDropdown(
+                                    value: comGinHoushin(
+                                      currentKantoku,
+                                      univ.id,
+                                    ),
+                                    onChanged: (v) => _updateHoushin(
+                                      currentKantoku,
+                                      [univ.id],
+                                      v,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
                         ],
                       ),

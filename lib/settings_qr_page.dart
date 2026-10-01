@@ -232,7 +232,7 @@ class _SettingsQrPageState extends State<SettingsQrPage> {
             '・金銀支給量倍率設定\n'
             '・記録会時期設定\n'
             '・年間強化練習効果設定\n'
-            '・コンピュータ金銀使用設定(ON/OFF・大学ごとの支給レベル)\n',
+            '・コンピュータ金銀使用設定(ON/OFF・大学ごとの支給レベルと銀の使い道)\n',
 
             style: TextStyle(color: Colors.white70, fontSize: 14),
           ),

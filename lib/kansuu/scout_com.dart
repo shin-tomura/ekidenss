@@ -48,13 +48,15 @@ import 'package:ekiden/kansuu/ShozokusakiKettei_By_Univmeisei.dart'; // 振り�
 //       3登り重視、4下り重視、5アップダウン重視、6駅伝男重視(駅伝男だけ)、
 //       7タイム重視
 //       (1〜5は年間強化練習メニュー・銀の使い道と同じ番号)
-//     新入生(留学生を除く)全体の中で、自校の方針での点数が上位半分の選手だけを狙う
-//     性格(大学ごと、yobiint2[61]・[62]に1大学1桁)で、上積み(点数−全体の真ん中の点数)と
-//     成功率から狙う
-//       1大物狙い: 上積み×上積み×成功率、2バランス: 上積み×成功率、
-//       3堅実: 上積み×成功率×成功率
+//     性格(大学ごと、yobiint2[61]・[62]に1大学1桁)で、欲しい選手の要件を決める
+//       要件: まだ進路未定の新入生(留学生を除く)の中で、自校の方針での点数が上位何%以内か
+//       (人数は切り上げ。大物がいなくなれば、残りの中での上位へ自然に下がる)
+//       1大物狙い: 上位5%、2バランス: 上位25%、3堅実: 上位50%
 //       0自動: 名声順位1〜5位は大物狙い、6〜15位はバランス、16位以下は堅実
-//       全大学が同じ選手に集中しないように、上位3人から値の重みを付けた抽選で選ぶ
+//     要件を満たす選手を成功率の高い順に並べる。同じ成功率なら点数の低い順
+//       (要件ぎりぎりで、ほかの大学と取り合いになりにくい選手から。名声の低い大学は
+//       ほとんどの選手が同じ成功率になるので、この順番で狙う選手が決まる)
+//     全大学が同じ選手に集中しないように、上から3人を3:2:1の重みの抽選で選ぶ
 //     積極性(全体): 各大学が1ラウンドで動く確率
 // ・デバッグ実行時は、VS Codeのデバッグコンソールに「[COMスカウト]」で始まるログを出す
 // ------------------------------------------------------------
@@ -447,17 +449,20 @@ double _seikouritsu({
   return (p * 100).round() / 100.0;
 }
 
-/// 性格に合わせた狙う値
-double _neraiAtai(int seikaku, double uwazumi, double p) {
+/// 性格ごとの要件(まだ進路未定の新入生の中で、自校の方針での点数が上位何%以内か)
+int _youkenPercent(int seikaku) {
   switch (seikaku) {
     case _seikakuOomono:
-      return uwazumi * uwazumi * p;
+      return 5;
     case _seikakuKenjitsu:
-      return uwazumi * p * p;
+      return 50;
     default:
-      return uwazumi * p;
+      return 25;
   }
 }
+
+/// 狙う選手を上から3人の中から選ぶときの重み(1番目3・2番目2・3番目1)
+const List<double> _jouiOmomi = [3, 2, 1];
 
 /// 値の重みを付けて、リストから1つ選ぶ(値がすべて0以下なら先頭)
 int _omomiChuusen(List<double> omomi, Random random) {
@@ -620,15 +625,9 @@ class _Kousyou {
 /// 候補1人分
 class _Kouho {
   final SenshuData senshu;
-  final double uwazumi;
-  final double p;
-  final double atai;
-  _Kouho({
-    required this.senshu,
-    required this.uwazumi,
-    required this.p,
-    required this.atai,
-  });
+  final double ten; // 自校の方針での点数
+  final double p; // 成功率
+  _Kouho({required this.senshu, required this.ten, required this.p});
 }
 
 List<UnivData> _sortedUnivData() {
@@ -639,16 +638,6 @@ List<UnivData> _sortedUnivData() {
 List<SenshuData> _sortedSenshuData() {
   return Hive.box<SenshuData>('senshuBox').values.toList()
     ..sort((a, b) => a.id.compareTo(b.id));
-}
-
-/// 真ん中の値(値がなければ0)
-double _mannaka(List<double> atai) {
-  if (atai.isEmpty) return 0;
-  final List<double> narabi = List.of(atai)..sort();
-  final int n = narabi.length;
-  return n.isOdd
-      ? narabi[n ~/ 2]
-      : (narabi[n ~/ 2 - 1] + narabi[n ~/ 2]) / 2;
 }
 
 /// 1ラウンド分の新入生スカウト(ONのとき)
@@ -740,31 +729,31 @@ Future<List<ComScoutKekka>> comScoutRound({
         continue; // このラウンドは動かない
       }
 
-      // 新入生全体の中での、自校の方針での点数の真ん中
-      final double mannaka = _mannaka(
-        nihonjin.map((s) => m.ten(s, timeTen)).toList(),
-      );
-
-      // 候補(進路未定の選手で、自校の方針での点数が上位半分の選手)
-      final List<_Kouho> kouho = [];
+      // まだ進路未定の選手を、自校の方針での点数の高い順に並べる
+      final List<_Kouho> mitei = [];
       for (final SenshuData s in nihonjin) {
         if (comScoutKettei(s)) continue;
-        final double uwazumi = m.ten(s, timeTen) - mannaka;
-        if (uwazumi <= 0) continue;
-        final double ps = _seikouritsu(
-          kousyouUniv: univ,
-          heikinMeisei: heikin,
-          timeJuni: timeJuni[s.id] ?? 999,
-        );
-        kouho.add(
+        mitei.add(
           _Kouho(
             senshu: s,
-            uwazumi: uwazumi,
-            p: ps,
-            atai: _neraiAtai(m.seikaku, uwazumi, ps),
+            ten: m.ten(s, timeTen),
+            p: _seikouritsu(
+              kousyouUniv: univ,
+              heikinMeisei: heikin,
+              timeJuni: timeJuni[s.id] ?? 999,
+            ),
           ),
         );
       }
+      mitei.sort((a, b) {
+        final int c = b.ten.compareTo(a.ten);
+        return c != 0 ? c : a.senshu.id.compareTo(b.senshu.id);
+      });
+
+      // 候補(性格の要件を満たす選手。進路未定の選手の中で点数が上位何%以内か、人数は切り上げ)
+      final int youkenNinzuu =
+          (mitei.length * _youkenPercent(m.seikaku) + 99) ~/ 100;
+      final List<_Kouho> kouho = mitei.take(youkenNinzuu).toList();
       if (kouho.isEmpty) {
         memo[univ.id] = _KoudouMemo(
           shurui: comScoutKoudouMiokuri,
@@ -777,10 +766,17 @@ Future<List<ComScoutKekka>> comScoutRound({
         }
         continue;
       }
-      kouho.sort((a, b) => b.atai.compareTo(a.atai));
+      // 成功率の高い順。同じ成功率なら点数の低い順(要件ぎりぎりで、取り合いになりにくい選手から)
+      kouho.sort((a, b) {
+        int c = b.p.compareTo(a.p);
+        if (c != 0) return c;
+        c = a.ten.compareTo(b.ten);
+        return c != 0 ? c : a.senshu.id.compareTo(b.senshu.id);
+      });
+      // 上から3人を、3:2:1の重みの抽選で選ぶ
       final List<_Kouho> jouI = kouho.take(3).toList();
       final _Kouho nerai =
-          jouI[_omomiChuusen(jouI.map((k) => k.atai).toList(), rnd)];
+          jouI[_omomiChuusen(_jouiOmomi.take(jouI.length).toList(), rnd)];
       final bool seikou = rnd.nextDouble() < nerai.p;
       kousyouList.add(
         _Kousyou(
@@ -800,13 +796,13 @@ Future<List<ComScoutKekka>> comScoutRound({
         final String kouhoStr = jouI
             .map(
               (k) =>
-                  '${k.senshu.name}(上積み${k.uwazumi.toStringAsFixed(1)}・'
+                  '${k.senshu.name}(点数${k.ten.toStringAsFixed(1)}・'
                   '成功率${(k.p * 100).toStringAsFixed(1)}%)',
             )
             .join(' / ');
         print(
           '[COMスカウト] ラウンド$roundBangou ${univ.name}(${m.riyuu}) '
-          '真ん中の点数${mannaka.toStringAsFixed(1)} '
+          '要件 進路未定${mitei.length}人の上位${_youkenPercent(m.seikaku)}%($youkenNinzuu人) '
           '上位候補: $kouhoStr → ${nerai.senshu.name}に交渉 ${seikou ? '成功' : '失敗'}',
         );
       }

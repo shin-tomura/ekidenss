@@ -926,7 +926,7 @@ class _SettingScreenState extends State<SettingScreen> {
               style: TextStyle(color: Colors.white),
             ),
             const Text(
-              "総監督(あなた)ができることは、選手の区間配置とレース中の指示だけです。選手は勝手に成長します。(金特訓と銀特訓で少し手助けできることもあるかもしれませんが)",
+              "総監督(あなた)ができることは、選手の区間配置とレース中の指示、新入生スカウト、練習メニューの選択、金特訓・銀特訓など、限られたことだけです。選手は基本的に勝手に成長します。",
               style: TextStyle(color: Colors.white),
             ),
             const Text(
@@ -974,6 +974,10 @@ class _SettingScreenState extends State<SettingScreen> {
               "各大学は過去10年の成績に基づいて名声という値を保持しています。名声が高いほど有力な新入生が入学しやすくなります。",
               style: TextStyle(color: Colors.white),
             ),
+            const Text(
+              "コンピュータスカウトがONのときは、名声は新入生スカウトの交渉の成功率や、同じ選手に複数の大学が交渉に成功したときの抽選、交渉で決まらなかった選手が自ら志望して進学先を選ぶときの選ばれやすさに影響します(詳しくは大学画面の「コンピュータスカウト」の説明をご覧ください)。",
+              style: TextStyle(color: Colors.white),
+            ),
             const SizedBox(height: 24),
 
             const Text(
@@ -990,7 +994,19 @@ class _SettingScreenState extends State<SettingScreen> {
               style: TextStyle(color: Colors.white),
             ),
             const Text(
-              "このゲームの駅伝の2区以降では、目標順位を下回った順位でタスキを受けると、前半無理に突っ込んで入ってしまいタイムが悪化するという現象が起きます。",
+              "このゲームの駅伝の2区以降では、目標順位を下回った順位でタスキを受けると、前半無理に突っ込んで入ってしまいタイムが悪化するという現象が起きます。悪化の大きさは、タスキを受けた時点の目標順位の大学とのタイム差に応じて大きくなり、これから走る区間の距離1kmあたり3秒以上の差で最大になります(例: 20kmの区間なら60秒差以上)。",
+              style: TextStyle(color: Colors.white),
+            ),
+            const Text(
+              "逆に、目標順位を上回った順位でタスキを受けると、ほっと一息ついてしまい、タイムが少しだけ悪化します(上回っている順位の数が多いほど少し大きくなります)。",
+              style: TextStyle(color: Colors.white),
+            ),
+            const Text(
+              "これらの補正は、「前半突っ込み」や「前半抑え」の指示を出した選手にはかからず、代わりに指示の成否による補正がかかります(「レース中の指示について」をご覧ください)。",
+              style: TextStyle(color: Colors.white),
+            ),
+            const Text(
+              "目標順位はレース中にも「全大学目標順位画面」から変えられます。ただし、これから走る選手に補正がかかるかどうかはすでに決まっているので、変えた目標順位はその次の選手から影響します。",
               style: TextStyle(color: Colors.white),
             ),
             const Text(
@@ -1024,6 +1040,10 @@ class _SettingScreenState extends State<SettingScreen> {
               "・三冠\n・駅伝か対校戦優勝\n・駅伝すべて3位以内\n・駅伝か対校戦どれか３位以内\n・対校戦8位以内もしくは10月駅伝5位以内もしくは11月駅伝8位以内もしくは正月駅伝10位以内\n・11月駅伝予選突破もしくは正月駅伝予選突破\n・上記のどれも未達成(最低額)",
               style: TextStyle(color: Colors.white),
             ),
+            const Text(
+              "コンピュータの大学も金銀を獲得し、夏合宿で選手の能力強化に使います(大学画面の「コンピュータ金銀使用」で設定できます)。",
+              style: TextStyle(color: Colors.white),
+            ),
             const SizedBox(height: 24),
 
             const Text(
@@ -1036,7 +1056,7 @@ class _SettingScreenState extends State<SettingScreen> {
             ),
             const SizedBox(height: 8),
             const Text(
-              "駅伝と11月駅伝予選では、レース中走り出す直前に選手に指示を出すことができます。「スタート直後飛び出し」と「前半突っ込み」の成功確率は駅伝男の能力と、「前半抑え」の成功確率は平常心の能力と直結します。",
+              "駅伝と11月駅伝予選では、レース中走り出す直前に選手に指示を出すことができます。駅伝の1区と11月駅伝予選では「スタート直後飛び出し」を、駅伝の2区以降では「前半突っ込み」か「前半抑え」を指示できます。「スタート直後飛び出し」と「前半突っ込み」の成功確率は駅伝男の能力と、「前半抑え」の成功確率は平常心の能力と直結します。",
               style: TextStyle(color: Colors.white),
             ),
             const Text(
@@ -1044,11 +1064,19 @@ class _SettingScreenState extends State<SettingScreen> {
               style: TextStyle(color: Colors.white),
             ),
             const Text(
+              "「前半抑え」は、目標順位を下回ったときの悪化や、上回ったときのほっと一息を防ぐための指示です。成功するとこれらの悪化がなくなり、少しタイムが良くなりますが、失敗すると指示を出さなかった場合よりタイムが悪くなります。",
+              style: TextStyle(color: Colors.white),
+            ),
+            const Text(
               "目標順位を下回った順位でタスキを受けた場合、「前半抑え」に失敗した時のタイム損は、目標順位の大学とのタイム差が大きいほど大きくなります(最大でも「前半突っ込み」に失敗した時より小さいです)。",
               style: TextStyle(color: Colors.white),
             ),
             const Text(
-              "正月駅伝予選では、各選手ごとにフリー走か集団走を選べます。集団走は最大6つの集団を作れます。集団走には設定タイムを指示しなくてはなりません。",
+              "正月駅伝予選では、各選手ごとにフリー走か集団走を選べます。フリー走では「前半突っ込み」か「前半抑え」も指示できます。集団走は最大6つの集団を作れます。集団走には設定タイムを指示しなくてはなりません。",
+              style: TextStyle(color: Colors.white),
+            ),
+            const Text(
+              "コンピュータの大学も、駅伝男や平常心の高い選手には指示を出すことがあります。学連選抜の選手には指示は出ません(1区で飛び出すことはあります)。",
               style: TextStyle(color: Colors.white),
             ),
             const SizedBox(height: 24),
@@ -1095,6 +1123,10 @@ class _SettingScreenState extends State<SettingScreen> {
                 color: Colors.white,
                 fontStyle: FontStyle.italic,
               ), // イタリック体を適用
+            ),
+            const Text(
+              "なお、レースでは、選手ごとの練習メニュー(年間強化練習)と、大学画面の「大学の個性(実力発揮度)設定」によって、能力の効き方が変わります。",
+              style: TextStyle(color: Colors.white),
             ),
 
             const Text(

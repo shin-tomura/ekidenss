@@ -6,6 +6,7 @@ import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/senshu_data.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/kansuu/scout_com.dart';
+import 'package:ekiden/screens/Modal_senshu.dart'; // 選手データ(選手の詳細)
 
 // ------------------------------------------------------------
 // 「新入生の進学先(全大学)」の画面(1.8.0)
@@ -18,6 +19,9 @@ import 'package:ekiden/kansuu/scout_com.dart';
 // ・表示は「大学ごと」(初期値)と「選手ごと(タイム順)」を切り替えられる
 //   大学ごとは、あなたの大学を先頭に、あとは大学ID順(初期値。いろいろな画面で使っていて
 //   見慣れているため)か名声の高い順。開くたびに大学ID順に戻る
+//   選手の行は「【志望】山田太郎 14分13秒」の形(5000m持ちタイム)
+// ・選手の行を押すと選手データ(Modal_senshu.dart)を開く(選手名に下線を付ける)
+//   進路未定の選手は押せない(選手データの上部に、仮の振り分けの大学が出てしまうため)
 // ・コンピュータスカウトONでスカウトの途中のときは、進路未定の選手の仮の振り分けの大学は
 //   見せない(進学先が決まった選手だけを大学ごとに出し、進路未定の人数を添える)
 // ・コンピュータスカウトOFFで入学した年は、確定・志望の区別なしで出す
@@ -126,7 +130,6 @@ class _ModalShinnyuuseiShingakusakiState
                           univs: univs,
                           shinnyuusei: shinnyuusei,
                           joutai: joutai,
-                          timeJuni: timeJuni,
                           meiseiJuni: meiseiJuni,
                           myUnivid: myUnivid,
                           kubetsuAri: kubetsuAri,
@@ -308,7 +311,6 @@ class _ModalShinnyuuseiShingakusakiState
     required List<UnivData> univs,
     required List<SenshuData> shinnyuusei,
     required Map<int, _Joutai> joutai,
-    required Map<int, int> timeJuni,
     required Map<int, int> meiseiJuni,
     required int myUnivid,
     required bool kubetsuAri,
@@ -352,7 +354,6 @@ class _ModalShinnyuuseiShingakusakiState
           u: u,
           senshu: senshu,
           joutai: joutai,
-          timeJuni: timeJuni,
           meiseiJuni: meiseiJuni,
           jibun: u.id == myUnivid,
           kubetsuAri: kubetsuAri,
@@ -365,7 +366,6 @@ class _ModalShinnyuuseiShingakusakiState
     required UnivData u,
     required List<SenshuData> senshu,
     required Map<int, _Joutai> joutai,
-    required Map<int, int> timeJuni,
     required Map<int, int> meiseiJuni,
     required bool jibun,
     required bool kubetsuAri,
@@ -430,17 +430,12 @@ class _ModalShinnyuuseiShingakusakiState
                 ),
               ),
             for (final SenshuData s in senshu)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 2),
-                child: Text(
-                  _senshuGyou(s, joutai[s.id]!, timeJuni),
-                  style: TextStyle(
-                    color: _joutaiIro(joutai[s.id]!),
-                    fontSize: HENSUU.fontsize_honbun - 1,
-                    fontWeight: joutai[s.id] == _Joutai.kakutei
-                        ? FontWeight.bold
-                        : FontWeight.normal,
-                  ),
+              // 行を押すと選手データを開く(大学ごとの表示には進路未定の選手は出さない)
+              InkWell(
+                onTap: () => _senshuShousai(s),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 3),
+                  child: _senshuGyou(s, joutai[s.id]!),
                 ),
               ),
           ],
@@ -449,13 +444,56 @@ class _ModalShinnyuuseiShingakusakiState
     );
   }
 
-  /// 大学ごとの表示の、選手の1行(例: 【確定】○○選手(5000m 14分05秒・新入生の中で3位))
-  String _senshuGyou(SenshuData s, _Joutai j, Map<int, int> timeJuni) {
+  /// 大学ごとの表示の、選手の1行(例: 【志望】山田太郎 14分13秒)
+  /// 選手名に下線を付ける(押すと選手データを開けることが分かるように)
+  Widget _senshuGyou(SenshuData s, _Joutai j) {
     final String mei = _joutaiMei(j);
-    final String time = comScoutTimeMoji(s.kiroku_nyuugakuji_5000);
-    final int? juni = timeJuni[s.id]; // 留学生は順位なし
-    return '${mei.isEmpty ? '' : '【$mei】'}${s.name}選手'
-        '(5000m $time${juni == null ? '' : '・新入生の中で$juni位'})';
+    final Color iro = _joutaiIro(j);
+    return Text.rich(
+      TextSpan(
+        style: TextStyle(
+          color: iro,
+          fontSize: HENSUU.fontsize_honbun - 1,
+          fontWeight: j == _Joutai.kakutei
+              ? FontWeight.bold
+              : FontWeight.normal,
+        ),
+        children: [
+          if (mei.isNotEmpty) TextSpan(text: '【$mei】'),
+          TextSpan(
+            text: s.name,
+            style: TextStyle(
+              decoration: TextDecoration.underline,
+              decorationColor: iro,
+            ),
+          ),
+          TextSpan(text: ' ${comScoutTimeMoji(s.kiroku_nyuugakuji_5000)}'),
+        ],
+      ),
+    );
+  }
+
+  /// 選手データ(選手の詳細)を開く(ほかの画面と同じ開き方)
+  /// 閉じたら、名前の変更などを反映するために描き直す
+  void _senshuShousai(SenshuData s) {
+    showGeneralDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.8),
+      barrierDismissible: true,
+      barrierLabel: '詳細',
+      transitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (context, animation, secondaryAnimation) {
+        return ModalSenshuDetailView(senshuId: s.id);
+      },
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        return FadeTransition(
+          opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+          child: child,
+        );
+      },
+    ).then((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   // ------------------------------------------------------------
@@ -484,12 +522,13 @@ class _ModalShinnyuuseiShingakusakiState
         if (chuui != null && index == 0) return chuui;
         final SenshuData s = narabi[chuui == null ? index : index - 1];
         final _Joutai j = joutai[s.id]!;
-        // 進路未定の選手は、仮の振り分けの大学を見せない
-        final bool jibun = j != _Joutai.mitei && s.univid == myUnivid;
+        // 進路未定の選手は、仮の振り分けの大学を見せない(選手データにも大学が出るので押せないようにする)
+        final bool mitei = j == _Joutai.mitei;
+        final bool jibun = !mitei && s.univid == myUnivid;
         final int? juni = timeJuni[s.id];
         final String mei = _joutaiMei(j);
         final String shingakusaki;
-        if (j == _Joutai.mitei) {
+        if (mitei) {
           shingakusaki = '進路未定';
         } else {
           final String univMei = univMap[s.univid]?.name ?? '不明';
@@ -497,52 +536,75 @@ class _ModalShinnyuuseiShingakusakiState
               '$univMei大学${jibun ? '(あなたの大学)' : ''}'
               '${mei.isEmpty ? '' : '【$mei】'}';
         }
-        return Container(
-          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-          decoration: BoxDecoration(
-            border: Border(
-              bottom: BorderSide(color: Colors.white12, width: 1),
+        final Color namaeIro = jibun ? Colors.amber : HENSUU.textcolor;
+        return InkWell(
+          onTap: mitei ? null : () => _senshuShousai(s),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(color: Colors.white12, width: 1),
+              ),
             ),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SizedBox(
-                width: 44,
-                child: Text(
-                  juni == null ? '留学生' : '$juni位',
-                  style: TextStyle(
-                    color: HENSUU.textcolor.withOpacity(0.7),
-                    fontSize: HENSUU.fontsize_honbun - 2,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 44,
+                  child: Text(
+                    juni == null ? '留学生' : '$juni位',
+                    style: TextStyle(
+                      color: HENSUU.textcolor.withOpacity(0.7),
+                      fontSize: HENSUU.fontsize_honbun - 2,
+                    ),
                   ),
                 ),
-              ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${s.name}選手(5000m ${comScoutTimeMoji(s.kiroku_nyuugakuji_5000)})',
-                      style: TextStyle(
-                        color: jibun ? Colors.amber : HENSUU.textcolor,
-                        fontSize: HENSUU.fontsize_honbun - 1,
-                        fontWeight: jibun ? FontWeight.bold : FontWeight.normal,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 例: 山田太郎 14分13秒(選手名に下線。進路未定の選手は下線なし)
+                      Text.rich(
+                        TextSpan(
+                          style: TextStyle(
+                            color: namaeIro,
+                            fontSize: HENSUU.fontsize_honbun - 1,
+                            fontWeight: jibun
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                          ),
+                          children: [
+                            TextSpan(
+                              text: s.name,
+                              style: mitei
+                                  ? null
+                                  : TextStyle(
+                                      decoration: TextDecoration.underline,
+                                      decorationColor: namaeIro,
+                                    ),
+                            ),
+                            TextSpan(
+                              text:
+                                  ' ${comScoutTimeMoji(s.kiroku_nyuugakuji_5000)}',
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    Text(
-                      '→ $shingakusaki',
-                      style: TextStyle(
-                        color: jibun ? Colors.amber : _joutaiIro(j),
-                        fontSize: HENSUU.fontsize_honbun - 2,
-                        fontWeight: j == _Joutai.kakutei
-                            ? FontWeight.bold
-                            : FontWeight.normal,
+                      Text(
+                        '→ $shingakusaki',
+                        style: TextStyle(
+                          color: jibun ? Colors.amber : _joutaiIro(j),
+                          fontSize: HENSUU.fontsize_honbun - 2,
+                          fontWeight: j == _Joutai.kakutei
+                              ? FontWeight.bold
+                              : FontWeight.normal,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },

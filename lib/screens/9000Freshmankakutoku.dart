@@ -10,6 +10,7 @@ import 'dart:math';
 import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/kansuu/scout_com.dart';
 import 'package:ekiden/kansuu/ShoriGuard.dart';
+import 'package:ekiden/screens/ScoutRoundKekka_screen.dart';
 //import 'package:ekiden/kansuu/kojinBestKirokuJuniKettei.dart';
 
 enum SortCriterion {
@@ -78,6 +79,9 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
   int _waku = TEISUU.NINZUU_1GAKUNEN_INUNIV; // 自大学の日本人の新入生の枠(ONのとき)
   int _ryuugakuseiSuu = 0; // 自大学に入学する留学生の新入生の人数(ONのとき)
   int _kakuteiSuu = 0; // 自大学に確定した新入生の人数(ONのとき)
+  // ラウンドごとの全大学の行動の記録(ラウンドの番号 → 行動)。「ラウンドの結果」の画面で出す
+  // (スカウト画面を開いている間だけ持つ。アプリを開き直すと、それより前の記録は消える)
+  final List<MapEntry<int, List<ComScoutKoudou>>> _roundKiroku = [];
 
   @override
   void initState() {
@@ -543,6 +547,7 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
       _loadingMessage = 'ラウンド$roundBangouの結果を判定中...';
     });
     List<ComScoutKekka> kekka = [];
+    final List<ComScoutKoudou> koudou = [];
     try {
       // 処理前スナップショット(途中で終了しても処理前の状態に戻せるように)
       await ShoriGuard.begin('新入生スカウト');
@@ -551,6 +556,7 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
         roundBangou: roundBangou,
         playerTarget: freshman,
         playerSeikouritsu: successRate,
+        koudou: koudou,
       );
       _ghensuu!.scoutChances--;
       await _ghensuu!.save();
@@ -559,12 +565,67 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
       ShoriGuard.reportError('新入生スカウト', e);
       return;
     }
+    _roundKiroku.add(MapEntry(roundBangou, koudou));
     // リストの再初期化
     _initializeScoutingData();
     if (!mounted) return;
-    await _showKekkaDialog('ラウンド$roundBangouの結果', [
-      ...comScoutKekkaBun(kekka, _ghensuu!.MYunivid),
-    ]);
+    // ダイアログは自大学の結果だけ(全大学の動きは「全大学の動きを見る」から)
+    await _showKekkaDialog(
+      'ラウンド$roundBangouの結果',
+      comScoutKekkaBun(kekka, _ghensuu!.MYunivid, jibunNomi: true),
+      hajimeRound: roundBangou,
+    );
+  }
+
+  /// 「ラウンドの結果」の画面(全大学のラウンドごとの行動)を開く
+  Future<void> _openRoundKekka({int? hajimeRound}) {
+    return Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ScoutRoundKekkaScreen(
+          kiroku: _roundKiroku,
+          myUnivid: _ghensuu!.MYunivid,
+          hajimeRound: hajimeRound,
+        ),
+      ),
+    );
+  }
+
+  /// コンピュータスカウトONのときの説明
+  void _showSetsumeiDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text(
+            'コンピュータスカウトON',
+            style: TextStyle(color: Colors.black),
+          ),
+          content: SingleChildScrollView(
+            child: Text(
+              '新入生は全員「進路未定」です(あなたの大学も含め、どの大学にも分かりません)。\n\n'
+              '交渉するたびに、コンピュータの大学も同じラウンドで1人ずつ交渉し、成功した大学に確定します。'
+              '同じ選手に複数の大学が成功した場合は、名声の高い大学ほど選ばれやすい抽選で決まります。'
+              '確定した選手は、その年はもう交渉に応じません。\n\n'
+              '確定できるのは、日本人の新入生の枠(5人。留学生が入学する大学は4人)までです。'
+              'あなたの大学の枠は$_waku人で、確定しているのは$_kakuteiSuu人です。'
+              '${_ryuugakuseiSuu > 0 ? 'あなたの大学には留学生が$_ryuugakuseiSuu人入学します。' : ''}\n\n'
+              'スカウトを終えると、残りのラウンドはコンピュータの大学だけで行います。'
+              'そのあと、確定しなかった選手が自ら志望して進学先を選びます(名声の高い大学ほど選ばれやすく、どの大学も枠がちょうど埋まります)。\n\n'
+              '「ラウンドの結果」では、全大学のラウンドごとの動きを見られます(スカウト画面を開いている間だけ記録しています)。',
+              style: const TextStyle(color: Colors.black),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   /// スカウトを終える(コンピュータスカウトONなら、残りのラウンドと最後の志望を先に済ませる)
@@ -582,40 +643,37 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
       try {
         // 処理前スナップショット(途中で終了しても処理前の状態に戻せるように)
         await ShoriGuard.begin('新入生スカウト');
-        // 残りのラウンドはコンピュータの大学だけで行う
+        // 残りのラウンドはコンピュータの大学だけで行う(全大学の動きは「全大学の動きを見る」から)
+        final List<MapEntry<int, List<ComScoutKoudou>>> nokoriKiroku = [];
         for (int i = 0; i < nokori; i++) {
-          final List<ComScoutKekka> kekka = await comScoutRound(
+          final List<ComScoutKoudou> koudou = [];
+          await comScoutRound(
             gh: _ghensuu!,
             roundBangou: hajime + i,
+            koudou: koudou,
           );
-          final List<String> roundBun = comScoutKekkaBun(
-            kekka,
-            _ghensuu!.MYunivid,
-          );
-          bun.add('― ラウンド${hajime + i} ―');
-          bun.addAll(roundBun.isEmpty ? ['(確定した選手はいませんでした)'] : roundBun);
+          nokoriKiroku.add(MapEntry(hajime + i, koudou));
         }
         _ghensuu!.scoutChances = 0;
         await _ghensuu!.save();
         // 確定しなかった選手が、自ら志望して進学先を選ぶ
         final Map<int, int> shigan = await comScoutShigan(gh: _ghensuu!);
-        bun.add('― あなたの大学に入学する新入生 ―');
         bun.addAll(
           comScoutNyuugakuBun(myUnivid: _ghensuu!.MYunivid, shigan: shigan),
         );
         await ShoriGuard.end();
+        _roundKiroku.addAll(nokoriKiroku);
       } catch (e) {
         ShoriGuard.reportError('新入生スカウト', e);
         return;
       }
       if (!mounted) return;
       setState(() => _isLoading = false);
-      if (bun.isNotEmpty) {
-        await _showKekkaDialog(
-          nokori > 0 ? '残りのラウンドと入学する新入生' : '入学する新入生',
-          bun,
-        );
-      }
+      await _showKekkaDialog(
+        'あなたの大学に入学する新入生',
+        bun,
+        hajimeRound: nokori > 0 ? hajime : null,
+      );
       if (!mounted) return;
     }
 
@@ -634,7 +692,12 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
   }
 
   /// ラウンドの結果を表示するダイアログ(閉じるまで待つ)
-  Future<void> _showKekkaDialog(String title, List<String> lines) {
+  /// ラウンドの記録があれば「全大学の動きを見る」ボタンを付ける([hajimeRound] のラウンドから開く)
+  Future<void> _showKekkaDialog(
+    String title,
+    List<String> lines, {
+    int? hajimeRound,
+  }) {
     return showDialog(
       context: context,
       builder: (context) {
@@ -667,6 +730,11 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
             ),
           ),
           actions: [
+            if (_roundKiroku.isNotEmpty)
+              TextButton(
+                onPressed: () => _openRoundKekka(hajimeRound: hajimeRound),
+                child: const Text('全大学の動きを見る'),
+              ),
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
@@ -676,6 +744,27 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
           ],
         );
       },
+    );
+  }
+
+  /// 下部の1行に置くリンク(押せる範囲を少し広めにとる。押せないときは薄く出す)
+  Widget _footerLink(String text, VoidCallback? onTap) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+        child: Text(
+          text,
+          style: TextStyle(
+            color: onTap == null ? Colors.white38 : Colors.lightBlueAccent,
+            fontSize: HENSUU.fontsize_honbun - 2,
+            decoration: onTap == null
+                ? TextDecoration.none
+                : TextDecoration.underline,
+            decorationColor: Colors.lightBlueAccent,
+          ),
+        ),
+      ),
     );
   }
 
@@ -1289,17 +1378,33 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
           mainAxisSize: MainAxisSize.min,
           children: [
             // コンピュータスカウトONのときのお知らせ
+            // コンピュータスカウトONのとき: 枠の表示と「説明」「ラウンドの結果」のリンクを1行に
+            // (入りきらなければ部品ごとに次の行へ送る。文字は省略しない)
             if (_comScoutOn)
               Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Text(
-                  'コンピュータスカウトON: 新入生は全員「進路未定」です。交渉するたびに、コンピュータの大学も同じラウンドで交渉し、成功した大学に確定します。確定しなかった選手は、最後に自ら志望して進学先を選びます。\n'
-                  'あなたの大学の日本人の新入生の枠: $_waku人(確定 $_kakuteiSuu人)'
-                  '${_ryuugakuseiSuu > 0 ? '　※留学生が$_ryuugakuseiSuu人入学します' : ''}'
-                  '${_kakuteiSuu >= _waku ? '　枠がいっぱいのため、これ以上は交渉できません' : ''}',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: HENSUU.fontsize_honbun - 2,
+                padding: const EdgeInsets.only(bottom: 6),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: Wrap(
+                    spacing: 12,
+                    runSpacing: 2,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text(
+                        '枠 確定$_kakuteiSuu/$_waku'
+                        '${_ryuugakuseiSuu > 0 ? '・留学生$_ryuugakuseiSuu' : ''}'
+                        '${_kakuteiSuu >= _waku ? '(いっぱい)' : ''}',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: HENSUU.fontsize_honbun - 2,
+                        ),
+                      ),
+                      _footerLink('説明', _showSetsumeiDialog),
+                      _footerLink(
+                        'ラウンドの結果',
+                        _roundKiroku.isEmpty ? null : () => _openRoundKekka(),
+                      ),
+                    ],
                   ),
                 ),
               ),

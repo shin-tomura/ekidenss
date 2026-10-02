@@ -555,6 +555,54 @@ class ComScoutKekka {
   });
 }
 
+/// 1ラウンドの、大学ごとの行動の種類
+const int comScoutKoudouKousyou = 0; // 交渉した
+const int comScoutKoudouMiokuri = 1; // 狙う選手なし(見送り)
+const int comScoutKoudouUgokazu = 2; // 動かず(積極性)
+const int comScoutKoudouWakuIppai = 3; // 枠がいっぱい
+const int comScoutKoudouNashi = 4; // 交渉しなかった(プレイヤーがスカウトを終えたあとなど)
+
+/// 1ラウンドの、大学ごとの行動(「ラウンドの結果」の画面で全大学分を出す)
+class ComScoutKoudou {
+  final int univid;
+  final int shurui; // 行動の種類(comScoutKoudou〜)
+  final String riyuu; // 方針・性格(コンピュータのみ。例: 登り重視・大物狙い)
+  final int senshuId; // 交渉した選手(交渉したときだけ。それ以外は-1)
+  final String senshuName;
+  final double senshuTime; // 交渉した選手の5000m持ちタイム
+  final bool seikou; // 交渉が成立したか
+  final int kimariUnivid; // 交渉が成立した選手が確定した大学(成立しなかった場合は-1)
+  final int ketteiSuu; // このラウンドのあとの、進学先が決まった新入生の人数
+  final int waku; // 日本人の新入生の枠
+
+  ComScoutKoudou({
+    required this.univid,
+    required this.shurui,
+    required this.riyuu,
+    required this.senshuId,
+    required this.senshuName,
+    required this.senshuTime,
+    required this.seikou,
+    required this.kimariUnivid,
+    required this.ketteiSuu,
+    required this.waku,
+  });
+}
+
+/// 行動の記録をまとめるためのメモ(判定前)
+class _KoudouMemo {
+  final int shurui;
+  final String riyuu;
+  final SenshuData? senshu;
+  final bool seikou;
+  _KoudouMemo({
+    required this.shurui,
+    required this.riyuu,
+    this.senshu,
+    this.seikou = false,
+  });
+}
+
 /// 1件分の交渉(判定前)
 class _Kousyou {
   final int univid;
@@ -606,12 +654,14 @@ double _mannaka(List<double> atai) {
 /// 1ラウンド分の新入生スカウト(ONのとき)
 /// プレイヤーの交渉([playerTarget]、nullなら見送り)と、コンピュータの各大学の交渉を
 /// 一斉に判定し、成功した選手を確定させて保存する。戻り値はこのラウンドの交渉の結果
+/// [koudou] を渡すと、全大学のこのラウンドの行動(見送りなども含む)を大学id順に入れて返す
 Future<List<ComScoutKekka>> comScoutRound({
   required Ghensuu gh,
   required int roundBangou, // デバッグログ用(1から)
   SenshuData? playerTarget,
   double playerSeikouritsu = 0.0,
   Random? random,
+  List<ComScoutKoudou>? koudou,
 }) async {
   final Random rnd = random ?? Random();
   final KantokuData? kantoku = Hive.box<KantokuData>(
@@ -624,13 +674,20 @@ Future<List<ComScoutKekka>> comScoutRound({
       .toList();
   final int myUnivid = gh.MYunivid;
   final List<_Kousyou> kousyouList = [];
+  final Map<int, _KoudouMemo> memo = {}; // 大学id → このラウンドの行動
 
   // プレイヤーの交渉(進路未定の選手だけ。枠がいっぱいなら交渉できない)
+  final bool playerWakuIppai =
+      comScoutKetteiSuu(shinnyuusei, myUnivid) >=
+      comScoutWaku(shinnyuusei, myUnivid);
+  memo[myUnivid] = _KoudouMemo(
+    shurui: playerWakuIppai ? comScoutKoudouWakuIppai : comScoutKoudouNashi,
+    riyuu: '',
+  );
   if (playerTarget != null &&
       playerTarget.hirou != 1 &&
       !comScoutKettei(playerTarget) &&
-      comScoutKetteiSuu(shinnyuusei, myUnivid) <
-          comScoutWaku(shinnyuusei, myUnivid)) {
+      !playerWakuIppai) {
     final bool seikou = rnd.nextDouble() < playerSeikouritsu;
     kousyouList.add(
       _Kousyou(
@@ -639,6 +696,12 @@ Future<List<ComScoutKekka>> comScoutRound({
         seikou: seikou,
         riyuu: '',
       ),
+    );
+    memo[myUnivid] = _KoudouMemo(
+      shurui: comScoutKoudouKousyou,
+      riyuu: '',
+      senshu: playerTarget,
+      seikou: seikou,
     );
     if (kDebugMode) {
       print(
@@ -660,12 +723,22 @@ Future<List<ComScoutKekka>> comScoutRound({
     final int sekkyoku = comScoutSekkyokusei(kantoku);
     for (final UnivData univ in sortedUnivData) {
       if (univ.id == myUnivid) continue;
+      final _Mekiki m = _mekikiTsukuru(kantoku, univ, zenSenshu);
       if (comScoutKetteiSuu(shinnyuusei, univ.id) >=
           comScoutWaku(shinnyuusei, univ.id)) {
+        memo[univ.id] = _KoudouMemo(
+          shurui: comScoutKoudouWakuIppai,
+          riyuu: m.riyuu,
+        );
         continue; // 枠がいっぱい
       }
-      if (rnd.nextInt(100) >= sekkyoku) continue; // このラウンドは動かない
-      final _Mekiki m = _mekikiTsukuru(kantoku, univ, zenSenshu);
+      if (rnd.nextInt(100) >= sekkyoku) {
+        memo[univ.id] = _KoudouMemo(
+          shurui: comScoutKoudouUgokazu,
+          riyuu: m.riyuu,
+        );
+        continue; // このラウンドは動かない
+      }
 
       // 新入生全体の中での、自校の方針での点数の真ん中
       final double mannaka = _mannaka(
@@ -693,6 +766,10 @@ Future<List<ComScoutKekka>> comScoutRound({
         );
       }
       if (kouho.isEmpty) {
+        memo[univ.id] = _KoudouMemo(
+          shurui: comScoutKoudouMiokuri,
+          riyuu: m.riyuu,
+        );
         if (kDebugMode) {
           print(
             '[COMスカウト] ラウンド$roundBangou ${univ.name}(${m.riyuu}) → 狙う選手なし(見送り)',
@@ -712,6 +789,12 @@ Future<List<ComScoutKekka>> comScoutRound({
           seikou: seikou,
           riyuu: m.riyuu,
         ),
+      );
+      memo[univ.id] = _KoudouMemo(
+        shurui: comScoutKoudouKousyou,
+        riyuu: m.riyuu,
+        senshu: nerai.senshu,
+        seikou: seikou,
       );
       if (kDebugMode) {
         final String kouhoStr = jouI
@@ -760,6 +843,30 @@ Future<List<ComScoutKekka>> comScoutRound({
         '[COMスカウト] ラウンド$roundBangou ${kachi.senshu.name}は'
         '${list.map((k) => sortedUnivData[k.univid].name).join('・')}が競合 → '
         '${sortedUnivData[kachi.univid].name}に確定',
+      );
+    }
+  }
+
+  // 全大学のこのラウンドの行動(確定人数は、このラウンドの確定を反映したあとの人数)
+  if (koudou != null) {
+    for (final UnivData univ in sortedUnivData) {
+      final _KoudouMemo mm =
+          memo[univ.id] ??
+          _KoudouMemo(shurui: comScoutKoudouNashi, riyuu: '');
+      final SenshuData? s = mm.senshu;
+      koudou.add(
+        ComScoutKoudou(
+          univid: univ.id,
+          shurui: mm.shurui,
+          riyuu: mm.riyuu,
+          senshuId: s?.id ?? -1,
+          senshuName: s?.name ?? '',
+          senshuTime: s?.kiroku_nyuugakuji_5000 ?? TEISUU.DEFAULTTIME,
+          seikou: mm.seikou,
+          kimariUnivid: s == null ? -1 : (kimari[s.id] ?? -1),
+          ketteiSuu: comScoutKetteiSuu(shinnyuusei, univ.id),
+          waku: comScoutWaku(shinnyuusei, univ.id),
+        ),
       );
     }
   }
@@ -880,7 +987,12 @@ String _timeMoji(double time) {
 }
 
 /// ラウンドの結果を、画面に出す文にする(プレイヤーの交渉を先に)
-List<String> comScoutKekkaBun(List<ComScoutKekka> kekka, int myUnivid) {
+/// [jibunNomi] がtrueなら、プレイヤーの交渉の結果だけ
+List<String> comScoutKekkaBun(
+  List<ComScoutKekka> kekka,
+  int myUnivid, {
+  bool jibunNomi = false,
+}) {
   final List<UnivData> sortedUnivData = _sortedUnivData();
   final List<String> jibun = []; // プレイヤーの交渉
   final List<String> hoka = []; // ほかの大学の確定
@@ -905,7 +1017,32 @@ List<String> comScoutKekkaBun(List<ComScoutKekka> kekka, int myUnivid) {
       );
     }
   }
-  return [...jibun, ...hoka];
+  return jibunNomi ? jibun : [...jibun, ...hoka];
+}
+
+/// 「ラウンドの結果」の画面に出す、大学の行動の文
+String comScoutKoudouBun(ComScoutKoudou k) {
+  switch (k.shurui) {
+    case comScoutKoudouKousyou:
+      final String kekka;
+      if (!k.seikou) {
+        kekka = '失敗';
+      } else if (k.kimariUnivid == k.univid) {
+        kekka = '確定';
+      } else {
+        final String mei = _univMei(_sortedUnivData(), k.kimariUnivid);
+        kekka = '成立したが$meiと競合し、確定ならず';
+      }
+      return '${k.senshuName}選手(5000m ${_timeMoji(k.senshuTime)})に交渉 → $kekka';
+    case comScoutKoudouMiokuri:
+      return '狙う選手なし(見送り)';
+    case comScoutKoudouUgokazu:
+      return '動かず';
+    case comScoutKoudouWakuIppai:
+      return '枠がいっぱい';
+    default:
+      return '交渉しなかった';
+  }
 }
 
 /// スカウトの最後に出す、プレイヤーの大学に入学する新入生の一覧

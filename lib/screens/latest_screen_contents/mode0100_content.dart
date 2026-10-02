@@ -7,6 +7,7 @@ import 'package:hive_flutter/hive_flutter.dart'; // Hiveのリスナーを使用
 import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/riji_data.dart';
 import 'package:ekiden/kantoku_data.dart';
+import 'package:ekiden/screens/Modal_shinnyuuseiShingakusaki.dart';
 // KANSUUクラスをインポートするか、必要な関数をここに直接定義
 // 仮で必要な関数をここに定義します。もし kansuu.dart があるならそちらをインポートしてください。
 // import 'package:ekiden/utils/kansuu.dart';
@@ -496,6 +497,55 @@ class Mode0100Content extends StatelessWidget {
                                           ),
                                         ],
                                       ),
+                                  // 全大学の新入生の進学先(交渉で確定・自ら志望・留学生)を見る(1.8.0)
+                                  TextButton(
+                                    onPressed: () {
+                                      showGeneralDialog(
+                                        context: context,
+                                        barrierColor: Colors.black.withOpacity(
+                                          0.8,
+                                        ), // モーダルの背景色
+                                        barrierDismissible:
+                                            true, // 背景タップで閉じられるようにする
+                                        barrierLabel:
+                                            '新入生の進学先(全大学)', // アクセシビリティ用ラベル
+                                        transitionDuration: const Duration(
+                                          milliseconds: 300,
+                                        ), // アニメーション時間
+                                        pageBuilder:
+                                            (
+                                              context,
+                                              animation,
+                                              secondaryAnimation,
+                                            ) {
+                                              return const ModalShinnyuuseiShingakusaki();
+                                            },
+                                        transitionBuilder:
+                                            (
+                                              context,
+                                              animation,
+                                              secondaryAnimation,
+                                              child,
+                                            ) {
+                                              return FadeTransition(
+                                                opacity: CurvedAnimation(
+                                                  parent: animation,
+                                                  curve: Curves.easeOut,
+                                                ),
+                                                child: child,
+                                              );
+                                            },
+                                      );
+                                    },
+                                    child: const Text(
+                                      "新入生の進学先(全大学)",
+                                      style: TextStyle(
+                                        color: Color.fromARGB(255, 0, 255, 0),
+                                        decoration: TextDecoration.underline,
+                                        decorationColor: HENSUU.textcolor,
+                                      ),
+                                    ),
+                                  ),
                                   const SizedBox(height: 20),
                                   Text(
                                     "${idjununivdata[currentGhensuu.MYunivid].name}大学　新入生",

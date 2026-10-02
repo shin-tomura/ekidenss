@@ -11,11 +11,13 @@ import 'package:ekiden/kansuu/scout_com.dart';
 // 「新入生の進学先(全大学)」の画面(1.8.0)
 //
 // ・今年の新入生(1年生)が、どの大学にどう決まったか(交渉で確定・自ら志望・留学生)を全大学分出す
-// ・スカウト終了時のダイアログ(「全大学の新入生を見る」)と、大学画面のリンクから開く
+// ・スカウト終了時のダイアログ(「全大学の新入生を見る」)と、最新画面の4月5日の
+//   「新入生が入りました！」の表示と、大学画面のリンクから開く
 // ・保存されているデータ(選手の大学と、確定・志望の目印)から作るので、スカウトのあと
 //   翌年のスカウトまで見られる(スキップ中にスカウトが済んだ年も見られる)
 // ・表示は「大学ごと」(初期値)と「選手ごと(タイム順)」を切り替えられる
-//   大学ごとは、あなたの大学を先頭に、あとは名声の高い順(初期値)か大学ID順
+//   大学ごとは、あなたの大学を先頭に、あとは大学ID順(初期値。いろいろな画面で使っていて
+//   見慣れているため)か名声の高い順。開くたびに大学ID順に戻る
 // ・コンピュータスカウトONでスカウトの途中のときは、進路未定の選手の仮の振り分けの大学は
 //   見せない(進学先が決まった選手だけを大学ごとに出し、進路未定の人数を添える)
 // ・コンピュータスカウトOFFで入学した年は、確定・志望の区別なしで出す
@@ -29,8 +31,8 @@ enum _HyoujiShurui {
 
 /// 大学の並び順(大学ごとのとき。あなたの大学はいつも先頭)
 enum _UnivNarabi {
+  idJun, // 大学ID順(初期値)
   meiseiJun, // 名声の高い順
-  idJun, // 大学ID順
 }
 
 /// 新入生の進学先の状態
@@ -53,7 +55,7 @@ class ModalShinnyuuseiShingakusaki extends StatefulWidget {
 class _ModalShinnyuuseiShingakusakiState
     extends State<ModalShinnyuuseiShingakusaki> {
   _HyoujiShurui _hyouji = _HyoujiShurui.daigakuGoto;
-  _UnivNarabi _narabi = _UnivNarabi.meiseiJun;
+  _UnivNarabi _narabi = _UnivNarabi.idJun;
 
   @override
   Widget build(BuildContext context) {
@@ -246,14 +248,14 @@ class _ModalShinnyuuseiShingakusakiState
               runSpacing: 4,
               children: [
                 _chip(
-                  '名声の高い順',
-                  _narabi == _UnivNarabi.meiseiJun,
-                  () => setState(() => _narabi = _UnivNarabi.meiseiJun),
-                ),
-                _chip(
                   '大学ID順',
                   _narabi == _UnivNarabi.idJun,
                   () => setState(() => _narabi = _UnivNarabi.idJun),
+                ),
+                _chip(
+                  '名声の高い順',
+                  _narabi == _UnivNarabi.meiseiJun,
+                  () => setState(() => _narabi = _UnivNarabi.meiseiJun),
                 ),
               ],
             ),
@@ -312,7 +314,7 @@ class _ModalShinnyuuseiShingakusakiState
     required bool kubetsuAri,
     required int miteiSuu,
   }) {
-    // あなたの大学を先頭に、あとは名声の高い順(同じ名声は大学ID順)か大学ID順
+    // あなたの大学を先頭に、あとは大学ID順(初期値)か名声の高い順(同じ名声は大学ID順)
     final List<UnivData> hoka = univs.where((u) => u.id != myUnivid).toList();
     if (_narabi == _UnivNarabi.meiseiJun) {
       hoka.sort((a, b) {

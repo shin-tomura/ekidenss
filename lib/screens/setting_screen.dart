@@ -1006,10 +1006,6 @@ class _SettingScreenState extends State<SettingScreen> {
               style: TextStyle(color: Colors.white),
             ),
             const Text(
-              "目標順位はレース中にも「全大学目標順位画面」から変えられます。ただし、これから走る選手に補正がかかるかどうかはすでに決まっているので、変えた目標順位はその次の選手から影響します。",
-              style: TextStyle(color: Colors.white),
-            ),
-            const Text(
               "一方、この目標順位をクリアすると、金または銀を獲得できたり、総監督が選手の能力を見抜くことができるようになったりします。",
               style: TextStyle(color: Colors.white),
             ),

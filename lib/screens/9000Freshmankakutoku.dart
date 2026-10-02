@@ -11,6 +11,7 @@ import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/kansuu/scout_com.dart';
 import 'package:ekiden/kansuu/ShoriGuard.dart';
 import 'package:ekiden/screens/ScoutRoundKekka_screen.dart';
+import 'package:ekiden/screens/Modal_shinnyuuseiShingakusaki.dart';
 //import 'package:ekiden/kansuu/kojinBestKirokuJuniKettei.dart';
 
 enum SortCriterion {
@@ -601,6 +602,13 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
     );
   }
 
+  /// 「新入生の進学先(全大学)」の画面を開く(スカウト終了時のダイアログから)
+  Future<void> _openShingakusaki() {
+    return Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const ModalShinnyuuseiShingakusaki()),
+    );
+  }
+
   /// コンピュータスカウトONのときの説明
   void _showSetsumeiDialog() {
     showDialog(
@@ -625,7 +633,9 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
               '${_ryuugakuseiSuu > 0 ? 'あなたの大学には留学生が$_ryuugakuseiSuu人入学します。' : ''}\n\n'
               'スカウトを終えると、残りのラウンドはコンピュータの大学だけで行います。'
               'そのあと、確定しなかった選手が自ら志望して進学先を選びます(名声の高い大学ほど選ばれやすく、どの大学も枠がちょうど埋まります)。\n\n'
-              '「ラウンドの結果」では、全大学のラウンドごとの動きを見られます(スカウト画面を開いている間だけ記録しています)。',
+              '「ラウンドの結果」では、全大学のラウンドごとの動きを見られます(スカウト画面を開いている間だけ記録しています)。\n\n'
+              'スカウトを終えると、全大学の新入生の進学先(交渉で確定・自ら志望・留学生)を見られます'
+              '(大学画面の「新入生の進学先(全大学)」からも、翌年のスカウトまで見られます)。',
               style: const TextStyle(color: Colors.black),
             ),
           ),
@@ -687,6 +697,7 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
         'あなたの大学に入学する新入生',
         bun,
         hajimeRound: nokori > 0 ? hajime : null,
+        shingakusakiBotan: true,
       );
       if (!mounted) return;
     }
@@ -707,10 +718,12 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
 
   /// ラウンドの結果を表示するダイアログ(閉じるまで待つ)
   /// ラウンドの記録があれば「全大学の動きを見る」ボタンを付ける([hajimeRound] のラウンドから開く)
+  /// [shingakusakiBotan] がtrueなら「全大学の新入生を見る」ボタンを付ける(スカウト終了時)
   Future<void> _showKekkaDialog(
     String title,
     List<String> lines, {
     int? hajimeRound,
+    bool shingakusakiBotan = false,
   }) {
     return showDialog(
       context: context,
@@ -748,6 +761,11 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
               TextButton(
                 onPressed: () => _openRoundKekka(hajimeRound: hajimeRound),
                 child: const Text('全大学の動きを見る'),
+              ),
+            if (shingakusakiBotan)
+              TextButton(
+                onPressed: () => _openShingakusaki(),
+                child: const Text('全大学の新入生を見る'),
               ),
             TextButton(
               onPressed: () {

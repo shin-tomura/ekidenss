@@ -30,6 +30,7 @@ import 'package:ekiden/kansuu/ChartPanelUniv.dart';
 import 'package:ekiden/screens/tradeScreen.dart';
 import 'package:ekiden/screens/Modal_comGoldSilver.dart';
 import 'package:ekiden/screens/Modal_comScout.dart';
+import 'package:ekiden/screens/Modal_shinnyuuseiShingakusaki.dart';
 //import 'package:ekiden/kansuu/kojinBestKirokuJuniKettei.dart';
 // Modal views (placeholders for now, you'll need to create these files)
 //import 'package:ekiden/modals/modal_univ_name_henshuu_view.dart';
@@ -4899,6 +4900,41 @@ class _UnivScreenState extends State<UnivScreen> {
           },
           child: Text(
             "コンピュータスカウト",
+            style: TextStyle(
+              color: const Color.fromARGB(255, 0, 255, 0),
+              decoration: TextDecoration.underline,
+              decorationColor: HENSUU.textcolor,
+            ),
+          ),
+        ),
+        // 今年の新入生の進学先(交渉で確定・自ら志望・留学生)を全大学分見る(1.8.0)
+        TextButton(
+          onPressed: () {
+            showGeneralDialog(
+              context: context,
+              barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+              barrierDismissible: true, // 背景タップで閉じられるようにする
+              barrierLabel: '新入生の進学先(全大学)', // アクセシビリティ用ラベル
+              transitionDuration: const Duration(
+                milliseconds: 300,
+              ), // アニメーション時間
+              pageBuilder: (context, animation, secondaryAnimation) {
+                return const ModalShinnyuuseiShingakusaki();
+              },
+              transitionBuilder:
+                  (context, animation, secondaryAnimation, child) {
+                    return FadeTransition(
+                      opacity: CurvedAnimation(
+                        parent: animation,
+                        curve: Curves.easeOut,
+                      ),
+                      child: child,
+                    );
+                  },
+            );
+          },
+          child: Text(
+            "新入生の進学先(全大学)",
             style: TextStyle(
               color: const Color.fromARGB(255, 0, 255, 0),
               decoration: TextDecoration.underline,

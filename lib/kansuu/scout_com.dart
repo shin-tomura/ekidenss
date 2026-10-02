@@ -1043,6 +1043,15 @@ String _timeMoji(double time) {
   return '$m分${s.toString().padLeft(2, '0')}秒';
 }
 
+/// 5000m持ちタイムの文字(例: 14分05秒。記録がなければ「記録なし」)
+/// 「新入生の進学先(全大学)」の画面で使う
+String comScoutTimeMoji(double time) => _timeMoji(time);
+
+/// 新入生(留学生を除く)全体の中での5000m持ちタイムの順位(選手id → 1から)
+/// 「新入生の進学先(全大学)」の画面で使う(交渉の成功率の計算と同じ順位)
+Map<int, int> comScoutTimeJuni(List<SenshuData> shinnyuusei) =>
+    _timeJuniTsukuru(shinnyuusei);
+
 /// ラウンドの結果を、画面に出す文にする(プレイヤーの交渉を先に)
 /// [jibunNomi] がtrueなら、プレイヤーの交渉の結果だけ
 List<String> comScoutKekkaBun(

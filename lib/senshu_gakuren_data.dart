@@ -363,10 +363,14 @@ class Senshu_Gakuren_Data extends HiveObject {
 
       time_taikai_total: senshu.time_taikai_total,
       speed: senshu.speed,
-      sijiflag: senshu.sijiflag,
-      sijiseikouflag: senshu.sijiseikouflag,
-      startchokugotobidasiflag: senshu.startchokugotobidasiflag,
-      startchokugotobidasiseikouflag: senshu.startchokugotobidasiseikouflag,
+      // 指示の目印は写さずに0にする(1.8.0で修正)
+      // 学連選抜の選手には指示を出さない仕様だが、元の選手には前の駅伝(11月駅伝)の指示の目印が
+      // 次の駅伝のエントリーまで残っているため、写すと正月駅伝でもその指示が働いてしまっていた
+      // (1区の学連選抜の仕組みによる飛び出しはRaceCalc_gakuren.dartで別に抽選する)
+      sijiflag: 0,
+      sijiseikouflag: 0,
+      startchokugotobidasiflag: 0,
+      startchokugotobidasiseikouflag: 0,
       racechuukakuseiflag: senshu.racechuukakuseiflag,
 
       // **値渡し（ディープコピー）に修正**

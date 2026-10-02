@@ -877,17 +877,35 @@ Future<void> RaceCalc({
                       1] ==
                   1) {
                 final lasttime = sortedsenshudata[senshuid].time_taikai_total;
+                final UnivData jibunUniv =
+                    sortedunivdata[sortedsenshudata[senshuid].univid];
                 if (Random().nextInt(100) <
                     sortedsenshudata[senshuid].heijousin) {
                   sortedsenshudata[senshuid].time_taikai_total *= 0.999;
                   sortedsenshudata[senshuid].sijiseikouflag = 1;
                 } else {
-                  sortedsenshudata[senshuid].time_taikai_total *= 1.015;
+                  // 失敗したときは、指示なしの場合の前半突っ込みの悪化の1.5倍(最小0.5%、最大1.2%)
+                  // (1.7.9までは一律1.5%で、前半突っ込みの指示の失敗と同じだった)
+                  final double? mokuhyouSa = mokuhyouJuniTimeSa(
+                    univs: sortedunivdata,
+                    jibunTime:
+                        jibunUniv.time_taikai_total[gh[0].nowracecalckukan - 1],
+                    mokuhyou: jibunUniv.mokuhyojuni[racebangou],
+                    kukan: gh[0].nowracecalckukan,
+                  );
+                  sortedsenshudata[senshuid].time_taikai_total *=
+                      mokuhyouOsaeShippaiBairitsu(
+                        // 差が分からない場合(通常は起こらない)は最大の1.2%
+                        timeSa: mokuhyouSa ?? double.infinity,
+                        kyoriMeter: gh[0]
+                            .kyori_taikai_kukangoto[racebangou][gh[0]
+                            .nowracecalckukan],
+                      );
                 }
                 final sontokutime =
                     sortedsenshudata[senshuid].time_taikai_total - lasttime;
                 sortedsenshudata[senshuid].string_racesetumei +=
-                    "指示(前半抑え)補正:${sontokutime.isNegative ? '' : '+'}${sontokutime.toStringAsFixed(1)}秒\n";
+                    "指示(前半抑え)補正(${_mokuhyouKonkyo(jibunUniv, racebangou, gh[0].nowracecalckukan, univs: sortedunivdata)}):${sontokutime.isNegative ? '' : '+'}${sontokutime.toStringAsFixed(1)}秒\n";
                 //atai_hosei[senshuid][12] = sontokutime;
                 atai_hosei[senshuid][9] = sontokutime;
               } else {

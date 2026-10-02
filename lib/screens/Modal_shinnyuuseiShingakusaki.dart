@@ -11,7 +11,10 @@ import 'package:ekiden/screens/Modal_senshu.dart'; // 選手データ(選手の�
 // ------------------------------------------------------------
 // 「新入生の進学先(全大学)」の画面(1.8.0)
 //
-// ・今年の新入生(1年生)が、どの大学にどう決まったか(交渉で確定・自ら志望・留学生)を全大学分出す
+// ・今年の新入生(1年生)が、どの大学にどう入ったか(交渉・志望・留学生)を全大学分出す
+//   スカウト後は全員の進学先が決まっているので、「確定」ではなく入り方で
+//   【交渉】(交渉で確定した選手)・【志望】(自ら志望して入学した選手)と出す
+//   (スカウトの途中に開いた場合も、決まった選手は同じく【交渉】と出す)
 // ・スカウト終了時のダイアログ(「全大学の新入生を見る」)と、最新画面の4月5日の
 //   「新入生が入りました！」の表示と、大学画面のリンクから開く
 // ・保存されているデータ(選手の大学と、確定・志望の目印)から作るので、スカウトのあと
@@ -24,7 +27,7 @@ import 'package:ekiden/screens/Modal_senshu.dart'; // 選手データ(選手の�
 //   進路未定の選手は押せない(選手データの上部に、仮の振り分けの大学が出てしまうため)
 // ・コンピュータスカウトONでスカウトの途中のときは、進路未定の選手の仮の振り分けの大学は
 //   見せない(進学先が決まった選手だけを大学ごとに出し、進路未定の人数を添える)
-// ・コンピュータスカウトOFFで入学した年は、確定・志望の区別なしで出す
+// ・コンピュータスカウトOFFで入学した年は、交渉・志望の区別なしで出す
 // ------------------------------------------------------------
 
 /// 表示の種類
@@ -41,9 +44,9 @@ enum _UnivNarabi {
 
 /// 新入生の進学先の状態
 enum _Joutai {
-  kakutei, // 交渉で確定
-  shigan, // 自ら志望して入学
-  nyuugaku, // 入学(確定・志望の区別なし。OFFで入学した年など)
+  kakutei, // 交渉で確定(画面では【交渉】)
+  shigan, // 自ら志望して入学(画面では【志望】)
+  nyuugaku, // 入学(交渉・志望の区別なし。OFFで入学した年など)
   ryuugakusei, // 留学生
   mitei, // 進路未定(ONでスカウトの途中)
 }
@@ -77,7 +80,7 @@ class _ModalShinnyuuseiShingakusakiState
       'senshuBox',
     ).values.where((s) => s.gakunen == 1).toList();
 
-    // 確定・志望の区別があるか(ONでスカウトの途中か、ONで進学先が決まった選手がいる年)
+    // 交渉・志望の区別があるか(ONでスカウトの途中か、ONで進学先が決まった選手がいる年)
     final bool scoutChuuOn =
         gh != null &&
         gh.mode == 9000 &&
@@ -150,7 +153,7 @@ class _ModalShinnyuuseiShingakusakiState
   }
 
   /// 選手の進学先の状態を決める
-  /// [kubetsuAri] 確定・志望の区別があるか(ONの年)
+  /// [kubetsuAri] 交渉・志望の区別があるか(ONの年)
   /// [scoutChuu] ONでスカウトの途中か(決まっていない選手は進路未定として、大学を見せない)
   _Joutai _joutaiKimeru(
     SenshuData s, {
@@ -187,11 +190,11 @@ class _ModalShinnyuuseiShingakusakiState
     return c != 0 ? c : a.id.compareTo(b.id);
   }
 
-  /// 状態の見出し(【確定】など。区別がないときは空)
+  /// 状態の見出し(【交渉】など。区別がないときは空)
   String _joutaiMei(_Joutai j) {
     switch (j) {
       case _Joutai.kakutei:
-        return '確定';
+        return '交渉';
       case _Joutai.shigan:
         return '志望';
       case _Joutai.ryuugakusei:
@@ -284,7 +287,7 @@ class _ModalShinnyuuseiShingakusakiState
   Widget? _chuuiGaki({required bool kubetsuAri, required int miteiSuu}) {
     String? bun;
     if (!kubetsuAri) {
-      bun = 'この年の新入生は、コンピュータスカウトOFFで入学したため、確定・志望の区別はありません。';
+      bun = 'この年の新入生は、コンピュータスカウトOFFで入学したため、交渉・志望の区別はありません。';
     } else if (miteiSuu > 0) {
       bun =
           'スカウトの途中です。進学先が決まっていない新入生(進路未定 $miteiSuu人)は、'
@@ -339,7 +342,7 @@ class _ModalShinnyuuseiShingakusakiState
       itemBuilder: (context, index) {
         if (chuui != null && index == 0) return chuui;
         final UnivData u = narabi[chuui == null ? index : index - 1];
-        // この大学の新入生(進路未定の選手は出さない)を、確定→志望→入学→留学生の順に、それぞれタイム順で
+        // この大学の新入生(進路未定の選手は出さない)を、交渉→志望→入学→留学生の順に、それぞれタイム順で
         final List<SenshuData> senshu =
             shinnyuusei
                 .where((s) => s.univid == u.id && joutai[s.id] != _Joutai.mitei)
@@ -380,7 +383,7 @@ class _ModalShinnyuuseiShingakusakiState
         .where((s) => joutai[s.id] == _Joutai.ryuugakusei)
         .length;
     final String ninzuu = kubetsuAri
-        ? '確定$kakutei 志望$shigan${ryuugakusei > 0 ? ' 留学生$ryuugakusei' : ''}'
+        ? '交渉$kakutei 志望$shigan${ryuugakusei > 0 ? ' 留学生$ryuugakusei' : ''}'
         : '新入生${senshu.length}人${ryuugakusei > 0 ? '(留学生$ryuugakusei人)' : ''}';
 
     return Card(

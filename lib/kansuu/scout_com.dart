@@ -1135,7 +1135,8 @@ List<String> comScoutNyuugakuBun({
     if (s.hirou == 1) {
       hoka.add('【留学生】${s.name}選手が入学します');
     } else if (comScoutKakutei(s)) {
-      kakutei.add('【確定】${s.name}選手(5000m $time)');
+      // スカウト後は全員の進学先が決まっているので、「確定」ではなく入り方(交渉・志望)で出す(1.8.0)
+      kakutei.add('【交渉】${s.name}選手(5000m $time)');
     } else if (shigan[s.id] == myUnivid || s.kegaflag == comScoutShiganFlag) {
       shiganBun.add('【志望】${s.name}選手が自ら志望して入学します(5000m $time)');
     } else {

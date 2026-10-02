@@ -497,7 +497,7 @@ class Mode0100Content extends StatelessWidget {
                                           ),
                                         ],
                                       ),
-                                  // 全大学の新入生の進学先(交渉で確定・自ら志望・留学生)を見る(1.8.0)
+                                  // 全大学の新入生の進学先(交渉・志望・留学生)を見る(1.8.0)
                                   TextButton(
                                     onPressed: () {
                                       showGeneralDialog(

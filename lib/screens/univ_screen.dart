@@ -4907,7 +4907,7 @@ class _UnivScreenState extends State<UnivScreen> {
             ),
           ),
         ),
-        // 今年の新入生の進学先(交渉で確定・自ら志望・留学生)を全大学分見る(1.8.0)
+        // 今年の新入生の進学先(交渉・志望・留学生)を全大学分見る(1.8.0)
         TextButton(
           onPressed: () {
             showGeneralDialog(

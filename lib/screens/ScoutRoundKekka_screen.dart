@@ -66,24 +66,45 @@ class _ScoutRoundKekkaScreenState extends State<ScoutRoundKekkaScreen> {
             )
           : Column(
               children: [
-                // ラウンドの切り替え(入りきらなければ折り返す)
+                // ラウンドの切り替え(← ラウンド7 → の1行。ラウンドが多くても場所をとらないように)
                 Container(
                   width: double.infinity,
                   color: Colors.grey[900],
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
+                    horizontal: 4,
+                    vertical: 4,
                   ),
-                  child: Wrap(
-                    spacing: 8,
-                    runSpacing: 4,
+                  child: Row(
                     children: [
-                      for (int i = 0; i < widget.kiroku.length; i++)
-                        ChoiceChip(
-                          label: Text('ラウンド${widget.kiroku[i].key}'),
-                          selected: _erabi == i,
-                          onSelected: (_) => setState(() => _erabi = i),
+                      IconButton(
+                        icon: const Icon(Icons.chevron_left),
+                        color: Colors.white,
+                        disabledColor: Colors.white24,
+                        tooltip: '前のラウンド',
+                        onPressed: _erabi > 0
+                            ? () => setState(() => _erabi--)
+                            : null,
+                      ),
+                      Expanded(
+                        child: Text(
+                          'ラウンド${widget.kiroku[_erabi].key}',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: HENSUU.fontsize_honbun,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.chevron_right),
+                        color: Colors.white,
+                        disabledColor: Colors.white24,
+                        tooltip: '次のラウンド',
+                        onPressed: _erabi < widget.kiroku.length - 1
+                            ? () => setState(() => _erabi++)
+                            : null,
+                      ),
                     ],
                   ),
                 ),

@@ -19,8 +19,11 @@ import 'package:ekiden/kansuu/ShozokusakiKettei_By_Univmeisei.dart'; // 振り�
 //     結果を一斉に判定する。成功した大学に確定し(univid=その大学、kegaflag=-3)、
 //     確定した選手はその年はもう交渉に応じない
 //     (kegaflagはスカウト画面の成功率の表示に使っている欄。新入生を作るときに0に戻る)
+//   ・交渉に失敗した選手とは、その大学はその年はもう交渉できない(全大学同じ)
+//     プレイヤーの大学に断った選手はkegaflag=-5にして保存する(アプリを開き直しても交渉できない)
+//     コンピュータの大学に断った選手は、アプリを終了するまで覚えておく(_comKotowari)
 //   ・各大学が確定できるのは、日本人の新入生の枠(5人−その大学の留学生の新入生の人数)まで
-//   ・ラウンド数は設定の回数(1〜5回、初期値3回)。プレイヤーがスカウトを終えたら、
+//   ・ラウンド数は設定の回数(1〜10回、初期値3回)。プレイヤーがスカウトを終えたら、
 //     残りのラウンドはコンピュータだけで行う
 //   ・最後に、確定しなかった選手が「自ら志望して」進学先を選ぶ(今までの新入生の振り分けと
 //     同じ抽選。持ちタイムの良い順に、名声の重みで、枠が残っている大学から選ぶ)。
@@ -32,7 +35,11 @@ import 'package:ekiden/kansuu/ShozokusakiKettei_By_Univmeisei.dart'; // 振り�
 //     名声の比 = 交渉する大学の名声 ÷ (交渉する大学の名声 + 全大学の平均の名声) (0.1%〜90%)
 //     タイム順位による上限 = 新入生(留学生を除く)全体の中での5000m持ちタイムの順位で、
 //       1位10%〜87位以下75%
-//     成功率 = 小さいほう(1%単位に丸め、1%未満は0.1%)
+//     成功率 = タイム順位による上限 × 名声の比 ÷ 75% (名声の比が75%以上なら上限のまま。
+//       1%単位に丸め、1%未満は0.1%)
+//     (トップ級の大学と、タイム87位以下の選手は「小さいほう」と同じ値になる。名声の高くない
+//     大学ほど、持ちタイムの良い選手の成功率が下がる。どの大学も同じ10%で大物に挑めると、
+//     成功率の低い大物を後回しにするコンピュータより、粘って大物を狙う人間が有利になるため)
 // ・同じ選手に複数の大学が成功した場合は、名声の重みを付けた抽選で1校に決める(名声0は重み1)
 // ・留学生は交渉の対象外(年度替わりの処理で決まった大学にそのまま入学する)
 // ・コンピュータの判断(見るのは5000m持ちタイムと能力の値そのもの。個性の設定や、
@@ -49,7 +56,8 @@ import 'package:ekiden/kansuu/ShozokusakiKettei_By_Univmeisei.dart'; // 振り�
 //       7タイム重視
 //       (1〜5は年間強化練習メニュー・銀の使い道と同じ番号)
 //     性格(大学ごと、yobiint2[61]・[62]に1大学1桁)で、欲しい選手の要件を決める
-//       要件: まだ進路未定の新入生(留学生を除く)の中で、自校の方針での点数が上位何%以内か
+//       要件: まだ進路未定の新入生(留学生を除く。自校に断った選手も除く)の中で、
+//         自校の方針での点数が上位何%以内か
 //       (人数は切り上げ。大物がいなくなれば、残りの中での上位へ自然に下がる)
 //       1大物狙い: 上位5%、2バランス: 上位25%、3堅実: 上位50%
 //       0自動: 名声順位1〜5位は大物狙い、6〜15位はバランス、16位以下は堅実
@@ -63,7 +71,7 @@ import 'package:ekiden/kansuu/ShozokusakiKettei_By_Univmeisei.dart'; // 振り�
 
 /// KantokuData.yobiint2 の使用番号: コンピュータスカウトの設定
 /// ラウンド回数のコード×10000 + OFFなら1000 + (100−積極性)
-///   ラウンド回数のコード: 0なら3回(初期値)、1〜5ならその回数
+///   ラウンド回数のコード: 0なら3回(初期値)、1〜10ならその回数
 ///   OFF: 0=ON(初期値)、1=OFF
 ///   積極性: 0〜100(%)。100から引いた値を入れるので、0が100%(初期値)
 const int comScoutSetteiIndex = 58;
@@ -132,10 +140,13 @@ int comScoutSekkyokusei(KantokuData kantoku) {
   return (100 - _settei(kantoku) % 1000).clamp(0, 100);
 }
 
-/// ラウンド回数(1〜5回)
+/// ラウンド回数の上限
+const int comScoutKaisuuMax = 10;
+
+/// ラウンド回数(1〜10回)
 int comScoutKaisuu(KantokuData kantoku) {
-  final int code = (_settei(kantoku) ~/ 10000) % 10;
-  return (code >= 1 && code <= 5) ? code : 3;
+  final int code = _settei(kantoku) ~/ 10000;
+  return (code >= 1 && code <= comScoutKaisuuMax) ? code : 3;
 }
 
 /// 新入生スカウトの回数(ONなら設定のラウンド回数、OFFなら今まで通り3回)
@@ -152,17 +163,19 @@ void comScoutSetteiKaku(
 }) {
   if (yobiint2.length <= comScoutSetteiIndex) return;
   final int s = sekkyokusei.clamp(0, 100);
-  final int code = (kaisuu >= 1 && kaisuu <= 5 && kaisuu != 3) ? kaisuu : 0;
+  final int code = (kaisuu >= 1 && kaisuu <= comScoutKaisuuMax && kaisuu != 3)
+      ? kaisuu
+      : 0;
   yobiint2[comScoutSetteiIndex] = code * 10000 + (on ? 0 : 1000) + (100 - s);
 }
 
 /// 各種設定のQRコードから読んだ値が、正しい形かどうか
 bool comScoutSetteiTadashii(int v) {
-  if (v < 0 || v >= 100000) return false;
+  if (v < 0) return false;
   final int code = v ~/ 10000;
   final int off = (v ~/ 1000) % 10;
   final int gyaku = v % 1000;
-  return code <= 5 && off <= 1 && gyaku <= 100;
+  return code <= comScoutKaisuuMax && off <= 1 && gyaku <= 100;
 }
 
 /// 1大学1桁で詰めた値(大学0〜14は[idx0]、15〜29は[idx1])から、大学の桁(0〜9)を取り出す
@@ -427,8 +440,12 @@ double _heikinMeisei(List<UnivData> sortedUnivData) {
   return goukei / sortedUnivData.length;
 }
 
+/// 成功率の計算で、タイム順位による上限のまま使える名声の比(これより低いと比に応じて下がる)
+const double _meiseiHiKijun = 0.75;
+
 /// 交渉の成功率(ONのとき。1%単位に丸め、1%未満は0.1%)
 /// 名声の比は全大学の平均の名声と比べる(仮の振り分けの大学によらないように)
+/// 成功率 = タイム順位による上限 × 名声の比 ÷ 75%(名声の比が75%以上なら上限のまま)
 double _seikouritsu({
   required UnivData kousyouUniv,
   required double heikinMeisei,
@@ -444,7 +461,7 @@ double _seikouritsu({
   meiseiHi = meiseiHi.clamp(0.001, 0.9);
   final double jougen = (0.10 + (timeJuni - 1) * (0.75 - 0.10) / (87.0 - 1.0))
       .clamp(0.10, 0.75);
-  final double p = min(meiseiHi, jougen);
+  final double p = jougen * min(1.0, meiseiHi / _meiseiHiKijun);
   if (p < 0.01) return 0.001;
   return (p * 100).round() / 100.0;
 }
@@ -492,8 +509,16 @@ const int comScoutKakuteiFlag = -3;
 /// (アプリを開き直しても、志望の抽選をやり直さないように)
 const int comScoutShiganFlag = -4;
 
+/// プレイヤーの大学との交渉を断った選手のkegaflagの値(その年はもうプレイヤーの大学と交渉しない)
+/// (進路はまだ決まっていないので、コンピュータの大学とは交渉できる。最後の志望で
+/// プレイヤーの大学に入ることもある)
+const int comScoutKotowariFlag = -5;
+
 /// 選手が交渉で確定しているか
 bool comScoutKakutei(SenshuData s) => s.kegaflag == comScoutKakuteiFlag;
+
+/// 選手がプレイヤーの大学との交渉を断ったか
+bool comScoutKotowarareta(SenshuData s) => s.kegaflag == comScoutKotowariFlag;
 
 /// 選手の進学先が決まっているか(交渉で確定、または最後の志望で決定)
 bool comScoutKettei(SenshuData s) =>
@@ -528,7 +553,7 @@ Map<int, double> comScoutSeikouritsuIchiran({required int univid}) {
   final double heikin = _heikinMeisei(sortedUnivData);
   return {
     for (final SenshuData s in shinnyuusei)
-      if (s.hirou != 1 && !comScoutKettei(s))
+      if (s.hirou != 1 && !comScoutKettei(s) && !comScoutKotowarareta(s))
         s.id: _seikouritsu(
           kousyouUniv: sortedUnivData[univid],
           heikinMeisei: heikin,
@@ -540,6 +565,21 @@ Map<int, double> comScoutSeikouritsuIchiran({required int univid}) {
 // ------------------------------------------------------------
 // ラウンドと最後の志望
 // ------------------------------------------------------------
+
+/// コンピュータの大学との交渉を断った選手(大学id → 選手idの集まり)
+/// 保存はせず、アプリを終了するまで覚えておく。年が変わったときと、
+/// その年の1ラウンド目を始めるときに忘れる
+final Map<int, Set<int>> _comKotowari = {};
+int _comKotowariNen = -1;
+
+/// コンピュータの大学[univid]との交渉を断った選手の集まり(年が変わっていたら忘れてから返す)
+Set<int> _comKotowariSet(int nen, int univid) {
+  if (_comKotowariNen != nen) {
+    _comKotowari.clear();
+    _comKotowariNen = nen;
+  }
+  return _comKotowari.putIfAbsent(univid, () => <int>{});
+}
 
 /// 交渉の結果1件分
 class ComScoutKekka {
@@ -646,13 +686,16 @@ List<SenshuData> _sortedSenshuData() {
 /// [koudou] を渡すと、全大学のこのラウンドの行動(見送りなども含む)を大学id順に入れて返す
 Future<List<ComScoutKekka>> comScoutRound({
   required Ghensuu gh,
-  required int roundBangou, // デバッグログ用(1から)
+  required int roundBangou, // ラウンドの番号(1から。1ならコンピュータの大学の断られた記憶を忘れてから始める)
   SenshuData? playerTarget,
   double playerSeikouritsu = 0.0,
   Random? random,
   List<ComScoutKoudou>? koudou,
 }) async {
   final Random rnd = random ?? Random();
+  if (roundBangou <= 1) {
+    _comKotowari.clear(); // その年の1ラウンド目
+  }
   final KantokuData? kantoku = Hive.box<KantokuData>(
     'kantokuBox',
   ).get('KantokuData');
@@ -665,7 +708,7 @@ Future<List<ComScoutKekka>> comScoutRound({
   final List<_Kousyou> kousyouList = [];
   final Map<int, _KoudouMemo> memo = {}; // 大学id → このラウンドの行動
 
-  // プレイヤーの交渉(進路未定の選手だけ。枠がいっぱいなら交渉できない)
+  // プレイヤーの交渉(進路未定の選手だけ。枠がいっぱいなら交渉できない。断られた選手とも交渉できない)
   final bool playerWakuIppai =
       comScoutKetteiSuu(shinnyuusei, myUnivid) >=
       comScoutWaku(shinnyuusei, myUnivid);
@@ -676,6 +719,7 @@ Future<List<ComScoutKekka>> comScoutRound({
   if (playerTarget != null &&
       playerTarget.hirou != 1 &&
       !comScoutKettei(playerTarget) &&
+      !comScoutKotowarareta(playerTarget) &&
       !playerWakuIppai) {
     final bool seikou = rnd.nextDouble() < playerSeikouritsu;
     kousyouList.add(
@@ -729,10 +773,12 @@ Future<List<ComScoutKekka>> comScoutRound({
         continue; // このラウンドは動かない
       }
 
-      // まだ進路未定の選手を、自校の方針での点数の高い順に並べる
+      // まだ進路未定で、自校に断っていない選手を、自校の方針での点数の高い順に並べる
+      final Set<int> kotowari = _comKotowariSet(gh.year, univ.id);
       final List<_Kouho> mitei = [];
       for (final SenshuData s in nihonjin) {
         if (comScoutKettei(s)) continue;
+        if (kotowari.contains(s.id)) continue;
         mitei.add(
           _Kouho(
             senshu: s,
@@ -750,7 +796,7 @@ Future<List<ComScoutKekka>> comScoutRound({
         return c != 0 ? c : a.senshu.id.compareTo(b.senshu.id);
       });
 
-      // 候補(性格の要件を満たす選手。進路未定の選手の中で点数が上位何%以内か、人数は切り上げ)
+      // 候補(性格の要件を満たす選手。交渉できる進路未定の選手の中で点数が上位何%以内か、人数は切り上げ)
       final int youkenNinzuu =
           (mitei.length * _youkenPercent(m.seikaku) + 99) ~/ 100;
       final List<_Kouho> kouho = mitei.take(youkenNinzuu).toList();
@@ -802,7 +848,7 @@ Future<List<ComScoutKekka>> comScoutRound({
             .join(' / ');
         print(
           '[COMスカウト] ラウンド$roundBangou ${univ.name}(${m.riyuu}) '
-          '要件 進路未定${mitei.length}人の上位${_youkenPercent(m.seikaku)}%($youkenNinzuu人) '
+          '要件 交渉できる進路未定${mitei.length}人の上位${_youkenPercent(m.seikaku)}%($youkenNinzuu人) '
           '上位候補: $kouhoStr → ${nerai.senshu.name}に交渉 ${seikou ? '成功' : '失敗'}',
         );
       }
@@ -840,6 +886,21 @@ Future<List<ComScoutKekka>> comScoutRound({
         '${list.map((k) => sortedUnivData[k.univid].name).join('・')}が競合 → '
         '${sortedUnivData[kachi.univid].name}に確定',
       );
+    }
+  }
+
+  // 交渉に失敗した選手とは、その大学はその年はもう交渉しない
+  // (プレイヤーの大学は目印を入れて保存し、コンピュータの大学はアプリを終了するまで覚える)
+  for (final _Kousyou k in kousyouList) {
+    if (k.seikou) continue;
+    if (k.univid == myUnivid) {
+      if (!comScoutKettei(k.senshu)) {
+        // ほかの大学に確定していなければ
+        k.senshu.kegaflag = comScoutKotowariFlag;
+        await k.senshu.save();
+      }
+    } else {
+      _comKotowariSet(gh.year, k.univid).add(k.senshu.id);
     }
   }
 
@@ -1002,7 +1063,9 @@ List<String> comScoutKekkaBun(
           '【競合】${k.senshuName}選手との交渉は成立しましたが、$meiと競合し、$meiに確定しました',
         );
       } else {
-        jibun.add('【失敗】${k.senshuName}選手との交渉は失敗しました');
+        jibun.add(
+          '【失敗】${k.senshuName}選手との交渉は失敗しました(この選手とは、今年はもう交渉できません)',
+        );
       }
       continue;
     }

@@ -96,6 +96,11 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
     if (kantoku != null) {
       _comScoutOn = isComScoutOn(kantoku);
       _roundSuu = comScoutKaisuu(kantoku);
+      // スカウトの途中でラウンド回数の設定を減らした場合も、ラウンドの番号が1より小さくならないように
+      // (1ラウンド目では、コンピュータの大学の断られた記憶を忘れるため)
+      if (_ghensuu != null && _ghensuu!.scoutChances > _roundSuu) {
+        _roundSuu = _ghensuu!.scoutChances;
+      }
     }
 
     // ★追加: フィルターマップの初期化 (全て0で初期化)
@@ -195,12 +200,13 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
         .toList();
     _kakuteiSuu = _myFreshmen.length;
 
-    // 進路未定の選手の成功率をkegaflagに入れる(決まった選手は目印のまま)
+    // 進路未定の選手の成功率をkegaflagに入れる(決まった選手と、あなたの大学に断った選手は目印のまま)
     final Map<int, double> seikouritsu = comScoutSeikouritsuIchiran(
       univid: myUnivId,
     );
     for (final SenshuData s in _targetFreshmen) {
       if (comScoutKettei(s)) continue;
+      if (comScoutKotowarareta(s)) continue;
       final double r = seikouritsu[s.id] ?? 0.001;
       s.kegaflag = r < 0.01 ? -1 : (r * 100).round();
       await s.save();
@@ -215,6 +221,7 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
 
   /// 選手の状態の表示(ONのとき。進路未定・○○大学に確定など)
   String _jyoutaiMoji(SenshuData s) {
+    if (comScoutKotowarareta(s)) return '進路未定(あなたの大学は断った)';
     if (!comScoutKettei(s)) return '進路未定';
     final String mei = _univBox.get(s.univid)?.name ?? '不明';
     if (s.univid == _ghensuu!.MYunivid) {
@@ -485,6 +492,10 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
     if (_ghensuu!.scoutChances <= 0) {
       return;
     }
+    // コンピュータスカウトONでは、断られた選手とはその年はもう交渉できない
+    if (_comScoutOn && comScoutKotowarareta(freshman)) {
+      return;
+    }
     // コンピュータスカウトがONなら、コンピュータの大学と同じラウンドで一斉に判定する
     if (_comScoutOn) {
       await _negotiateRound(freshman);
@@ -605,7 +616,8 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
               '新入生は全員「進路未定」です(あなたの大学も含め、どの大学にも分かりません)。\n\n'
               '交渉するたびに、コンピュータの大学も同じラウンドで1人ずつ交渉し、成功した大学に確定します。'
               '同じ選手に複数の大学が成功した場合は、名声の高い大学ほど選ばれやすい抽選で決まります。'
-              '確定した選手は、その年はもう交渉に応じません。\n\n'
+              '確定した選手は、その年はもう交渉に応じません。'
+              '交渉に失敗した選手とは、その年はもう交渉できません(コンピュータの大学も同じです)。\n\n'
               '確定できるのは、日本人の新入生の枠(5人。留学生が入学する大学は4人)までです。'
               'あなたの大学の枠は$_waku人で、確定しているのは$_kakuteiSuu人です。'
               '${_ryuugakuseiSuu > 0 ? 'あなたの大学には留学生が$_ryuugakuseiSuu人入学します。' : ''}\n\n'
@@ -1030,6 +1042,9 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
     // コンピュータスカウトONで進学先が決まった選手は、成功率の代わりに「決定」
     final bool kettei = _comScoutOn && comScoutKettei(freshman);
     if (kettei) rateStr = '決定';
+    // コンピュータスカウトONであなたの大学との交渉を断った選手は「断られた」(もう交渉できない)
+    final bool kotowari = _comScoutOn && comScoutKotowarareta(freshman);
+    if (kotowari) rateStr = '断られた';
 
     return Card(
       // 自校なら濃い紺色、他校なら深いグレー
@@ -1103,7 +1118,7 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
                         ),
                       ] else ...[
                         Text(
-                          kettei ? '状態' : '成功率',
+                          kettei || kotowari ? '状態' : '成功率',
                           style: const TextStyle(
                             color: Colors.white54,
                             fontSize: HENSUU.fontsize_honbun - 2,
@@ -1181,8 +1196,10 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
                     width: 90,
                     child: ElevatedButton(
                       // コンピュータスカウトONのときは、日本人の新入生の枠がいっぱいなら交渉できない
+                      // (断られた選手とも交渉できない)
                       onPressed:
                           _ghensuu!.scoutChances > 0 &&
+                              !kotowari &&
                               (!_comScoutOn || _kakuteiSuu < _waku)
                           ? () => _showConfirmationDialog(freshman)
                           : null,

@@ -44,9 +44,11 @@ import 'package:ekiden/kansuu/ShozokusakiKettei_By_Univmeisei.dart'; // 振り�
 // ・留学生は交渉の対象外(年度替わりの処理で決まった大学にそのまま入学する)
 // ・コンピュータの判断(見るのは5000m持ちタイムと能力の値そのもの。個性の設定や、
 //   プレイヤーにも見えない成長タイプ、仮の振り分けの大学は使わない)
-//     点数 = タイム点(新入生の中での持ちタイムの順位を0〜100点にしたもの)×0.5
-//            + 能力点(スカウト方針で重視する能力の重み付き平均)×0.5
-//       (タイム重視はタイム点だけ)
+//     点数 = タイム点(新入生の中での持ちタイムの順位を0〜100点にしたもの)×タイムの割合
+//            + 能力点(スカウト方針で重視する能力の重み付き平均)×(1−タイムの割合)
+//       タイムの割合は全大学共通の設定(yobiint2[63]。0〜100%の10%刻み、初期値50%。1.8.0で追加。
+//       1.7.9までは50%で固定)
+//       (タイム重視は設定に関係なくタイム点だけ)
 //     スカウト方針(大学ごと、yobiint2[59]・[60]に1大学1桁)
 //       0自動: 長距離粘り・ロード適性(重み2)、ペース変動対応力(重み1)と、チーム事情による
 //         補強ポイント(重み2)。来年も残る2・3年生と自校に確定した新入生に、登り適性・
@@ -84,6 +86,15 @@ const int comScoutHoushinIndex1 = 60;
 /// KantokuData.yobiint2 の使用番号: 大学ごとの性格(同じ形式)
 const int comScoutSeikakuIndex0 = 61;
 const int comScoutSeikakuIndex1 = 62;
+
+/// KantokuData.yobiint2 の使用番号: コンピュータの大学が新入生を評価するときの
+/// タイムの割合(全大学共通。1.8.0で追加)
+///   0なら50%(初期値。タイム:能力=50:50)、1〜11なら(値−1)×10%(0%〜100%)
+///   (50%を選んだ場合も0を入れる)
+const int comScoutTimeWariaiIndex = 63;
+
+/// 評価のタイムの割合の初期値(%)
+const int comScoutTimeWariaiShokichi = 50;
 
 const int _ketasuu = 15; // 1つの番号に格納する大学数
 
@@ -178,6 +189,30 @@ bool comScoutSetteiTadashii(int v) {
   return code <= comScoutKaisuuMax && off <= 1 && gyaku <= 100;
 }
 
+/// コンピュータの大学が新入生を評価するときの、タイムの割合(0〜100%、10%刻み。全大学共通)
+/// 能力の割合は 100 − この値
+int comScoutTimeWariai(KantokuData kantoku) {
+  if (kantoku.yobiint2.length <= comScoutTimeWariaiIndex) {
+    return comScoutTimeWariaiShokichi;
+  }
+  final int code = kantoku.yobiint2[comScoutTimeWariaiIndex];
+  return (code >= 1 && code <= 11)
+      ? (code - 1) * 10
+      : comScoutTimeWariaiShokichi;
+}
+
+/// タイムの割合(0〜100%、10%刻みに丸める)をyobiint2のリストに書き込む(保存は呼び出し側で行う)
+void comScoutTimeWariaiSettei(List<int> yobiint2, int wariai) {
+  if (yobiint2.length <= comScoutTimeWariaiIndex) return;
+  final int w = (wariai.clamp(0, 100) / 10).round() * 10;
+  yobiint2[comScoutTimeWariaiIndex] = w == comScoutTimeWariaiShokichi
+      ? 0
+      : w ~/ 10 + 1;
+}
+
+/// 各種設定のQRコードから読んだタイムの割合の値が、正しい形かどうか
+bool comScoutTimeWariaiTadashii(int v) => v >= 0 && v <= 11;
+
 /// 1大学1桁で詰めた値(大学0〜14は[idx0]、15〜29は[idx1])から、大学の桁(0〜9)を取り出す
 int _univKetaYomu(List<int> yobiint2, int idx0, int idx1, int univid) {
   if (univid < 0 || univid >= _ketasuu * 2) return 0;
@@ -262,12 +297,14 @@ class _Mekiki {
   final int houshin; // スカウト方針(0〜7)
   final int seikaku; // 性格(1〜3。自動は名声順位で決めたもの)
   final List<int> hokyou; // 自動のときの補強ポイント(3登り・4下り・5アップダウン)
+  final int timeWariai; // 評価のタイムの割合(0〜100%。全大学共通の設定)
 
   _Mekiki({
     required this.univid,
     required this.houshin,
     required this.seikaku,
     required this.hokyou,
+    required this.timeWariai,
   });
 
   /// 能力点(重視する能力の重み付き平均)
@@ -311,11 +348,13 @@ class _Mekiki {
     return omomi == 0 ? 0 : goukei / omomi;
   }
 
-  /// 点数(タイム点×0.5+能力点×0.5。タイム重視はタイム点だけ)
+  /// 点数(タイム点×タイムの割合+能力点×(1−タイムの割合)。初期値はタイム50%・能力50%
+  /// で、1.7.9と同じ。タイム重視は設定に関係なくタイム点だけ)
   double ten(SenshuData s, Map<int, double> timeTen) {
     final double t = timeTen[s.id] ?? 0;
     if (houshin == _houshinTime) return t;
-    return t * 0.5 + nouryokuTen(s) * 0.5;
+    final double w = timeWariai / 100.0;
+    return t * w + nouryokuTen(s) * (1.0 - w);
   }
 
   /// 狙いの理由(方針。自動は実際に重視したもの)
@@ -399,6 +438,7 @@ _Mekiki _mekikiTsukuru(
     houshin: houshin,
     seikaku: seikaku,
     hokyou: hokyou,
+    timeWariai: comScoutTimeWariai(kantoku),
   );
 }
 

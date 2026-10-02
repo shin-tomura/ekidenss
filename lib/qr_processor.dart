@@ -147,6 +147,8 @@ class SettingsQrProcessor {
       // コンピュータスカウト設定(int) [58]ON/OFF・積極性・ラウンド回数、
       // [59]・[60]大学ごとのスカウト方針、[61]・[62]大学ごとの性格
       data['k_yobiint2_58_62'] = kantoku.yobiint2.sublist(58, 63);
+      // コンピュータスカウトの評価の割合(タイム:能力)(int) [63] (1.8.0で追加)
+      data['k_yobiint2_63'] = kantoku.yobiint2[63];
     } else if (department == SettingsDepartment.octoberTime) {
       //区間ごとタイム調整(int)
       data['k_yobiint5_30_39_time'] = kantoku.yobiint5.sublist(30, 40);
@@ -515,6 +517,14 @@ class SettingsQrProcessor {
             kantoku.yobiint2[58 + i] = v;
           }
         }
+      }
+      // 以下は1.8.0で追加した設定。古いQRコードには含まれないので、
+      // 含まれていない場合や範囲外の値の場合は、今の設定のままにする
+      // コンピュータスカウトの評価の割合(タイム:能力)(int) kantoku.yobiint2[63]
+      //   0なら50:50(初期値)、1〜11なら(値−1)×10%がタイムの割合
+      final dynamic yobiint2_63 = dataMap['k_yobiint2_63'];
+      if (yobiint2_63 is int && comScoutTimeWariaiTadashii(yobiint2_63)) {
+        kantoku.yobiint2[63] = yobiint2_63;
       }
       // 育成力(int) & 名声(int) & 留学生受け入れ設定(int) (UnivData 0から29)
       final List<dynamic> ikuseiryokuList = dataMap['ud_ikuseiryoku'] ?? [];

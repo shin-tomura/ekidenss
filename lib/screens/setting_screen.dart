@@ -842,7 +842,7 @@ class _SettingScreenState extends State<SettingScreen> {
                       // 実際のライセンス画面の表示部分
                       child: const LicensePage(
                         applicationName: '箱庭小駅伝SS',
-                        applicationVersion: '1.8.0',
+                        applicationVersion: '1.8.1',
                         // applicationIcon: Image.asset('lib/assets/icon/icon_ss1024.png', width: 48, height: 48),
                       ),
                     ),
@@ -863,7 +863,7 @@ class _SettingScreenState extends State<SettingScreen> {
 
             // constを削除して、可変的なウィジェットを追加できるようにする
             const Text(
-              "SS 1.8.0 (21800)",
+              "SS 1.8.1 (21810)",
               style: TextStyle(color: Colors.white),
             ),
             const SizedBox(height: 8), // 適度な余白
@@ -1065,6 +1065,10 @@ class _SettingScreenState extends State<SettingScreen> {
             ),
             const Text(
               "目標順位を下回った順位でタスキを受けた場合、「前半抑え」に失敗した時のタイム損は、目標順位の大学とのタイム差が大きいほど大きくなります(最大でも「前半突っ込み」に失敗した時より小さいです)。",
+              style: TextStyle(color: Colors.white),
+            ),
+            const Text(
+              "駅伝の2区以降では、指示を選ぶ欄の下の「指示ごとの損得」で、走り出す選手が指示なし・前半突っ込み・前半抑えのそれぞれの場合に何秒ほど損や得をするか(成功した時・失敗した時)を確認できます。",
               style: TextStyle(color: Colors.white),
             ),
             const Text(

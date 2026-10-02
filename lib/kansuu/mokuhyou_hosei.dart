@@ -20,6 +20,16 @@ import 'package:ekiden/univ_data.dart';
 //   例: 20kmの区間なら、25秒差までは0.5%、30秒差なら0.6%、60秒差以上で1.2%
 //   (1.7.9までは差に関係なく一律1.5%)
 // ・成功したときは今まで通り(0.1%良くなる)
+//
+// 指示(前半突っ込み・前半抑え)の成否と「ほっと一息」の倍率(1.8.1でここにまとめた)
+// ・RaceCalc.dart と「指示ごとの損得」の画面(siji_sontoku.dart)の両方から使う
+//   (数値を変えるときはここだけを変えれば、画面の表示も一緒に変わる)
+// ・前半突っ込み: 成功(確率は駅伝男の値%)で1%良くなり、失敗で1.5%悪くなる(順位に関係なし)
+// ・前半抑え(確率は平常心の値%):
+//   目標順位を下回って襷を受けたとき 成功で0.1%良くなり、失敗は上の通り
+//   目標順位ちょうどか上回って襷を受けたとき 成功で0.3%良くなり、
+//   失敗はほっと一息の悪化+0.1%(最小0.5%)
+// ・ほっと一息(目標順位を上回って襷を受けた、指示なしの選手): 0.1%+上回った順位の数×0.02%悪くなる
 // ------------------------------------------------------------
 
 /// 最大の悪化割合(1.7.8までの一律の値)
@@ -33,6 +43,40 @@ const double mokuhyouOsaeShippaiKeisuu = 1.5;
 
 /// 前半抑えの失敗の最小の悪化割合(目標順位ちょうどのときの前半抑えの失敗と同じ)
 const double mokuhyouOsaeShippaiSaishou = 0.005;
+
+/// 「前半突っ込み」の指示に成功したときのタイムの倍率
+const double sijiTsukkomiSeikouBairitsu = 0.99;
+
+/// 「前半突っ込み」の指示に失敗したときのタイムの倍率
+const double sijiTsukkomiShippaiBairitsu = 1.015;
+
+/// 目標順位を下回って襷を受けたときに「前半抑え」の指示に成功したときのタイムの倍率
+const double sijiOsaeSeikouShitamawariBairitsu = 0.999;
+
+/// 目標順位ちょうどか上回って襷を受けたときに「前半抑え」の指示に成功したときのタイムの倍率
+const double sijiOsaeSeikouBairitsu = 0.997;
+
+/// ほっと一息の倍率の基本(上回った順位の数が0のときの値)
+const double mokuhyouHitoikiKihon = 1.001;
+
+/// ほっと一息の、上回った順位の数1つあたりの悪化割合
+const double mokuhyouHitoikiKeisuu = 0.0002;
+
+/// 目標順位を上回って襷を受けたときの「ほっと一息」のタイムの倍率
+/// [uwamawariJunisuu] 目標順位を上回っている順位の数
+double mokuhyouHitoikiBairitsu(int uwamawariJunisuu) {
+  return mokuhyouHitoikiKihon + mokuhyouHitoikiKeisuu * uwamawariJunisuu;
+}
+
+/// 目標順位ちょうど(0)か上回って([uwamawariJunisuu]の数だけ)襷を受けたときに
+/// 「前半抑え」の指示に失敗したときのタイムの倍率
+/// ほっと一息の倍率+0.1%。ただし最小0.5%(目標順位ちょうどのときの値)
+double mokuhyouOsaeShippaiUwamawariBairitsu(int uwamawariJunisuu) {
+  final double hitoiki = mokuhyouHitoikiBairitsu(uwamawariJunisuu);
+  const double saishou = 1.0 + mokuhyouOsaeShippaiSaishou;
+  if (hitoiki < saishou) return saishou;
+  return hitoiki + 0.001;
+}
 
 /// 最大の損になる差(秒)。[kyoriMeter] はこれから走る区間の距離(m)
 double mokuhyouTsukkomiSaidaiSa(double kyoriMeter) {

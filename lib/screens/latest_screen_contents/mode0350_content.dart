@@ -24,6 +24,8 @@ import 'package:ekiden/screens/Modal_tuukajunisuii.dart';
 import 'package:ekiden/screens/Modal_timesasuii.dart';
 import 'package:ekiden/kansuu/mokuhyou_hosei.dart';
 import 'package:ekiden/screens/Modal_senshu_race_bunseki.dart';
+import 'package:ekiden/screens/Modal_sijiSontoku.dart';
+import 'package:ekiden/kansuu/siji_sontoku.dart';
 
 String _getCombinedDifficultyText(KantokuData kantoku, Ghensuu currentGhensuu) {
   // 難易度モードを取得 (0:通常, 1:極, 2:天)
@@ -149,6 +151,44 @@ class _Mode0350ContentState extends State<Mode0350Content> {
           return a.id.compareTo(b.id);
         }
       });
+
+  // 指示ごとの損得の画面を呼び出すボタン(駅伝の2区以降。1.8.1)
+  // [sentakuchuu] 今選んでいる指示(画面で印を付ける)
+  Widget _buildSijiSontokuButton(SenshuData senshu, int sentakuchuu) {
+    return TextButton(
+      onPressed: () {
+        showGeneralDialog(
+          context: context,
+          barrierColor: Colors.black.withOpacity(0.8),
+          barrierDismissible: true,
+          barrierLabel: '指示ごとの損得',
+          transitionDuration: const Duration(milliseconds: 300),
+          pageBuilder: (context, animation, secondaryAnimation) {
+            return ModalSijiSontokuView(
+              senshuId: senshu.id,
+              sentakuchuu: sentakuchuu,
+            );
+          },
+          transitionBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(
+              opacity: CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeOut,
+              ),
+              child: child,
+            );
+          },
+        );
+      },
+      child: Text(
+        '指示ごとの損得',
+        style: TextStyle(
+          color: HENSUU.LinkColor,
+          fontSize: HENSUU.fontsize_honbun,
+        ),
+      ),
+    );
+  }
 
   // 選手詳細モーダルを呼び出す共通関数
   Widget _buildDetailButton(SenshuData senshu) {
@@ -1776,6 +1816,12 @@ class _Mode0350ContentState extends State<Mode0350Content> {
                   );
                 }).toList(),
               ),
+              // 駅伝の2区以降は、指示ごとのタイムの損得を見られる(1.8.1)
+              if (sijiSontokuTaishou(
+                currentGhensuu.hyojiracebangou,
+                currentGhensuu.nowracecalckukan,
+              ))
+                _buildSijiSontokuButton(senshu, currentSijiOption),
               const SizedBox(height: 10),
             ],
           );

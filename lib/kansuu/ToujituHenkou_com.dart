@@ -6,6 +6,7 @@ import 'package:ekiden/senshu_data.dart';
 import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/constants.dart';
 import 'package:ekiden/kansuu/TrialTime.dart';
+import 'package:ekiden/kansuu/chousi_keiken_hosei.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 // ------------------------------------------------------------
@@ -142,17 +143,9 @@ void _debugLog(String message) {
   if (kDebugMode) print(message);
 }
 
-/// 調子によるタイム補正の倍率(RaceCalcの調子補正と同じ式)
+/// 調子によるタイム補正の倍率(RaceCalcの調子補正と共通の式。chousi_keiken_hosei.dart)
 double _chousiKeisuu(SenshuData s, KantokuData kantoku) {
-  // 調子のタイムへの影響度が0%なら、体調不良も含めて補正しない(RaceCalcと同じ)
-  if (kantoku.yobiint2[2] == 0) return 1.0;
-  if (s.chousi == 0) {
-    return 1.0 + kantoku.yobiint2[11].toDouble() / 100.0;
-  }
-  return 1.0 +
-      (100 - s.chousi).toDouble() *
-          0.001 *
-          (kantoku.yobiint2[2].toDouble() / 100.0);
+  return chousiHoseiBairitsu(s, kantoku);
 }
 
 Future<void> _yasumi() async {

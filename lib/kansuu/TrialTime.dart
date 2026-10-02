@@ -13,6 +13,7 @@ import 'package:ekiden/kansuu/TimeDesugiHoseiHoseitime.dart';
 import 'package:ekiden/kansuu/SpurtRyokuHoseitime.dart';
 import 'package:ekiden/kansuu/ChoukyoriNebariHoseitime.dart';
 import 'package:ekiden/kansuu/univkosei.dart';
+import 'package:ekiden/kansuu/chousi_keiken_hosei.dart';
 import 'package:ekiden/kantoku_data.dart';
 
 // このメソッドは、各区間の走破タイム（秒単位のdouble型）を計算します。
@@ -26,6 +27,7 @@ double shisouTimeNigosu(double time) {
 }
 
 /// [nigosu] falseにすると±0.5%の乱数をかけない(コンピュータ大学の当日変更などの判断用)
+/// [keikenHosei] trueにすると、本番と同じ位置で経験補正もかける(指示ごとの損得の画面用。1.8.1)
 Future<double> runTrialCalculation(
   int senshuid,
   int i_kukan,
@@ -35,6 +37,7 @@ Future<double> runTrialCalculation(
   KantokuData kantoku, {
   //Ghensuu currentGhensuu,
   bool nigosu = true,
+  bool keikenHosei = false,
 }) async {
   if (senshuid < 0 || senshuid >= sortedsenshudata.length) {
     senshuid = 0;
@@ -320,6 +323,15 @@ Future<double> runTrialCalculation(
       temptandokusou = set_road;
       temppaceagesagetaiouryoku = 100;
     }
+  }
+
+  // 経験補正(本番のRaceCalcと同じ位置。試走タイムとしては含めない)
+  if (keikenHosei) {
+    hoseitotal += keikenHoseiWariai(
+      sortedsenshudata[senshuid],
+      currentGhensuu.hyojiracebangou,
+      i_kukan,
+    );
   }
 
   // Apply total correction

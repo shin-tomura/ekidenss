@@ -16,6 +16,7 @@ import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/kansuu/univkosei.dart';
 import 'package:ekiden/kansuu/ToujituHenkou_com.dart';
 import 'package:ekiden/kansuu/mokuhyou_hosei.dart';
+import 'package:ekiden/kansuu/chousi_keiken_hosei.dart';
 
 String _timeToMinuteSecondString(double time) {
   if (time == TEISUU.DEFAULTTIME) {
@@ -675,22 +676,12 @@ Future<void> RaceCalc({
 
       // Experience correction
       if ((racebangou >= 0 && racebangou <= 2) || racebangou == 5) {
-        var temphosei_exp = 0.0;
-        for (
-          var i_gakunen = sortedsenshudata[senshuid].gakunen - 1;
-          i_gakunen >= 1;
-          i_gakunen--
-        ) {
-          if (sortedsenshudata[senshuid].entrykukan_race[racebangou][i_gakunen -
-                  1] >=
-              0) {
-            if (sortedsenshudata[senshuid]
-                    .entrykukan_race[racebangou][i_gakunen - 1] ==
-                gh[0].nowracecalckukan) {
-              temphosei_exp -= 0.003;
-            }
-          }
-        }
+        // 同じ区間を走った回数×0.3%(式は chousi_keiken_hosei.dart で、試走タイムと共通)
+        final double temphosei_exp = keikenHoseiWariai(
+          sortedsenshudata[senshuid],
+          racebangou,
+          gh[0].nowracecalckukan,
+        );
         hoseitotal += temphosei_exp;
         if (temphosei_exp < -0.0001) {
           /*sortedsenshudata[senshuid].string_racesetumei +=
@@ -796,27 +787,16 @@ Future<void> RaceCalc({
       // 駅伝(10月・11月・正月・カスタム)で、調子のタイムへの影響度が0%でない場合のみ
       // (影響度0%なら体調不良も含めて補正しない)
       if ((racebangou <= 2 || racebangou == 5) && kantoku.yobiint2[2] != 0) {
-        if (sortedsenshudata[senshuid].chousi == 0) {
-          tanihosei = (kantoku.yobiint2[11].toDouble() / 100.0) / 100.0;
-          temphosei = (100 - 0) * tanihosei;
-          //temphosei *= (kantoku.yobiint2[2].toDouble() / 100.0); //調子適用率
-          moto_time_taikai_total = sortedsenshudata[senshuid].time_taikai_total;
-          sortedsenshudata[senshuid].time_taikai_total +=
-              sortedsenshudata[senshuid].time_taikai_total * temphosei;
-          atai_hosei[senshuid][13] = moto_time_taikai_total * temphosei;
-          sortedsenshudata[senshuid].string_racesetumei +=
-              "調子補正:調子${sortedsenshudata[senshuid].chousi} → ${(atai_hosei[senshuid][13]).isNegative ? '' : '+'}${(atai_hosei[senshuid][13]).toStringAsFixed(1)}秒\n";
-        } else {
-          tanihosei = 0.10 / 100.0;
-          temphosei = (100 - sortedsenshudata[senshuid].chousi) * tanihosei;
-          temphosei *= (kantoku.yobiint2[2].toDouble() / 100.0); //調子適用率
-          moto_time_taikai_total = sortedsenshudata[senshuid].time_taikai_total;
-          sortedsenshudata[senshuid].time_taikai_total +=
-              sortedsenshudata[senshuid].time_taikai_total * temphosei;
-          atai_hosei[senshuid][13] = moto_time_taikai_total * temphosei;
-          sortedsenshudata[senshuid].string_racesetumei +=
-              "調子補正:調子${sortedsenshudata[senshuid].chousi} → ${(atai_hosei[senshuid][13]).isNegative ? '' : '+'}${(atai_hosei[senshuid][13]).toStringAsFixed(1)}秒\n";
-        }
+        // 体調不良(調子0)は設定の悪化パーセント、それ以外は(100−調子)×0.1%×調子適用率
+        // (式は chousi_keiken_hosei.dart で、コンピュータの当日変更・指示ごとの損得の画面と共通)
+        temphosei =
+            chousiHoseiBairitsu(sortedsenshudata[senshuid], kantoku) - 1.0;
+        moto_time_taikai_total = sortedsenshudata[senshuid].time_taikai_total;
+        sortedsenshudata[senshuid].time_taikai_total +=
+            sortedsenshudata[senshuid].time_taikai_total * temphosei;
+        atai_hosei[senshuid][13] = moto_time_taikai_total * temphosei;
+        sortedsenshudata[senshuid].string_racesetumei +=
+            "調子補正:調子${sortedsenshudata[senshuid].chousi} → ${(atai_hosei[senshuid][13]).isNegative ? '' : '+'}${(atai_hosei[senshuid][13]).toStringAsFixed(1)}秒\n";
         tensuu[senshuid][0] = atai_hosei[senshuid][13];
       }
 
@@ -855,15 +835,16 @@ Future<void> RaceCalc({
               atai_hosei[senshuid][9] = sontokutime;
             }
           } else {
-            final double uwamawarihosei_kihonsuu = 1.001;
-            final double uwamawarihosei_keisuu = 0.0002;
+            // 倍率の数値は mokuhyou_hosei.dart にまとめている(指示ごとの損得の画面と共通)
             if (sortedsenshudata[senshuid].sijiflag == 1) {
               final lasttime = sortedsenshudata[senshuid].time_taikai_total;
               if (Random().nextInt(100) < sortedsenshudata[senshuid].konjou) {
-                sortedsenshudata[senshuid].time_taikai_total *= 0.99;
+                sortedsenshudata[senshuid].time_taikai_total *=
+                    sijiTsukkomiSeikouBairitsu;
                 sortedsenshudata[senshuid].sijiseikouflag = 1;
               } else {
-                sortedsenshudata[senshuid].time_taikai_total *= 1.015;
+                sortedsenshudata[senshuid].time_taikai_total *=
+                    sijiTsukkomiShippaiBairitsu;
               }
               final sontokutime =
                   sortedsenshudata[senshuid].time_taikai_total - lasttime;
@@ -881,7 +862,8 @@ Future<void> RaceCalc({
                     sortedunivdata[sortedsenshudata[senshuid].univid];
                 if (Random().nextInt(100) <
                     sortedsenshudata[senshuid].heijousin) {
-                  sortedsenshudata[senshuid].time_taikai_total *= 0.999;
+                  sortedsenshudata[senshuid].time_taikai_total *=
+                      sijiOsaeSeikouShitamawariBairitsu;
                   sortedsenshudata[senshuid].sijiseikouflag = 1;
                 } else {
                   // 失敗したときは、指示なしの場合の前半突っ込みの悪化の1.5倍(最小0.5%、最大1.2%)
@@ -912,29 +894,21 @@ Future<void> RaceCalc({
                 final lasttime = sortedsenshudata[senshuid].time_taikai_total;
                 if (Random().nextInt(100) <
                     sortedsenshudata[senshuid].heijousin) {
-                  sortedsenshudata[senshuid].time_taikai_total *= 0.997;
+                  sortedsenshudata[senshuid].time_taikai_total *=
+                      sijiOsaeSeikouBairitsu;
                   sortedsenshudata[senshuid].sijiseikouflag = 1;
-                } else if (sortedunivdata[sortedsenshudata[senshuid].univid]
-                        .mokuhyojuniwositamawatteruflag[gh[0].nowracecalckukan -
-                        1] <
-                    0) {
-                  double kotaehosei = 0.0;
-                  double uwamawarihosei =
-                      uwamawarihosei_kihonsuu +
-                      uwamawarihosei_keisuu *
-                          (-sortedunivdata[sortedsenshudata[senshuid].univid]
-                              .mokuhyojuniwositamawatteruflag[gh[0]
-                                  .nowracecalckukan -
-                              1]);
-                  double osaesippaihosei = 1.005;
-                  if (uwamawarihosei < osaesippaihosei) {
-                    kotaehosei = osaesippaihosei;
-                  } else {
-                    kotaehosei = uwamawarihosei + 0.001;
-                  }
-                  sortedsenshudata[senshuid].time_taikai_total *= kotaehosei;
                 } else {
-                  sortedsenshudata[senshuid].time_taikai_total *= 1.005;
+                  // 失敗したときは、ほっと一息の悪化+0.1%
+                  // (最小0.5%で、目標順位ちょうどで襷を受けたときはこの値)
+                  final int flag =
+                      sortedunivdata[sortedsenshudata[senshuid].univid]
+                          .mokuhyojuniwositamawatteruflag[gh[0]
+                              .nowracecalckukan -
+                          1];
+                  sortedsenshudata[senshuid].time_taikai_total *=
+                      mokuhyouOsaeShippaiUwamawariBairitsu(
+                        flag < 0 ? -flag : 0,
+                      );
                 }
                 final sontokutime =
                     sortedsenshudata[senshuid].time_taikai_total - lasttime;
@@ -980,12 +954,12 @@ Future<void> RaceCalc({
                   0) {
                 final lasttime = sortedsenshudata[senshuid].time_taikai_total;
                 sortedsenshudata[senshuid].time_taikai_total *=
-                    (uwamawarihosei_kihonsuu +
-                    uwamawarihosei_keisuu *
-                        (-sortedunivdata[sortedsenshudata[senshuid].univid]
-                            .mokuhyojuniwositamawatteruflag[gh[0]
-                                .nowracecalckukan -
-                            1]));
+                    mokuhyouHitoikiBairitsu(
+                      -sortedunivdata[sortedsenshudata[senshuid].univid]
+                          .mokuhyojuniwositamawatteruflag[gh[0]
+                              .nowracecalckukan -
+                          1],
+                    );
                 final sontokutime =
                     sortedsenshudata[senshuid].time_taikai_total - lasttime;
                 sortedsenshudata[senshuid].string_racesetumei +=

@@ -22,6 +22,7 @@ import 'package:ekiden/screens/Modal_mokuhyojuni.dart';
 import 'package:ekiden/screens/Modal_GakurenKukan.dart';
 import 'package:ekiden/screens/Modal_tuukajunisuii.dart';
 import 'package:ekiden/screens/Modal_timesasuii.dart';
+import 'package:ekiden/kansuu/mokuhyou_hosei.dart';
 import 'package:ekiden/screens/Modal_senshu_race_bunseki.dart';
 
 String _getCombinedDifficultyText(KantokuData kantoku, Ghensuu currentGhensuu) {
@@ -1860,7 +1861,7 @@ class _Mode0350ContentState extends State<Mode0350Content> {
                         idjununivdata[currentGhensuu.MYunivid]
                                 .mokuhyojuniwositamawatteruflag[i_kukan - 1] ==
                             1) {
-                      sijiResult = "チーム目標順位を下回っていた(${_mokuhyouKonkyo(idjununivdata[currentGhensuu.MYunivid], currentGhensuu.hyojiracebangou, i_kukan)})ことによる前半突っ込みでのタイム悪化あり";
+                      sijiResult = "チーム目標順位を下回っていた(${_mokuhyouKonkyo(idjununivdata[currentGhensuu.MYunivid], currentGhensuu.hyojiracebangou, i_kukan, univs: idjununivdata)})ことによる前半突っ込みでのタイム悪化あり";
                     } else if (i_kukan > 0 &&
                         idjununivdata[currentGhensuu.MYunivid]
                                 .mokuhyojuniwositamawatteruflag[i_kukan - 1] <
@@ -2014,7 +2015,7 @@ class _Mode0350ContentState extends State<Mode0350Content> {
                         idjununivdata[currentGhensuu.MYunivid]
                                 .mokuhyojuniwositamawatteruflag[i_kukan - 1] ==
                             1) {
-                      sijiResult = "チーム目標順位を下回っていた(${_mokuhyouKonkyo(idjununivdata[currentGhensuu.MYunivid], currentGhensuu.hyojiracebangou, i_kukan)})ことによる前半突っ込みでのタイム悪化あり";
+                      sijiResult = "チーム目標順位を下回っていた(${_mokuhyouKonkyo(idjununivdata[currentGhensuu.MYunivid], currentGhensuu.hyojiracebangou, i_kukan, univs: idjununivdata)})ことによる前半突っ込みでのタイム悪化あり";
                     } else if (i_kukan > 0 &&
                         idjununivdata[currentGhensuu.MYunivid]
                                 .mokuhyojuniwositamawatteruflag[i_kukan - 1] <
@@ -2335,11 +2336,27 @@ class ProgressView extends StatelessWidget {
 
 /// 目標順位による補正の根拠(例: 襷を受けた時点で5位・目標3位)
 /// 判定は襷を受けた時点(前の区間の終了時点)の通過順位と目標順位で行っている
-String _mokuhyouKonkyo(UnivData univ, int racebangou, int kukan) {
+/// [univs] を渡すと、目標順位を下回っているときは目標順位の大学とのタイム差も付ける
+/// (例: 襷を受けた時点で5位・目標3位・3位と32.0秒差)
+String _mokuhyouKonkyo(
+  UnivData univ,
+  int racebangou,
+  int kukan, {
+  List<UnivData>? univs,
+}) {
   if (kukan <= 0 ||
       univ.tuukajuni_taikai.length < kukan ||
       univ.mokuhyojuni.length <= racebangou) {
     return '';
   }
-  return '襷を受けた時点で${univ.tuukajuni_taikai[kukan - 1] + 1}位・目標${univ.mokuhyojuni[racebangou] + 1}位';
+  final String sa = univs == null
+      ? ''
+      : mokuhyouSaBun(
+          univs: univs,
+          univ: univ,
+          racebangou: racebangou,
+          kukan: kukan,
+        );
+  return '襷を受けた時点で${univ.tuukajuni_taikai[kukan - 1] + 1}位・目標${univ.mokuhyojuni[racebangou] + 1}位'
+      '${sa.isEmpty ? '' : '・$sa'}';
 }

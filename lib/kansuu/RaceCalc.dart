@@ -15,6 +15,7 @@ import 'package:ekiden/album.dart';
 import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/kansuu/univkosei.dart';
 import 'package:ekiden/kansuu/ToujituHenkou_com.dart';
+import 'package:ekiden/kansuu/mokuhyou_hosei.dart';
 
 String _timeToMinuteSecondString(double time) {
   if (time == TEISUU.DEFAULTTIME) {
@@ -930,11 +931,29 @@ Future<void> RaceCalc({
                       1] ==
                   1) {
                 final lasttime = sortedsenshudata[senshuid].time_taikai_total;
-                sortedsenshudata[senshuid].time_taikai_total *= 1.008;
+                // 目標順位の大学とのタイム差に比例(最大0.8%。最大の損になる差は
+                // 1kmあたり3秒×これから走る区間の距離)
+                final UnivData jibunUniv =
+                    sortedunivdata[sortedsenshudata[senshuid].univid];
+                final double? mokuhyouSa = mokuhyouJuniTimeSa(
+                  univs: sortedunivdata,
+                  jibunTime:
+                      jibunUniv.time_taikai_total[gh[0].nowracecalckukan - 1],
+                  mokuhyou: jibunUniv.mokuhyojuni[racebangou],
+                  kukan: gh[0].nowracecalckukan,
+                );
+                sortedsenshudata[senshuid].time_taikai_total *=
+                    mokuhyouTsukkomiBairitsu(
+                      // 差が分からない場合(通常は起こらない)は今まで通り最大の0.8%
+                      timeSa: mokuhyouSa ?? double.infinity,
+                      kyoriMeter: gh[0]
+                          .kyori_taikai_kukangoto[racebangou][gh[0]
+                          .nowracecalckukan],
+                    );
                 final sontokutime =
                     sortedsenshudata[senshuid].time_taikai_total - lasttime;
                 sortedsenshudata[senshuid].string_racesetumei +=
-                    "目標順位下回って突っ込み補正(${_mokuhyouKonkyo(sortedunivdata[sortedsenshudata[senshuid].univid], racebangou, gh[0].nowracecalckukan)}):${sontokutime.isNegative ? '' : '+'}${sontokutime.toStringAsFixed(1)}秒\n";
+                    "目標順位下回って突っ込み補正(${_mokuhyouKonkyo(jibunUniv, racebangou, gh[0].nowracecalckukan, univs: sortedunivdata)}):${sontokutime.isNegative ? '' : '+'}${sontokutime.toStringAsFixed(1)}秒\n";
                 //atai_hosei[senshuid][13] = sontokutime;
                 atai_hosei[senshuid][9] = sontokutime;
               } else if (sortedunivdata[sortedsenshudata[senshuid].univid]
@@ -1603,11 +1622,27 @@ Future<void> RaceCalc({
 
 /// 目標順位による補正の根拠(例: 襷を受けた時点5位/目標3位)
 /// 判定は襷を受けた時点(前の区間の終了時点)の通過順位と目標順位で行っている
-String _mokuhyouKonkyo(UnivData univ, int racebangou, int kukan) {
+/// [univs] を渡すと、目標順位を下回っているときは目標順位の大学とのタイム差も付ける
+/// (例: 襷を受けた時点5位/目標3位・3位と32.0秒差)
+String _mokuhyouKonkyo(
+  UnivData univ,
+  int racebangou,
+  int kukan, {
+  List<UnivData>? univs,
+}) {
   if (kukan <= 0 ||
       univ.tuukajuni_taikai.length < kukan ||
       univ.mokuhyojuni.length <= racebangou) {
     return '';
   }
-  return '襷を受けた時点${univ.tuukajuni_taikai[kukan - 1] + 1}位/目標${univ.mokuhyojuni[racebangou] + 1}位';
+  final String sa = univs == null
+      ? ''
+      : mokuhyouSaBun(
+          univs: univs,
+          univ: univ,
+          racebangou: racebangou,
+          kukan: kukan,
+        );
+  return '襷を受けた時点${univ.tuukajuni_taikai[kukan - 1] + 1}位/目標${univ.mokuhyojuni[racebangou] + 1}位'
+      '${sa.isEmpty ? '' : '・$sa'}';
 }

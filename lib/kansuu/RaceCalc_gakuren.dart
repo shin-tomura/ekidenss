@@ -14,6 +14,7 @@ import 'package:ekiden/univ_gakuren_data.dart';
 import 'package:ekiden/album.dart';
 import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/kansuu/univkosei.dart';
+import 'package:ekiden/kansuu/mokuhyou_hosei.dart';
 
 String _timeToMinuteSecondString(double time) {
   if (time == TEISUU.DEFAULTTIME) {
@@ -710,11 +711,27 @@ Future<void> RaceCalc_gakuren({
                       1] ==
                   1) {
                 final lasttime = gakurensenshudata[senshuid].time_taikai_total;
-                gakurensenshudata[senshuid].time_taikai_total *= 1.008;
+                // 目標(学連選抜はいつも10位)の大学とのタイム差に比例(最大0.8%。
+                // 最大の損になる差は1kmあたり3秒×これから走る区間の距離)
+                final double? mokuhyouSa = mokuhyouJuniTimeSa(
+                  univs: sortedunivdata,
+                  jibunTime: gakurenunivdata[0]
+                      .time_taikai_total[gh[0].nowracecalckukan - 1],
+                  mokuhyou: 9,
+                  kukan: gh[0].nowracecalckukan,
+                );
+                gakurensenshudata[senshuid].time_taikai_total *=
+                    mokuhyouTsukkomiBairitsu(
+                      // 差が分からない場合(通常は起こらない)は今まで通り最大の0.8%
+                      timeSa: mokuhyouSa ?? double.infinity,
+                      kyoriMeter: gh[0]
+                          .kyori_taikai_kukangoto[racebangou][gh[0]
+                          .nowracecalckukan],
+                    );
                 final sontokutime =
                     gakurensenshudata[senshuid].time_taikai_total - lasttime;
                 gakurensenshudata[senshuid].string_racesetumei +=
-                    "目標順位下回って突っ込み補正:${sontokutime.isNegative ? '' : '+'}${sontokutime.toStringAsFixed(1)}秒\n";
+                    "目標順位下回って突っ込み補正${mokuhyouSa == null ? '' : '(10位と${mokuhyouSa.toStringAsFixed(1)}秒差)'}:${sontokutime.isNegative ? '' : '+'}${sontokutime.toStringAsFixed(1)}秒\n";
                 //atai_hosei[senshuid][13] = sontokutime;
                 atai_hosei[senshuid][9] = sontokutime;
               }

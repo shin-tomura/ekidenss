@@ -173,7 +173,14 @@ String gakurenEkidenRirekiText(Ghensuu gh) {
 /// 一次エントリーの画面(モード200より前)では、選んでいる選手と人数。
 /// それより後(学連選抜編成・区間エントリーの画面)では、一次エントリーの選手と今の区間配置・補欠。
 /// 生成AIが一次エントリーに入っていない選手を区間に勧めないように入れる
-String entryJoukyouText(Ghensuu gh, {required int univId}) {
+/// [toujitsu] trueなら当日変更の相談用に、選手ごとの当日の調子(0は体調不良)と、
+///   走り終えた区間(正月駅伝の復路の前)の印を付ける(1.8.3)
+/// 当日変更で外れた選手(区間の値が-100以下)は、補欠と分けて「外れた選手」として出す(1.8.3)
+String entryJoukyouText(
+  Ghensuu gh, {
+  required int univId,
+  bool toujitsu = false,
+}) {
   final int race = gh.hyojiracebangou;
   if (race < 0 || race > 5 || gh.kukansuu_taikaigoto.length <= race) {
     return '';
@@ -205,9 +212,15 @@ String entryJoukyouText(Ghensuu gh, {required int univId}) {
     return s.entrykukan_race[race][s.gakunen - 1];
   }
 
-  String meibo(List<SenshuData> list) => list.isEmpty
-      ? 'なし'
-      : list.map((s) => '${s.name}(${s.gakunen}年)').join('、');
+  // 選手の書き方(当日変更の相談用では、当日の調子も付ける。1.8.3)
+  String senshuMei(SenshuData s) {
+    if (!toujitsu) return '${s.name}(${s.gakunen}年)';
+    if (s.chousi == 0) return '${s.name}(${s.gakunen}年・体調不良)';
+    return '${s.name}(${s.gakunen}年・調子${s.chousi})';
+  }
+
+  String meibo(List<SenshuData> list) =>
+      list.isEmpty ? 'なし' : list.map(senshuMei).join('、');
 
   final List<SenshuData> erabi = senshuList
       .where((s) => entryAtai(s) != -2)
@@ -245,15 +258,25 @@ String entryJoukyouText(Ghensuu gh, {required int univId}) {
       final List<SenshuData> hashiru = erabi
           .where((s) => entryAtai(s) == k)
           .toList();
+      // 当日変更の相談用では、走り終えた区間に印を付ける(正月駅伝の復路の前)
+      final String hashittaBun =
+          toujitsu && k < gh.nowracecalckukan ? '(走り終えた)' : '';
       sb.writeln(
-        '${k + 1}$tani ${hashiru.isEmpty ? '未定' : hashiru.map((s) => '${s.name}(${s.gakunen}年)').join('・')}',
+        '${k + 1}$tani ${hashiru.isEmpty ? '未定' : hashiru.map(senshuMei).join('・')}$hashittaBun',
       );
     }
+    // 補欠(当日変更で外れた選手(-100以下)は除く。1.8.3)
     final List<SenshuData> hoketsu = erabi.where((s) {
       final int e = entryAtai(s);
-      return e < 0 || e >= kukansuu;
+      return (e < 0 && e > -100) || e >= kukansuu;
     }).toList();
     sb.writeln('補欠:${meibo(hoketsu)}');
+    final List<SenshuData> hazureta = erabi
+        .where((s) => entryAtai(s) <= -100)
+        .toList();
+    if (hazureta.isNotEmpty) {
+      sb.writeln('当日変更で外れた選手(この大会ではもう走れない):${meibo(hazureta)}');
+    }
     sb.writeln('一次エントリーに入っていない選手(区間に配置できない):${meibo(erabanai)}');
   }
   return sb.toString();

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ekiden/ghensuu.dart';
 import 'package:ekiden/univ_data.dart';
+import 'package:ekiden/senshu_data.dart';
 import 'package:ekiden/kansuu/gakuren_text.dart';
 import 'package:ekiden/kansuu/jibun_keika_text.dart';
 import 'package:ekiden/kansuu/rireki_text.dart';
@@ -172,6 +173,85 @@ String _mokuhyouSoudanSet(Ghensuu gh, int race, bool shutsujou) {
   return bun.where((t) => t.trim().isNotEmpty).join(_setKugiri);
 }
 
+// 当日変更相談セットの文(当日変更の画面で使う。1.8.3)
+// 見出しとこの場面の当日変更のルール+自分の大学のエントリーの状況(当日の調子つき)
+// +(正月駅伝の復路の前は)自分の大学のレース経過と5区の通過順位速報
+// +変えられる区間のコース情報+自分の大学の今季タイム一覧表+駅伝出場履歴
+// 当日変更のルールは、当日変更の画面(Toujituhenkou.dart・ToujitsuAhenkou.dart・ToujitsuBhenkou.dart)と同じ
+String _toujitsuSoudanSet(Ghensuu gh, int race) {
+  final int kukansuu = gh.kukansuu_taikaigoto[race];
+  final int jikai = gh.nowracecalckukan;
+  final bool shougatsu = race == 2;
+  // 変えられる区間(正月駅伝は、往路の前は1〜5区、復路の前は6〜10区)
+  int kara = 0;
+  int made = kukansuu - 1;
+  String jiten = 'スタート前';
+  if (shougatsu) {
+    if (jikai >= 5) {
+      kara = 5;
+      jiten = '復路のスタート前・5区終了時点';
+    } else {
+      made = kukansuu < 5 ? kukansuu - 1 : 4;
+      jiten = '往路のスタート前';
+    }
+  }
+  // 今の補欠の人数(区間の値が-1の選手)
+  int hoketsuSuu = 0;
+  for (final SenshuData s in Hive.box<SenshuData>('senshuBox').values) {
+    if (s.univid != gh.MYunivid || s.gakunen < 1) continue;
+    if (s.entrykukan_race.length <= race ||
+        s.entrykukan_race[race].length < s.gakunen) {
+      continue;
+    }
+    if (s.entrykukan_race[race][s.gakunen - 1] == -1) hoketsuSuu++;
+  }
+  // 入れ替えられる最大人数(当日変更の画面と同じ決まり)
+  int saidai;
+  if (shougatsu) {
+    saidai = 4;
+  } else {
+    saidai = kukansuu <= 6 ? 2 : (kukansuu <= 8 ? 3 : 6);
+    if (saidai > hoketsuSuu) saidai = hoketsuSuu;
+  }
+
+  final StringBuffer sb = StringBuffer();
+  sb.writeln('【${courseRaceTitle(race)} 当日変更の相談($jiten)】');
+  sb.writeln(
+    '・入れ替えられるのは、${kara + 1}〜${made + 1}区を走る予定の選手と補欠の間だけ。補欠を区間に入れると、その区間を走る予定だった選手が外れる'
+    '(区間を走る予定の選手どうしの入れ替えや、区間の並べ替えはできない)。',
+  );
+  sb.writeln('・入れ替えられるのは最大$saidai人まで(今の補欠は$hoketsuSuu人)。');
+  if (shougatsu && jikai < 5) {
+    sb.writeln('・外れた選手は、この大会ではもう走れない(復路にも出られない)。往路で使わなかった補欠は、復路のスタート前の当日変更でも使える(復路も最大4人)。');
+  } else {
+    sb.writeln('・外れた選手は、この大会ではもう走れない。');
+  }
+  sb.writeln(
+    '・このあと、コンピュータの大学も当日変更をする(主力を補欠に温存し、当日変更で起用する「戦略的エントリー」もある)。'
+    'そのため、ほかの大学の区間配置は変わることがある。',
+  );
+  sb.writeln(
+    '・調子は当日の値(100が最高、0は体調不良)。経験補正は、同じ駅伝の同じ区間を前の学年までに走った回数で決まる(駅伝出場履歴で分かる)。',
+  );
+
+  final List<String> bun = [
+    sb.toString(),
+    entryJoukyouText(gh, univId: gh.MYunivid, toujitsu: true),
+  ];
+  if (jikai > 0) {
+    bun.add(jibunRaceKeikaText(gh));
+    bun.add(tuukaJuniSokuhouText(gh, jikai - 1));
+  }
+  bun.add(
+    [
+      for (int k = kara; k <= made; k++) courseKukanText(gh, race, k),
+    ].where((t) => t.isNotEmpty).join('\n'),
+  );
+  bun.add(konkiSeisekiHyouText(univId: gh.MYunivid));
+  bun.add(ekidenRirekiText(univId: gh.MYunivid));
+  return bun.where((t) => t.trim().isNotEmpty).join(_setKugiri);
+}
+
 /// 生成AIに渡すテキストのまとめボタン
 /// [entryAri] 区間エントリーが済んでいる場面か(一次エントリー・学連選抜編成・区間エントリーの
 ///   画面ではfalse。falseのときは、ほかの大学の区間エントリーが分かってしまう全区間・全大学詳細リストと
@@ -179,15 +259,18 @@ String _mokuhyouSoudanSet(Ghensuu gh, int race, bool shutsujou) {
 /// [kekkaGamen] レースの結果画面か(trueのときは、レース中の速報の代わりに
 ///   振り返りセット・総合成績・全区間の個人成績を出す。文は結果画面のコピーと同じ)
 /// [mokuhyouGamen] 目標順位を決める画面か(trueのときは、一番上に目標順位相談セットを出す。1.8.3)
+/// [toujitsuGamen] 当日変更の画面か(trueのときは、一番上に当日変更相談セットを出す。1.8.3)
 class AiCopyMatomeButton extends StatelessWidget {
   final bool entryAri;
   final bool kekkaGamen;
   final bool mokuhyouGamen;
+  final bool toujitsuGamen;
   const AiCopyMatomeButton({
     super.key,
     this.entryAri = true,
     this.kekkaGamen = false,
     this.mokuhyouGamen = false,
+    this.toujitsuGamen = false,
   });
 
   // 今の場面でコピーできるものの一覧
@@ -243,6 +326,21 @@ class AiCopyMatomeButton extends StatelessWidget {
               : '目標順位ごとの金銀・目標順位と指示の仕様・コース情報・全区間・全大学詳細リストをまとめてコピー。目標順位の相談に',
           Icons.flag_circle,
           () => _mokuhyouSoudanSet(gh, race, shutsujou),
+        ),
+      );
+    }
+    // 当日変更の画面では、当日変更相談セットを一番上に出す(1.8.3)
+    // (当日変更がある駅伝(10月・11月・正月・カスタム)だけ。コンピュータの大学の当日変更は
+    //  プレイヤーの確定のあとなので、ここで全大学の区間配置を出しても先の情報は漏れない)
+    if (toujitsuGamen && [0, 1, 2, 5].contains(race) && shutsujou) {
+      list.add(
+        _AiCopyKoumoku(
+          '当日変更相談セット',
+          jikai > 0
+              ? '当日変更のルール・自分の大学の区間配置と補欠(当日の調子つき)・レース経過と${kukanMei}の通過順位速報・変えられる区間のコース情報・今季タイム一覧表・駅伝出場履歴をまとめてコピー。当日変更の相談に'
+              : '当日変更のルール・自分の大学の区間配置と補欠(当日の調子つき)・変えられる区間のコース情報・今季タイム一覧表・駅伝出場履歴をまとめてコピー。当日変更の相談に',
+          Icons.swap_horiz,
+          () => _toujitsuSoudanSet(gh, race),
         ),
       );
     }

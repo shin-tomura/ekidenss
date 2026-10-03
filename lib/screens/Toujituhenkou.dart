@@ -17,6 +17,7 @@ import 'package:ekiden/screens/Modal_kukanhaiti2.dart';
 import 'package:ekiden/screens/Modal_Taichoufuryou.dart';
 import 'package:ekiden/kansuu/ToujituHenkou_com.dart';
 import 'package:ekiden/kansuu/ShoriGuard.dart';
+import 'package:ekiden/screens/ai_copy_matome.dart'; // 生成AIに渡すテキスト(1.8.3)
 
 // --- 当日変更画面ウィジェット ---
 
@@ -523,6 +524,9 @@ class _ToujitsuHenkouScreenState extends State<ToujitsuHenkouScreen> {
                     ),
                   ),
                   const SizedBox(height: 20),
+                  // 生成AIに渡すテキストのまとめボタン(当日変更の相談用。1.8.3。
+                  // コンピュータの大学の当日変更はプレイヤーの確定のあとなので、全大学の区間配置を出してよい)
+                  const AiCopyMatomeButton(toujitsuGamen: true),
 
                   if (kantoku.yobiint2[17] == 1 &&
                       (currentGhensuu.hyojiracebangou <= 2 ||

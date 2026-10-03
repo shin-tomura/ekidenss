@@ -721,44 +721,67 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
             child: TableView.builder(
               pinnedColumnCount: 1,
               pinnedRowCount: 1,
-              columnCount: _eventLabels.length + _extraCols.length,
+              columnCount:
+                  _eventLabels.length + _extraCols.length + _gakurenRetsuSuu,
               rowCount: _sortedSenshu.length + 1,
-              columnBuilder: (index) => TableSpan(
-                extent: FixedTableSpanExtent(
-                  index >= _eventLabels.length
-                      ? _extraCols[index - _eventLabels.length].width
-                      : (index == 0
-                            ? 100
-                            : (index == 1 || index == 2 ? 60 : 90)),
-                ),
-              ),
+              columnBuilder: (index) {
+                // 学連選抜の表の所属大学と正月駅伝予選の列
+                if (_gakurenRetsu(index) == 1) {
+                  return TableSpan(extent: FixedTableSpanExtent(100));
+                }
+                if (_gakurenRetsu(index) == 2) {
+                  return TableSpan(extent: FixedTableSpanExtent(80));
+                }
+                final int col = _ronriRetsu(index);
+                return TableSpan(
+                  extent: FixedTableSpanExtent(
+                    col >= _eventLabels.length
+                        ? _extraCols[col - _eventLabels.length].width
+                        : (col == 0 ? 100 : (col == 1 || col == 2 ? 60 : 90)),
+                  ),
+                );
+              },
               rowBuilder: (index) => TableSpan(
                 extent: FixedTableSpanExtent(index == 0 ? 55 : _rowHeight),
               ),
               cellBuilder: (context, vicinity) {
+                // 学連選抜の表の所属大学と正月駅伝予選の列(1.8.2)
+                final int gakurenRetsu = _gakurenRetsu(vicinity.column);
+                if (gakurenRetsu > 0) {
+                  if (vicinity.row == 0) {
+                    return _buildGakurenHeaderCell(
+                      gakurenRetsu == 1 ? '所属大学' : '正月駅伝予選',
+                      gakurenRetsu == 2,
+                    );
+                  }
+                  final senshu = _sortedSenshu[vicinity.row - 1];
+                  return gakurenRetsu == 1
+                      ? _buildShozokuCell(senshu, vicinity.row)
+                      : _buildYosenCell(senshu, vicinity.row);
+                }
+                // ここから下は、学連選抜の列を除いた列の番号で作る
+                final int col = _ronriRetsu(vicinity.column);
                 if (vicinity.row == 0)
                   return _buildHeaderCell(
-                    vicinity.column < _eventLabels.length
-                        ? _eventLabels[vicinity.column]
-                        : _extraCols[vicinity.column - _eventLabels.length]
-                              .label,
-                    vicinity.column,
+                    col < _eventLabels.length
+                        ? _eventLabels[col]
+                        : _extraCols[col - _eventLabels.length].label,
+                    col,
                   );
                 final senshu = _sortedSenshu[vicinity.row - 1];
 
-                if (vicinity.column >= _eventLabels.length)
+                if (col >= _eventLabels.length)
                   return _buildExtraCell(
                     senshu,
-                    _extraCols[vicinity.column - _eventLabels.length],
+                    _extraCols[col - _eventLabels.length],
                     vicinity.row,
-                    vicinity.column,
+                    col,
                   );
 
-                if (vicinity.column == 0)
-                  return _buildNameCell(senshu, vicinity.row);
-                if (vicinity.column == 1)
+                if (col == 0) return _buildNameCell(senshu, vicinity.row);
+                if (col == 1)
                   return _buildStatCell(senshu.konjou, true, vicinity.row, 1);
-                if (vicinity.column == 2)
+                if (col == 2)
                   return _buildStatCell(
                     senshu.heijousin,
                     false,
@@ -767,9 +790,9 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
                   );
                 return _buildDataCell(
                   senshu,
-                  _raceIndices[vicinity.column - 3],
+                  _raceIndices[col - 3],
                   vicinity.row,
-                  vicinity.column,
+                  col,
                 );
               },
             ),
@@ -798,6 +821,144 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
             ),
           ),
       ],
+    );
+  }
+
+  // 学連選抜の表では、選手名の右に所属大学と正月駅伝予選の2列を入れる(1.8.2)
+  int get _gakurenRetsuSuu => widget.gakuren ? 2 : 0;
+
+  // 画面の列[index]が学連選抜の列なら1(所属大学)か2(正月駅伝予選)、そうでなければ0
+  int _gakurenRetsu(int index) {
+    if (!widget.gakuren) return 0;
+    if (index == 1 || index == 2) return index;
+    return 0;
+  }
+
+  // 画面の列[index]を、学連選抜の列を除いた列の番号にする
+  int _ronriRetsu(int index) {
+    if (widget.gakuren && index >= 3) return index - _gakurenRetsuSuu;
+    return index;
+  }
+
+  // 学連選抜の列の見出し([migiSen]がtrueなら右に区切り線を引く)
+  TableViewCell _buildGakurenHeaderCell(String label, bool migiSen) {
+    return TableViewCell(
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.07),
+          border: migiSen
+              ? Border(
+                  right: BorderSide(
+                    color: _seriesBorderColor,
+                    width: _seriesBorderWidth,
+                  ),
+                )
+              : null,
+        ),
+        padding: const EdgeInsets.all(4),
+        alignment: Alignment.center,
+        child: AutoSizeText(
+          label,
+          textAlign: TextAlign.center,
+          maxLines: 2,
+          minFontSize: 8,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // 学連選抜の選手の所属大学のセル
+  TableViewCell _buildShozokuCell(SenshuData senshu, int rowIdx) {
+    return TableViewCell(
+      child: Container(
+        padding: const EdgeInsets.all(6),
+        alignment: Alignment.centerLeft,
+        decoration: BoxDecoration(
+          color: rowIdx.isEven
+              ? Colors.transparent
+              : Colors.white.withOpacity(0.02),
+          border: Border(
+            bottom: BorderSide(color: Colors.white.withOpacity(0.05)),
+          ),
+        ),
+        child: AutoSizeText(
+          _shozoku(senshu),
+          maxLines: 2,
+          minFontSize: 8,
+          style: const TextStyle(color: Colors.white, fontSize: 12),
+        ),
+      ),
+    );
+  }
+
+  // 学連選抜の選手の正月駅伝予選のセル(タイムと、予選に出た選手全体の中での個人順位)
+  TableViewCell _buildYosenCell(SenshuData senshu, int rowIdx) {
+    final int? juni = _yosenJuni(senshu);
+    final Border border = Border(
+      bottom: BorderSide(color: Colors.white.withOpacity(0.05)),
+      right: BorderSide(color: _seriesBorderColor, width: _seriesBorderWidth),
+    );
+    final Color rowBg = rowIdx.isEven
+        ? Colors.transparent
+        : Colors.white.withOpacity(0.02);
+    if (juni == null) {
+      return TableViewCell(
+        child: Container(
+          alignment: Alignment.center,
+          decoration: BoxDecoration(color: rowBg, border: border),
+          child: const Text(
+            "---",
+            style: TextStyle(color: Colors.grey, fontSize: 11),
+          ),
+        ),
+      );
+    }
+    final double time = senshu.kukantime_race[4][senshu.gakunen - 1];
+    final int m = (time / 60).floor();
+    final int s = (time % 60).floor();
+    return TableViewCell(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 2),
+        decoration: BoxDecoration(color: rowBg, border: border),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: AutoSizeText(
+                  "$m'${s.toString().padLeft(2, '0')}\"",
+                  maxLines: 1,
+                  minFontSize: 6,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ),
+              const SizedBox(height: 1),
+              Flexible(
+                child: AutoSizeText(
+                  "$juni位",
+                  maxLines: 1,
+                  minFontSize: 6,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -860,9 +1021,7 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
             ),
           ),
           child: AutoSizeText(
-            widget.gakuren
-                ? '${p.name}(${p.gakunen}年)\n${_shozokuToYosen(p)}'
-                : '${p.name}\n(${p.gakunen}年)',
+            '${p.name}\n(${p.gakunen}年)',
             maxLines: 2,
             minFontSize: 8,
             style: TextStyle(

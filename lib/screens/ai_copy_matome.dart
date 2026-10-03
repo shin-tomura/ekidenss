@@ -20,6 +20,8 @@ import 'package:ekiden/screens/Modal_kukanresult.dart' as kekka;
 // ・レース前セット: コース情報+全区間・全大学詳細リスト(展開予想に)
 // ・区間ごとセット: 直近の区間の個人順位速報+通過順位速報(実況に)
 // ・振り返りセット: 総合成績+自分の大学のレース経過(結果画面で、レース後の振り返りに)
+// ・学連選抜の振り返りセット: 総合成績+学連選抜のレース経過+学連選抜の区間配置(結果画面で)
+// 結果画面では、個人成績を区間を選んで1つずつコピーすることもできる
 // 文はそれぞれの画面のコピーと同じもの(画面の外に出した関数で作る)
 // ------------------------------------------------------------
 
@@ -28,8 +30,23 @@ class _AiCopyKoumoku {
   final String title;
   final String setsumei;
   final IconData icon;
-  final String Function() tsukuru; // コピーする文を作る
-  const _AiCopyKoumoku(this.title, this.setsumei, this.icon, this.tsukuru);
+  final String Function()? tsukuru; // コピーする文を作る
+  // 区間を選んでコピーするもの(区間の番号(0が1区)から文を作る)
+  final String Function(int)? kukanTsukuru;
+  final int kukanKazu; // 選べる区間の数
+  final String kukanTani; // 区間の呼び方(「区」か「組」)
+  const _AiCopyKoumoku(this.title, this.setsumei, this.icon, this.tsukuru)
+    : kukanTsukuru = null,
+      kukanKazu = 0,
+      kukanTani = '区';
+  const _AiCopyKoumoku.kukanSentaku(
+    this.title,
+    this.setsumei,
+    this.icon,
+    this.kukanTsukuru,
+    this.kukanKazu,
+    this.kukanTani,
+  ) : tsukuru = null;
 }
 
 // セットでコピーするときの区切り
@@ -73,20 +90,33 @@ class AiCopyMatomeButton extends StatelessWidget {
     final List<_AiCopyKoumoku> list = [];
     // 結果画面(レース後の振り返り)
     if (kekkaGamen && ekiden && chokkin >= 0) {
-      final bool jibunAri = shutsujou && race != 4;
-      list.add(
-        _AiCopyKoumoku(
-          '振り返りセット',
-          jibunAri
-              ? '総合成績と自分の大学のレース経過をまとめてコピー。振り返りに'
-              : '総合成績をコピー。振り返りに',
-          Icons.library_books,
-          () => [
-            tuukaJuniSokuhouText(gh, chokkin),
-            if (jibunAri) jibunRaceKeikaText(gh),
-          ].join(_setKugiri),
-        ),
-      );
+      if (shutsujou && race != 4) {
+        list.add(
+          _AiCopyKoumoku(
+            '振り返りセット',
+            '総合成績と自分の大学のレース経過をまとめてコピー。振り返りに',
+            Icons.library_books,
+            () => [
+              tuukaJuniSokuhouText(gh, chokkin),
+              jibunRaceKeikaText(gh),
+            ].join(_setKugiri),
+          ),
+        );
+      }
+      if (gakuren) {
+        list.add(
+          _AiCopyKoumoku(
+            '学連選抜の振り返りセット',
+            '総合成績(学連選抜もOPで入る)・学連選抜のレース経過・学連選抜の区間配置(選手の詳しい情報)をまとめてコピー。学連選抜の物語の振り返りに',
+            Icons.library_books_outlined,
+            () => [
+              tuukaJuniSokuhouText(gh, chokkin),
+              gakurenRaceKeikaText(gh),
+              gakurenKukanHaitiText(gh),
+            ].join(_setKugiri),
+          ),
+        );
+      }
       list.add(
         _AiCopyKoumoku(
           '総合成績',
@@ -103,6 +133,16 @@ class AiCopyMatomeButton extends StatelessWidget {
           () => [
             for (int k = 0; k <= chokkin; k++) kekka.kojinSeisekiText(gh, k),
           ].join(_setKugiri),
+        ),
+      );
+      list.add(
+        _AiCopyKoumoku.kukanSentaku(
+          '個人成績(区間を選んでコピー)',
+          '選んだ${race == 3 ? '組' : '区間'}の全選手の順位とタイム。全区間では長すぎるときに',
+          Icons.format_list_bulleted,
+          (int k) => kekka.kojinSeisekiText(gh, k),
+          chokkin + 1,
+          race == 3 ? '組' : '区',
         ),
       );
     }
@@ -228,6 +268,81 @@ class AiCopyMatomeButton extends StatelessWidget {
     return list;
   }
 
+  // コピーして一覧を閉じ、お知らせを出す
+  Future<void> _copy(
+    BuildContext sheetContext,
+    ScaffoldMessengerState messenger,
+    String title,
+    String text,
+  ) async {
+    await Clipboard.setData(ClipboardData(text: text));
+    if (sheetContext.mounted) Navigator.pop(sheetContext);
+    messenger.showSnackBar(SnackBar(content: Text('「$title」をコピーしました')));
+  }
+
+  // 区間を選んでコピーするものの行(区間のボタンを並べる)
+  Widget _kukanSentakuTile(
+    BuildContext sheetContext,
+    ScaffoldMessengerState messenger,
+    _AiCopyKoumoku k,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(k.icon, color: Colors.cyanAccent),
+              const SizedBox(width: 32),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(k.title, style: const TextStyle(color: Colors.white)),
+                    Text(
+                      k.setsumei,
+                      style: const TextStyle(
+                        color: Colors.white60,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.only(left: 56),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (int kukan = 0; kukan < k.kukanKazu; kukan++)
+                  OutlinedButton(
+                    onPressed: () => _copy(
+                      sheetContext,
+                      messenger,
+                      '個人成績(${kukan + 1}${k.kukanTani})',
+                      k.kukanTsukuru!(kukan),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.cyanAccent,
+                      side: const BorderSide(color: Colors.cyanAccent),
+                      minimumSize: const Size(56, 36),
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                    ),
+                    child: Text('${kukan + 1}${k.kukanTani}'),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _hiraku(BuildContext context) {
     final Ghensuu? gh = Hive.box<Ghensuu>('ghensuuBox').getAt(0);
     if (gh == null) return;
@@ -276,25 +391,29 @@ class AiCopyMatomeButton extends StatelessWidget {
                   ),
                 ),
               for (final _AiCopyKoumoku k in list)
-                ListTile(
-                  leading: Icon(k.icon, color: Colors.cyanAccent),
-                  title: Text(
-                    k.title,
-                    style: const TextStyle(color: Colors.white),
+                if (k.kukanTsukuru != null)
+                  _kukanSentakuTile(sheetContext, messenger, k)
+                else
+                  ListTile(
+                    leading: Icon(k.icon, color: Colors.cyanAccent),
+                    title: Text(
+                      k.title,
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                    subtitle: Text(
+                      k.setsumei,
+                      style: const TextStyle(
+                        color: Colors.white60,
+                        fontSize: 12,
+                      ),
+                    ),
+                    onTap: () => _copy(
+                      sheetContext,
+                      messenger,
+                      k.title,
+                      k.tsukuru!(),
+                    ),
                   ),
-                  subtitle: Text(
-                    k.setsumei,
-                    style: const TextStyle(color: Colors.white60, fontSize: 12),
-                  ),
-                  onTap: () async {
-                    final String text = k.tsukuru();
-                    await Clipboard.setData(ClipboardData(text: text));
-                    if (sheetContext.mounted) Navigator.pop(sheetContext);
-                    messenger.showSnackBar(
-                      SnackBar(content: Text('「${k.title}」をコピーしました')),
-                    );
-                  },
-                ),
             ],
           ),
         ),

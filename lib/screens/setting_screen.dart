@@ -1201,7 +1201,7 @@ class _SettingScreenState extends State<SettingScreen> {
               style: TextStyle(color: Colors.white),
             ),
             const Text(
-              "・レース後の振り返りには、レース結果の画面の「振り返りセット」(総合成績と自分の大学のレース経過をまとめたもの)や「全区間の個人成績」",
+              "・レース後の振り返りには、レース結果の画面の「振り返りセット」(総合成績と自分の大学のレース経過をまとめたもの)や「全区間の個人成績」(長すぎるときは、区間を選んで1つずつコピーできます)。正月駅伝では「学連選抜の振り返りセット」(総合成績と学連選抜のレース経過・区間配置をまとめたもの)もあります",
               style: TextStyle(color: Colors.white),
             ),
             const Text(

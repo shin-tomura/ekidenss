@@ -842,7 +842,7 @@ class _SettingScreenState extends State<SettingScreen> {
                       // 実際のライセンス画面の表示部分
                       child: const LicensePage(
                         applicationName: '箱庭小駅伝SS',
-                        applicationVersion: '1.8.1',
+                        applicationVersion: '1.8.2',
                         // applicationIcon: Image.asset('lib/assets/icon/icon_ss1024.png', width: 48, height: 48),
                       ),
                     ),
@@ -863,7 +863,7 @@ class _SettingScreenState extends State<SettingScreen> {
 
             // constを削除して、可変的なウィジェットを追加できるようにする
             const Text(
-              "SS 1.8.1 (21810)",
+              "SS 1.8.2 (21820)",
               style: TextStyle(color: Colors.white),
             ),
             const SizedBox(height: 8), // 適度な余白

@@ -1619,10 +1619,21 @@ Future<void> RaceCalc({
   }
 
   if (racebangou == 2) {
+    // 学連選抜の選手の補正の説明で、大学の選手と比べた順位(○位相当)を出すため、
+    // この区間を走った大学の選手の補正の値と、区間の最速の基本のタイムを渡す(1.8.2)
+    final List<List<double>> daigakuHoseiList = [
+      for (int i = 0; i < idshuruisuu; i++)
+        if (sortedsenshudata[i]
+                .entrykukan_race[racebangou][sortedsenshudata[i].gakunen - 1] ==
+            gh[0].nowracecalckukan)
+          List<double>.from(atai_hosei[i]),
+    ];
     await RaceCalc_gakuren(
       racebangou: racebangou,
       gh: gh,
       sortedunivdata: sortedunivdata,
+      daigakuHoseiList: daigakuHoseiList,
+      daigakuKihonMin: minValue,
     );
   }
 

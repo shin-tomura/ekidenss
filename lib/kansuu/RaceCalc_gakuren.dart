@@ -33,6 +33,10 @@ Future<void> RaceCalc_gakuren({
   required List<Ghensuu> gh,
   required List<UnivData> sortedunivdata,
   //required List<SenshuData> gakurensenshudata,
+  // 同じ区間を走った大学の選手の補正の値(RaceCalc.dartのatai_hosei。基本走力差は区間の最速との差)と、
+  // その区間の最速の基本のタイム。学連選抜の選手の補正の説明で「○位相当」を出すのに使う(1.8.2)
+  List<List<double>>? daigakuHoseiList,
+  double? daigakuKihonMin,
 }) async {
   // Hive.box() を使って、既に開いているBoxを取得
   final kantokuBox = Hive.box<KantokuData>('kantokuBox');
@@ -1081,13 +1085,31 @@ Future<void> RaceCalc_gakuren({
     }
   }
 
-  // 補正計と能力ごとの補正の説明(1.8.2。学連選抜の監督の画面の「ここまでの区間」で見られる)
-  // ・能力ごとの補正は、大学の選手(RaceCalc.dart)と同じく、総監督の見抜く力がついている能力だけを出す
-  //   (経験補正は効いたときだけ出す)
-  // ・学連選抜の計算は1区間に学連選抜の選手1人だけなので、区間内の順位と基本走力差は出さない
-  //   (補正がほぼ0の能力は、大学の選手で区間の誰にも効かないときと同じく「無」と出す)
+  // 補正の説明(1.8.2。学連選抜の監督の画面の「ここまでの区間」で見られる)
+  // ・同じ区間を走った大学の選手の補正の値(RaceCalc.dartから渡される)と比べた順位を「○位相当」で出す
+  //   (大学の選手のうち、値が小さい(速い)選手の数+1。大学の選手の値が渡されないときは順位を出さない)
+  // ・基本走力差は、同じ区間を走った大学の選手の中で一番速い基本のタイムとの差
   // ・補正計は、能力・経験・調子・指示・集団走・モチベーション低下の補正の合計
+  // ・能力ごとの補正は、大学の選手と同じく、総監督の見抜く力がついている能力だけを出す
+  //   (経験補正は効いたときだけ出す。区間の誰にも効かない能力は「無」)
   if (racebangou >= 0 && racebangou <= 5) {
+    final List<List<double>> daigaku = daigakuHoseiList ?? const [];
+    final double? kihonMin = daigakuKihonMin;
+    final bool juniAri = daigaku.isNotEmpty && kihonMin != null;
+    // 補正の種類[j]の値[atai]の、大学の選手と比べた順位の文(例: " 5位相当")
+    String juniBun(int j, double atai) {
+      if (!juniAri) return '';
+      int juni = 1;
+      for (final List<double> row in daigaku) {
+        if (row.length > j && row[j] < atai) juni++;
+      }
+      return ' $juni位相当';
+    }
+
+    bool kiitaka(double atai) =>
+        atai != TEISUU.DEFAULTTIME && (atai > 0.001 || atai < -0.001);
+    String fugou(double atai) => atai.isNegative ? '' : '+';
+
     for (var senshuid = 0; senshuid < gakurensenshudata.length; senshuid++) {
       final senshu = gakurensenshudata[senshuid];
       if (senshu.entrykukan_race[racebangou][senshu.gakunen - 1] !=
@@ -1101,14 +1123,24 @@ Future<void> RaceCalc_gakuren({
           hoseiKei += atai_hosei[senshuid][j];
         }
       }
-      senshu.string_racesetumei +=
-          "${name_hosei[15]}:${hoseiKei.isNegative ? '' : '+'}${hoseiKei.toStringAsFixed(1)}秒\n";
+      if (juniAri) {
+        // atai_hosei[8]は基本のタイムそのもの(学連選抜の計算では最速との差にしていない)
+        final double kihonSa = atai_hosei[senshuid][8] - (kihonMin ?? 0.0);
+        final double total = kihonSa + hoseiKei;
+        senshu.string_racesetumei +=
+            "${name_hosei[8]}${juniBun(8, kihonSa)}:${fugou(kihonSa)}${kihonSa.toStringAsFixed(1)}秒\n";
+        senshu.string_racesetumei +=
+            "${name_hosei[15]}${juniBun(15, hoseiKei)}:${fugou(hoseiKei)}${hoseiKei.toStringAsFixed(1)}秒\n";
+        senshu.string_racesetumei +=
+            "${name_hosei[16]}${juniBun(16, total)}:${fugou(total)}${total.toStringAsFixed(1)}秒(${TimeDate.timeToFunByouString(senshu.time_taikai_total)})\n";
+      } else {
+        senshu.string_racesetumei +=
+            "${name_hosei[15]}:${fugou(hoseiKei)}${hoseiKei.toStringAsFixed(1)}秒\n";
+      }
       for (int j = 0; j < 8; j++) {
         final double atai = atai_hosei[senshuid][j];
-        final bool kiita =
-            atai != TEISUU.DEFAULTTIME && (atai > 0.001 || atai < -0.001);
         if (j == 3) {
-          if (kiita && atai < -0.0001) {
+          if (kiitaka(atai) && atai < -0.0001) {
             senshu.string_racesetumei +=
                 "${name_hosei[j]}:${atai.toStringAsFixed(1)}秒\n";
           }
@@ -1117,11 +1149,21 @@ Future<void> RaceCalc_gakuren({
         if (gh[0].nouryokumieruflag[nouryokumieruflagIndex_hosei[j]] != 1) {
           continue;
         }
-        if (kiita) {
-          senshu.string_racesetumei +=
-              "${name_hosei[j]}:${atai.isNegative ? '' : '+'}${atai.toStringAsFixed(1)}秒\n";
-        } else {
+        // 区間の誰にも効かない(学連選抜の選手も大学の選手も、ほぼ0)なら「無」
+        bool mukankei = !kiitaka(atai);
+        if (mukankei) {
+          for (final List<double> row in daigaku) {
+            if (row.length > j && kiitaka(row[j])) {
+              mukankei = false;
+              break;
+            }
+          }
+        }
+        if (mukankei || atai == TEISUU.DEFAULTTIME) {
           senshu.string_racesetumei += "${name_hosei[j]} 無\n";
+        } else {
+          senshu.string_racesetumei +=
+              "${name_hosei[j]}${juniBun(j, atai)}:${fugou(atai)}${atai.toStringAsFixed(1)}秒\n";
         }
       }
     }

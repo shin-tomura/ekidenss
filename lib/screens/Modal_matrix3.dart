@@ -112,7 +112,11 @@ class _ModalEkidenKukanHistoryMatrixViewState
             String timeStr = (timeVal > 0 && timeVal < TEISUU.DEFAULTTIME)
                 ? "${(timeVal / 60).floor()}:${(timeVal % 60).floor().toString().padLeft(2, '0')}"
                 : "---";
-            row.add("${s.name}($targetGakunen年) ${rankVal + 1}位 $timeStr");
+            // 学連選抜で走った正月駅伝は、区間順位に100を足して記録している(1.8.2)
+            final String rankStr = (config['raceIdx'] == 2 && rankVal >= 100)
+                ? "学連選抜${rankVal - 100 + 1}位相当"
+                : "${rankVal + 1}位";
+            row.add("${s.name}($targetGakunen年) $rankStr $timeStr");
           } else {
             row.add("---");
           }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:two_dimensional_scrollables/two_dimensional_scrollables.dart';
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:hive/hive.dart';
@@ -14,6 +15,7 @@ import 'package:share_plus/share_plus.dart';
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:screenshot/screenshot.dart';
+import 'package:ekiden/kansuu/rireki_text.dart';
 
 class ModalEkidenHistoryMatrixView extends StatefulWidget {
   final int targetUnivId;
@@ -109,7 +111,11 @@ class _ModalEkidenHistoryMatrixViewState
             String timeStr = (time > 0 && time < TEISUU.DEFAULTTIME)
                 ? "${(time / 60).floor()}:${(time % 60).floor().toString().padLeft(2, '0')}"
                 : "---";
-            row.add("${kukan + 1}区(${rank + 1}位) $timeStr");
+            // 学連選抜で走った正月駅伝は、区間順位に100を足して記録している(1.8.2)
+            final String rankStr = (rIdx == 2 && rank >= 100)
+                ? "学連選抜${rank - 100 + 1}位相当"
+                : "${rank + 1}位";
+            row.add("${kukan + 1}区($rankStr) $timeStr");
           } else if (kukan <= -100) {
             row.add("補員");
           } else {
@@ -442,6 +448,23 @@ class _ModalEkidenHistoryMatrixViewState
             foregroundColor: Colors.white,
             elevation: 0,
             actions: [
+              // 生成AIに渡せるテキストでコピー(出場した大会だけを選手ごとに1行で。1.8.2)
+              IconButton(
+                icon: const Icon(Icons.copy),
+                tooltip: 'テキストでコピー',
+                onPressed: () async {
+                  final ScaffoldMessengerState messenger =
+                      ScaffoldMessenger.of(context);
+                  await Clipboard.setData(
+                    ClipboardData(
+                      text: ekidenRirekiText(univId: widget.targetUnivId),
+                    ),
+                  );
+                  messenger.showSnackBar(
+                    const SnackBar(content: Text('駅伝出場履歴をコピーしました')),
+                  );
+                },
+              ),
               IconButton(
                 icon: const Icon(Icons.image),
                 onPressed: _isExporting ? null : _showRaceSelectionForImage,

@@ -8,6 +8,7 @@ import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/kansuu/gakuren_kantoku.dart';
 import 'package:ekiden/screens/gakuren_copy_button.dart';
+import 'package:ekiden/screens/ai_copy_matome.dart';
 
 class Mode0290Content extends StatefulWidget {
   final Ghensuu ghensuu;
@@ -235,6 +236,9 @@ class _Mode0290ContentState extends State<Mode0290Content> {
                         ),
                         // 学連選抜のメンバーの今季タイム一覧表(1.8.2)
                         const GakurenKonkiTimeLink(),
+                        // 生成AIに渡すテキストのまとめボタン(1.8.2。区間エントリーの前の場面なので、
+                        // ほかの大学の区間エントリーが分かってしまうものは出さない)
+                        const AiCopyMatomeButton(entryAri: false),
                       ],
                     ),
                   ),

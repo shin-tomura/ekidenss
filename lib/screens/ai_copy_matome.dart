@@ -5,6 +5,7 @@ import 'package:ekiden/ghensuu.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/kansuu/gakuren_text.dart';
 import 'package:ekiden/kansuu/jibun_keika_text.dart';
+import 'package:ekiden/kansuu/rireki_text.dart';
 import 'package:ekiden/screens/Modal_courseshoukai.dart';
 import 'package:ekiden/screens/Modal_kukanhaiti2.dart';
 import 'package:ekiden/screens/Modal_kukanresult350.dart';
@@ -21,6 +22,9 @@ import 'package:ekiden/screens/Modal_kukanresult.dart' as kekka;
 // ・区間ごとセット: 直近の区間の個人順位速報(説明文つき)+通過順位速報(実況に)
 // ・振り返りセット: 総合成績+自分の大学のレース経過(結果画面で、レース後の振り返りに)
 // ・学連選抜の振り返りセット: 総合成績+学連選抜のレース経過+学連選抜の区間配置(結果画面で)
+// ・相談セット: コース情報+自分の大学の今季タイム一覧表+駅伝出場履歴(エントリーの画面で)
+// ・学連選抜の相談セット: コース情報+学連選抜の区間配置+今季タイム一覧表+駅伝出場履歴
+//   (学連選抜編成・区間エントリーの画面で)
 // 結果画面では、個人成績を区間を選んで1つずつコピーすることもできる
 // 文はそれぞれの画面のコピーと同じもの(画面の外に出した関数で作る)
 // ------------------------------------------------------------
@@ -53,8 +57,9 @@ class _AiCopyKoumoku {
 const String _setKugiri = '\n\n==============================\n\n';
 
 /// 生成AIに渡すテキストのまとめボタン
-/// [entryAri] 区間エントリーが済んでいる場面か(一次エントリーの画面ではfalse。
-///   falseのときは、全区間・全大学詳細リストとレース経過を出さない)
+/// [entryAri] 区間エントリーが済んでいる場面か(一次エントリー・学連選抜編成・区間エントリーの
+///   画面ではfalse。falseのときは、ほかの大学の区間エントリーが分かってしまう全区間・全大学詳細リストと
+///   レース前セット、レース経過を出さず、代わりに相談セットを出す)
 /// [kekkaGamen] レースの結果画面か(trueのときは、レース中の速報の代わりに
 ///   振り返りセット・総合成績・全区間の個人成績を出す。文は結果画面のコピーと同じ)
 class AiCopyMatomeButton extends StatelessWidget {
@@ -222,6 +227,36 @@ class AiCopyMatomeButton extends StatelessWidget {
         ),
       );
     }
+    // エントリーの画面(一次エントリー・学連選抜編成・区間エントリー)の相談セット(1.8.2)
+    if (!entryAri && ekiden && shutsujou) {
+      list.add(
+        _AiCopyKoumoku(
+          '相談セット',
+          'コース情報・自分の大学の今季タイム一覧表・駅伝出場履歴をまとめてコピー。エントリーや区間配置の相談に',
+          Icons.library_books,
+          () => [
+            courseZenKukanText(gh, race),
+            konkiSeisekiHyouText(univId: gh.MYunivid),
+            ekidenRirekiText(univId: gh.MYunivid),
+          ].where((t) => t.isNotEmpty).join(_setKugiri),
+        ),
+      );
+    }
+    if (!entryAri && gakuren) {
+      list.add(
+        _AiCopyKoumoku(
+          '学連選抜の相談セット',
+          'コース情報・学連選抜の区間配置(選手の詳しい情報)・今季タイム一覧表・駅伝出場履歴をまとめてコピー。学連選抜の区間配置の相談に',
+          Icons.library_books_outlined,
+          () => [
+            courseZenKukanText(gh, race),
+            gakurenKukanHaitiText(gh),
+            konkiSeisekiHyouText(univId: -1, gakuren: true),
+            gakurenEkidenRirekiText(gh),
+          ].where((t) => t.isNotEmpty).join(_setKugiri),
+        ),
+      );
+    }
     if (ekiden) {
       list.add(
         _AiCopyKoumoku(
@@ -251,6 +286,14 @@ class AiCopyMatomeButton extends StatelessWidget {
           () => konkiSeisekiHyouText(univId: gh.MYunivid),
         ),
       );
+      list.add(
+        _AiCopyKoumoku(
+          '自分の大学の駅伝出場履歴',
+          '選手ごとに、出場した駅伝の区間・順位・タイム(駅伝出場履歴一覧(選手ごと)と同じ内容)',
+          Icons.history,
+          () => ekidenRirekiText(univId: gh.MYunivid),
+        ),
+      );
     }
     if (gakuren) {
       list.add(
@@ -267,6 +310,14 @@ class AiCopyMatomeButton extends StatelessWidget {
           '学連選抜のメンバーの今季の成績と能力(CSV形式)',
           Icons.table_chart_outlined,
           () => konkiSeisekiHyouText(univId: -1, gakuren: true),
+        ),
+      );
+      list.add(
+        _AiCopyKoumoku(
+          '学連選抜の駅伝出場履歴',
+          'メンバーが元の大学などで出場した駅伝の区間・順位・タイム',
+          Icons.history_toggle_off,
+          () => gakurenEkidenRirekiText(gh),
         ),
       );
     }

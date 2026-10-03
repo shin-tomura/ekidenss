@@ -2814,7 +2814,9 @@ class _Mode0300ContentState extends State<Mode0300Content> {
     return Column(
       children: [
         // 生成AIに渡すテキストのまとめボタン(1.8.2)
-        const AiCopyMatomeButton(),
+        // 区間エントリーの画面では、ほかの大学の区間エントリーが分かってしまうものを出さない
+        // (一次エントリーの画面と同じ一覧にする)
+        const AiCopyMatomeButton(entryAri: false),
         if (kantoku.yobiint2[17] == 1 && (raceBangou <= 2 || raceBangou == 5))
           TextButton(
             onPressed: () async {

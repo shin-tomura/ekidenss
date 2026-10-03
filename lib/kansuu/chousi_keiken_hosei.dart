@@ -6,7 +6,7 @@ import 'package:ekiden/kantoku_data.dart';
 //
 // RaceCalc.dart(本番の計算)、TrialTime.dart(試走タイム)、
 // ToujituHenkou_com.dart(コンピュータの当日変更の見込みタイム)、
-// siji_sontoku.dart(「指示ごとの損得」の画面)から使う。
+// siji_sontoku.dart(「指示ごとの損得予測」の画面)から使う。
 // 式を変えるときはここだけを変えれば、すべてに反映される。
 // ------------------------------------------------------------
 

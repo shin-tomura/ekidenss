@@ -27,7 +27,7 @@ double shisouTimeNigosu(double time) {
 }
 
 /// [nigosu] falseにすると±0.5%の乱数をかけない(コンピュータ大学の当日変更などの判断用)
-/// [keikenHosei] trueにすると、本番と同じ位置で経験補正もかける(指示ごとの損得の画面用。1.8.1)
+/// [keikenHosei] trueにすると、本番と同じ位置で経験補正もかける(指示ごとの損得予測の画面用。1.8.1)
 Future<double> runTrialCalculation(
   int senshuid,
   int i_kukan,

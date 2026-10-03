@@ -152,7 +152,7 @@ class _Mode0350ContentState extends State<Mode0350Content> {
         }
       });
 
-  // 指示ごとの損得の画面を呼び出すボタン(駅伝の2区以降。1.8.1)
+  // 指示ごとの損得予測の画面を呼び出すボタン(駅伝の2区以降。1.8.1)
   // [sentakuchuu] 今選んでいる指示(画面で印を付ける)
   Widget _buildSijiSontokuButton(SenshuData senshu, int sentakuchuu) {
     return TextButton(
@@ -161,7 +161,7 @@ class _Mode0350ContentState extends State<Mode0350Content> {
           context: context,
           barrierColor: Colors.black.withOpacity(0.8),
           barrierDismissible: true,
-          barrierLabel: '指示ごとの損得',
+          barrierLabel: '指示ごとの損得予測',
           transitionDuration: const Duration(milliseconds: 300),
           pageBuilder: (context, animation, secondaryAnimation) {
             return ModalSijiSontokuView(
@@ -181,7 +181,7 @@ class _Mode0350ContentState extends State<Mode0350Content> {
         );
       },
       child: Text(
-        '指示ごとの損得',
+        '指示ごとの損得予測',
         style: TextStyle(
           color: HENSUU.LinkColor,
           fontSize: HENSUU.fontsize_honbun,
@@ -1816,12 +1816,15 @@ class _Mode0350ContentState extends State<Mode0350Content> {
                   );
                 }).toList(),
               ),
-              // 駅伝の2区以降は、指示ごとのタイムの損得を見られる(1.8.1)
+              // 駅伝の2区以降は、指示ごとのタイムの損得予測を見られる(1.8.1)
+              // (ドロップダウンを押すつもりで間違って押さないよう、少し離す)
               if (sijiSontokuTaishou(
                 currentGhensuu.hyojiracebangou,
                 currentGhensuu.nowracecalckukan,
-              ))
+              )) ...[
+                const SizedBox(height: 16),
                 _buildSijiSontokuButton(senshu, currentSijiOption),
+              ],
               const SizedBox(height: 10),
             ],
           );

@@ -5,7 +5,7 @@ import 'package:ekiden/senshu_data.dart';
 import 'package:ekiden/constants.dart'; // HENSUU
 import 'package:ekiden/kansuu/siji_sontoku.dart';
 
-/// 「指示ごとの損得」の画面(1.8.1)
+/// 「指示ごとの損得予測」の画面(1.8.1)
 /// 駅伝の2区以降で、走り出す直前の選手の、指示なし・前半突っ込み・前半抑えそれぞれの
 /// タイムの損得(成功時・失敗時)を「約○秒」で出す。計算は siji_sontoku.dart
 class ModalSijiSontokuView extends StatefulWidget {
@@ -49,7 +49,7 @@ class _ModalSijiSontokuViewState extends State<ModalSijiSontokuView> {
       backgroundColor: HENSUU.backgroundcolor,
       appBar: AppBar(
         title: Text(
-          '${kukan + 1}区 指示ごとの損得',
+          '${kukan + 1}区 指示ごとの損得予測',
           style: const TextStyle(color: Colors.white),
         ),
         backgroundColor: Colors.grey[900],

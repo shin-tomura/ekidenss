@@ -788,7 +788,7 @@ Future<void> RaceCalc({
       // (影響度0%なら体調不良も含めて補正しない)
       if ((racebangou <= 2 || racebangou == 5) && kantoku.yobiint2[2] != 0) {
         // 体調不良(調子0)は設定の悪化パーセント、それ以外は(100−調子)×0.1%×調子適用率
-        // (式は chousi_keiken_hosei.dart で、コンピュータの当日変更・指示ごとの損得の画面と共通)
+        // (式は chousi_keiken_hosei.dart で、コンピュータの当日変更・指示ごとの損得予測の画面と共通)
         temphosei =
             chousiHoseiBairitsu(sortedsenshudata[senshuid], kantoku) - 1.0;
         moto_time_taikai_total = sortedsenshudata[senshuid].time_taikai_total;
@@ -835,7 +835,7 @@ Future<void> RaceCalc({
               atai_hosei[senshuid][9] = sontokutime;
             }
           } else {
-            // 倍率の数値は mokuhyou_hosei.dart にまとめている(指示ごとの損得の画面と共通)
+            // 倍率の数値は mokuhyou_hosei.dart にまとめている(指示ごとの損得予測の画面と共通)
             if (sortedsenshudata[senshuid].sijiflag == 1) {
               final lasttime = sortedsenshudata[senshuid].time_taikai_total;
               if (Random().nextInt(100) < sortedsenshudata[senshuid].konjou) {

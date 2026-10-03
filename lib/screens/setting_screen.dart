@@ -1168,6 +1168,49 @@ class _SettingScreenState extends State<SettingScreen> {
             const SizedBox(height: 24),
 
             const Text(
+              "⭐️生成AIと遊ぶ(テキストのコピー)",
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: HENSUU.fontsize_honbun,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              "各画面のコピーのボタンでテキストをコピーして生成AIに貼り付けると、レースの実況や、エントリー・区間配置・指示の相談を楽しめます。コピーしたテキストには、生成AIが読み違えないように、数値の意味などの注意書きも入っています。",
+              style: TextStyle(color: Colors.white),
+            ),
+            const Text(
+              "一次エントリー・区間エントリー・レース中の画面にある「生成AIに渡すテキスト」ボタンを押すと、その場面で役に立つテキストの一覧が出て、1回押すだけでコピーできます。いつもいっしょに渡すものは、まとめてコピーできます。",
+              style: TextStyle(color: Colors.white),
+            ),
+            const Text(
+              "・エントリーや区間配置の相談には「自分の大学の今季タイム一覧表」(今季タイム一覧表の画面の右上のコピーのボタンでも同じ)",
+              style: TextStyle(color: Colors.white),
+            ),
+            const Text(
+              "・レース前の展開予想には「レース前セット」(コース情報と全区間・全大学詳細リストをまとめたもの)",
+              style: TextStyle(color: Colors.white),
+            ),
+            const Text(
+              "・レース中の実況には、区間ごとに「区間ごとセット」(直近の区間の個人順位速報と通過順位速報をまとめたもの)や「自分の大学のレース経過」",
+              style: TextStyle(color: Colors.white),
+            ),
+            const Text(
+              "・指示の相談には「自分の大学のレース経過」と「全区間・全大学詳細リスト」を渡して、この先の展開を予想してもらう",
+              style: TextStyle(color: Colors.white),
+            ),
+            const Text(
+              "正月駅伝の個人順位速報・通過順位速報には、学連選抜も「OP」として入ります(順位は大学の中に入れた場合の「○位相当」)。学連選抜区間配置の画面などからは、学連選抜の区間配置・レース経過・今季タイム一覧表もコピーできます。",
+              style: TextStyle(color: Colors.white),
+            ),
+            const Text(
+              "生成AIによっては、一度に貼り付けられる文字数に限りがあります。長すぎるときは、まとめたものではなく一つずつ渡してください。",
+              style: TextStyle(color: Colors.white),
+            ),
+            const SizedBox(height: 24),
+
+            const Text(
               "⭐️経験補正について",
               style: TextStyle(
                 color: Colors.white,

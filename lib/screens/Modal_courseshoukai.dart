@@ -109,65 +109,19 @@ class _ModalCourseshoukaiViewState extends State<ModalCourseshoukaiView> {
   }
 
   // 全区間の情報をまとめてクリップボードへコピーする処理
+  // (文は画面の外の courseZenKukanText で作る。1.8.2)
   Future<void> _copyAllSectionsToClipboard(
     String raceTitle,
     Ghensuu currentGhensuu,
   ) async {
-    int kukanCount =
-        (widget.racebangou >= 0 && widget.racebangou <= 3) ||
-            widget.racebangou == 5
-        ? currentGhensuu.kukansuu_taikaigoto[widget.racebangou]
-        : (widget.racebangou == 4 ? 1 : 0);
+    final String text = courseZenKukanText(
+      currentGhensuu,
+      widget.racebangou,
+      raceTitle: raceTitle,
+    );
+    if (text.isEmpty) return;
 
-    if (kukanCount == 0) return;
-
-    final StringBuffer buffer = StringBuffer();
-    buffer.writeln("【$raceTitle コース詳細データ】");
-    buffer.writeln("");
-
-    for (int i = 0; i < kukanCount; i++) {
-      final double dist =
-          currentGhensuu.kyori_taikai_kukangoto[widget.racebangou][i];
-      final double nDist = currentGhensuu
-          .kyoriwariainobori_taikai_kukangoto[widget.racebangou][i];
-      final double kDist = currentGhensuu
-          .kyoriwariaikudari_taikai_kukangoto[widget.racebangou][i];
-      final double nKoubai = currentGhensuu
-          .heikinkoubainobori_taikai_kukangoto[widget.racebangou][i];
-      final double kKoubai = currentGhensuu
-          .heikinkoubaikudari_taikai_kukangoto[widget.racebangou][i];
-      final int updown = currentGhensuu
-          .noborikudarikirikaekaisuu_taikai_kukangoto[widget.racebangou][i];
-
-      // 指数の計算
-      int nIndexInt = (nDist * nKoubai.abs() * 10000).round();
-      int kIndexInt = (kDist * kKoubai.abs() * 10000).round();
-      if (widget.racebangou == 3) {
-        buffer.writeln("[${i + 1}組]");
-      } else if (widget.racebangou == 4) {
-        buffer.writeln("[全員が同じコースを一斉に走る]");
-      } else {
-        buffer.writeln("[${i + 1}区]");
-      }
-
-      buffer.writeln("距離: ${_formatDoubleToFixed(dist, 0)}m");
-      buffer.writeln(
-        "登り距離割合: ${_formatDoubleToFixed(nDist * 100, 1)}% (平均勾配 ${_formatDoubleToFixed(nKoubai.abs(), 3)}) [登り指数:$nIndexInt]",
-      );
-      buffer.writeln(
-        "下り距離割合: ${_formatDoubleToFixed(kDist * 100, 1)}% (平均勾配 ${_formatDoubleToFixed(kKoubai.abs(), 3)}) [下り指数:$kIndexInt]",
-      );
-      buffer.writeln("アップダウン回数: $updown回");
-      buffer.writeln("");
-    }
-
-    // 指数に関する説明文を追加
-    buffer.writeln("----------------");
-    buffer.writeln("※数値の意味");
-    buffer.writeln("・登り指数＝ 登り距離割合 × 平均勾配(絶対値) × 10000");
-    buffer.writeln("・下り指数＝ 下り距離割合 × 平均勾配(絶対値) × 10000");
-
-    await Clipboard.setData(ClipboardData(text: buffer.toString()));
+    await Clipboard.setData(ClipboardData(text: text));
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -769,5 +723,95 @@ class _ModalCourseshoukaiViewState extends State<ModalCourseshoukaiView> {
         ),
       ),
     );
+  }
+}
+
+/// 全区間のコース情報のテキスト(区間コース確認の「全区間をコピー」と同じ文。区間がなければ空)
+/// 画面を開かずに作れるように、画面の外に出した(1.8.2。生成AIに渡すテキストのまとめボタンからも使う)
+/// [raceTitle]を省くと、画面と同じ決まりでレースの名前を付ける
+String courseZenKukanText(
+  Ghensuu currentGhensuu,
+  int racebangou, {
+  String? raceTitle,
+}) {
+  raceTitle ??= courseRaceTitle(racebangou);
+  int kukanCount =
+      (racebangou >= 0 && racebangou <= 3) ||
+          racebangou == 5
+      ? currentGhensuu.kukansuu_taikaigoto[racebangou]
+      : (racebangou == 4 ? 1 : 0);
+
+  if (kukanCount == 0) return "";
+
+  final StringBuffer buffer = StringBuffer();
+  buffer.writeln("【$raceTitle コース詳細データ】");
+  buffer.writeln("");
+
+  for (int i = 0; i < kukanCount; i++) {
+    final double dist =
+        currentGhensuu.kyori_taikai_kukangoto[racebangou][i];
+    final double nDist = currentGhensuu
+        .kyoriwariainobori_taikai_kukangoto[racebangou][i];
+    final double kDist = currentGhensuu
+        .kyoriwariaikudari_taikai_kukangoto[racebangou][i];
+    final double nKoubai = currentGhensuu
+        .heikinkoubainobori_taikai_kukangoto[racebangou][i];
+    final double kKoubai = currentGhensuu
+        .heikinkoubaikudari_taikai_kukangoto[racebangou][i];
+    final int updown = currentGhensuu
+        .noborikudarikirikaekaisuu_taikai_kukangoto[racebangou][i];
+
+    // 指数の計算
+    int nIndexInt = (nDist * nKoubai.abs() * 10000).round();
+    int kIndexInt = (kDist * kKoubai.abs() * 10000).round();
+    if (racebangou == 3) {
+      buffer.writeln("[${i + 1}組]");
+    } else if (racebangou == 4) {
+      buffer.writeln("[全員が同じコースを一斉に走る]");
+    } else {
+      buffer.writeln("[${i + 1}区]");
+    }
+
+    buffer.writeln("距離: ${_formatDoubleToFixed(dist, 0)}m");
+    buffer.writeln(
+      "登り距離割合: ${_formatDoubleToFixed(nDist * 100, 1)}% (平均勾配 ${_formatDoubleToFixed(nKoubai.abs(), 3)}) [登り指数:$nIndexInt]",
+    );
+    buffer.writeln(
+      "下り距離割合: ${_formatDoubleToFixed(kDist * 100, 1)}% (平均勾配 ${_formatDoubleToFixed(kKoubai.abs(), 3)}) [下り指数:$kIndexInt]",
+    );
+    buffer.writeln("アップダウン回数: $updown回");
+    buffer.writeln("");
+  }
+
+  // 指数に関する説明文を追加
+  buffer.writeln("----------------");
+  buffer.writeln("※数値の意味");
+  buffer.writeln("・登り指数＝ 登り距離割合 × 平均勾配(絶対値) × 10000");
+  buffer.writeln("・下り指数＝ 下り距離割合 × 平均勾配(絶対値) × 10000");
+
+  return buffer.toString();
+}
+
+/// 区間コース確認と同じ決まりのレースの名前(1.8.2)
+String courseRaceTitle(int racebangou) {
+  switch (racebangou) {
+    case 0:
+      return "10月駅伝";
+    case 1:
+      return "11月駅伝";
+    case 2:
+      return "正月駅伝";
+    case 3:
+      return "11月駅伝予選";
+    case 4:
+      return "正月駅伝予選";
+    case 5:
+      final List<UnivData> sortedUnivData =
+          Hive.box<UnivData>('univBox').values.toList()
+            ..sort((a, b) => a.id.compareTo(b.id));
+      if (sortedUnivData.isNotEmpty) return sortedUnivData[0].name_tanshuku;
+      return "特別レース";
+    default:
+      return "区間コース確認";
   }
 }

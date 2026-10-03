@@ -9,6 +9,7 @@ import 'package:ekiden/screens/Modal_courseshoukai.dart';
 import 'package:ekiden/screens/All0150.dart';
 import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/screens/Modal_matrix.dart';
+import 'package:ekiden/screens/ai_copy_matome.dart';
 import 'package:ekiden/screens/Modal_matrix2.dart';
 import 'package:ekiden/screens/Modal_matrix3.dart';
 
@@ -416,6 +417,8 @@ class _Mode0150ContentState extends State<Mode0150Content> {
                                     ),
                                   ),
                                 ),
+                              // 生成AIに渡すテキストのまとめボタン(1.8.2。一次エントリーの場面なので、区間エントリーの後のものは出さない)
+                              const AiCopyMatomeButton(entryAri: false),
                               TextButton(
                                 onPressed: () {
                                   showGeneralDialog(

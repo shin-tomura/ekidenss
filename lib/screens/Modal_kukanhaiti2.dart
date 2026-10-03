@@ -925,159 +925,12 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
     );
   }
 
-  // 【追加】全区間のリストを一括生成するメソッド
-  String _generateAllKukanList() {
-    final gBox = Hive.box<Ghensuu>('ghensuuBox');
-    final currentGhensuu = gBox.getAt(0)!;
-    final int raceIdx = currentGhensuu.hyojiracebangou;
-    final int kukanCount = currentGhensuu.kukansuu_taikaigoto[raceIdx];
+  // 全区間のリストを一括生成する(文は画面の外の zenKukanZenDaigakuText で作る。1.8.2)
+  String _generateAllKukanList() => zenKukanZenDaigakuText();
 
-    StringBuffer sb = StringBuffer();
-    sb.writeln("=== 全区間・全大学詳細リスト ===");
-    sb.writeln("-----------------------------------\n");
-
-    for (int i = 0; i < kukanCount; i++) {
-      // 既存の単一区間生成ロジックを再利用
-      sb.write(_generateSingleKukanList(i));
-      sb.writeln("\n"); // 区間ごとに改行を入れる
-    }
-
-    return sb.toString();
-  }
-
-  // 改修後: 指定された区間の全大学選手リスト（詳細版フォーマット）
-  String _generateSingleKukanList(int targetKukanIdx) {
-    final gBox = Hive.box<Ghensuu>('ghensuuBox');
-    final sBox = Hive.box<SenshuData>('senshuBox');
-    final uBox = Hive.box<UnivData>('univBox');
-
-    final currentGhensuu = gBox.getAt(0)!;
-    final raceIdx = currentGhensuu.hyojiracebangou;
-
-    // 区間名の決定
-    String kukanLabel = "${targetKukanIdx + 1}${raceIdx == 3 ? "組" : "区"}";
-    if (raceIdx == 4) kukanLabel = "記録会";
-
-    // エントリー済み大学を取得してID順にソート
-    final entryUnivs =
-        uBox.values.where((u) => u.taikaientryflag[raceIdx] == 1).toList()
-          ..sort((a, b) => a.id.compareTo(b.id)); // 大学ID順
-
-    StringBuffer sb = StringBuffer();
-    String kyoristring =
-        "${_formatDoubleToFixed(currentGhensuu.kyori_taikai_kukangoto[raceIdx][targetKukanIdx], 0)}m";
-
-    sb.writeln("=== $kukanLabel($kyoristring) 全大学詳細リスト ===");
-    //sb.writeln("生成日時: ${DateTime.now().toString()}");
-    sb.writeln("");
-
-    bool hasEntry = false;
-
-    // 大学ID順にループ
-    for (var univ in entryUnivs) {
-      // その大学の選手の中で、指定区間にエントリーしている選手を探す
-      final targetSenshus = sBox.values.where((s) {
-        return s.univid == univ.id &&
-            s.entrykukan_race[raceIdx][s.gakunen - 1] == targetKukanIdx;
-      }).toList();
-
-      if (targetSenshus.isNotEmpty) {
-        hasEntry = true;
-        for (var s in targetSenshus) {
-          // --- ここから詳細版(mode=2)のロジックを適用 ---
-
-          // ヘッダー: 【大学名】 区間 選手名 (学年)
-          //sb.writeln('【${univ.name}】 $kukanLabel ${s.name} (${s.gakunen}年)');
-          sb.writeln('【${univ.name}】  ${s.name} (${s.gakunen}年)');
-
-          // 距離表示 (駅伝の場合のみ)
-          /*if (raceIdx != 3 && raceIdx != 4) {
-            sb.writeln(
-              ' ${_formatDoubleToFixed(currentGhensuu.kyori_taikai_kukangoto[raceIdx][targetKukanIdx], 0)}m',
-            );
-          }*/
-
-          // 能力値 (フラグチェック付き)
-          sb.write(
-            '  駅伝男:${currentGhensuu.nouryokumieruflag[0] == 1 ? s.konjou : "??"} ',
-          );
-          sb.write(
-            '平常心:${currentGhensuu.nouryokumieruflag[1] == 1 ? s.heijousin : "??"} ',
-          );
-          sb.writeln('調子:${s.chousi}');
-
-          //過去に同じ区間を走ったことがあるかどうかの表示
-          int keikenkaisuu = 0;
-          for (int i_gakunen = 0; i_gakunen < s.gakunen - 1; i_gakunen++) {
-            if (s.entrykukan_race[currentGhensuu.hyojiracebangou][i_gakunen] ==
-                s.entrykukan_race[currentGhensuu.hyojiracebangou][s.gakunen -
-                    1]) {
-              keikenkaisuu++;
-            }
-          }
-          //if (keikenkaisuu > 0) {
-          sb.writeln('  この区間の経験回数:$keikenkaisuu回');
-          //}
-
-          // 記録情報の生成用ローカル関数 (詳細版固定)
-          String getRec(int idx, bool showRank) {
-            if (s.time_bestkiroku[idx] == TEISUU.DEFAULTTIME) return "記録無";
-            String base = TimeDate.timeToFunByouString(s.time_bestkiroku[idx]);
-
-            // 詳細版なので順位情報を付与
-            if (showRank) {
-              // 区間順位・学内順位・全体順位
-              base +=
-                  " [区:${s.kukannaijuni[idx] + 1}位 学:${s.gakunaijuni_bestkiroku[idx] + 1}位 全:${s.zentaijuni_bestkiroku[idx] + 1}位]";
-            } else {
-              // 学内順位のみ
-              base += " [学:${s.gakunaijuni_bestkiroku[idx] + 1}位]";
-            }
-            return base;
-          }
-
-          // 主要記録
-          sb.writeln('  5000m: ${getRec(0, true)}');
-          sb.writeln('  10000m: ${getRec(1, true)}');
-          sb.writeln('  ハーフ: ${getRec(2, true)}');
-
-          // 詳細記録 (登り・下り・ロード・クロカン)
-          sb.writeln('  登り1万: ${getRec(4, false)}');
-          sb.writeln('  下り1万: ${getRec(5, false)}');
-          sb.writeln('  ロード1万: ${getRec(6, false)}');
-          sb.writeln('  クロカン1万: ${getRec(7, false)}');
-
-          sb.writeln("-----------------------------------"); // 区切り線
-        }
-      }
-    }
-
-    // 学連選抜(正月駅伝のときだけ)。オープン参加なので大学の後ろに入れる(1.8.2)
-    final bool gakurenAri = gakurenKonnenAri(currentGhensuu);
-    if (gakurenAri) {
-      final Senshu_Gakuren_Data? gakurenSenshu = gakurenKukanSenshu(
-        targetKukanIdx,
-      );
-      if (gakurenSenshu != null) {
-        hasEntry = true;
-        gakurenSenshuShousaiKaku(sb, gakurenSenshu, currentGhensuu);
-      }
-    }
-
-    sb.writeln(
-      "\n※「区」はその区間にエントリーされている選手の中でのその種目の持ちタイムの順位、「学」はその種目の所属大学学内での持ちタイムの順位、「全」はその種目の学生全体での持ちタイムの順位",
-    );
-    if (gakurenAri) {
-      sb.write(gakurenOpChuui);
-      sb.writeln(gakurenKukanJuniChuui);
-    }
-
-    if (!hasEntry) {
-      sb.writeln("この区間へのエントリーはありません。");
-    }
-
-    return sb.toString();
-  }
+  // 指定された区間の全大学選手リスト(文は画面の外の kukanZenDaigakuText で作る。1.8.2)
+  String _generateSingleKukanList(int targetKukanIdx) =>
+      kukanZenDaigakuText(targetKukanIdx);
 
   // --- テキスト情報生成ロジック (3段階) ---
   String _generateHaitiText(int mode) {
@@ -1176,4 +1029,159 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
 
     return sb.toString();
   }
+}
+
+/// 全区間・全大学詳細リストのテキスト(区間配置確認の「全大学一括出力」の全区間と同じ文)
+/// 画面を開かずに作れるように、画面の外に出した(1.8.2。生成AIに渡すテキストのまとめボタンからも使う)
+String zenKukanZenDaigakuText() {
+  final gBox = Hive.box<Ghensuu>('ghensuuBox');
+  final currentGhensuu = gBox.getAt(0)!;
+  final int raceIdx = currentGhensuu.hyojiracebangou;
+  final int kukanCount = currentGhensuu.kukansuu_taikaigoto[raceIdx];
+
+  StringBuffer sb = StringBuffer();
+  sb.writeln("=== 全区間・全大学詳細リスト ===");
+  sb.writeln("-----------------------------------\n");
+
+  for (int i = 0; i < kukanCount; i++) {
+    // 既存の単一区間生成ロジックを再利用
+    sb.write(kukanZenDaigakuText(i));
+    sb.writeln("\n"); // 区間ごとに改行を入れる
+  }
+
+  return sb.toString();
+}
+
+/// 指定された区間の全大学選手リスト（詳細版フォーマット）のテキスト(1.8.2で画面の外に出した)
+String kukanZenDaigakuText(int targetKukanIdx) {
+  final gBox = Hive.box<Ghensuu>('ghensuuBox');
+  final sBox = Hive.box<SenshuData>('senshuBox');
+  final uBox = Hive.box<UnivData>('univBox');
+
+  final currentGhensuu = gBox.getAt(0)!;
+  final raceIdx = currentGhensuu.hyojiracebangou;
+
+  // 区間名の決定
+  String kukanLabel = "${targetKukanIdx + 1}${raceIdx == 3 ? "組" : "区"}";
+  if (raceIdx == 4) kukanLabel = "記録会";
+
+  // エントリー済み大学を取得してID順にソート
+  final entryUnivs =
+      uBox.values.where((u) => u.taikaientryflag[raceIdx] == 1).toList()
+        ..sort((a, b) => a.id.compareTo(b.id)); // 大学ID順
+
+  StringBuffer sb = StringBuffer();
+  String kyoristring =
+      "${currentGhensuu.kyori_taikai_kukangoto[raceIdx][targetKukanIdx].toStringAsFixed(0)}m";
+
+  sb.writeln("=== $kukanLabel($kyoristring) 全大学詳細リスト ===");
+  //sb.writeln("生成日時: ${DateTime.now().toString()}");
+  sb.writeln("");
+
+  bool hasEntry = false;
+
+  // 大学ID順にループ
+  for (var univ in entryUnivs) {
+    // その大学の選手の中で、指定区間にエントリーしている選手を探す
+    final targetSenshus = sBox.values.where((s) {
+      return s.univid == univ.id &&
+          s.entrykukan_race[raceIdx][s.gakunen - 1] == targetKukanIdx;
+    }).toList();
+
+    if (targetSenshus.isNotEmpty) {
+      hasEntry = true;
+      for (var s in targetSenshus) {
+        // --- ここから詳細版(mode=2)のロジックを適用 ---
+
+        // ヘッダー: 【大学名】 区間 選手名 (学年)
+        //sb.writeln('【${univ.name}】 $kukanLabel ${s.name} (${s.gakunen}年)');
+        sb.writeln('【${univ.name}】  ${s.name} (${s.gakunen}年)');
+
+        // 距離表示 (駅伝の場合のみ)
+        /*if (raceIdx != 3 && raceIdx != 4) {
+          sb.writeln(
+            ' ${_formatDoubleToFixed(currentGhensuu.kyori_taikai_kukangoto[raceIdx][targetKukanIdx], 0)}m',
+          );
+        }*/
+
+        // 能力値 (フラグチェック付き)
+        sb.write(
+          '  駅伝男:${currentGhensuu.nouryokumieruflag[0] == 1 ? s.konjou : "??"} ',
+        );
+        sb.write(
+          '平常心:${currentGhensuu.nouryokumieruflag[1] == 1 ? s.heijousin : "??"} ',
+        );
+        sb.writeln('調子:${s.chousi}');
+
+        //過去に同じ区間を走ったことがあるかどうかの表示
+        int keikenkaisuu = 0;
+        for (int i_gakunen = 0; i_gakunen < s.gakunen - 1; i_gakunen++) {
+          if (s.entrykukan_race[currentGhensuu.hyojiracebangou][i_gakunen] ==
+              s.entrykukan_race[currentGhensuu.hyojiracebangou][s.gakunen -
+                  1]) {
+            keikenkaisuu++;
+          }
+        }
+        //if (keikenkaisuu > 0) {
+        sb.writeln('  この区間の経験回数:$keikenkaisuu回');
+        //}
+
+        // 記録情報の生成用ローカル関数 (詳細版固定)
+        String getRec(int idx, bool showRank) {
+          if (s.time_bestkiroku[idx] == TEISUU.DEFAULTTIME) return "記録無";
+          String base = TimeDate.timeToFunByouString(s.time_bestkiroku[idx]);
+
+          // 詳細版なので順位情報を付与
+          if (showRank) {
+            // 区間順位・学内順位・全体順位
+            base +=
+                " [区:${s.kukannaijuni[idx] + 1}位 学:${s.gakunaijuni_bestkiroku[idx] + 1}位 全:${s.zentaijuni_bestkiroku[idx] + 1}位]";
+          } else {
+            // 学内順位のみ
+            base += " [学:${s.gakunaijuni_bestkiroku[idx] + 1}位]";
+          }
+          return base;
+        }
+
+        // 主要記録
+        sb.writeln('  5000m: ${getRec(0, true)}');
+        sb.writeln('  10000m: ${getRec(1, true)}');
+        sb.writeln('  ハーフ: ${getRec(2, true)}');
+
+        // 詳細記録 (登り・下り・ロード・クロカン)
+        sb.writeln('  登り1万: ${getRec(4, false)}');
+        sb.writeln('  下り1万: ${getRec(5, false)}');
+        sb.writeln('  ロード1万: ${getRec(6, false)}');
+        sb.writeln('  クロカン1万: ${getRec(7, false)}');
+
+        sb.writeln("-----------------------------------"); // 区切り線
+      }
+    }
+  }
+
+  // 学連選抜(正月駅伝のときだけ)。オープン参加なので大学の後ろに入れる(1.8.2)
+  final bool gakurenAri = gakurenKonnenAri(currentGhensuu);
+  if (gakurenAri) {
+    final Senshu_Gakuren_Data? gakurenSenshu = gakurenKukanSenshu(
+      targetKukanIdx,
+    );
+    if (gakurenSenshu != null) {
+      hasEntry = true;
+      gakurenSenshuShousaiKaku(sb, gakurenSenshu, currentGhensuu);
+    }
+  }
+
+  sb.writeln(
+    "\n※「区」はその区間にエントリーされている選手の中でのその種目の持ちタイムの順位、「学」はその種目の所属大学学内での持ちタイムの順位、「全」はその種目の学生全体での持ちタイムの順位",
+  );
+  if (gakurenAri) {
+    sb.write(gakurenOpChuui);
+    sb.writeln(gakurenKukanJuniChuui);
+  }
+
+  if (!hasEntry) {
+    sb.writeln("この区間へのエントリーはありません。");
+  }
+
+  return sb.toString();
 }

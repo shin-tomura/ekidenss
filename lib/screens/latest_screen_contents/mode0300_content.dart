@@ -23,6 +23,7 @@ import 'package:ekiden/screens/Modal_senshu.dart';
 import 'package:ekiden/screens/Modal_courseshoukai.dart';
 import 'package:ekiden/screens/Modal_koteisaitekikai.dart';
 import 'package:ekiden/screens/Modal_matrix.dart';
+import 'package:ekiden/screens/ai_copy_matome.dart';
 import 'package:ekiden/screens/Modal_matrix2.dart';
 import 'package:ekiden/screens/Modal_matrix3.dart';
 import 'package:ekiden/screens/All0300.dart';
@@ -2812,6 +2813,8 @@ class _Mode0300ContentState extends State<Mode0300Content> {
 
     return Column(
       children: [
+        // 生成AIに渡すテキストのまとめボタン(1.8.2)
+        const AiCopyMatomeButton(),
         if (kantoku.yobiint2[17] == 1 && (raceBangou <= 2 || raceBangou == 5))
           TextButton(
             onPressed: () async {

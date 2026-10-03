@@ -33,6 +33,247 @@ class _ExtraColDef {
   });
 }
 
+const List<String> _eventLabels = [
+  '選手名',
+  '駅伝男',
+  '平常心',
+  '対校5千',
+  '対校1万',
+  '対校ハーフ',
+  '記録5千',
+  '記録1万',
+  '市民ハーフ',
+  '登り10k',
+  '下り10k',
+  'ロード10k',
+  'クロカン10k',
+];
+
+const List<int> _raceIndices = [6, 7, 8, 10, 11, 12, 13, 14, 15, 16];
+
+// 追加列（表の右端に追加。画像出力には含めない）
+final List<_ExtraColDef> _extraCols = [
+  _ExtraColDef(
+    '年間強化',
+    -1,
+    getText: (s) => TrainingMenu.getMenuString(s.kaifukuryoku),
+    width: 90,
+  ),
+  _ExtraColDef('安定感', -1, getValue: (s) => s.anteikan),
+  _ExtraColDef('長距離粘り', 2, getValue: (s) => s.choukyorinebari),
+  _ExtraColDef('スパート力', 3, getValue: (s) => s.spurtryoku),
+  _ExtraColDef('カリスマ', 4, getValue: (s) => s.karisuma),
+  _ExtraColDef('登り適性', 5, getValue: (s) => s.noboritekisei),
+  _ExtraColDef('下り適性', 6, getValue: (s) => s.kudaritekisei),
+  _ExtraColDef(
+    'アップダウン対応力',
+    7,
+    getValue: (s) => s.noborikudarikirikaenouryoku,
+  ),
+  _ExtraColDef('ロード適性', 8, getValue: (s) => s.tandokusou),
+  _ExtraColDef('ペース変動対応力', 9, getValue: (s) => s.paceagesagetaiouryoku),
+];
+
+// 今季タイム一覧表のデータ(1.8.2で画面の外に出した)
+// 画面の表と、テキストのコピー・CSVの共有で使う。生成AIに渡すテキストのまとめボタンからも使う
+class _KonkiSeisekiHyou {
+  /// trueなら学連選抜のメンバーの表
+  final bool gakuren;
+  String univName = "";
+  List<SenshuData> senshuList = [];
+
+  // 大学のidから名前を引く表(学連選抜の表で、選手の所属大学を出すのに使う)
+  Map<int, String> _shozokuMei = {};
+
+  // 能力の見える化フラグ（読み取り専用のコピー）
+  List<int> _mieruflag = [];
+
+  // 種目(レース番号)ごとの、この表の選手の中での順位(選手id → 順位)
+  final Map<int, Map<int, int>> rankMap = {};
+
+  _KonkiSeisekiHyou({required int univId, this.gakuren = false}) {
+    _junbi(univId);
+  }
+
+  void _junbi(int univId) {
+    final Box<Ghensuu> ghensuuBox = Hive.box<Ghensuu>('ghensuuBox');
+    final Box<UnivData> univBox = Hive.box<UnivData>('univBox');
+    final Box<SenshuData> senshuBox = Hive.box<SenshuData>('senshuBox');
+
+    final Ghensuu? currentGhensuu = ghensuuBox.getAt(0);
+    if (currentGhensuu == null) return;
+
+    // 能力の見える化フラグを読み取る（コピーを持つだけで書き換えはしない）
+    _mieruflag = List<int>.from(currentGhensuu.nouryokumieruflag);
+
+    _shozokuMei = {for (final u in univBox.values) u.id: u.name};
+
+    if (gakuren) {
+      // 学連選抜のメンバーの表(学連選抜の選手のidは元の選手と同じ)
+      // 正月駅伝予選の順位の良い順に並べる
+      univName = "学連選抜";
+      final Map<int, Senshu_Gakuren_Data> gakurenMap = {
+        for (final g in Hive.box<Senshu_Gakuren_Data>(
+          'gakurenSenshuBox',
+        ).values)
+          g.id: g,
+      };
+      senshuList = senshuBox.values
+          .where((s) => gakurenMap[s.id]?.univid == s.univid)
+          .toList();
+      int yosenJuni(SenshuData s) => s.kukanjuni_race[4][s.gakunen - 1];
+      senshuList.sort((a, b) {
+        final int juniComp = yosenJuni(a).compareTo(yosenJuni(b));
+        return juniComp != 0 ? juniComp : a.id.compareTo(b.id);
+      });
+    } else {
+      univName = univBox.get(univId)?.name ?? "";
+
+      senshuList = senshuBox.values.where((s) => s.univid == univId).toList();
+      senshuList.sort((a, b) {
+        int gradeComp = b.gakunen.compareTo(a.gakunen);
+        return gradeComp != 0 ? gradeComp : a.id.compareTo(b.id);
+      });
+    }
+
+    for (int raceIdx in _raceIndices) {
+      List<SenshuData> rankList = senshuList.where((s) {
+        double t = s.kukantime_race[raceIdx][s.gakunen - 1];
+        return t > 0 && t < TEISUU.DEFAULTTIME;
+      }).toList();
+      rankList.sort(
+        (a, b) => a.kukantime_race[raceIdx][a.gakunen - 1].compareTo(
+          b.kukantime_race[raceIdx][b.gakunen - 1],
+        ),
+      );
+      rankMap[raceIdx] = {};
+      for (int i = 0; i < rankList.length; i++) {
+        rankMap[raceIdx]![rankList[i].id] = i + 1;
+      }
+    }
+  }
+
+  String shozoku(SenshuData senshu) => _shozokuMei[senshu.univid] ?? '---';
+
+  // 正月駅伝予選の個人順位(1始まり)(学連選抜の表で使う。走っていなければnull)
+  int? yosenJuni(SenshuData senshu) {
+    final double time = senshu.kukantime_race[4][senshu.gakunen - 1];
+    if (time <= 0 || time >= TEISUU.DEFAULTTIME) return null;
+    return senshu.kukanjuni_race[4][senshu.gakunen - 1] + 1;
+  }
+
+  // 学連選抜の表の画像で、選手名の下に出す所属大学と予選の順位
+  String shozokuToYosen(SenshuData senshu) {
+    final int? juni = yosenJuni(senshu);
+    return juni == null ? shozoku(senshu) : '${shozoku(senshu)} 予選$juni位';
+  }
+
+  bool isExtraVisible(_ExtraColDef def) {
+    if (def.flagIndex < 0) return true;
+    if (def.flagIndex >= _mieruflag.length) return false;
+    return _mieruflag[def.flagIndex] == 1;
+  }
+
+  String extraText(_ExtraColDef def, SenshuData senshu) {
+    if (!isExtraVisible(def)) return '??';
+    if (def.getText != null) return def.getText!(senshu);
+    return '${def.getValue?.call(senshu) ?? ''}';
+  }
+
+  // CSVの行(見出しの行と選手ごとの行)。共有とテキストのコピーで使う
+  // 学連選抜の表では、選手名の後ろに所属大学と正月駅伝予選の列を入れる(1.8.2)
+  List<List<dynamic>> csvGyou() {
+    List<dynamic> header = ['選手名'];
+    if (gakuren) {
+      header.addAll(['所属大学', '正月駅伝予選(順位)', '正月駅伝予選']);
+    }
+    header.addAll(['駅伝男', '平常心']);
+    for (int i = 3; i < _eventLabels.length; i++) {
+      header.add('${_eventLabels[i]}(順位)');
+      header.add(_eventLabels[i]);
+    }
+    for (final def in _extraCols) {
+      header.add(def.label);
+    }
+
+    List<List<dynamic>> rows = [header];
+
+    for (var senshu in senshuList) {
+      List<dynamic> row = ['${senshu.name}(${senshu.gakunen}年)'];
+      if (gakuren) {
+        row.add(shozoku(senshu));
+        final int? yosen = yosenJuni(senshu);
+        if (yosen == null) {
+          row.add("");
+          row.add("---");
+        } else {
+          final double time = senshu.kukantime_race[4][senshu.gakunen - 1];
+          final int m = (time / 60).floor();
+          final int s = (time % 60).floor();
+          row.add(yosen);
+          row.add("$m:${s.toString().padLeft(2, '0')}");
+        }
+      }
+      row.addAll([senshu.konjou, senshu.heijousin]);
+      for (int raceIdx in _raceIndices) {
+        final double time = senshu.kukantime_race[raceIdx][senshu.gakunen - 1];
+        final int? rank = rankMap[raceIdx]?[senshu.id];
+        if (time <= 0 || time >= TEISUU.DEFAULTTIME) {
+          row.add("");
+          row.add("---");
+        } else {
+          final int m = (time / 60).floor();
+          final int s = (time % 60).floor();
+          row.add(rank ?? "");
+          row.add("$m:${s.toString().padLeft(2, '0')}");
+        }
+      }
+      for (final def in _extraCols) {
+        row.add(extraText(def, senshu));
+      }
+      rows.add(row);
+    }
+    return rows;
+  }
+
+  // 共有やコピーのときに付ける注意書き
+  String chuuiBun() {
+    String bun =
+        '※能力値は1〜99で、数値が大きいほど優れています。「??」はまだ判明していない能力のため、値を推測しないでください。\n'
+        '※年間強化は、レース時に対応する能力を一時的に上乗せするもので、表の能力値そのものは変わりません（バランス：平均的に上乗せ、スピード：スパート力とペース変動対応力、距離走：長距離粘りとロード適性、登り：登り適性、下り：下り適性、アップダウン：アップダウン対応力）。\n'
+        '※安定感は、調子を決めるときの最低保証値になる能力です(当日の突発的な体調不良は除く)。\n'
+        '※タイムは「分:秒」です(例: 60:43は1時間0分43秒)。\n'
+        '※タイムが「---」で順位が空欄の種目は、今季まだ走っていないことを表します(遅いという意味ではありません)。\n'
+        '※種目の「対校」は対校戦、「記録」は記録会のレースです。「登り10k」「下り10k」「ロード10k」「クロカン10k」は、それぞれ登り・下り・ロード・クロスカントリーのコースの1万mのレースです。';
+    if (gakuren) {
+      bun +=
+          '\n※学連選抜は、正月駅伝に出場できなかった大学の選手で作るオープン参加のチームです。今季の成績は所属大学の選手として出したものです。\n'
+          '※「正月駅伝予選(順位)」は、正月駅伝予選に出た選手全体の中での個人順位です。表は予選の順位の良い順に並んでいます。\n'
+          '※ほかの「(順位)」の列は、この表の選手の中での順位です。';
+    } else {
+      bun += '\n※「(順位)」の列は、この表の選手の中での順位です。';
+    }
+    return bun;
+  }
+
+  // テキストでコピーするときの文(注意書きとCSV形式の表)
+  String copyText() {
+    final String csvData = const ListToCsvConverter()
+        .convert(csvGyou())
+        .replaceAll('\r\n', '\n');
+    return '【$univName 今季成績表(CSV形式)】\n'
+        '${chuuiBun()}\n'
+        '$csvData\n'
+        '#箱庭小駅伝SS';
+  }
+}
+
+/// 今季タイム一覧表のテキスト(画面の「テキストでコピー」と同じ文)を、画面を開かずに作る(1.8.2)
+/// [gakuren]がtrueなら学連選抜のメンバーの表([univId]は使わない)
+String konkiSeisekiHyouText({required int univId, bool gakuren = false}) {
+  return _KonkiSeisekiHyou(univId: univId, gakuren: gakuren).copyText();
+}
+
 class ModalUnivSenshuMatrixView extends StatefulWidget {
   final int targetUnivId;
 
@@ -52,88 +293,20 @@ class ModalUnivSenshuMatrixView extends StatefulWidget {
 class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
   final ScreenshotController _screenshotController = ScreenshotController();
 
-  late List<SenshuData> _sortedSenshu;
-  String _univName = "";
+  // 表のデータ(選手の並び・順位・能力が見えるか・所属大学など)。中身は _KonkiSeisekiHyou を参照
+  late final _KonkiSeisekiHyou _hyou;
+  List<SenshuData> get _sortedSenshu => _hyou.senshuList;
+  String get _univName => _hyou.univName;
+  Map<int, Map<int, int>> get _rankMap => _hyou.rankMap;
+  String _shozoku(SenshuData senshu) => _hyou.shozoku(senshu);
+  int? _yosenJuni(SenshuData senshu) => _hyou.yosenJuni(senshu);
+  String _shozokuToYosen(SenshuData senshu) => _hyou.shozokuToYosen(senshu);
+  bool _isExtraVisible(_ExtraColDef def) => _hyou.isExtraVisible(def);
+  List<List<dynamic>> _csvGyou() => _hyou.csvGyou();
+  String _chuuiBun() => _hyou.chuuiBun();
 
-  // 大学のidから名前を引く表(学連選抜の表で、選手の所属大学を出すのに使う)
-  Map<int, String> _shozokuMei = {};
-
-  String _shozoku(SenshuData senshu) => _shozokuMei[senshu.univid] ?? '---';
-
-  // 正月駅伝予選の個人順位(1始まり)とタイム(学連選抜の表で使う。走っていなければnull)
-  int? _yosenJuni(SenshuData senshu) {
-    final double time = senshu.kukantime_race[4][senshu.gakunen - 1];
-    if (time <= 0 || time >= TEISUU.DEFAULTTIME) return null;
-    return senshu.kukanjuni_race[4][senshu.gakunen - 1] + 1;
-  }
-
-  // 学連選抜の表の選手名の下に出す、所属大学と予選の順位
-  String _shozokuToYosen(SenshuData senshu) {
-    final int? juni = _yosenJuni(senshu);
-    return juni == null
-        ? _shozoku(senshu)
-        : '${_shozoku(senshu)} 予選$juni位';
-  }
   bool _isInitialized = false;
   bool _isExporting = false;
-
-  final List<String> _eventLabels = [
-    '選手名',
-    '駅伝男',
-    '平常心',
-    '対校5千',
-    '対校1万',
-    '対校ハーフ',
-    '記録5千',
-    '記録1万',
-    '市民ハーフ',
-    '登り10k',
-    '下り10k',
-    'ロード10k',
-    'クロカン10k',
-  ];
-
-  final List<int> _raceIndices = [6, 7, 8, 10, 11, 12, 13, 14, 15, 16];
-
-  // 追加列（表の右端に追加。画像出力には含めない）
-  final List<_ExtraColDef> _extraCols = [
-    _ExtraColDef(
-      '年間強化',
-      -1,
-      getText: (s) => TrainingMenu.getMenuString(s.kaifukuryoku),
-      width: 90,
-    ),
-    _ExtraColDef('安定感', -1, getValue: (s) => s.anteikan),
-    _ExtraColDef('長距離粘り', 2, getValue: (s) => s.choukyorinebari),
-    _ExtraColDef('スパート力', 3, getValue: (s) => s.spurtryoku),
-    _ExtraColDef('カリスマ', 4, getValue: (s) => s.karisuma),
-    _ExtraColDef('登り適性', 5, getValue: (s) => s.noboritekisei),
-    _ExtraColDef('下り適性', 6, getValue: (s) => s.kudaritekisei),
-    _ExtraColDef(
-      'アップダウン対応力',
-      7,
-      getValue: (s) => s.noborikudarikirikaenouryoku,
-    ),
-    _ExtraColDef('ロード適性', 8, getValue: (s) => s.tandokusou),
-    _ExtraColDef('ペース変動対応力', 9, getValue: (s) => s.paceagesagetaiouryoku),
-  ];
-
-  // 能力の見える化フラグ（読み取り専用のコピー）
-  List<int> _mieruflag = [];
-
-  bool _isExtraVisible(_ExtraColDef def) {
-    if (def.flagIndex < 0) return true;
-    if (def.flagIndex >= _mieruflag.length) return false;
-    return _mieruflag[def.flagIndex] == 1;
-  }
-
-  String _extraText(_ExtraColDef def, SenshuData senshu) {
-    if (!_isExtraVisible(def)) return '??';
-    if (def.getText != null) return def.getText!(senshu);
-    return '${def.getValue?.call(senshu) ?? ''}';
-  }
-
-  final Map<int, Map<int, int>> _rankMap = {};
 
   final double _rowHeight = 75.0;
 
@@ -151,93 +324,9 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
   final Color _seriesBorderColor = Colors.white.withOpacity(0.5);
   final double _seriesBorderWidth = 2.0;
 
-  // CSVの行(見出しの行と選手ごとの行)。共有とテキストのコピーで使う
-  // 学連選抜の表では、選手名の後ろに所属大学と正月駅伝予選の列を入れる(1.8.2)
-  List<List<dynamic>> _csvGyou() {
-    List<dynamic> header = ['選手名'];
-    if (widget.gakuren) {
-      header.addAll(['所属大学', '正月駅伝予選(順位)', '正月駅伝予選']);
-    }
-    header.addAll(['駅伝男', '平常心']);
-    for (int i = 3; i < _eventLabels.length; i++) {
-      header.add('${_eventLabels[i]}(順位)');
-      header.add(_eventLabels[i]);
-    }
-    for (final def in _extraCols) {
-      header.add(def.label);
-    }
-
-    List<List<dynamic>> rows = [header];
-
-    for (var senshu in _sortedSenshu) {
-      List<dynamic> row = ['${senshu.name}(${senshu.gakunen}年)'];
-      if (widget.gakuren) {
-        row.add(_shozoku(senshu));
-        final int? yosenJuni = _yosenJuni(senshu);
-        if (yosenJuni == null) {
-          row.add("");
-          row.add("---");
-        } else {
-          final double time = senshu.kukantime_race[4][senshu.gakunen - 1];
-          final int m = (time / 60).floor();
-          final int s = (time % 60).floor();
-          row.add(yosenJuni);
-          row.add("$m:${s.toString().padLeft(2, '0')}");
-        }
-      }
-      row.addAll([senshu.konjou, senshu.heijousin]);
-      for (int raceIdx in _raceIndices) {
-        final double time = senshu.kukantime_race[raceIdx][senshu.gakunen - 1];
-        final int? rank = _rankMap[raceIdx]?[senshu.id];
-        if (time <= 0 || time >= TEISUU.DEFAULTTIME) {
-          row.add("");
-          row.add("---");
-        } else {
-          final int m = (time / 60).floor();
-          final int s = (time % 60).floor();
-          row.add(rank ?? "");
-          row.add("$m:${s.toString().padLeft(2, '0')}");
-        }
-      }
-      for (final def in _extraCols) {
-        row.add(_extraText(def, senshu));
-      }
-      rows.add(row);
-    }
-    return rows;
-  }
-
-  // 共有やコピーのときに付ける注意書き
-  String _chuuiBun() {
-    String bun =
-        '※能力値は1〜99で、数値が大きいほど優れています。「??」はまだ判明していない能力のため、値を推測しないでください。\n'
-        '※年間強化は、レース時に対応する能力を一時的に上乗せするもので、表の能力値そのものは変わりません（バランス：平均的に上乗せ、スピード：スパート力とペース変動対応力、距離走：長距離粘りとロード適性、登り：登り適性、下り：下り適性、アップダウン：アップダウン対応力）。\n'
-        '※安定感は、調子を決めるときの最低保証値になる能力です(当日の突発的な体調不良は除く)。\n'
-        '※タイムは「分:秒」です(例: 60:43は1時間0分43秒)。\n'
-        '※タイムが「---」で順位が空欄の種目は、今季まだ走っていないことを表します(遅いという意味ではありません)。\n'
-        '※種目の「対校」は対校戦、「記録」は記録会のレースです。「登り10k」「下り10k」「ロード10k」「クロカン10k」は、それぞれ登り・下り・ロード・クロスカントリーのコースの1万mのレースです。';
-    if (widget.gakuren) {
-      bun +=
-          '\n※学連選抜は、正月駅伝に出場できなかった大学の選手で作るオープン参加のチームです。今季の成績は所属大学の選手として出したものです。\n'
-          '※「正月駅伝予選(順位)」は、正月駅伝予選に出た選手全体の中での個人順位です。表は予選の順位の良い順に並んでいます。\n'
-          '※ほかの「(順位)」の列は、この表の選手の中での順位です。';
-    } else {
-      bun += '\n※「(順位)」の列は、この表の選手の中での順位です。';
-    }
-    return bun;
-  }
-
   // --- テキストでコピー(生成AIに渡して区間配置などを相談するとき用。1.8.2) ---
   Future<void> _copyAsText() async {
-    final String csvData = const ListToCsvConverter()
-        .convert(_csvGyou())
-        .replaceAll('\r\n', '\n');
-    final String text =
-        '【$_univName 今季成績表(CSV形式)】\n'
-        '${_chuuiBun()}\n'
-        '$csvData\n'
-        '#箱庭小駅伝SS';
-    await Clipboard.setData(ClipboardData(text: text));
+    await Clipboard.setData(ClipboardData(text: _hyou.copyText()));
     if (mounted) {
       ScaffoldMessenger.of(
         context,
@@ -621,65 +710,11 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
   }
 
   void _prepareData() {
-    final Box<Ghensuu> ghensuuBox = Hive.box<Ghensuu>('ghensuuBox');
-    final Box<UnivData> univBox = Hive.box<UnivData>('univBox');
-    final Box<SenshuData> senshuBox = Hive.box<SenshuData>('senshuBox');
-
-    final Ghensuu? currentGhensuu = ghensuuBox.getAt(0);
-    if (currentGhensuu == null) return;
-
-    // 能力の見える化フラグを読み取る（コピーを持つだけで書き換えはしない）
-    _mieruflag = List<int>.from(currentGhensuu.nouryokumieruflag);
-
-    //final int targetUnivId = currentGhensuu.hyojiunivnum;
-
-    _shozokuMei = {for (final u in univBox.values) u.id: u.name};
-
-    if (widget.gakuren) {
-      // 学連選抜のメンバーの表(学連選抜の選手のidは元の選手と同じ。1.8.2)
-      // 正月駅伝予選の順位の良い順に並べる
-      _univName = "学連選抜";
-      final Map<int, Senshu_Gakuren_Data> gakurenMap = {
-        for (final g in Hive.box<Senshu_Gakuren_Data>(
-          'gakurenSenshuBox',
-        ).values)
-          g.id: g,
-      };
-      _sortedSenshu = senshuBox.values
-          .where((s) => gakurenMap[s.id]?.univid == s.univid)
-          .toList();
-      int yosenJuni(SenshuData s) => s.kukanjuni_race[4][s.gakunen - 1];
-      _sortedSenshu.sort((a, b) {
-        final int juniComp = yosenJuni(a).compareTo(yosenJuni(b));
-        return juniComp != 0 ? juniComp : a.id.compareTo(b.id);
-      });
-    } else {
-      _univName = univBox.get(widget.targetUnivId)?.name ?? "";
-
-      _sortedSenshu = senshuBox.values
-          .where((s) => s.univid == widget.targetUnivId)
-          .toList();
-      _sortedSenshu.sort((a, b) {
-        int gradeComp = b.gakunen.compareTo(a.gakunen);
-        return gradeComp != 0 ? gradeComp : a.id.compareTo(b.id);
-      });
-    }
-
-    for (int raceIdx in _raceIndices) {
-      List<SenshuData> rankList = _sortedSenshu.where((s) {
-        double t = s.kukantime_race[raceIdx][s.gakunen - 1];
-        return t > 0 && t < TEISUU.DEFAULTTIME;
-      }).toList();
-      rankList.sort(
-        (a, b) => a.kukantime_race[raceIdx][a.gakunen - 1].compareTo(
-          b.kukantime_race[raceIdx][b.gakunen - 1],
-        ),
-      );
-      _rankMap[raceIdx] = {};
-      for (int i = 0; i < rankList.length; i++) {
-        _rankMap[raceIdx]![rankList[i].id] = i + 1;
-      }
-    }
+    // 表のデータは _KonkiSeisekiHyou で作る(テキストのコピーを画面の外からも作れるように。1.8.2)
+    _hyou = _KonkiSeisekiHyou(
+      univId: widget.targetUnivId,
+      gakuren: widget.gakuren,
+    );
     _isInitialized = true;
   }
 

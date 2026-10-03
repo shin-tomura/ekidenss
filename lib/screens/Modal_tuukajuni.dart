@@ -27,29 +27,6 @@ class _ModalKukanResultListViewPassState
   bool _isExporting = false;
   int? _displayKukan;
 
-  List<UnivData> _sortUnivListByTsuukaJuni(
-    List<UnivData> list,
-    int raceBangou,
-    int kukanBangou,
-  ) {
-    list.sort((a, b) {
-      final bool isAValid = a.tuukajuni_taikai.length > kukanBangou;
-      final bool isBValid = b.tuukajuni_taikai.length > kukanBangou;
-      final int junibA = isAValid
-          ? a.tuukajuni_taikai[kukanBangou]
-          : TEISUU.DEFAULTJUNI;
-      final int junibB = isBValid
-          ? b.tuukajuni_taikai[kukanBangou]
-          : TEISUU.DEFAULTJUNI;
-      if (junibA == TEISUU.DEFAULTJUNI && junibB == TEISUU.DEFAULTJUNI)
-        return 0;
-      if (junibA == TEISUU.DEFAULTJUNI) return 1;
-      if (junibB == TEISUU.DEFAULTJUNI) return -1;
-      return junibA.compareTo(junibB);
-    });
-    return list;
-  }
-
   Future<void> _changeKukan(Ghensuu currentGhensuu, int delta) async {
     if (_displayKukan == null) return;
     final int maxDisplayKukanIndex = currentGhensuu.nowracecalckukan > 0
@@ -332,36 +309,6 @@ class _ModalKukanResultListViewPassState
       if (mounted) setState(() => _isExporting = false);
     }
   }
-  // --- ロジック部分は変更なし ---
-
-  String _formatTimeDifference(double diffTime) {
-    if (diffTime < 0) return '';
-    final int totalSeconds = diffTime.round();
-    final int minutes = totalSeconds ~/ 60;
-    final int seconds = totalSeconds % 60;
-    return minutes >= 1 ? '+$minutes分$seconds秒' : '+$seconds秒';
-  }
-
-  String _formatTimeDifferenceForRecordDiff(double diffTime) {
-    final bool isNegative = diffTime < 0;
-    final double absTime = diffTime.abs();
-    final int totalSeconds = absTime.round();
-    final int minutes = (totalSeconds / 60).floor();
-    final int seconds = totalSeconds % 60;
-    final String sign = isNegative ? '-' : '+';
-    return absTime < 60 ? '$sign${seconds}秒' : '$sign${minutes}分${seconds}秒';
-  }
-
-  String _formatTimeDifferenceForRecordDiff_copy(double diffTime) {
-    //final bool isNegative = diffTime < 0;
-    final double absTime = diffTime.abs();
-    final int totalSeconds = absTime.round();
-    final int minutes = (totalSeconds / 60).floor();
-    final int seconds = totalSeconds % 60;
-    //final String sign = isNegative ? '-' : '+';
-    return absTime < 60 ? '${seconds}秒' : '${minutes}分${seconds}秒';
-  }
-
   List<Widget> _calculateAndFormatRaceRecordDifference(
     double totalTime,
     int univId,
@@ -414,28 +361,6 @@ class _ModalKukanResultListViewPassState
       }
     }
     return diffWidgets;
-  }
-
-  int _calculateRankDifference(UnivData univ, int currentKukanBangou) {
-    if (currentKukanBangou == 0) return 0;
-    final int currentRank = univ.tuukajuni_taikai.length > currentKukanBangou
-        ? univ.tuukajuni_taikai[currentKukanBangou]
-        : TEISUU.DEFAULTJUNI;
-    final int previousRank =
-        univ.tuukajuni_taikai.length > (currentKukanBangou - 1)
-        ? univ.tuukajuni_taikai[currentKukanBangou - 1]
-        : TEISUU.DEFAULTJUNI;
-    if (currentRank == TEISUU.DEFAULTJUNI || previousRank == TEISUU.DEFAULTJUNI)
-      return 0;
-    return previousRank - currentRank;
-  }
-
-  Map<String, dynamic> _getRankDifferenceText(int difference) {
-    if (difference > 0)
-      return {'text': '↑$difference', 'color': Colors.lightGreenAccent};
-    if (difference < 0)
-      return {'text': '↓${difference.abs()}', 'color': Colors.redAccent};
-    return {'text': '→', 'color': Colors.white};
   }
 
   @override
@@ -887,31 +812,7 @@ class _ModalKukanResultListViewPassState
   }
 
   // ★ 追加：テキスト出力・共有機能（通過順位・順位変動・記録比対応） ★
-  // 通過順位のコピーに差し込む学連選抜の行(例: OP(8位相当) 学連選抜 5時間32分10秒 ↑2。1.8.2)
-  String _gakurenTsuukaGyou(
-    GakurenKukanKekka gakuren,
-    double topTimeTotal,
-    bool isTopTimeValid,
-  ) {
-    String gyou =
-        'OP(${gakuren.tuukaJuni + 1}位相当) 学連選抜 '
-        '${TimeDate.timeToJikanFunByouString(gakuren.tuukaTime)}';
-    if (gakuren.maeTuukaJuni != null) {
-      final Map<String, dynamic> rankDiffData = _getRankDifferenceText(
-        gakuren.maeTuukaJuni! - gakuren.tuukaJuni,
-      );
-      gyou += ' ${rankDiffData['text']}';
-    }
-    gyou += '\n';
-    if (isTopTimeValid) {
-      final double diff = gakuren.tuukaTime - topTimeTotal;
-      if (diff > 0) {
-        gyou += '   (1位差: ${_formatTimeDifference(diff)})\n';
-      }
-    }
-    return gyou;
-  }
-
+  // (文は画面の外の tuukaJuniSokuhouHonbun で作る。1.8.2)
   Future<void> _exportAsText(
     String title,
     List<UnivData> filteredData,
@@ -924,132 +825,18 @@ class _ModalKukanResultListViewPassState
     bool isTopTimeValid,
     bool isEkidenRace,
   ) async {
-    String shareText = "";
-    // 学連選抜(正月駅伝のときだけ)は、通過順位相当の位置に「OP」として差し込む(1.8.2)
-    final GakurenKukanKekka? gakuren = gakurenKukanKekka(
-      currentGhensuu,
-      kukanBangou,
+    final String shareText = tuukaJuniSokuhouHonbun(
+      title: title,
+      filteredData: filteredData,
+      kukanBangou: kukanBangou,
+      raceBangou: raceBangou,
+      lastKukanIndex: lastKukanIndex,
+      currentGhensuu: currentGhensuu,
+      kantoku: kantoku,
+      topTimeTotal: topTimeTotal,
+      isTopTimeValid: isTopTimeValid,
+      isEkidenRace: isEkidenRace,
     );
-    bool gakurenKaita = false;
-
-    if (gakuren != null) shareText += gakurenOpChuui;
-    shareText +=
-        '※大会記録比や学内記録比のタイムがプラスの場合は新記録に届かなかったことを表し、マイナスの場合には新記録を表します。ただし、速報値なので誤差がありますことをご了承ください\n';
-    shareText +=
-        '※※※陸上競技のタイム計算に関係することなので、【数値が小さいほど優秀】と捉えてください。(「プラス」は悪い数値、「マイナス」は良い数値。ただし、項目によっては仕様上「プラスの数値」しか出ないものもあります。その場合は「いかにプラスの数値を小さく（0に近く）抑えられたか」を高く評価してください。)※※※\n';
-    shareText += '【$title 通過順位】\n';
-    for (var univ in filteredData) {
-      final int tsuukaJuni = univ.tuukajuni_taikai[kukanBangou];
-      final double tsuukaTimeTotal = univ.time_taikai_total[kukanBangou];
-      if (gakuren != null && !gakurenKaita && tsuukaJuni >= gakuren.tuukaJuni) {
-        shareText += _gakurenTsuukaGyou(gakuren, topTimeTotal, isTopTimeValid);
-        gakurenKaita = true;
-      }
-      final String junistr = tsuukaJuni == TEISUU.DEFAULTJUNI
-          ? '---'
-          : '${tsuukaJuni + 1}位';
-
-      // 1. 基本情報（順位・大学名・通過タイム）
-      shareText +=
-          '$junistr ${univ.name} ${TimeDate.timeToJikanFunByouString(tsuukaTimeTotal)}';
-
-      // 2. 順位変動（2区以降）
-      if (kukanBangou > 0 && tsuukaJuni != TEISUU.DEFAULTJUNI) {
-        final int rankDiff = _calculateRankDifference(univ, kukanBangou);
-        final Map<String, dynamic> rankDiffData = _getRankDifferenceText(
-          rankDiff,
-        );
-        shareText += ' ${rankDiffData['text']}';
-      }
-      shareText += '\n';
-
-      // 3. 1位との差
-      if (tsuukaJuni != 0 &&
-          isTopTimeValid &&
-          tsuukaTimeTotal != TEISUU.DEFAULTTIME) {
-        final double diff = tsuukaTimeTotal - topTimeTotal;
-        if (diff > 0) {
-          shareText += '   (1位差: ${_formatTimeDifference(diff)})\n';
-        }
-      }
-
-      // 4. 大会新・学内新（総合）の判定
-      if (kukanBangou == lastKukanIndex &&
-          (raceBangou <= 2 || raceBangou == 5)) {
-        if (univ.chokuzentaikai_zentaitaikaisinflag == 1) {
-          shareText += '   ★大会新更新\n';
-        } else if (univ.chokuzentaikai_univtaikaisinflag == 1 &&
-            univ.id == currentGhensuu.MYunivid) {
-          shareText += '   ☆学内新更新\n';
-        }
-      }
-
-      // 5. 大会記録比・学内記録比（画面に表示がある場合）
-      if (isEkidenRace && tsuukaTimeTotal < TEISUU.DEFAULTTIME) {
-        final bool isTop = (tsuukaJuni == 0);
-        final bool isMyUniv = (univ.id == currentGhensuu.MYunivid);
-        final bool isLast = (kukanBangou == lastKukanIndex);
-
-        // 大会記録比（1位または大会新達成時）
-        if (isTop || (isLast && univ.chokuzentaikai_zentaitaikaisinflag == 1)) {
-          final int recInt = isLast
-              ? kantoku.yobiint4[20]
-              : kantoku.yobiint3[kukanBangou];
-          if (recInt != 0 && recInt != TEISUU.DEFAULTTIME) {
-            final double diff = tsuukaTimeTotal - recInt.toDouble();
-            if (isLast) {
-              if (diff < 0) {
-                shareText +=
-                    '   [大会記録比: ${_formatTimeDifferenceForRecordDiff(diff)}(速報値では大会記録を${_formatTimeDifferenceForRecordDiff_copy(diff.abs())}更新)]\n';
-              } else {
-                shareText +=
-                    '   [大会記録比: ${_formatTimeDifferenceForRecordDiff(diff)}(速報値では大会記録には${_formatTimeDifferenceForRecordDiff_copy(diff.abs())}及ばず)]\n';
-              }
-            } else {
-              if (diff < 0) {
-                shareText +=
-                    '   [大会記録比: ${_formatTimeDifferenceForRecordDiff(diff)}(大会記録ペースを${_formatTimeDifferenceForRecordDiff_copy(diff.abs())}上回っている)]\n';
-              } else {
-                shareText +=
-                    '   [大会記録比: ${_formatTimeDifferenceForRecordDiff(diff)}(大会記録ペースには${_formatTimeDifferenceForRecordDiff_copy(diff.abs())}及ばず)]\n';
-              }
-            }
-          }
-        }
-        // 学内記録比（自校かつ最終区）
-        if (isMyUniv && isLast) {
-          final double gakunaiRec = kantoku.yobiint4[21].toDouble();
-          if (gakunaiRec != 0 && gakunaiRec != TEISUU.DEFAULTTIME) {
-            final double diff = tsuukaTimeTotal - gakunaiRec;
-            if (isLast) {
-              if (diff < 0) {
-                shareText +=
-                    '   [学内記録比: ${_formatTimeDifferenceForRecordDiff(diff)}(速報値では学内記録を${_formatTimeDifferenceForRecordDiff_copy(diff.abs())}更新)]\n';
-              } else {
-                shareText +=
-                    '   [学内記録比: ${_formatTimeDifferenceForRecordDiff(diff)}(速報値では学内記録には${_formatTimeDifferenceForRecordDiff_copy(diff.abs())}及ばず)]\n';
-              }
-            } else {
-              if (diff < 0) {
-                shareText +=
-                    '   [学内記録比: ${_formatTimeDifferenceForRecordDiff(diff)}(学内記録ペースを${_formatTimeDifferenceForRecordDiff_copy(diff.abs())}上回っている)]\n';
-              } else {
-                shareText +=
-                    '   [学内記録比: ${_formatTimeDifferenceForRecordDiff(diff)}(学内記録ペースには${_formatTimeDifferenceForRecordDiff_copy(diff.abs())}及ばず)]\n';
-              }
-            }
-          }
-        }
-      }
-    }
-    //shareText +=
-    //    '\n※大会記録比や学内記録比のタイムがプラスの場合は新記録に届かなかったことを表し。マイナスの場合には新記録を表します。ただし、速報値なので誤差がありますことをご了承ください\n';
-
-    if (gakuren != null && !gakurenKaita) {
-      shareText += _gakurenTsuukaGyou(gakuren, topTimeTotal, isTopTimeValid);
-    }
-
-    shareText += '\n#箱庭小駅伝SS';
 
     await Clipboard.setData(ClipboardData(text: shareText));
     if (mounted) {
@@ -1059,4 +846,300 @@ class _ModalKukanResultListViewPassState
     }
     //await Share.share(shareText);
   }
+}
+
+// ------------------------------------------------------------
+// 通過順位速報のコピーの文を作る部品(1.8.2で画面の外に出した。文は今までと同じ)
+// ------------------------------------------------------------
+
+List<UnivData> _sortUnivListByTsuukaJuni(
+  List<UnivData> list,
+  int raceBangou,
+  int kukanBangou,
+) {
+  list.sort((a, b) {
+    final bool isAValid = a.tuukajuni_taikai.length > kukanBangou;
+    final bool isBValid = b.tuukajuni_taikai.length > kukanBangou;
+    final int junibA = isAValid
+        ? a.tuukajuni_taikai[kukanBangou]
+        : TEISUU.DEFAULTJUNI;
+    final int junibB = isBValid
+        ? b.tuukajuni_taikai[kukanBangou]
+        : TEISUU.DEFAULTJUNI;
+    if (junibA == TEISUU.DEFAULTJUNI && junibB == TEISUU.DEFAULTJUNI)
+      return 0;
+    if (junibA == TEISUU.DEFAULTJUNI) return 1;
+    if (junibB == TEISUU.DEFAULTJUNI) return -1;
+    return junibA.compareTo(junibB);
+  });
+  return list;
+}
+
+// --- ロジック部分は変更なし ---
+
+String _formatTimeDifference(double diffTime) {
+  if (diffTime < 0) return '';
+  final int totalSeconds = diffTime.round();
+  final int minutes = totalSeconds ~/ 60;
+  final int seconds = totalSeconds % 60;
+  return minutes >= 1 ? '+$minutes分$seconds秒' : '+$seconds秒';
+}
+
+String _formatTimeDifferenceForRecordDiff(double diffTime) {
+  final bool isNegative = diffTime < 0;
+  final double absTime = diffTime.abs();
+  final int totalSeconds = absTime.round();
+  final int minutes = (totalSeconds / 60).floor();
+  final int seconds = totalSeconds % 60;
+  final String sign = isNegative ? '-' : '+';
+  return absTime < 60 ? '$sign${seconds}秒' : '$sign${minutes}分${seconds}秒';
+}
+
+String _formatTimeDifferenceForRecordDiff_copy(double diffTime) {
+  //final bool isNegative = diffTime < 0;
+  final double absTime = diffTime.abs();
+  final int totalSeconds = absTime.round();
+  final int minutes = (totalSeconds / 60).floor();
+  final int seconds = totalSeconds % 60;
+  //final String sign = isNegative ? '-' : '+';
+  return absTime < 60 ? '${seconds}秒' : '${minutes}分${seconds}秒';
+}
+
+int _calculateRankDifference(UnivData univ, int currentKukanBangou) {
+  if (currentKukanBangou == 0) return 0;
+  final int currentRank = univ.tuukajuni_taikai.length > currentKukanBangou
+      ? univ.tuukajuni_taikai[currentKukanBangou]
+      : TEISUU.DEFAULTJUNI;
+  final int previousRank =
+      univ.tuukajuni_taikai.length > (currentKukanBangou - 1)
+      ? univ.tuukajuni_taikai[currentKukanBangou - 1]
+      : TEISUU.DEFAULTJUNI;
+  if (currentRank == TEISUU.DEFAULTJUNI || previousRank == TEISUU.DEFAULTJUNI)
+    return 0;
+  return previousRank - currentRank;
+}
+
+Map<String, dynamic> _getRankDifferenceText(int difference) {
+  if (difference > 0)
+    return {'text': '↑$difference', 'color': Colors.lightGreenAccent};
+  if (difference < 0)
+    return {'text': '↓${difference.abs()}', 'color': Colors.redAccent};
+  return {'text': '→', 'color': Colors.white};
+}
+
+// 通過順位のコピーに差し込む学連選抜の行(例: OP(8位相当) 学連選抜 5時間32分10秒 ↑2。1.8.2)
+String _gakurenTsuukaGyou(
+  GakurenKukanKekka gakuren,
+  double topTimeTotal,
+  bool isTopTimeValid,
+) {
+  String gyou =
+      'OP(${gakuren.tuukaJuni + 1}位相当) 学連選抜 '
+      '${TimeDate.timeToJikanFunByouString(gakuren.tuukaTime)}';
+  if (gakuren.maeTuukaJuni != null) {
+    final Map<String, dynamic> rankDiffData = _getRankDifferenceText(
+      gakuren.maeTuukaJuni! - gakuren.tuukaJuni,
+    );
+    gyou += ' ${rankDiffData['text']}';
+  }
+  gyou += '\n';
+  if (isTopTimeValid) {
+    final double diff = gakuren.tuukaTime - topTimeTotal;
+    if (diff > 0) {
+      gyou += '   (1位差: ${_formatTimeDifference(diff)})\n';
+    }
+  }
+  return gyou;
+}
+
+// 通過順位速報のコピーの文(1.8.2で画面の外に出した。文は今までと同じ)
+String tuukaJuniSokuhouHonbun({
+  required String title,
+  required List<UnivData> filteredData,
+  required int kukanBangou,
+  required int raceBangou,
+  required int lastKukanIndex,
+  required Ghensuu currentGhensuu,
+  required KantokuData kantoku,
+  required double topTimeTotal,
+  required bool isTopTimeValid,
+  required bool isEkidenRace,
+}) {
+  String shareText = "";
+  // 学連選抜(正月駅伝のときだけ)は、通過順位相当の位置に「OP」として差し込む(1.8.2)
+  final GakurenKukanKekka? gakuren = gakurenKukanKekka(
+    currentGhensuu,
+    kukanBangou,
+  );
+  bool gakurenKaita = false;
+
+  if (gakuren != null) shareText += gakurenOpChuui;
+  shareText +=
+      '※大会記録比や学内記録比のタイムがプラスの場合は新記録に届かなかったことを表し、マイナスの場合には新記録を表します。ただし、速報値なので誤差がありますことをご了承ください\n';
+  shareText +=
+      '※※※陸上競技のタイム計算に関係することなので、【数値が小さいほど優秀】と捉えてください。(「プラス」は悪い数値、「マイナス」は良い数値。ただし、項目によっては仕様上「プラスの数値」しか出ないものもあります。その場合は「いかにプラスの数値を小さく（0に近く）抑えられたか」を高く評価してください。)※※※\n';
+  shareText += '【$title 通過順位】\n';
+  for (var univ in filteredData) {
+    final int tsuukaJuni = univ.tuukajuni_taikai[kukanBangou];
+    final double tsuukaTimeTotal = univ.time_taikai_total[kukanBangou];
+    if (gakuren != null && !gakurenKaita && tsuukaJuni >= gakuren.tuukaJuni) {
+      shareText += _gakurenTsuukaGyou(gakuren, topTimeTotal, isTopTimeValid);
+      gakurenKaita = true;
+    }
+    final String junistr = tsuukaJuni == TEISUU.DEFAULTJUNI
+        ? '---'
+        : '${tsuukaJuni + 1}位';
+
+    // 1. 基本情報（順位・大学名・通過タイム）
+    shareText +=
+        '$junistr ${univ.name} ${TimeDate.timeToJikanFunByouString(tsuukaTimeTotal)}';
+
+    // 2. 順位変動（2区以降）
+    if (kukanBangou > 0 && tsuukaJuni != TEISUU.DEFAULTJUNI) {
+      final int rankDiff = _calculateRankDifference(univ, kukanBangou);
+      final Map<String, dynamic> rankDiffData = _getRankDifferenceText(
+        rankDiff,
+      );
+      shareText += ' ${rankDiffData['text']}';
+    }
+    shareText += '\n';
+
+    // 3. 1位との差
+    if (tsuukaJuni != 0 &&
+        isTopTimeValid &&
+        tsuukaTimeTotal != TEISUU.DEFAULTTIME) {
+      final double diff = tsuukaTimeTotal - topTimeTotal;
+      if (diff > 0) {
+        shareText += '   (1位差: ${_formatTimeDifference(diff)})\n';
+      }
+    }
+
+    // 4. 大会新・学内新（総合）の判定
+    if (kukanBangou == lastKukanIndex &&
+        (raceBangou <= 2 || raceBangou == 5)) {
+      if (univ.chokuzentaikai_zentaitaikaisinflag == 1) {
+        shareText += '   ★大会新更新\n';
+      } else if (univ.chokuzentaikai_univtaikaisinflag == 1 &&
+          univ.id == currentGhensuu.MYunivid) {
+        shareText += '   ☆学内新更新\n';
+      }
+    }
+
+    // 5. 大会記録比・学内記録比（画面に表示がある場合）
+    if (isEkidenRace && tsuukaTimeTotal < TEISUU.DEFAULTTIME) {
+      final bool isTop = (tsuukaJuni == 0);
+      final bool isMyUniv = (univ.id == currentGhensuu.MYunivid);
+      final bool isLast = (kukanBangou == lastKukanIndex);
+
+      // 大会記録比（1位または大会新達成時）
+      if (isTop || (isLast && univ.chokuzentaikai_zentaitaikaisinflag == 1)) {
+        final int recInt = isLast
+            ? kantoku.yobiint4[20]
+            : kantoku.yobiint3[kukanBangou];
+        if (recInt != 0 && recInt != TEISUU.DEFAULTTIME) {
+          final double diff = tsuukaTimeTotal - recInt.toDouble();
+          if (isLast) {
+            if (diff < 0) {
+              shareText +=
+                  '   [大会記録比: ${_formatTimeDifferenceForRecordDiff(diff)}(速報値では大会記録を${_formatTimeDifferenceForRecordDiff_copy(diff.abs())}更新)]\n';
+            } else {
+              shareText +=
+                  '   [大会記録比: ${_formatTimeDifferenceForRecordDiff(diff)}(速報値では大会記録には${_formatTimeDifferenceForRecordDiff_copy(diff.abs())}及ばず)]\n';
+            }
+          } else {
+            if (diff < 0) {
+              shareText +=
+                  '   [大会記録比: ${_formatTimeDifferenceForRecordDiff(diff)}(大会記録ペースを${_formatTimeDifferenceForRecordDiff_copy(diff.abs())}上回っている)]\n';
+            } else {
+              shareText +=
+                  '   [大会記録比: ${_formatTimeDifferenceForRecordDiff(diff)}(大会記録ペースには${_formatTimeDifferenceForRecordDiff_copy(diff.abs())}及ばず)]\n';
+            }
+          }
+        }
+      }
+      // 学内記録比（自校かつ最終区）
+      if (isMyUniv && isLast) {
+        final double gakunaiRec = kantoku.yobiint4[21].toDouble();
+        if (gakunaiRec != 0 && gakunaiRec != TEISUU.DEFAULTTIME) {
+          final double diff = tsuukaTimeTotal - gakunaiRec;
+          if (isLast) {
+            if (diff < 0) {
+              shareText +=
+                  '   [学内記録比: ${_formatTimeDifferenceForRecordDiff(diff)}(速報値では学内記録を${_formatTimeDifferenceForRecordDiff_copy(diff.abs())}更新)]\n';
+            } else {
+              shareText +=
+                  '   [学内記録比: ${_formatTimeDifferenceForRecordDiff(diff)}(速報値では学内記録には${_formatTimeDifferenceForRecordDiff_copy(diff.abs())}及ばず)]\n';
+            }
+          } else {
+            if (diff < 0) {
+              shareText +=
+                  '   [学内記録比: ${_formatTimeDifferenceForRecordDiff(diff)}(学内記録ペースを${_formatTimeDifferenceForRecordDiff_copy(diff.abs())}上回っている)]\n';
+            } else {
+              shareText +=
+                  '   [学内記録比: ${_formatTimeDifferenceForRecordDiff(diff)}(学内記録ペースには${_formatTimeDifferenceForRecordDiff_copy(diff.abs())}及ばず)]\n';
+            }
+          }
+        }
+      }
+    }
+  }
+  //shareText +=
+  //    '\n※大会記録比や学内記録比のタイムがプラスの場合は新記録に届かなかったことを表し。マイナスの場合には新記録を表します。ただし、速報値なので誤差がありますことをご了承ください\n';
+
+  if (gakuren != null && !gakurenKaita) {
+    shareText += _gakurenTsuukaGyou(gakuren, topTimeTotal, isTopTimeValid);
+  }
+
+  shareText += '\n#箱庭小駅伝SS';
+  return shareText;
+}
+
+/// 通過順位速報のコピーの文を、画面を開かずに作る(1.8.2)
+/// 画面の表と同じ決まりで、区間[kukanBangou]の大学を選んで並べる
+/// (生成AIに渡すテキストのまとめボタンから使う)
+String tuukaJuniSokuhouText(Ghensuu currentGhensuu, int kukanBangou) {
+  final int raceBangou = currentGhensuu.hyojiracebangou;
+  final int lastKukanIndex =
+      currentGhensuu.kukansuu_taikaigoto.length > raceBangou
+      ? currentGhensuu.kukansuu_taikaigoto[raceBangou] - 1
+      : -1;
+  final bool isEkidenRace = raceBangou != 3 && raceBangou != 4;
+  final List<UnivData> allUnivData = Hive.box<UnivData>(
+    'univBox',
+  ).values.toList();
+  List<UnivData> filteredUnivData = allUnivData.where((univ) {
+    return univ.taikaientryflag.length > raceBangou &&
+        univ.taikaientryflag[raceBangou] == 1 &&
+        univ.tuukajuni_taikai.length > kukanBangou &&
+        univ.time_taikai_total.length > kukanBangou;
+  }).toList();
+  filteredUnivData = _sortUnivListByTsuukaJuni(
+    filteredUnivData,
+    raceBangou,
+    kukanBangou,
+  );
+  final double topTimeTotal = filteredUnivData.isNotEmpty
+      ? filteredUnivData.first.time_taikai_total[kukanBangou]
+      : TEISUU.DEFAULTTIME;
+  final bool isTopTimeValid = topTimeTotal != TEISUU.DEFAULTTIME;
+  final int kukanKyori =
+      (currentGhensuu.kyori_taikai_kukangoto[raceBangou][kukanBangou]).round();
+  String kukantext = '第${kukanBangou + 1}区 ${kukanKyori}m';
+  if (raceBangou == 3) kukantext = '第${kukanBangou + 1}組 1万ｍ';
+  if (raceBangou == 4) kukantext = '予選会 ${kukanKyori}m';
+  final KantokuData kantoku = Hive.box<KantokuData>(
+    'kantokuBox',
+  ).get('KantokuData')!;
+  return tuukaJuniSokuhouHonbun(
+    title: kukantext,
+    filteredData: filteredUnivData,
+    kukanBangou: kukanBangou,
+    raceBangou: raceBangou,
+    lastKukanIndex: lastKukanIndex,
+    currentGhensuu: currentGhensuu,
+    kantoku: kantoku,
+    topTimeTotal: topTimeTotal,
+    isTopTimeValid: isTopTimeValid,
+    isEkidenRace: isEkidenRace,
+  );
 }

@@ -1099,6 +1099,8 @@ class _Mode0350ContentState extends State<Mode0350Content> {
         .where((u) => u.taikaientryflag.length > 2 && u.taikaientryflag[2] == 1)
         .length;
 
+    // 大学の指示画面と同じ形にする(1.8.2)
+    // 1行目(現在順位)はスクロールしない。2行目から下(順位経過・差)は空行から始め、各行の最後で改行する
     String joukyou;
     String saBun = "";
     if (kukan == 0) {
@@ -1117,9 +1119,10 @@ class _Mode0350ContentState extends State<Mode0350Content> {
       }
       joukyou =
           "${kukan}区終了時点 $juni位相当$yajirushi (学連選抜の目標:${mokuhyou + 1}位)";
+      saBun = "\n";
       // 通過(区間)順位の経過(大学と同じく2区終了時点から出す。1.8.2)
       if (kukan > 1) {
-        saBun = "通過(区間)順位経過(相当):";
+        saBun += "通過(区間)順位経過(相当):";
         for (int i = 0; i < kukan; i++) {
           saBun +=
               "${gakurenUniv.tuukajuni_taikai[i] + 1}(${gakurenUniv.kukanjuni_taikai[i] + 1})-";
@@ -1128,17 +1131,17 @@ class _Mode0350ContentState extends State<Mode0350Content> {
       }
       final double jibun = gakurenUniv.time_taikai_total[kukan - 1];
       saBun +=
-          "トップとの差:${_gakurenSaBun(jibun - timejununivdata[0].time_taikai_total[kukan - 1])}";
+          "トップとの差:${_gakurenSaBun(jibun - timejununivdata[0].time_taikai_total[kukan - 1])}\n";
       if (mokuhyou < timejununivdata.length) {
         saBun +=
-            "\n目標(${mokuhyou + 1}位)との差:${_gakurenSaBun(jibun - timejununivdata[mokuhyou].time_taikai_total[kukan - 1])}";
+            "目標(${mokuhyou + 1}位)との差:${_gakurenSaBun(jibun - timejununivdata[mokuhyou].time_taikai_total[kukan - 1])}\n";
       }
       // シード権ライン(10位)との差(学連選抜にシード権はないが目安として出す。
       // 目標が10位のときは目標との差と同じなので出さない。1.8.2)
       const int seedIndex = 9;
       if (mokuhyou != seedIndex && seedIndex < shutsujouSuu) {
         saBun +=
-            "\n${seedIndex + 1}位(シード権ライン)との差:${_gakurenSaBun(jibun - timejununivdata[seedIndex].time_taikai_total[kukan - 1])}";
+            "${seedIndex + 1}位(シード権ライン)との差:${_gakurenSaBun(jibun - timejununivdata[seedIndex].time_taikai_total[kukan - 1])}\n";
       }
     }
 
@@ -1146,209 +1149,249 @@ class _Mode0350ContentState extends State<Mode0350Content> {
         ? ["指示なし", "スタート直後に飛び出す", "スタート直後は飛び出さない"]
         : ["指示なし", "前半から突っ込む", "前半は抑える"];
 
+    // 大学の指示画面と同じアニメーションでモーダルを開く
+    Widget fadeTransition(
+      BuildContext context,
+      Animation<double> animation,
+      Animation<double> secondaryAnimation,
+      Widget child,
+    ) {
+      return FadeTransition(
+        opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+        child: child,
+      );
+    }
+
+    // 並びと見た目は大学の指示画面に合わせる(1.8.2)
+    // 現在順位 → (ここからスクロール)順位経過・差 → 生成AIに渡すテキスト → リンク →
+    // レース経過のコピー → 走る選手への指示 → 直近区間 → 総合成績 → ここまでの全区間
     return Expanded(
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              "${idjununivdata[currentGhensuu.MYunivid].name}大学は不出場です。学連選抜の監督として指示を出せます。",
-              style: TextStyle(color: HENSUU.textcolor),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              joukyou,
-              style: const TextStyle(
-                color: Colors.amber,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            if (saBun.isNotEmpty)
-              Text(saBun, style: TextStyle(color: HENSUU.textcolor)),
-            // 正月駅伝の6区のスタート前は、大学と同じく復路の目標順位を決め直せる
-            // (6区は判定せず、7区から効く。1.8.2)
-            if (kukan == 5 && shutsujouSuu > 0) ...[
-              const SizedBox(height: 8),
-              Text(
-                "復路の目標順位を決め直せます(6区は目標順位の判定をしないので、7区から効きます)",
-                style: TextStyle(
-                  color: HENSUU.textcolor,
-                  fontSize: HENSUU.fontsize_honbun - 2,
-                ),
-              ),
-              DropdownButton<int>(
-                value: mokuhyou.clamp(0, shutsujouSuu - 1).toInt(),
-                dropdownColor: const Color.fromARGB(255, 30, 30, 30),
-                iconEnabledColor: HENSUU.textcolor,
-                onChanged: (int? v) async {
-                  if (v == null) return;
-                  await gakurenMokuhyouHozon(kantoku, v);
-                  if (mounted) setState(() {});
-                },
-                items: [
-                  for (int i = 0; i < shutsujouSuu; i++)
-                    DropdownMenuItem<int>(
-                      value: i,
-                      child: Text(
-                        "学連選抜の目標:${i + 1}位",
-                        style: TextStyle(
-                          fontSize: HENSUU.fontsize_honbun,
-                          color: HENSUU.LinkColor,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ],
-            const SizedBox(height: 12),
-            if (sonoSenshu == null)
-              Text(
-                "${kukan + 1}区を走る学連選抜の選手はいません",
-                style: TextStyle(color: HENSUU.textcolor),
-              )
-            else ...[
-              Text(
-                "${kukan + 1}区の学連選抜の選手(${sonoSenshu.name}(${sonoSenshu.gakunen}) ${idjununivdata[sonoSenshu.univid].name})へ指示をしますか？\n"
-                "駅伝男${sonoSenshu.konjou}${kukan > 0 ? ' 平常心${sonoSenshu.heijousin}' : ''}",
-                style: TextStyle(color: HENSUU.textcolor),
-              ),
-              TextButton(
-                onPressed: () {
-                  showGeneralDialog(
-                    context: context,
-                    barrierColor: Colors.black.withOpacity(0.8),
-                    barrierDismissible: true,
-                    barrierLabel: '選手詳細',
-                    transitionDuration: const Duration(milliseconds: 300),
-                    pageBuilder: (context, animation, secondaryAnimation) {
-                      return ModalSenshuDetailView(senshuId: sonoSenshu.id);
-                    },
-                  );
-                },
-                child: Text(
-                  '選手詳細',
-                  style: TextStyle(
-                    color: HENSUU.LinkColor,
-                    fontSize: HENSUU.fontsize_honbun,
-                  ),
-                ),
-              ),
-              DropdownButton<int>(
-                value: sonoSenshu.sijiflag.clamp(0, 2).toInt(),
-                dropdownColor: const Color.fromARGB(255, 30, 30, 30),
-                style: TextStyle(color: HENSUU.textcolor),
-                iconEnabledColor: HENSUU.textcolor,
-                isExpanded: true,
-                onChanged: (int? v) async {
-                  if (v == null) return;
-                  sonoSenshu.sijiflag = v;
-                  // 1区は飛び出しの印も付ける(指示なしは計算のときに自動の飛び出しの抽選をする)
-                  sonoSenshu.startchokugotobidasiflag = (kukan == 0 && v == 1)
-                      ? 1
-                      : 0;
-                  await sonoSenshu.save();
-                  if (mounted) setState(() {});
-                },
-                items: [
-                  for (int i = 0; i < options.length; i++)
-                    DropdownMenuItem<int>(
-                      value: i,
-                      child: Text(
-                        options[i],
-                        style: TextStyle(
-                          fontSize: HENSUU.fontsize_honbun,
-                          color: HENSUU.LinkColor,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                ],
-              ),
-              if (kukan > 0) ...[
-                const SizedBox(height: 16),
-                TextButton(
-                  onPressed: () {
-                    showGeneralDialog(
-                      context: context,
-                      barrierColor: Colors.black.withOpacity(0.8),
-                      barrierDismissible: true,
-                      barrierLabel: '指示ごとの損得予測',
-                      transitionDuration: const Duration(milliseconds: 300),
-                      pageBuilder: (context, animation, secondaryAnimation) {
-                        return ModalSijiSontokuView(
-                          senshuId: sonoSenshu.id,
-                          sentakuchuu: sonoSenshu.sijiflag,
-                          gakuren: true,
-                        );
-                      },
-                    );
-                  },
-                  child: Text(
-                    '指示ごとの損得予測',
+      child: Column(
+        children: [
+          // 現在順位表示(大学の指示画面と同じくスクロールしない)
+          Text(joukyou, style: TextStyle(color: HENSUU.textcolor)),
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  Text(
+                    "${idjununivdata[currentGhensuu.MYunivid].name}大学は不出場です。学連選抜の監督として指示を出せます。",
                     style: TextStyle(
-                      color: HENSUU.LinkColor,
-                      fontSize: HENSUU.fontsize_honbun,
+                      color: HENSUU.textcolor,
+                      fontSize: HENSUU.fontsize_honbun - 2,
                     ),
                   ),
-                ),
-              ],
-            ],
-            const SizedBox(height: 8),
-            TextButton(
-              onPressed: () {
-                showGeneralDialog(
-                  context: context,
-                  barrierColor: Colors.black.withOpacity(0.8),
-                  barrierDismissible: true,
-                  barrierLabel: '学連選抜区間配置',
-                  transitionDuration: const Duration(milliseconds: 300),
-                  pageBuilder: (context, _, __) =>
-                      const ModalGakurenKukanView(),
-                );
-              },
-              child: const Text(
-                "学連選抜区間配置",
-                style: TextStyle(
-                  color: Color.fromARGB(255, 0, 255, 0),
-                  decoration: TextDecoration.underline,
-                ),
+                  Text(saBun),
+                  // 正月駅伝の6区のスタート前は、大学と同じく復路の目標順位を決め直せる
+                  // (6区は判定せず、7区から効く。1.8.2)
+                  if (kukan == 5 && shutsujouSuu > 0) ...[
+                    Text(
+                      "復路の目標順位を決め直せます(6区は目標順位の判定をしないので、7区から効きます)",
+                      style: TextStyle(
+                        color: HENSUU.textcolor,
+                        fontSize: HENSUU.fontsize_honbun - 2,
+                      ),
+                    ),
+                    // 文字が大きい設定でもはみ出さないよう、横幅いっぱいにして長いときは「...」にする
+                    DropdownButton<int>(
+                      value: mokuhyou.clamp(0, shutsujouSuu - 1).toInt(),
+                      dropdownColor: const Color.fromARGB(255, 30, 30, 30),
+                      iconEnabledColor: HENSUU.textcolor,
+                      isExpanded: true,
+                      onChanged: (int? v) async {
+                        if (v == null) return;
+                        await gakurenMokuhyouHozon(kantoku, v);
+                        if (mounted) setState(() {});
+                      },
+                      items: [
+                        for (int i = 0; i < shutsujouSuu; i++)
+                          DropdownMenuItem<int>(
+                            value: i,
+                            child: Text(
+                              "学連選抜の目標:${i + 1}位",
+                              style: TextStyle(
+                                fontSize: HENSUU.fontsize_honbun,
+                                color: HENSUU.LinkColor,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  // 生成AIに渡すテキストのまとめボタン(1.8.2)
+                  const AiCopyMatomeButton(),
+                  // いつものリンク(個人順位速報・通過順位速報など。大学の選手への指示の画面は出さない)
+                  LinkButtons(gakurenKantoku: true),
+                  // 学連選抜のレース経過をコピーする(大学の「自分の大学のレース経過をコピー」の位置)
+                  const GakurenCopyButton(),
+                  TextButton(
+                    onPressed: () {
+                      showGeneralDialog(
+                        context: context,
+                        barrierColor: Colors.black.withOpacity(0.8),
+                        barrierDismissible: true,
+                        barrierLabel: '学連選抜区間配置',
+                        transitionDuration: const Duration(milliseconds: 300),
+                        pageBuilder: (context, _, __) =>
+                            const ModalGakurenKukanView(),
+                        transitionBuilder: fadeTransition,
+                      );
+                    },
+                    child: const Text(
+                      "学連選抜区間配置",
+                      style: TextStyle(
+                        color: Color.fromARGB(255, 0, 255, 0),
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+                  // 走る学連選抜の選手への指示(大学の選手への指示と同じ並びと見た目)
+                  if (sonoSenshu == null)
+                    Text(
+                      "${kukan + 1}区を走る学連選抜の選手はいません",
+                      style: TextStyle(color: HENSUU.textcolor),
+                    )
+                  else
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // 所属大学の名前が入って大学のときより長いので、行数は制限せずに折り返す
+                        Text(
+                          "${kukan + 1}区の学連選抜の選手(${sonoSenshu.name}(${sonoSenshu.gakunen}) ${idjununivdata[sonoSenshu.univid].name})へ指示をしますか？\n"
+                          "駅伝男${sonoSenshu.konjou}${kukan > 0 ? ' 平常心${sonoSenshu.heijousin}' : ''}",
+                          style: TextStyle(color: HENSUU.textcolor),
+                          softWrap: true,
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            showGeneralDialog(
+                              context: context,
+                              barrierColor: Colors.black.withOpacity(0.8),
+                              barrierDismissible: true,
+                              barrierLabel: '選手詳細',
+                              transitionDuration: const Duration(
+                                milliseconds: 300,
+                              ),
+                              pageBuilder:
+                                  (context, animation, secondaryAnimation) {
+                                    return ModalSenshuDetailView(
+                                      senshuId: sonoSenshu.id,
+                                    );
+                                  },
+                              transitionBuilder: fadeTransition,
+                            );
+                          },
+                          child: Text(
+                            '選手詳細',
+                            style: TextStyle(
+                              color: HENSUU.LinkColor,
+                              fontSize: HENSUU.fontsize_honbun,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        DropdownButton<int>(
+                          value: sonoSenshu.sijiflag.clamp(0, 2).toInt(),
+                          dropdownColor: const Color.fromARGB(255, 30, 30, 30),
+                          style: TextStyle(color: HENSUU.textcolor),
+                          iconEnabledColor: HENSUU.textcolor,
+                          isExpanded: true,
+                          onChanged: (int? v) async {
+                            if (v == null) return;
+                            sonoSenshu.sijiflag = v;
+                            // 1区は飛び出しの印も付ける(指示なしは計算のときに自動の飛び出しの抽選をする)
+                            sonoSenshu.startchokugotobidasiflag =
+                                (kukan == 0 && v == 1) ? 1 : 0;
+                            await sonoSenshu.save();
+                            if (mounted) setState(() {});
+                          },
+                          items: [
+                            for (int i = 0; i < options.length; i++)
+                              DropdownMenuItem<int>(
+                                value: i,
+                                child: Text(
+                                  options[i],
+                                  style: TextStyle(
+                                    fontSize: HENSUU.fontsize_honbun,
+                                    color: HENSUU.LinkColor,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                          ],
+                        ),
+                        // 2区以降は、指示ごとのタイムの損得予測を見られる
+                        // (ドロップダウンを押すつもりで間違って押さないよう、少し離す)
+                        if (kukan > 0) ...[
+                          const SizedBox(height: 16),
+                          TextButton(
+                            onPressed: () {
+                              showGeneralDialog(
+                                context: context,
+                                barrierColor: Colors.black.withOpacity(0.8),
+                                barrierDismissible: true,
+                                barrierLabel: '指示ごとの損得予測',
+                                transitionDuration: const Duration(
+                                  milliseconds: 300,
+                                ),
+                                pageBuilder:
+                                    (context, animation, secondaryAnimation) {
+                                      return ModalSijiSontokuView(
+                                        senshuId: sonoSenshu.id,
+                                        sentakuchuu: sonoSenshu.sijiflag,
+                                        gakuren: true,
+                                      );
+                                    },
+                                transitionBuilder: fadeTransition,
+                              );
+                            },
+                            child: Text(
+                              '指示ごとの損得予測',
+                              style: TextStyle(
+                                color: HENSUU.LinkColor,
+                                fontSize: HENSUU.fontsize_honbun,
+                              ),
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 10),
+                      ],
+                    ),
+                  const SizedBox(height: 16),
+                  // 直近区間・総合成績・ここまでの全区間(大学の指示画面と同じ並び)
+                  if (kukan > 0) ...[
+                    Text("==直近区間=="),
+                    gakurenRaceResults(
+                      currentGhensuu,
+                      idjununivdata,
+                      shousai: true,
+                      chokkinNomi: true,
+                    ),
+                    Text("==総合成績=="),
+                    AllUnivOverallResults_shougatu(
+                      currentGhensuu,
+                      timejununivdata,
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                  if (kukan > 0) ...[
+                    Text("==ここまでの全区間=="),
+                    gakurenRaceResults(
+                      currentGhensuu,
+                      idjununivdata,
+                      shousai: true,
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                ],
               ),
             ),
-            // 生成AIに渡すテキストのまとめボタン(1.8.2)
-            const AiCopyMatomeButton(),
-            // 学連選抜のレース経過をコピーする(生成AIとの実況や相談用)
-            const GakurenCopyButton(),
-            // いつものリンク(個人順位速報・通過順位速報など。大学の選手への指示の画面は出さない)
-            LinkButtons(gakurenKantoku: true),
-            // 大学の監督のときの指示画面と同じく、直近区間・総合成績・ここまでの全区間の順に出す
-            if (kukan > 0) ...[
-              const SizedBox(height: 8),
-              Text(
-                "==直近区間==",
-                style: TextStyle(color: HENSUU.textcolor),
-              ),
-              gakurenRaceResults(
-                currentGhensuu,
-                idjununivdata,
-                shousai: true,
-                chokkinNomi: true,
-              ),
-              Text(
-                "==総合成績==",
-                style: TextStyle(color: HENSUU.textcolor),
-              ),
-              AllUnivOverallResults_shougatu(currentGhensuu, timejununivdata),
-              const SizedBox(height: 16),
-              Text(
-                "==ここまでの全区間==",
-                style: TextStyle(color: HENSUU.textcolor),
-              ),
-              gakurenRaceResults(currentGhensuu, idjununivdata, shousai: true),
-            ],
-            const SizedBox(height: 16),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

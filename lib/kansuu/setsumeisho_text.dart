@@ -3,32 +3,82 @@ import 'package:ekiden/kansuu/shiyou_text.dart';
 // ------------------------------------------------------------
 // 説明書タブの本文(1.8.4)
 // ・仕様の部分は shiyou_text.dart の文を使う(生成AI向けの「ゲームの仕様」と共通)。
-//   ここには、説明書だけの部分(はじめに・生成AIと遊ぶ・学内記録など)を書く。
+//   ここには、説明書だけの部分(はじめに・生成AIと遊ぶ・学内記録・プライバシーポリシーなど)と、
+//   見出しのグループと並び、見出しの中に出す参考資料の図を書く。
 // ・書き方の決まりはCLAUDE.md(1行に1つのことを「・」で始めて書く、など)。
-//   「・」で始まらない行は、そのままの文として出す(はじめに・最後に)。
-// ・プライバシーポリシーと参考資料の画像は、setting_screen.dart で出す。
+//   「・」で始まらない行は、そのままの文として出す(はじめに・最後に・プライバシーポリシー)。
+// ・表示(折りたたみ・検索)は lib/screens/setsumeisho_tab.dart。
 // ------------------------------------------------------------
 
-/// 説明書タブに出す見出しの並び
-List<ShiyouSetsu> setsumeishoSetsuList() {
+/// 説明書の見出し1つ分と、その中の最後に出す参考資料の図(説明書だけ)
+class SetsumeishoKoumoku {
+  const SetsumeishoKoumoku(
+    this.setsu, {
+    this.zuSetsumei = '',
+    this.zu = const [],
+  });
+  final ShiyouSetsu setsu;
+
+  /// 図の説明(図の上に出す)
+  final String zuSetsumei;
+
+  /// 図の画像のパス
+  final List<String> zu;
+}
+
+/// 説明書のグループ(区切りの名前と、その中の見出し)
+class SetsumeishoGroup {
+  const SetsumeishoGroup(this.namae, this.koumoku);
+
+  /// 区切りの名前。見出しが1つだけのグループは空にして、区切りの線だけを出す
+  final String namae;
+  final List<SetsumeishoKoumoku> koumoku;
+}
+
+/// 説明書タブに出すグループと見出しの並び
+List<SetsumeishoGroup> setsumeishoGroupList() {
   return [
-    _hajimeni,
-    shiyouTaikai(setsumeisho: true),
-    shiyouMokuhyou(setsumeisho: true),
-    shiyouSiji(setsumeisho: true),
-    shiyouKinGin(setsumeisho: true),
-    shiyouMeisei(setsumeisho: true),
-    shiyouNouryoku(setsumeisho: true),
-    shiyouMochiTime(setsumeisho: true),
-    shiyouSuuchi(setsumeisho: true),
-    shiyouKeiken(setsumeisho: true),
-    shiyouIchiku(setsumeisho: true),
-    shiyouGakuren(setsumeisho: true),
-    _seiseiAI,
-    _gakunaiKiroku,
-    _kantokuCoach,
-    _pcBan,
-    _saigoni,
+    const SetsumeishoGroup('', [SetsumeishoKoumoku(_hajimeni)]),
+    SetsumeishoGroup('レースの決まり', [
+      SetsumeishoKoumoku(shiyouTaikai(setsumeisho: true)),
+      SetsumeishoKoumoku(shiyouMokuhyou(setsumeisho: true)),
+      SetsumeishoKoumoku(shiyouSiji(setsumeisho: true)),
+      SetsumeishoKoumoku(shiyouIchiku(setsumeisho: true)),
+      SetsumeishoKoumoku(shiyouKeiken(setsumeisho: true)),
+      SetsumeishoKoumoku(shiyouGakuren(setsumeisho: true)),
+    ]),
+    SetsumeishoGroup('選手と能力', [
+      SetsumeishoKoumoku(
+        shiyouNouryoku(setsumeisho: true),
+        zuSetsumei:
+            '参考資料: ロード適性・ペース変動対応力と各競技との関係性(○はよく効く、△は少し効く)',
+        zu: const ['lib/assets/gazou/nouryoku.png'],
+      ),
+      SetsumeishoKoumoku(shiyouMochiTime(setsumeisho: true)),
+      SetsumeishoKoumoku(shiyouSuuchi(setsumeisho: true)),
+    ]),
+    SetsumeishoGroup('金銀と名声', [
+      SetsumeishoKoumoku(shiyouKinGin(setsumeisho: true)),
+      SetsumeishoKoumoku(
+        shiyouMeisei(setsumeisho: true),
+        zuSetsumei: '参考資料: 各大会での獲得名声初期値一覧(目標順位1位の場合)',
+        zu: const [
+          'lib/assets/gazou/meisei_10.png',
+          'lib/assets/gazou/meisei_11.png',
+          'lib/assets/gazou/meisei_01.png',
+          'lib/assets/gazou/meisei_custom.png',
+          'lib/assets/gazou/meisei_taikousen.png',
+        ],
+      ),
+    ]),
+    const SetsumeishoGroup('', [SetsumeishoKoumoku(_seiseiAI)]),
+    const SetsumeishoGroup('その他', [
+      SetsumeishoKoumoku(_gakunaiKiroku),
+      SetsumeishoKoumoku(_kantokuCoach),
+      SetsumeishoKoumoku(_pcBan),
+      SetsumeishoKoumoku(_saigoni),
+      SetsumeishoKoumoku(_privacy),
+    ]),
   ];
 }
 
@@ -49,7 +99,7 @@ const ShiyouSetsu _seiseiAI = ShiyouSetsu('生成AIと遊ぶ(テキストのコ�
   '・一覧のそれぞれの中身は、一覧の説明をご覧ください。',
   '・このボタンは、一次エントリー・学連選抜編成・区間エントリー・当日変更・目標順位の決定・レース中・レース結果の画面にあります。',
   '・会話の最初に「ゲームの仕様(生成AI向け)」を一度渡しておくと、能力の名前だけから推測した誤った判断が減り、相談の精度が上がります。',
-  '　・どの場面の一覧にもあります。中身は、この説明書の「大会と人数」から「学連選抜(正月駅伝)」までとほぼ同じです。',
+  '　・どの場面の一覧にもあります。中身は、この説明書の「レースの決まり」「選手と能力」「金銀と名声」とほぼ同じです。',
   '・場面ごとのおすすめは次のとおりです。',
   '　・エントリー・区間配置の相談: エントリーの画面の「相談セット」(学連選抜の監督をするときは「学連選抜の相談セット」)',
   '　・当日変更の相談: 当日変更の画面の「当日変更相談セット」',
@@ -92,4 +142,26 @@ const ShiyouSetsu _pcBan = ShiyouSetsu('PC版(箱庭小駅伝・箱庭小駅伝2
 const ShiyouSetsu _saigoni = ShiyouSetsu('最後に', [
   '攻略法がどうのこうのというより、ただの運ゲーかもしれません。',
   '電車での移動時間などのちょっとした暇つぶしにでもなれば幸いです。',
+]);
+
+// プライバシーポリシー(文はそのまま。空の行は段落の区切り)
+const ShiyouSetsu _privacy = ShiyouSetsu('プライバシーポリシー', [
+  '1. 利用者情報の取り扱いについて',
+  '情報の取得・利用: 当アプリは、ユーザーの氏名、連絡先、位置情報などの個人情報を取得・利用することはありません。',
+  '',
+  '第三者への提供: 当アプリが、ユーザーの許可なく情報を第三者に提供することはありません。',
+  '',
+  '2. カメラおよび写真へのアクセスについて',
+  'カメラ機能: QRコードを読み取るために、ユーザーの許可を得てカメラ機能を使用します。',
+  '',
+  '写真ライブラリ: 画像ファイルからQRコードを読み取るために、ユーザーの許可を得て端末内の写真へのアクセスを行います。',
+  '',
+  '取得データの扱い: 読み取った画像およびデータは、QRコードの解析処理にのみ使用され、アプリ外部のサーバーへ送信・保存されることはありません。',
+  '',
+  '3. データの共有（CSV/画像出力）機能について',
+  '外部出力: ユーザー自身の操作により、選手データ等をCSV/画像ファイルとして書き出し、外部（メール、SNS、ストレージサービス等）へ共有する機能を提供しています。',
+  '',
+  '一時ファイルの保存: CSV/画像作成時、共有のために端末内の一時フォルダにファイルを保存しますが、このファイルは共有処理以外の目的で使用されることはありません。',
+  '',
+  '共有先管理: データの送信先（共有先）はユーザー自身が選択・管理するものとし、アプリが自動的に情報を外部送信することはありません。',
 ]);

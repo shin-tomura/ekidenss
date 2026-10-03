@@ -30,8 +30,7 @@ import 'package:ekiden/screens/Modal_TTmode.dart';
 import 'package:ekiden/screens/Modal_Skip.dart';
 import 'package:ekiden/share_exporter.dart';
 import 'package:ekiden/screens/Modal_memo.dart';
-import 'package:ekiden/kansuu/shiyou_text.dart'; // 説明書の見出し1つ分(ShiyouSetsu)
-import 'package:ekiden/kansuu/setsumeisho_text.dart'; // 説明書の本文
+import 'package:ekiden/screens/setsumeisho_tab.dart'; // 説明書タブ(折りたたみ・検索)
 
 class SettingScreen extends StatefulWidget {
   const SettingScreen({super.key});
@@ -928,42 +927,24 @@ class _SettingScreenState extends State<SettingScreen>
     );
   }
 
-  // 説明書タブ(版・変更履歴と説明書の本文)
+  // 説明書タブ(版・変更履歴・アップデートの確認と、説明書の本文)
+  // 本文の折りたたみ・検索は lib/screens/setsumeisho_tab.dart
   Widget _setsumeishoTab(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16.0), // 全体にパディング
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start, // テキストを左寄せにする
+    const TextStyle linkStyle = TextStyle(
+      color: Colors.blue, // リンクの色
+      decoration: TextDecoration.underline, // 下線
+    );
+    return SetsumeishoTab(
+      // 一番上: 版・変更履歴・アップデートの確認を1行にまとめる
+      ueWidget: Wrap(
+        spacing: 16,
+        runSpacing: 4,
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          const SizedBox(height: 20),
-          // constを削除して、可変的なウィジェットを追加できるようにする
           const Text(
             "SS 1.8.4 (21840)",
             style: TextStyle(color: Colors.white),
           ),
-          const SizedBox(height: 8), // 適度な余白
-          InkWell(
-            onTap: _launchUrl,
-            /*child: Text(
-              // iOSの場合のみApp Storeへのリンクを表示
-              'App Storeでアップデートを確認',
-              style: const TextStyle(
-                color: Colors.blue,
-                decoration: TextDecoration.underline,
-              ),
-            ),*/
-            child: Text(
-              // 実行中のOSによって表示テキストを切り替える
-              Platform.isIOS
-                  ? 'App Storeでアップデートを確認'
-                  : 'Google Playでアップデートを確認',
-              style: const TextStyle(
-                color: Colors.blue, // リンクの色
-                decoration: TextDecoration.underline, // 下線
-              ),
-            ),
-          ),
-          const SizedBox(height: 8), // 適度な余白
           // 変更履歴(ToDo.txtの箱庭小駅伝SSの部分を表示)
           InkWell(
             onTap: () {
@@ -974,220 +955,70 @@ class _SettingScreenState extends State<SettingScreen>
                 ),
               );
             },
-            child: const Text(
-              '変更履歴',
-              style: TextStyle(
-                color: Colors.blue, // リンクの色
-                decoration: TextDecoration.underline, // 下線
-              ),
-            ),
+            child: const Text('変更履歴', style: linkStyle),
           ),
-          const SizedBox(height: 8), // 適度な余白
-          // 説明書の本文(仕様の部分は生成AI向けの「ゲームの仕様」と共通。
-          // 並びと説明書だけの部分は lib/kansuu/setsumeisho_text.dart、仕様の部分は lib/kansuu/shiyou_text.dart)
-          for (final ShiyouSetsu setsu in setsumeishoSetsuList())
-            ..._setsuWidgets(setsu),
-          // ここからモーダルではなく、直接画像を配置するコード
-          const SizedBox(height: 24),
-          const Text(
-            "[参考資料]\nロード適性・ペース変動対応力と各競技との関係性",
-            style: TextStyle(
-              color: HENSUU.textcolor,
-              fontSize: HENSUU.fontsize_honbun,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 16),
-          // 横長の画像を画面幅に合わせて表示
-          Center(
-            child: Image.asset(
-              'lib/assets/gazou/nouryoku.png',
-              fit: BoxFit.contain,
-            ),
-          ),
-
-          const SizedBox(height: 24),
-          const Text(
-            "[参考資料]\n各大会での獲得名声初期値一覧(目標順位1位の場合)",
-            style: TextStyle(
-              color: HENSUU.textcolor,
-              fontSize: HENSUU.fontsize_honbun,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 16),
-          // 横長の画像を画面幅に合わせて表示
-          Center(
-            child: Image.asset(
-              'lib/assets/gazou/meisei_10.png',
-              fit: BoxFit.contain,
-            ),
-          ),
-          const SizedBox(height: 16),
-          // 横長の画像を画面幅に合わせて表示
-          Center(
-            child: Image.asset(
-              'lib/assets/gazou/meisei_11.png',
-              fit: BoxFit.contain,
-            ),
-          ),
-          const SizedBox(height: 16),
-          // 横長の画像を画面幅に合わせて表示
-          Center(
-            child: Image.asset(
-              'lib/assets/gazou/meisei_01.png',
-              fit: BoxFit.contain,
-            ),
-          ),
-          const SizedBox(height: 16),
-          // 横長の画像を画面幅に合わせて表示
-          Center(
-            child: Image.asset(
-              'lib/assets/gazou/meisei_custom.png',
-              fit: BoxFit.contain,
-            ),
-          ),
-          const SizedBox(height: 16),
-          // 横長の画像を画面幅に合わせて表示
-          Center(
-            child: Image.asset(
-              'lib/assets/gazou/meisei_taikousen.png',
-              fit: BoxFit.contain,
-            ),
-          ),
-          const SizedBox(height: 16),
-          const Center(
+          InkWell(
+            onTap: _launchUrl,
             child: Text(
-              "",
-              style: TextStyle(color: Colors.white70, fontSize: 12),
+              // 実行中のOSによって表示テキストを切り替える
+              Platform.isIOS
+                  ? 'App Storeでアップデートを確認'
+                  : 'Google Playでアップデートを確認',
+              style: linkStyle,
             ),
           ),
-          const SizedBox(height: 24),
-          _midashiWidget('プライバシーポリシー'),
-          const SizedBox(height: 8),
-          const Text("""1. 利用者情報の取り扱いについて
-情報の取得・利用: 当アプリは、ユーザーの氏名、連絡先、位置情報などの個人情報を取得・利用することはありません。
-
-第三者への提供: 当アプリが、ユーザーの許可なく情報を第三者に提供することはありません。
-
-2. カメラおよび写真へのアクセスについて
-カメラ機能: QRコードを読み取るために、ユーザーの許可を得てカメラ機能を使用します。
-
-写真ライブラリ: 画像ファイルからQRコードを読み取るために、ユーザーの許可を得て端末内の写真へのアクセスを行います。
-
-取得データの扱い: 読み取った画像およびデータは、QRコードの解析処理にのみ使用され、アプリ外部のサーバーへ送信・保存されることはありません。
-
-3. データの共有（CSV/画像出力）機能について
-外部出力: ユーザー自身の操作により、選手データ等をCSV/画像ファイルとして書き出し、外部（メール、SNS、ストレージサービス等）へ共有する機能を提供しています。
-
-一時ファイルの保存: CSV/画像作成時、共有のために端末内の一時フォルダにファイルを保存しますが、このファイルは共有処理以外の目的で使用されることはありません。
-
-共有先管理: データの送信先（共有先）はユーザー自身が選択・管理するものとし、アプリが自動的に情報を外部送信することはありません。""", style: TextStyle(color: Colors.white)),
-          const SizedBox(height: 24),
-          TextButton(
-            onPressed: () {
-              // ⬇︎ showLicensePage() の代わりにこちらを使います
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => Theme(
-                    // ⬇︎ ここで「ライセンス画面の中だけ」で有効になる色を指定します
-                    data: Theme.of(context).copyWith(
-                      // 画面全体の背景色を指定（例として白にしています）
-                      scaffoldBackgroundColor: Colors.white,
-                      // パッケージ名などが載るカードの背景色
-                      cardColor: Colors.white,
-                      // 文字色を黒（見やすい色）に強制的に上書きします
-                      textTheme: Theme.of(context).textTheme.copyWith(
-                        // ライセンス詳細の本文（ここが一番重要です）
-                        bodySmall: const TextStyle(
-                          color: Colors.black87,
-                          fontSize: 14.0,
-                        ),
-                        // パッケージ名などの文字
-                        bodyMedium: const TextStyle(color: Colors.black87),
-                        titleLarge: const TextStyle(color: Colors.black),
-                        titleMedium: const TextStyle(color: Colors.black),
-                      ),
-                      // 上部のヘッダー（AppBar）の色も指定しておくと安心です
-                      appBarTheme: const AppBarTheme(
-                        backgroundColor: Colors.white, // ヘッダーの背景色
-                        foregroundColor: Colors.black, // ヘッダーの文字・戻るボタンの色
-                      ),
+        ],
+      ),
+      // 「その他」の一番下: ライセンス
+      licenseWidget: TextButton(
+        onPressed: () {
+          // ⬇︎ showLicensePage() の代わりにこちらを使います
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => Theme(
+                // ⬇︎ ここで「ライセンス画面の中だけ」で有効になる色を指定します
+                data: Theme.of(context).copyWith(
+                  // 画面全体の背景色を指定（例として白にしています）
+                  scaffoldBackgroundColor: Colors.white,
+                  // パッケージ名などが載るカードの背景色
+                  cardColor: Colors.white,
+                  // 文字色を黒（見やすい色）に強制的に上書きします
+                  textTheme: Theme.of(context).textTheme.copyWith(
+                    // ライセンス詳細の本文（ここが一番重要です）
+                    bodySmall: const TextStyle(
+                      color: Colors.black87,
+                      fontSize: 14.0,
                     ),
-                    // 実際のライセンス画面の表示部分
-                    child: const LicensePage(
-                      applicationName: '箱庭小駅伝SS',
-                      applicationVersion: '1.8.4',
-                      // applicationIcon: Image.asset('lib/assets/icon/icon_ss1024.png', width: 48, height: 48),
-                    ),
+                    // パッケージ名などの文字
+                    bodyMedium: const TextStyle(color: Colors.black87),
+                    titleLarge: const TextStyle(color: Colors.black),
+                    titleMedium: const TextStyle(color: Colors.black),
+                  ),
+                  // 上部のヘッダー（AppBar）の色も指定しておくと安心です
+                  appBarTheme: const AppBarTheme(
+                    backgroundColor: Colors.white, // ヘッダーの背景色
+                    foregroundColor: Colors.black, // ヘッダーの文字・戻るボタンの色
                   ),
                 ),
-              );
-            },
-            child: Text(
-              "ライセンス",
-              style: TextStyle(
-                color: HENSUU.LinkColor,
-                decoration: TextDecoration.underline,
-                decorationColor: HENSUU.textcolor,
+                // 実際のライセンス画面の表示部分
+                child: const LicensePage(
+                  applicationName: '箱庭小駅伝SS',
+                  applicationVersion: '1.8.4',
+                  // applicationIcon: Image.asset('lib/assets/icon/icon_ss1024.png', width: 48, height: 48),
+                ),
               ),
             ),
+          );
+        },
+        child: Text(
+          "ライセンス",
+          style: TextStyle(
+            color: HENSUU.LinkColor,
+            decoration: TextDecoration.underline,
+            decorationColor: HENSUU.textcolor,
           ),
-          const SizedBox(height: 20),
-          const SizedBox(height: 60), // 下部の余白
-        ],
-      ),
-    );
-  }
-
-  // 説明書の見出し1つ分(見出しと、1行に1つのことを書いた本文)
-  List<Widget> _setsuWidgets(ShiyouSetsu setsu) {
-    return [
-      _midashiWidget(setsu.midashi),
-      const SizedBox(height: 8),
-      for (final String gyou in setsu.gyou) _gyouWidget(gyou),
-      const SizedBox(height: 24),
-    ];
-  }
-
-  // 説明書の見出し
-  Widget _midashiWidget(String midashi) {
-    return Text(
-      '⭐️$midashi',
-      style: const TextStyle(
-        color: Colors.white,
-        fontSize: HENSUU.fontsize_honbun,
-        fontWeight: FontWeight.bold,
-      ),
-    );
-  }
-
-  // 説明書の本文の1行
-  // 「・」で始まる行は、折り返した2行目以降が「・」の後ろにそろうようにする。
-  // 「　・」で始まる行は1段下げる。「・」で始まらない行は、そのままの文として出す
-  Widget _gyouWidget(String gyou) {
-    const TextStyle style = TextStyle(color: Colors.white);
-    double sage = 0;
-    String bun = gyou;
-    if (bun.startsWith('　・')) {
-      sage = 16;
-      bun = bun.substring(1);
-    }
-    if (!bun.startsWith('・')) {
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 4),
-        child: Text(bun, style: style),
-      );
-    }
-    return Padding(
-      padding: EdgeInsets.only(left: sage, bottom: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('・', style: style),
-          Expanded(child: Text(bun.substring(1), style: style)),
-        ],
+        ),
       ),
     );
   }

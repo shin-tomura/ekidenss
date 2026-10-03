@@ -340,7 +340,7 @@ ShiyouSetsu shiyouMeisei({bool setsumeisho = false}) {
   if (setsumeisho) {
     gyou.addAll([
       '・コンピュータスカウトの詳しいことは、大学画面の「コンピュータスカウト」の説明をご覧ください。',
-      '・各大会で得られる名声の初期値は、この説明書の下の方にある参考資料の表をご覧ください。',
+      '・各大会で得られる名声の初期値は、下の参考資料の表をご覧ください。',
     ]);
   }
   return ShiyouSetsu('名声', gyou);

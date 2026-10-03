@@ -20,7 +20,8 @@ import 'package:ekiden/screens/Modal_kukanresult.dart' as kekka;
 // 1回押すだけでコピーできる。いつもいっしょに渡すものはセットでコピーできる。
 // ・レース前セット: コース情報+全区間・全大学詳細リスト(展開予想に)
 // ・直近区間結果セット: 直近の区間の個人順位速報(説明文つき)+通過順位速報(実況に)
-//   (1.8.2では「区間ごとセット」という名前だった。1.8.3で次区間予想セットと区別しやすい名前にした)
+//   (1.8.2では「区間ごとセット」という名前だった。1.8.3で次区間予想セットと区別しやすい名前にした。
+//    最後の区間の分は結果画面の一番上に出す。1.8.3)
 // ・次区間予想セット: 直近の通過順位速報+次の区間のコース情報+次の区間の全大学詳細リスト
 //   (次の区間の展開予想や指示の相談に。1区のスタート前は通過順位速報なし。1.8.3)
 // ・振り返りセット: 総合成績+自分の大学のレース経過(結果画面で、レース後の振り返りに)
@@ -106,10 +107,29 @@ class AiCopyMatomeButton extends StatelessWidget {
         jikai >= 0 &&
         jikai < kukansuu;
     final String jikaiMei = race == 3 ? '${jikai + 1}組' : '${jikai + 1}区';
+    // 直近区間結果セットの文(レース中と結果画面で共通)
+    // 実況が面白くなるように、個人順位速報は補正の説明まで入った説明文つきにする
+    String chokkinKekkaSet() =>
+        kojinJuniSokuhouText(gh, chokkin, viewMode: ViewMode.description) +
+        _setKugiri +
+        tuukaJuniSokuhouText(gh, chokkin);
 
     final List<_AiCopyKoumoku> list = [];
     // 結果画面(レース後の振り返り)
     if (kekkaGamen && ekiden && chokkin >= 0) {
+      // 最後の区間を走り終えるとレース画面に戻らず結果画面になるので、
+      // 最後の区間の直近区間結果セットは結果画面の一番上に出す
+      // (文はレース中と同じ。レース中にも出る場面がない正月駅伝予選では出さない。1.8.3)
+      if (race != 4) {
+        list.add(
+          _AiCopyKoumoku(
+            '直近区間結果セット($kukanMei)',
+            '走り終えた最後の区間(${kukanMei})の個人順位速報(説明文つき)と通過順位速報をまとめてコピー。実況の締めくくりに',
+            Icons.library_books,
+            chokkinKekkaSet,
+          ),
+        );
+      }
       if (shutsujou && race != 4) {
         list.add(
           _AiCopyKoumoku(
@@ -172,15 +192,7 @@ class AiCopyMatomeButton extends StatelessWidget {
           '直近区間結果セット($kukanMei)',
           '走り終えた${kukanMei}の個人順位速報(説明文つき)と通過順位速報をまとめてコピー。補正の説明まで入るので、実況が詳しくなる',
           Icons.library_books,
-          // 実況が面白くなるように、個人順位速報は補正の説明まで入った説明文つきにする
-          () =>
-              kojinJuniSokuhouText(
-                gh,
-                chokkin,
-                viewMode: ViewMode.description,
-              ) +
-              _setKugiri +
-              tuukaJuniSokuhouText(gh, chokkin),
+          chokkinKekkaSet,
         ),
       );
     }

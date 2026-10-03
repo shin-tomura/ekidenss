@@ -59,6 +59,21 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
   Map<int, String> _shozokuMei = {};
 
   String _shozoku(SenshuData senshu) => _shozokuMei[senshu.univid] ?? '---';
+
+  // 正月駅伝予選の個人順位(1始まり)とタイム(学連選抜の表で使う。走っていなければnull)
+  int? _yosenJuni(SenshuData senshu) {
+    final double time = senshu.kukantime_race[4][senshu.gakunen - 1];
+    if (time <= 0 || time >= TEISUU.DEFAULTTIME) return null;
+    return senshu.kukanjuni_race[4][senshu.gakunen - 1] + 1;
+  }
+
+  // 学連選抜の表の選手名の下に出す、所属大学と予選の順位
+  String _shozokuToYosen(SenshuData senshu) {
+    final int? juni = _yosenJuni(senshu);
+    return juni == null
+        ? _shozoku(senshu)
+        : '${_shozoku(senshu)} 予選$juni位';
+  }
   bool _isInitialized = false;
   bool _isExporting = false;
 
@@ -137,10 +152,12 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
   final double _seriesBorderWidth = 2.0;
 
   // CSVの行(見出しの行と選手ごとの行)。共有とテキストのコピーで使う
-  // 学連選抜の表では、選手名の後ろに所属大学の列を入れる(1.8.2)
+  // 学連選抜の表では、選手名の後ろに所属大学と正月駅伝予選の列を入れる(1.8.2)
   List<List<dynamic>> _csvGyou() {
     List<dynamic> header = ['選手名'];
-    if (widget.gakuren) header.add('所属大学');
+    if (widget.gakuren) {
+      header.addAll(['所属大学', '正月駅伝予選(順位)', '正月駅伝予選']);
+    }
     header.addAll(['駅伝男', '平常心']);
     for (int i = 3; i < _eventLabels.length; i++) {
       header.add('${_eventLabels[i]}(順位)');
@@ -154,7 +171,20 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
 
     for (var senshu in _sortedSenshu) {
       List<dynamic> row = ['${senshu.name}(${senshu.gakunen}年)'];
-      if (widget.gakuren) row.add(_shozoku(senshu));
+      if (widget.gakuren) {
+        row.add(_shozoku(senshu));
+        final int? yosenJuni = _yosenJuni(senshu);
+        if (yosenJuni == null) {
+          row.add("");
+          row.add("---");
+        } else {
+          final double time = senshu.kukantime_race[4][senshu.gakunen - 1];
+          final int m = (time / 60).floor();
+          final int s = (time % 60).floor();
+          row.add(yosenJuni);
+          row.add("$m:${s.toString().padLeft(2, '0')}");
+        }
+      }
       row.addAll([senshu.konjou, senshu.heijousin]);
       for (int raceIdx in _raceIndices) {
         final double time = senshu.kukantime_race[raceIdx][senshu.gakunen - 1];
@@ -181,10 +211,18 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
   String _chuuiBun() {
     String bun =
         '※能力値は1〜99で、数値が大きいほど優れています。「??」はまだ判明していない能力のため、値を推測しないでください。\n'
-        '※年間強化は、レース時に対応する能力を一時的に上乗せするもので、表の能力値そのものは変わりません（バランス：平均的に上乗せ、スピード：スパート力とペース変動対応力、距離走：長距離粘りとロード適性、登り：登り適性、下り：下り適性、アップダウン：アップダウン対応力）。';
+        '※年間強化は、レース時に対応する能力を一時的に上乗せするもので、表の能力値そのものは変わりません（バランス：平均的に上乗せ、スピード：スパート力とペース変動対応力、距離走：長距離粘りとロード適性、登り：登り適性、下り：下り適性、アップダウン：アップダウン対応力）。\n'
+        '※安定感は、調子を決めるときの最低保証値になる能力です(当日の突発的な体調不良は除く)。\n'
+        '※タイムは「分:秒」です(例: 60:43は1時間0分43秒)。\n'
+        '※タイムが「---」で順位が空欄の種目は、今季まだ走っていないことを表します(遅いという意味ではありません)。\n'
+        '※種目の「対校」は対校戦、「記録」は記録会のレースです。「登り10k」「下り10k」「ロード10k」「クロカン10k」は、それぞれ登り・下り・ロード・クロスカントリーのコースの1万mのレースです。';
     if (widget.gakuren) {
       bun +=
-          '\n※学連選抜は、正月駅伝に出場できなかった大学の選手で作るオープン参加のチームです。今季の成績は所属大学の選手として出したものです。';
+          '\n※学連選抜は、正月駅伝に出場できなかった大学の選手で作るオープン参加のチームです。今季の成績は所属大学の選手として出したものです。\n'
+          '※「正月駅伝予選(順位)」は、正月駅伝予選に出た選手全体の中での個人順位です。表は予選の順位の良い順に並んでいます。\n'
+          '※ほかの「(順位)」の列は、この表の選手の中での順位です。';
+    } else {
+      bun += '\n※「(順位)」の列は、この表の選手の中での順位です。';
     }
     return bun;
   }
@@ -197,7 +235,6 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
     final String text =
         '【$_univName 今季成績表(CSV形式)】\n'
         '${_chuuiBun()}\n'
-        '※「(順位)」の列は、この表の選手の中での順位です。\n'
         '$csvData\n'
         '#箱庭小駅伝SS';
     await Clipboard.setData(ClipboardData(text: text));
@@ -320,7 +357,7 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
                       alignment: Alignment.centerLeft,
                       child: Text(
                         widget.gakuren
-                            ? '${senshu.name}(${senshu.gakunen}年)\n${_shozoku(senshu)}'
+                            ? '${senshu.name}(${senshu.gakunen}年)\n${_shozokuToYosen(senshu)}'
                             : '${senshu.name}\n(${senshu.gakunen}年)',
                         style: TextStyle(
                           color: HENSUU.LinkColor,
@@ -824,7 +861,7 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
           ),
           child: AutoSizeText(
             widget.gakuren
-                ? '${p.name}(${p.gakunen}年)\n${_shozoku(p)}'
+                ? '${p.name}(${p.gakunen}年)\n${_shozokuToYosen(p)}'
                 : '${p.name}\n(${p.gakunen}年)',
             maxLines: 2,
             minFontSize: 8,

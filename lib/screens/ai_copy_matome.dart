@@ -24,6 +24,7 @@ import 'package:ekiden/screens/Modal_kukanresult.dart' as kekka;
 //    最後の区間の分は結果画面の一番上に出す。1.8.3)
 // ・次区間予想セット: 直近の通過順位速報+次の区間のコース情報+次の区間の全大学詳細リスト
 //   (次の区間の展開予想や指示の相談に。1区のスタート前は通過順位速報なし。1.8.3)
+// ・直近区間結果セットと次区間予想セットの先頭には、レースの名前と何区か(最終区間か)の見出しを付ける(1.8.3)
 // ・振り返りセット: 総合成績+自分の大学のレース経過(結果画面で、レース後の振り返りに)
 // ・学連選抜の振り返りセット: 総合成績+学連選抜のレース経過+学連選抜の区間配置(結果画面で)
 // ・相談セット: エントリーの状況+コース情報+自分の大学の今季タイム一覧表+駅伝出場履歴
@@ -60,6 +61,42 @@ class _AiCopyKoumoku {
 
 // セットでコピーするときの区切り
 const String _setKugiri = '\n\n==============================\n\n';
+
+// 直近区間結果セット・次区間予想セットの先頭に付ける見出し(1.8.3)
+// 速報の文にはレースの名前や全部で何区かが入っていないので、生成AIがレースのどこなのか
+// (最終区間かどうか)を分かるように、セットの先頭に付ける
+// 例: 【正月駅伝 5区(全10区) 直近区間結果】
+//     【正月駅伝 10区(最終区間・全10区) 直近区間結果】
+//     ※この区間でゴール。通過順位がそのまま最終順位です(シード権は10位まで)
+// [kukan] 区間の番号(0が1区)、[shurui] セットの種類(「直近区間結果」「次区間予想」)
+// [goalBun] trueなら、最終区間のときにゴールしたことの一文を付ける(直近区間結果セットで使う)
+String _setMidashi(
+  Ghensuu gh,
+  int race,
+  int kukan,
+  String shurui, {
+  bool goalBun = false,
+}) {
+  final int kukansuu = gh.kukansuu_taikaigoto[race];
+  final bool kumi = race == 3; // 11月駅伝予選は「組」
+  final String tani = kumi ? '組' : '区';
+  final bool saigo = kukan == kukansuu - 1;
+  final String ichi = saigo
+      ? '最終${kumi ? '組' : '区間'}・全$kukansuu$tani'
+      : '全$kukansuu$tani';
+  String midashi =
+      '【${courseRaceTitle(race)} ${kukan + 1}$tani($ichi) $shurui】';
+  if (goalBun && saigo) {
+    // シード権(11月駅伝は8位まで、正月駅伝は10位まで。KirokuKousin.dartと同じ)
+    String seed = '';
+    if (race == 1) seed = '(シード権は8位まで)';
+    if (race == 2) seed = '(シード権は10位まで)';
+    midashi += kumi
+        ? '\n※この組でレースが終了。通過順位がそのまま最終順位です'
+        : '\n※この区間でゴール。通過順位がそのまま最終順位です$seed';
+  }
+  return midashi;
+}
 
 /// 生成AIに渡すテキストのまとめボタン
 /// [entryAri] 区間エントリーが済んでいる場面か(一次エントリー・学連選抜編成・区間エントリーの
@@ -109,7 +146,9 @@ class AiCopyMatomeButton extends StatelessWidget {
     final String jikaiMei = race == 3 ? '${jikai + 1}組' : '${jikai + 1}区';
     // 直近区間結果セットの文(レース中と結果画面で共通)
     // 実況が面白くなるように、個人順位速報は補正の説明まで入った説明文つきにする
+    // 先頭には、レースの名前と何区か(最終区間ならゴールしたこと)の見出しを付ける(1.8.3)
     String chokkinKekkaSet() =>
+        '${_setMidashi(gh, race, chokkin, '直近区間結果', goalBun: true)}\n\n' +
         kojinJuniSokuhouText(gh, chokkin, viewMode: ViewMode.description) +
         _setKugiri +
         tuukaJuniSokuhouText(gh, chokkin);
@@ -205,12 +244,15 @@ class AiCopyMatomeButton extends StatelessWidget {
               ? '${kukanMei}の通過順位速報と、これから走る${jikaiMei}のコース情報・全大学詳細リストをまとめてコピー。次の区間の展開予想や指示の相談に'
               : 'これから走る${jikaiMei}のコース情報と全大学詳細リストをまとめてコピー。${jikaiMei}の展開予想や指示の相談に',
           Icons.insights,
+          // 先頭の見出し(レースの名前と何区か)のあと、
           // 今の状況(通過順位と差)→次の区間のコース→次の区間を走る選手の順
-          () => [
-            if (chokkin >= 0) tuukaJuniSokuhouText(gh, chokkin),
-            courseKukanText(gh, race, jikai),
-            kukanZenDaigakuText(jikai),
-          ].where((t) => t.isNotEmpty).join(_setKugiri),
+          () =>
+              '${_setMidashi(gh, race, jikai, '次区間予想')}\n\n' +
+              [
+                if (chokkin >= 0) tuukaJuniSokuhouText(gh, chokkin),
+                courseKukanText(gh, race, jikai),
+                kukanZenDaigakuText(jikai),
+              ].where((t) => t.isNotEmpty).join(_setKugiri),
         ),
       );
     }

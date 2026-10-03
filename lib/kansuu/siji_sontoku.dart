@@ -8,6 +8,7 @@ import 'package:ekiden/kansuu/mokuhyou_hosei.dart';
 import 'package:ekiden/kansuu/chousi_keiken_hosei.dart';
 import 'package:ekiden/senshu_gakuren_data.dart';
 import 'package:ekiden/univ_gakuren_data.dart';
+import 'package:ekiden/kansuu/gakuren_kantoku.dart';
 
 // ------------------------------------------------------------
 // 「指示ごとの損得予測」の画面の計算(1.8.1)
@@ -23,7 +24,8 @@ import 'package:ekiden/univ_gakuren_data.dart';
 //   本番ではこれに基本のタイムの±0.1%の揺れが入るだけなので、秒数のずれは0.1秒未満
 // ・画面では「約○秒」と1秒単位に丸めて出す
 // ・1.8.2から、学連選抜の監督をしているときの学連選抜の選手の分も出す(sijiSontokuKeisanGakuren)
-//   学連選抜は目標をいつも10位とし、ほっと一息はない(RaceCalc_gakuren.dartと同じ)
+//   監督をしているときの学連選抜は、プレイヤーが決めた目標順位で、大学と同じく
+//   ほっと一息があり、正月駅伝の6区は判定しない(RaceCalc_gakuren.dartと同じ)
 // ------------------------------------------------------------
 
 /// 襷を受けた時点の、目標順位との関係
@@ -40,7 +42,8 @@ enum SijiSontokuJoukyou {
   /// 正月駅伝の6区(往路の順位による補正はない)
   fukuroStart,
 
-  /// 学連選抜で、目標(10位)以内(学連選抜にはほっと一息はない。1.8.2)
+  /// 学連選抜で、目標(10位)以内(コンピュータが監督の学連選抜にはほっと一息はない。1.8.2。
+  /// 損得予測は監督をしているときだけ出すので、今は使っていない)
   gakurenMokuhyouNai,
 }
 
@@ -274,7 +277,12 @@ Future<SijiSontoku?> sijiSontokuKeisanGakuren(int senshuId) async {
     return null;
   }
   final int flag = gakurenUniv.mokuhyojuniwositamawatteruflag[idx];
-  const int mokuhyou = 9; // 学連選抜はいつも10位が目標
+  // 学連選抜の目標順位(監督をしているときはプレイヤーが決めた順位。1.8.2)
+  UnivData? myUniv;
+  for (final UnivData u in sortedUniv) {
+    if (u.id == gh.MYunivid) myUniv = u;
+  }
+  final int mokuhyou = myUniv == null ? 9 : gakurenMokuhyou(kantoku, myUniv);
   final double kyoriMeter = gh.kyori_taikai_kukangoto[racebangou][kukan];
 
   // 指示の補正がかかる直前の見込みタイム(秒)
@@ -320,18 +328,34 @@ Future<SijiSontoku?> sijiSontokuKeisanGakuren(int senshuId) async {
       tsuyosa: tsuyosa,
     );
   } else {
-    // 10位以内: ほっと一息はなく、目標順位ちょうどと同じ扱い
-    nashiBairitsu = 1.0;
+    // 目標ちょうどか上回っている(上回っているときはほっと一息。大学の選手と同じ)
+    final int uwamawari = flag < 0 ? -flag : 0;
+    nashiBairitsu = flag < 0
+        ? mokuhyouHitoikiBairitsu(uwamawari, tsuyosa)
+        : 1.0;
     osaeSeikouBairitsu = sijiOsaeSeikouBairitsu(tsuyosa);
-    osaeShippaiBairitsu = mokuhyouOsaeShippaiUwamawariBairitsu(0, tsuyosa);
+    osaeShippaiBairitsu = mokuhyouOsaeShippaiUwamawariBairitsu(
+      uwamawari,
+      tsuyosa,
+    );
+  }
+
+  // 正月駅伝の6区は、往路のゴールの時点で目標順位の判定を0(ちょうど扱い)にしている
+  final SijiSontokuJoukyou joukyou;
+  if (racebangou == 2 && kukan == 5 && flag == 0) {
+    joukyou = SijiSontokuJoukyou.fukuroStart;
+  } else if (flag == 1) {
+    joukyou = SijiSontokuJoukyou.shitamawari;
+  } else if (flag < 0) {
+    joukyou = SijiSontokuJoukyou.uwamawari;
+  } else {
+    joukyou = SijiSontokuJoukyou.choudo;
   }
 
   double byou(double bairitsu) => mikomiTime * (bairitsu - 1.0);
 
   return SijiSontoku(
-    joukyou: flag == 1
-        ? SijiSontokuJoukyou.shitamawari
-        : SijiSontokuJoukyou.gakurenMokuhyouNai,
+    joukyou: joukyou,
     juni: gakurenUniv.tuukajuni_taikai[idx],
     mokuhyou: mokuhyou,
     timeSa: timeSa,

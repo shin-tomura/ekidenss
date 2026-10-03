@@ -323,7 +323,11 @@ List<String> _sijiBun(
     bun.add('結果:${kekka[s.sijiseikouflag.clamp(0, 1).toInt()]}');
   } else if (u.mokuhyojuniwositamawatteruflag.length > kukan - 1 &&
       u.mokuhyojuniwositamawatteruflag[kukan - 1] == 1) {
-    bun.add('学連選抜の目標(10位)を下回っていたことによる前半突っ込みでのタイム悪化あり');
+    bun.add('学連選抜の目標順位を下回っていたことによる前半突っ込みでのタイム悪化あり');
+  } else if (u.mokuhyojuniwositamawatteruflag.length > kukan - 1 &&
+      u.mokuhyojuniwositamawatteruflag[kukan - 1] < 0) {
+    // 目標を上回ったときのほっと一息(学連選抜の監督をしているときだけ)
+    bun.add('学連選抜の目標順位を上回っていたことによるほっと一息でのタイム悪化あり');
   }
   return bun;
 }
@@ -338,7 +342,9 @@ String gakurenRaceKeikaText(Ghensuu gh) {
       ? Hive.box<UnivGakurenData>('gakurenUnivBox').values.first
       : null;
   final Map<int, String> univMei = _univMei();
-  // 正月駅伝に出場している大学(区間ごとのトップと10位との差を出すのに使う)
+  // 学連選抜の目標順位(0が1位。監督をしているときはプレイヤーが決めた順位、それ以外は10位)
+  final int mokuhyou = gakurenMokuhyouGenzai();
+  // 正月駅伝に出場している大学(区間ごとのトップと目標順位との差を出すのに使う)
   final List<UnivData> shutsujou = Hive.box<UnivData>('univBox').values
       .where(
         (x) =>
@@ -354,7 +360,7 @@ String gakurenRaceKeikaText(Ghensuu gh) {
   sb.write(_suutiChuui);
   sb.writeln('【正月駅伝 学連選抜(オープン参加) レース経過】');
   sb.write(_kantokuGyou());
-  sb.writeln('学連選抜の目標:10位相当');
+  sb.writeln('学連選抜の目標:${mokuhyou + 1}位相当');
   sb.writeln("-----------------------------------");
   for (int kukan = 0; kukan < kukansuu; kukan++) {
     final int kyori = gh.kyori_taikai_kukangoto[_raceIndex][kukan].round();
@@ -389,7 +395,7 @@ String gakurenRaceKeikaText(Ghensuu gh) {
       '  通過${k.tuukaJuni + 1}位相当 '
       '${TimeDate.timeToJikanFunByouString(k.tuukaTime)}$hendou',
     );
-    // トップと10位(大学の中で)との差
+    // トップと目標順位(大学の中で)との差
     final List<double> times =
         shutsujou
             .where((x) => x.time_taikai_total.length > kukan)
@@ -399,8 +405,9 @@ String gakurenRaceKeikaText(Ghensuu gh) {
           ..sort();
     if (times.isNotEmpty) {
       String saGyou = '  (トップとの差:${_saBun(k.tuukaTime - times[0])}';
-      if (times.length >= 10) {
-        saGyou += '、10位との差:${_saBun(k.tuukaTime - times[9])}';
+      if (times.length > mokuhyou) {
+        saGyou +=
+            '、目標(${mokuhyou + 1}位)との差:${_saBun(k.tuukaTime - times[mokuhyou])}';
       }
       sb.writeln('$saGyou)');
     }

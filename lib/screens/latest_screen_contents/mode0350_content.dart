@@ -1049,7 +1049,11 @@ class _Mode0350ContentState extends State<Mode0350Content> {
       sijiResult = "結果:${kekka[senshu.sijiseikouflag.clamp(0, 1).toInt()]}";
     } else if (gakurenUniv.mokuhyojuniwositamawatteruflag.length > iKukan - 1 &&
         gakurenUniv.mokuhyojuniwositamawatteruflag[iKukan - 1] == 1) {
-      sijiResult = "学連選抜の目標(10位)を下回っていたことによる前半突っ込みでのタイム悪化あり";
+      sijiResult = "学連選抜の目標順位を下回っていたことによる前半突っ込みでのタイム悪化あり";
+    } else if (gakurenUniv.mokuhyojuniwositamawatteruflag.length > iKukan - 1 &&
+        gakurenUniv.mokuhyojuniwositamawatteruflag[iKukan - 1] < 0) {
+      // 目標を上回ったときのほっと一息(学連選抜の監督をしているときだけ。1.8.2)
+      sijiResult = "学連選抜の目標順位を上回っていたことによるほっと一息でのタイム悪化あり";
     }
     return [
       Text(
@@ -1085,17 +1089,31 @@ class _Mode0350ContentState extends State<Mode0350Content> {
     }
     final Senshu_Gakuren_Data? sonoSenshu = runner;
 
+    // 学連選抜の目標順位(0が1位。学連選抜編成の画面で決め、6区のスタート前に決め直せる。1.8.2)
+    final KantokuData kantoku = Hive.box<KantokuData>(
+      'kantokuBox',
+    ).get('KantokuData')!;
+    final int mokuhyou = gakurenMokuhyouSettei(kantoku);
+    // 正月駅伝に出場している大学の数(目標順位に選べる順位の数)
+    final int shutsujouSuu = idjununivdata
+        .where((u) => u.taikaientryflag.length > 2 && u.taikaientryflag[2] == 1)
+        .length;
+
     String joukyou;
     String saBun = "";
     if (kukan == 0) {
-      joukyou = "スタート前 (学連選抜の目標:10位)";
+      joukyou = "スタート前 (学連選抜の目標:${mokuhyou + 1}位)";
     } else {
       final int juni = gakurenUniv.tuukajuni_taikai[kukan - 1] + 1;
-      joukyou = "${kukan}区終了時点 $juni位相当 (学連選抜の目標:10位)";
+      joukyou =
+          "${kukan}区終了時点 $juni位相当 (学連選抜の目標:${mokuhyou + 1}位)";
       final double jibun = gakurenUniv.time_taikai_total[kukan - 1];
       saBun =
-          "トップとの差:${_gakurenSaBun(jibun - timejununivdata[0].time_taikai_total[kukan - 1])}\n"
-          "10位との差:${_gakurenSaBun(jibun - timejununivdata[9].time_taikai_total[kukan - 1])}";
+          "トップとの差:${_gakurenSaBun(jibun - timejununivdata[0].time_taikai_total[kukan - 1])}";
+      if (mokuhyou < timejununivdata.length) {
+        saBun +=
+            "\n目標(${mokuhyou + 1}位)との差:${_gakurenSaBun(jibun - timejununivdata[mokuhyou].time_taikai_total[kukan - 1])}";
+      }
     }
 
     final List<String> options = kukan == 0
@@ -1121,6 +1139,41 @@ class _Mode0350ContentState extends State<Mode0350Content> {
             ),
             if (saBun.isNotEmpty)
               Text(saBun, style: TextStyle(color: HENSUU.textcolor)),
+            // 正月駅伝の6区のスタート前は、大学と同じく復路の目標順位を決め直せる
+            // (6区は判定せず、7区から効く。1.8.2)
+            if (kukan == 5 && shutsujouSuu > 0) ...[
+              const SizedBox(height: 8),
+              Text(
+                "復路の目標順位を決め直せます(6区は目標順位の判定をしないので、7区から効きます)",
+                style: TextStyle(
+                  color: HENSUU.textcolor,
+                  fontSize: HENSUU.fontsize_honbun - 2,
+                ),
+              ),
+              DropdownButton<int>(
+                value: mokuhyou.clamp(0, shutsujouSuu - 1).toInt(),
+                dropdownColor: const Color.fromARGB(255, 30, 30, 30),
+                iconEnabledColor: HENSUU.textcolor,
+                onChanged: (int? v) async {
+                  if (v == null) return;
+                  await gakurenMokuhyouHozon(kantoku, v);
+                  if (mounted) setState(() {});
+                },
+                items: [
+                  for (int i = 0; i < shutsujouSuu; i++)
+                    DropdownMenuItem<int>(
+                      value: i,
+                      child: Text(
+                        "学連選抜の目標:${i + 1}位",
+                        style: TextStyle(
+                          fontSize: HENSUU.fontsize_honbun,
+                          color: HENSUU.LinkColor,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
             const SizedBox(height: 12),
             if (sonoSenshu == null)
               Text(

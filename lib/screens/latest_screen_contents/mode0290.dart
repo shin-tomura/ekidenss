@@ -54,6 +54,12 @@ class _Mode0290ContentState extends State<Mode0290Content> {
       return const [];
     }
     final bool suru = gakurenKantokuSettei(kantoku);
+    // 学連選抜の目標順位(0が1位。初期値は10位。6区のスタート前にも決め直せる。1.8.2)
+    final int mokuhyou = gakurenMokuhyouSettei(kantoku);
+    // 正月駅伝に出場している大学の数(目標順位に選べる順位の数)
+    final int shutsujouSuu = Hive.box<UnivData>('univBox').values
+        .where((u) => u.taikaientryflag.length > 2 && u.taikaientryflag[2] == 1)
+        .length;
     return [
       Text(
         "${myUniv.name}大学は正月駅伝に出場できませんが、学連選抜の監督として区間配置を決めることができます。",
@@ -79,6 +85,42 @@ class _Mode0290ContentState extends State<Mode0290Content> {
         onChanged: (bool v) => _gakurenKantokuHozon(kantoku, v),
         activeColor: Colors.blue,
       ),
+      if (suru && shutsujouSuu > 0) ...[
+        Row(
+          children: [
+            const Text(
+              "学連選抜の目標順位:",
+              style: TextStyle(color: HENSUU.textcolor),
+            ),
+            const SizedBox(width: 8),
+            DropdownButton<int>(
+              value: mokuhyou.clamp(0, shutsujouSuu - 1).toInt(),
+              dropdownColor: const Color.fromARGB(255, 30, 30, 30),
+              iconEnabledColor: HENSUU.textcolor,
+              onChanged: (int? v) async {
+                if (v == null) return;
+                await gakurenMokuhyouHozon(kantoku, v);
+                if (mounted) setState(() {});
+              },
+              items: [
+                for (int i = 0; i < shutsujouSuu; i++)
+                  DropdownMenuItem<int>(
+                    value: i,
+                    child: Text(
+                      "${i + 1}位",
+                      style: const TextStyle(color: HENSUU.LinkColor),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+        const Text(
+          "大学の目標順位と同じく、目標を下回った位置で襷を受けると前半無理して突っ込んでのタイム悪化が、上回った位置で受けるとほっと一息ついてのタイム悪化があります(1区と6区は判定しません)。学連選抜には金銀や名声はないので、実力に見合った目標を選ぶのがおすすめです。正月駅伝の6区のスタート前に、復路の目標順位を決め直せます。",
+          style: TextStyle(color: Colors.white70, fontSize: 12),
+        ),
+        const SizedBox(height: 8),
+      ],
       if (suru)
         ElevatedButton(
           onPressed: () {

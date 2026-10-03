@@ -16,6 +16,7 @@ import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/kansuu/univkosei.dart';
 import 'package:ekiden/kansuu/mokuhyou_hosei.dart';
 import 'package:ekiden/kansuu/nouryoku_eikyodo.dart';
+import 'package:ekiden/kansuu/gakuren_kantoku.dart';
 
 String _timeToMinuteSecondString(double time) {
   if (time == TEISUU.DEFAULTTIME) {
@@ -49,6 +50,19 @@ Future<void> RaceCalc_gakuren({
   );
   // 目標順位・指示の補正の強さ(全大学共通の設定。1.8.2)
   final HoseiTsuyosa hoseiTsuyosa = HoseiTsuyosa.fromKantoku(kantoku);
+  // 学連選抜の目標順位(0が1位。1.8.2)
+  // ・学連選抜の監督をしているとき(スキップ中を除く)は、プレイヤーが決めた順位で、
+  //   大学と同じく上回るとほっと一息があり、正月駅伝の6区は判定しない
+  // ・コンピュータが監督のときは今まで通りいつも10位で、ほっと一息はない
+  UnivData? myUniv;
+  for (final UnivData u in sortedunivdata) {
+    if (u.id == gh[0].MYunivid) myUniv = u;
+  }
+  final bool kantokuRule =
+      myUniv != null && gakurenKantokuRule(kantoku, myUniv);
+  final int gakurenMokuhyouJuni = kantokuRule
+      ? gakurenMokuhyouSettei(kantoku)
+      : 9;
 
   final gakurenunivBox = Hive.box<UnivGakurenData>('gakurenUnivBox');
   final gakurenunivdata = gakurenunivBox.values.toList();
@@ -682,25 +696,30 @@ Future<void> RaceCalc_gakuren({
           } else {
             // 2区以降の指示(1.8.2から、学連選抜の監督をしているプレイヤーが出す。
             // コンピュータが監督のときは指示の印が0なので、指示なしの計算だけになる)
-            // 倍率は大学の選手と同じ(mokuhyou_hosei.dart)。学連選抜は目標をいつも10位とし、
-            // ほっと一息はないので、10位以内で襷を受けたときは目標順位ちょうどと同じ扱い
+            // 倍率は大学の選手と同じ(mokuhyou_hosei.dart)。
+            // 目標の判定の印(区間の終わりに付ける。この関数の最後を参照):
+            //   1=目標を下回った、0=目標ちょうど(コンピュータが監督のときは10位以内も0)、
+            //   負の値=目標を上回った順位の数(学連選抜の監督をしているときだけ。ほっと一息がある)
             final int gakurenFlag = gakurenunivdata[0]
                 .mokuhyojuniwositamawatteruflag[gh[0].nowracecalckukan - 1];
             final double kyoriMeter = gh[0]
                 .kyori_taikai_kukangoto[racebangou][gh[0].nowracecalckukan];
-            // 目標(10位)の大学とのタイム差(下回っているときだけ使う)
+            // 目標順位の大学とのタイム差(下回っているときだけ使う)
             final double? mokuhyouSa = gakurenFlag == 1
                 ? mokuhyouJuniTimeSa(
                     univs: sortedunivdata,
                     jibunTime: gakurenunivdata[0]
                         .time_taikai_total[gh[0].nowracecalckukan - 1],
-                    mokuhyou: 9,
+                    mokuhyou: gakurenMokuhyouJuni,
                     kukan: gh[0].nowracecalckukan,
                   )
                 : null;
-            final String saBun = mokuhyouSa == null
-                ? ''
-                : '(10位と${mokuhyouSa.toStringAsFixed(1)}秒差)';
+            // 補正の根拠(大学の選手と同じ書き方。例: 襷を受けた時点で12位相当・目標10位・10位と32.0秒差)
+            final String konkyo =
+                '襷を受けた時点で${gakurenunivdata[0].tuukajuni_taikai[gh[0].nowracecalckukan - 1] + 1}位相当'
+                '・目標${gakurenMokuhyouJuni + 1}位'
+                '${mokuhyouSa == null ? '' : '・${gakurenMokuhyouJuni + 1}位と${mokuhyouSa.toStringAsFixed(1)}秒差'}';
+            final String saBun = gakurenFlag == 1 ? '($konkyo)' : '';
             if (gakurensenshudata[senshuid].sijiflag == 1) {
               final lasttime = gakurensenshudata[senshuid].time_taikai_total;
               if (Random().nextInt(100) < gakurensenshudata[senshuid].konjou) {
@@ -734,7 +753,11 @@ Future<void> RaceCalc_gakuren({
                         kyoriMeter: kyoriMeter,
                         tsuyosa: hoseiTsuyosa,
                       )
-                    : mokuhyouOsaeShippaiUwamawariBairitsu(0, hoseiTsuyosa);
+                    // 目標ちょうどか上回っているとき(大学の選手と同じ)
+                    : mokuhyouOsaeShippaiUwamawariBairitsu(
+                        gakurenFlag < 0 ? -gakurenFlag : 0,
+                        hoseiTsuyosa,
+                      );
               }
               final sontokutime =
                   gakurensenshudata[senshuid].time_taikai_total - lasttime;
@@ -744,7 +767,7 @@ Future<void> RaceCalc_gakuren({
             } else {
               if (gakurenFlag == 1) {
                 final lasttime = gakurensenshudata[senshuid].time_taikai_total;
-                // 目標(学連選抜はいつも10位)の大学とのタイム差に比例(最大0.8%。
+                // 目標順位の大学とのタイム差に比例(最大0.8%。
                 // 最大の損になる差は1kmあたり3秒×これから走る区間の距離)
                 gakurensenshudata[senshuid].time_taikai_total *=
                     mokuhyouTsukkomiBairitsu(
@@ -758,6 +781,16 @@ Future<void> RaceCalc_gakuren({
                 gakurensenshudata[senshuid].string_racesetumei +=
                     "目標順位下回って突っ込み補正$saBun:${sontokutime.isNegative ? '' : '+'}${sontokutime.toStringAsFixed(1)}秒\n";
                 //atai_hosei[senshuid][13] = sontokutime;
+                atai_hosei[senshuid][9] = sontokutime;
+              } else if (gakurenFlag < 0) {
+                // 目標を上回ったときのほっと一息(学連選抜の監督をしているときだけ。大学の選手と同じ)
+                final lasttime = gakurensenshudata[senshuid].time_taikai_total;
+                gakurensenshudata[senshuid].time_taikai_total *=
+                    mokuhyouHitoikiBairitsu(-gakurenFlag, hoseiTsuyosa);
+                final sontokutime =
+                    gakurensenshudata[senshuid].time_taikai_total - lasttime;
+                gakurensenshudata[senshuid].string_racesetumei +=
+                    "目標順位上回って一息補正($konkyo):${sontokutime.isNegative ? '' : '+'}${sontokutime.toStringAsFixed(1)}秒\n";
                 atai_hosei[senshuid][9] = sontokutime;
               }
             }
@@ -1262,8 +1295,27 @@ Future<void> RaceCalc_gakuren({
         break;
       }
     }
-    //学連選抜は毎回10位を目標ということにしちゃう
-    if (gakurenunivdata[0].tuukajuni_taikai[gh[0].nowracecalckukan] < 10) {
+    // 目標の判定の印(次の区間の指示の補正で使う。1.8.2)
+    final int gakurenJuni =
+        gakurenunivdata[0].tuukajuni_taikai[gh[0].nowracecalckukan];
+    if (kantokuRule) {
+      // 学連選抜の監督をしているときは大学と同じ決まり
+      // (1=下回った、0=ちょうど、負の値=上回った順位の数。正月駅伝の5区の終わり(6区)は判定しない)
+      if (racebangou == 2 && gh[0].nowracecalckukan == 4) {
+        gakurenunivdata[0].mokuhyojuniwositamawatteruflag[gh[0]
+                .nowracecalckukan] =
+            0;
+      } else if (gakurenJuni > gakurenMokuhyouJuni) {
+        gakurenunivdata[0].mokuhyojuniwositamawatteruflag[gh[0]
+                .nowracecalckukan] =
+            1;
+      } else {
+        gakurenunivdata[0].mokuhyojuniwositamawatteruflag[gh[0]
+                .nowracecalckukan] =
+            gakurenJuni - gakurenMokuhyouJuni;
+      }
+    } else if (gakurenJuni < 10) {
+      //コンピュータが監督のときは、今まで通り毎回10位を目標とし、ほっと一息はない
       gakurenunivdata[0].mokuhyojuniwositamawatteruflag[gh[0]
               .nowracecalckukan] =
           0;

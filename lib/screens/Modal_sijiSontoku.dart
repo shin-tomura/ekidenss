@@ -189,6 +189,12 @@ class _ModalSijiSontokuViewState extends State<ModalSijiSontokuView> {
           : '・$mokuhyou位と${sa.toStringAsFixed(1)}秒差';
       return '襷を受けた時点で$juni位相当(学連選抜の目標の$mokuhyou位を下回っています$saBun)';
     }
+    if (widget.gakuren && s.joukyou == SijiSontokuJoukyou.uwamawari) {
+      return '襷を受けた時点で$juni位相当(学連選抜の目標の$mokuhyou位を${mokuhyou - juni}つ上回っています)';
+    }
+    if (widget.gakuren && s.joukyou == SijiSontokuJoukyou.choudo) {
+      return '襷を受けた時点で$juni位相当(学連選抜の目標順位ちょうど)';
+    }
     if (s.joukyou == SijiSontokuJoukyou.fukuroStart) {
       return '6区は復路のスタートなので、往路の順位による目標順位の補正はありません';
     }

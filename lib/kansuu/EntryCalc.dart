@@ -16,6 +16,7 @@ import 'package:ekiden/Shuudansou.dart';
 import 'package:ekiden/album.dart';
 import 'package:ekiden/fastest_filteredplayer.dart';
 import 'package:ekiden/kantoku_data.dart';
+import 'package:ekiden/kansuu/gakuren_kantoku.dart';
 
 List<int> kukanIDs = [];
 
@@ -633,6 +634,8 @@ Future<List<int>> EntryCalc({
   ////学連選抜////////////////////
   //////////////
   if (racebangou == 2) {
+    // 学連選抜の目標順位は、毎年10位(初期値)から(学連選抜の監督をする年に決める。1.8.2)
+    await gakurenMokuhyouShokika(kantoku);
     final Box<Senshu_Gakuren_Data> gakurenSenshuBox =
         Hive.box<Senshu_Gakuren_Data>('gakurenSenshuBox');
     await gakurenSenshuBox.clear();

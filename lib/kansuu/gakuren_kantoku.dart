@@ -3,6 +3,7 @@ import 'package:ekiden/ghensuu.dart';
 import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/senshu_gakuren_data.dart';
+import 'package:ekiden/skip.dart';
 
 // ------------------------------------------------------------
 // 学連選抜の監督(1.8.2)
@@ -16,6 +17,11 @@ import 'package:ekiden/senshu_gakuren_data.dart';
 //   RaceCalc_gakuren.dartで大学の選手と同じ倍率で補正する。2区以降は損得予測も見られる)
 // ・スキップ中は学連選抜編成の画面もレース画面も通らないので、今まで通りコンピュータが
 //   決めた区間配置のままで、指示も出ない
+// ・KantokuData.yobiint2[76] 学連選抜の目標順位(0=10位(初期値)、1〜=その順位)
+//   監督をする年は、学連選抜編成の画面と正月駅伝の6区のスタート前(レース画面)で決められる。
+//   毎年、学連選抜を作るとき(EntryCalc.dart)に10位に戻す。各種設定のQRコードには入れない
+//   (その年ごとの作戦なので)。監督をしている年は大学と同じく、目標を上回るとほっと一息があり、
+//   正月駅伝の6区は判定しない。コンピュータが監督のときは今まで通りいつも10位で、ほっと一息はない
 // ------------------------------------------------------------
 
 const int gakurenKantokuIndex = 75;
@@ -79,4 +85,62 @@ bool gakurenKantokuChuu(KantokuData kantoku, UnivData myUniv) {
   return gakurenKantokuSettei(kantoku) &&
       myUniv.taikaientryflag.length > 2 &&
       myUniv.taikaientryflag[2] == 0;
+}
+
+const int gakurenMokuhyouIndex = 76;
+
+/// プレイヤーが決めた学連選抜の目標順位(0が1位。yobiint2[76]が0なら10位(初期値)、1〜ならその順位)
+int gakurenMokuhyouSettei(KantokuData kantoku) {
+  if (kantoku.yobiint2.length <= gakurenMokuhyouIndex) return 9;
+  final int atai = kantoku.yobiint2[gakurenMokuhyouIndex];
+  return atai <= 0 ? 9 : atai - 1;
+}
+
+/// 学連選抜の目標順位[juni](0が1位)を保存する
+/// (変更をHiveに保存するために、List全体を更新)
+Future<void> gakurenMokuhyouHozon(KantokuData kantoku, int juni) async {
+  if (kantoku.yobiint2.length <= gakurenMokuhyouIndex) return;
+  final List<int> updated = List.from(kantoku.yobiint2);
+  updated[gakurenMokuhyouIndex] = juni + 1;
+  kantoku.yobiint2 = updated;
+  await kantoku.save();
+}
+
+/// 学連選抜の目標順位を初期値(10位)に戻す(毎年、学連選抜を作るときに呼ぶ)
+Future<void> gakurenMokuhyouShokika(KantokuData kantoku) async {
+  if (kantoku.yobiint2.length <= gakurenMokuhyouIndex) return;
+  if (kantoku.yobiint2[gakurenMokuhyouIndex] == 0) return;
+  final List<int> updated = List.from(kantoku.yobiint2);
+  updated[gakurenMokuhyouIndex] = 0;
+  kantoku.yobiint2 = updated;
+  await kantoku.save();
+}
+
+/// 学連選抜に、プレイヤーが決めた目標順位と大学と同じ目標の決まり(ほっと一息あり、
+/// 正月駅伝の6区は判定しない)を使うか(学連選抜の監督をしていて、スキップ中でないとき)
+bool gakurenKantokuRule(KantokuData kantoku, UnivData myUniv) {
+  if (!gakurenKantokuChuu(kantoku, myUniv)) return false;
+  final Skip? skip = Hive.box<Skip>('skipBox').get('SkipData');
+  return skip == null || skip.skipflag == 0;
+}
+
+/// 今年の学連選抜の目標順位(0が1位)。監督をしているときはプレイヤーが決めた順位、
+/// コンピュータが監督のときはいつも10位
+int gakurenMokuhyou(KantokuData kantoku, UnivData myUniv) {
+  return gakurenKantokuRule(kantoku, myUniv)
+      ? gakurenMokuhyouSettei(kantoku)
+      : 9;
+}
+
+/// [gakurenMokuhyou]を、ボックスから監督と自分の大学を読んで出す(画面やテキストから使う)
+int gakurenMokuhyouGenzai() {
+  final KantokuData? kantoku = Hive.box<KantokuData>(
+    'kantokuBox',
+  ).get('KantokuData');
+  final Ghensuu? gh = Hive.box<Ghensuu>('ghensuuBox').getAt(0);
+  if (kantoku == null || gh == null) return 9;
+  for (final UnivData u in Hive.box<UnivData>('univBox').values) {
+    if (u.id == gh.MYunivid) return gakurenMokuhyou(kantoku, u);
+  }
+  return 9;
 }

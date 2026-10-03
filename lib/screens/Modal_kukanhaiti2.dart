@@ -6,6 +6,8 @@ import 'package:ekiden/senshu_data.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/constants.dart';
 import 'package:ekiden/kansuu/time_date.dart';
+import 'package:ekiden/kansuu/gakuren_text.dart';
+import 'package:ekiden/senshu_gakuren_data.dart';
 import 'package:ekiden/screens/Modal_senshu.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
@@ -1050,9 +1052,25 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
       }
     }
 
+    // 学連選抜(正月駅伝のときだけ)。オープン参加なので大学の後ろに入れる(1.8.2)
+    final bool gakurenAri = gakurenKonnenAri(currentGhensuu);
+    if (gakurenAri) {
+      final Senshu_Gakuren_Data? gakurenSenshu = gakurenKukanSenshu(
+        targetKukanIdx,
+      );
+      if (gakurenSenshu != null) {
+        hasEntry = true;
+        gakurenSenshuShousaiKaku(sb, gakurenSenshu, currentGhensuu);
+      }
+    }
+
     sb.writeln(
       "\n※「区」はその区間にエントリーされている選手の中でのその種目の持ちタイムの順位、「学」はその種目の所属大学学内での持ちタイムの順位、「全」はその種目の学生全体での持ちタイムの順位",
     );
+    if (gakurenAri) {
+      sb.write(gakurenOpChuui);
+      sb.writeln(gakurenKukanJuniChuui);
+    }
 
     if (!hasEntry) {
       sb.writeln("この区間へのエントリーはありません。");

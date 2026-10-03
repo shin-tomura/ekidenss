@@ -27,6 +27,7 @@ import 'package:ekiden/screens/Modal_senshu_race_bunseki.dart';
 import 'package:ekiden/screens/Modal_sijiSontoku.dart';
 import 'package:ekiden/kansuu/siji_sontoku.dart';
 import 'package:ekiden/kansuu/gakuren_kantoku.dart';
+import 'package:ekiden/screens/gakuren_copy_button.dart';
 
 String _getCombinedDifficultyText(KantokuData kantoku, Ghensuu currentGhensuu) {
   // 難易度モードを取得 (0:通常, 1:極, 2:天)
@@ -507,6 +508,10 @@ class _Mode0350ContentState extends State<Mode0350Content> {
                                     ),
                                   ),
                                 ),
+                              // 学連選抜のレース経過をコピーする(生成AIとの実況用。1.8.2)
+                              if (currentGhensuu.hyojiracebangou == 2 &&
+                                  gakurensenshudata.isNotEmpty)
+                                const GakurenCopyButton(),
                               if (currentGhensuu.hyojiracebangou == 2 &&
                                   gakurensenshudata.isNotEmpty)
                                 gakurenRaceResults(
@@ -1207,6 +1212,10 @@ class _Mode0350ContentState extends State<Mode0350Content> {
                 ),
               ),
             ),
+            // 学連選抜のレース経過をコピーする(生成AIとの実況や相談用)
+            const GakurenCopyButton(),
+            // いつものリンク(個人順位速報・通過順位速報など。大学の選手への指示の画面は出さない)
+            LinkButtons(gakurenKantoku: true),
             if (kukan > 0) ...[
               const SizedBox(height: 8),
               Text(
@@ -1277,12 +1286,15 @@ class _Mode0350ContentState extends State<Mode0350Content> {
   }
 
   // リンクボタンをWidgetに分離
-  Widget LinkButtons() {
+  // [gakurenKantoku] 学連選抜の監督をしているときはtrue(1.8.2)。
+  // 自分の大学が出場していないので、全大学指示画面・全大学目標順位画面は出さない
+  Widget LinkButtons({bool gakurenKantoku = false}) {
     final kantokuBox = Hive.box<KantokuData>('kantokuBox');
     final KantokuData kantoku = kantokuBox.get('KantokuData')!;
     return Column(
       children: [
-        if (kantoku.yobiint2[17] == 1 &&
+        if (!gakurenKantoku &&
+            kantoku.yobiint2[17] == 1 &&
             (gh!.hyojiracebangou <= 2 || gh!.hyojiracebangou == 5))
           TextButton(
             onPressed: () async {
@@ -1339,7 +1351,8 @@ class _Mode0350ContentState extends State<Mode0350Content> {
               ),
             ),
           ),
-        if (kantoku.yobiint2[17] == 1 &&
+        if (!gakurenKantoku &&
+            kantoku.yobiint2[17] == 1 &&
             (gh!.hyojiracebangou <= 2 || gh!.hyojiracebangou == 5))
           TextButton(
             onPressed: () async {

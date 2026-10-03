@@ -5,6 +5,7 @@ import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/senshu_gakuren_data.dart';
 import 'package:ekiden/constants.dart';
 import 'package:ekiden/screens/Modal_senshu.dart';
+import 'package:ekiden/screens/gakuren_copy_button.dart';
 
 class ModalGakurenKukanView extends StatelessWidget {
   const ModalGakurenKukanView({super.key});
@@ -139,6 +140,11 @@ class ModalGakurenKukanView extends StatelessWidget {
                     ),
                   ],
                 ),
+              ),
+              // 区間配置と選手の詳しい情報をコピーする(生成AIとの相談用。1.8.2)
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: GakurenCopyButton(kukanHaiti: true),
               ),
 
               // ヘッダー行

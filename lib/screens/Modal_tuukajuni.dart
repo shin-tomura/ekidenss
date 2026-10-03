@@ -5,6 +5,7 @@ import 'package:ekiden/constants.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/kansuu/time_date.dart';
 import 'package:ekiden/kantoku_data.dart';
+import 'package:ekiden/kansuu/gakuren_text.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -797,6 +798,31 @@ class _ModalKukanResultListViewPassState
   }
 
   // ★ 追加：テキスト出力・共有機能（通過順位・順位変動・記録比対応） ★
+  // 通過順位のコピーに差し込む学連選抜の行(例: OP(8位相当) 学連選抜 5時間32分10秒 ↑2。1.8.2)
+  String _gakurenTsuukaGyou(
+    GakurenKukanKekka gakuren,
+    double topTimeTotal,
+    bool isTopTimeValid,
+  ) {
+    String gyou =
+        'OP(${gakuren.tuukaJuni + 1}位相当) 学連選抜 '
+        '${TimeDate.timeToJikanFunByouString(gakuren.tuukaTime)}';
+    if (gakuren.maeTuukaJuni != null) {
+      final Map<String, dynamic> rankDiffData = _getRankDifferenceText(
+        gakuren.maeTuukaJuni! - gakuren.tuukaJuni,
+      );
+      gyou += ' ${rankDiffData['text']}';
+    }
+    gyou += '\n';
+    if (isTopTimeValid) {
+      final double diff = gakuren.tuukaTime - topTimeTotal;
+      if (diff > 0) {
+        gyou += '   (1位差: ${_formatTimeDifference(diff)})\n';
+      }
+    }
+    return gyou;
+  }
+
   Future<void> _exportAsText(
     String title,
     List<UnivData> filteredData,
@@ -810,7 +836,14 @@ class _ModalKukanResultListViewPassState
     bool isEkidenRace,
   ) async {
     String shareText = "";
+    // 学連選抜(正月駅伝のときだけ)は、通過順位相当の位置に「OP」として差し込む(1.8.2)
+    final GakurenKukanKekka? gakuren = gakurenKukanKekka(
+      currentGhensuu,
+      kukanBangou,
+    );
+    bool gakurenKaita = false;
 
+    if (gakuren != null) shareText += gakurenOpChuui;
     shareText +=
         '※大会記録比や学内記録比のタイムがプラスの場合は新記録に届かなかったことを表し、マイナスの場合には新記録を表します。ただし、速報値なので誤差がありますことをご了承ください\n';
     shareText +=
@@ -819,6 +852,10 @@ class _ModalKukanResultListViewPassState
     for (var univ in filteredData) {
       final int tsuukaJuni = univ.tuukajuni_taikai[kukanBangou];
       final double tsuukaTimeTotal = univ.time_taikai_total[kukanBangou];
+      if (gakuren != null && !gakurenKaita && tsuukaJuni >= gakuren.tuukaJuni) {
+        shareText += _gakurenTsuukaGyou(gakuren, topTimeTotal, isTopTimeValid);
+        gakurenKaita = true;
+      }
       final String junistr = tsuukaJuni == TEISUU.DEFAULTJUNI
           ? '---'
           : '${tsuukaJuni + 1}位';
@@ -918,6 +955,10 @@ class _ModalKukanResultListViewPassState
     }
     //shareText +=
     //    '\n※大会記録比や学内記録比のタイムがプラスの場合は新記録に届かなかったことを表し。マイナスの場合には新記録を表します。ただし、速報値なので誤差がありますことをご了承ください\n';
+
+    if (gakuren != null && !gakurenKaita) {
+      shareText += _gakurenTsuukaGyou(gakuren, topTimeTotal, isTopTimeValid);
+    }
 
     shareText += '\n#箱庭小駅伝SS';
 

@@ -9,6 +9,7 @@ import 'package:ekiden/senshu_data.dart';
 import 'package:ekiden/kansuu/time_date.dart';
 import 'package:ekiden/screens/Modal_senshu.dart';
 import 'package:ekiden/kantoku_data.dart';
+import 'package:ekiden/kansuu/gakuren_text.dart';
 import 'package:screenshot/screenshot.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -910,6 +911,22 @@ class _ModalKukanResultListViewState350
     );
   }
 
+  // 区間順位のコピーに差し込む学連選抜の行(表示モードに合わせて補正の説明なども付ける。1.8.2)
+  String _gakurenGyou(GakurenKukanKekka gakuren) {
+    String gyou = gakurenKojinSokuhouGyou(gakuren);
+    if (_viewMode == ViewMode.description) {
+      final String setumei = gakuren.senshu.string_racesetumei.isNotEmpty
+          ? gakuren.senshu.string_racesetumei
+          : '(説明文なし)';
+      gyou += '\n $setumei\n';
+    } else if (_viewMode == ViewMode.analysis) {
+      gyou += '\n [分析] データなし(学連選抜の選手には分析データがありません)\n';
+    } else {
+      gyou += '\n';
+    }
+    return gyou;
+  }
+
   // ★ 追加・改良：テキスト出力・共有機能（学年・記録比対応、および3モード対応） ★
   Future<void> _exportAsText(
     String title,
@@ -921,6 +938,12 @@ class _ModalKukanResultListViewState350
     KantokuData kantoku,
   ) async {
     String shareText = "";
+    // 学連選抜(正月駅伝のときだけ)は、区間順位相当の位置に「OP」として差し込む(1.8.2)
+    final GakurenKukanKekka? gakuren = gakurenKukanKekka(
+      currentGhensuu,
+      kukanBangou,
+    );
+    bool gakurenKaita = false;
 
     if (_viewMode == ViewMode.analysis) {
       shareText +=
@@ -930,9 +953,14 @@ class _ModalKukanResultListViewState350
         '※区間記録比や学内記録比のタイムがプラスの場合は新記録に届かなかったことを表し、マイナスの場合には新記録を表します。ただし、速報値なので誤差がありますことをご了承ください\n';
     shareText +=
         '※※※陸上競技のタイム計算に関係することなので、【数値が小さいほど優秀】と捉えてください。(「プラス」は悪い数値、「マイナス」は良い数値。ただし、項目によっては仕様上「プラスの数値」しか出ないものもあります。その場合は「いかにプラスの数値を小さく（0に近く）抑えられたか」を高く評価してください。)※※※\n';
+    if (gakuren != null) shareText += gakurenOpChuui;
     shareText += '【$title 区間順位】\n';
     for (var univ in filteredUniv) {
       final int kukanJuni = univ.kukanjuni_taikai[kukanBangou];
+      if (gakuren != null && !gakurenKaita && kukanJuni >= gakuren.kukanJuni) {
+        shareText += _gakurenGyou(gakuren);
+        gakurenKaita = true;
+      }
       final double kukanTime = kukanBangou == 0
           ? univ.time_taikai_total[0]
           : univ.time_taikai_total[kukanBangou] -
@@ -1006,6 +1034,8 @@ class _ModalKukanResultListViewState350
         shareText += '\n'; // 通常タイムのみの場合
       }
     }
+
+    if (gakuren != null && !gakurenKaita) shareText += _gakurenGyou(gakuren);
 
     shareText += '\n#箱庭小駅伝SS';
 

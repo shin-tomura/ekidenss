@@ -18,6 +18,8 @@ import 'package:ekiden/screens/Modal_senshu.dart';
 
 import 'package:ekiden/kantoku_data.dart';
 
+import 'package:ekiden/kansuu/gakuren_text.dart';
+
 import 'package:screenshot/screenshot.dart';
 
 import 'package:path_provider/path_provider.dart';
@@ -1346,6 +1348,22 @@ class _ModalKukanResultListViewState extends State<ModalKukanResultListView> {
     return totalSeconds < 60 ? '${seconds}秒' : '${minutes}分${seconds}秒';
   }
 
+  // 個人成績のコピーに差し込む学連選抜の行(表示モードに合わせて補正の説明なども付ける。1.8.2)
+  String _gakurenGyou(GakurenKukanKekka gakuren) {
+    String gyou = gakurenKojinSokuhouGyou(gakuren);
+    if (_viewMode == ViewMode.description) {
+      final String setumei = gakuren.senshu.string_racesetumei.isNotEmpty
+          ? gakuren.senshu.string_racesetumei
+          : '(説明文なし)';
+      gyou += '\n $setumei\n';
+    } else if (_viewMode == ViewMode.analysis) {
+      gyou += '\n [分析] データなし(学連選抜の選手には分析データがありません)\n';
+    } else {
+      gyou += '\n';
+    }
+    return gyou;
+  }
+
   // テキスト出力・共有機能
 
   Future<void> _exportAsText(
@@ -1364,6 +1382,12 @@ class _ModalKukanResultListViewState extends State<ModalKukanResultListView> {
     KantokuData kantoku,
   ) async {
     String shareText = "";
+    // 学連選抜(正月駅伝のときだけ)は、区間順位相当の位置に「OP」として差し込む(1.8.2)
+    final GakurenKukanKekka? gakuren = gakurenKukanKekka(
+      currentGhensuu,
+      kukanBangou,
+    );
+    bool gakurenKaita = false;
 
     // ★ここから追加: 生成AI等へのコピペ用補足説明★
 
@@ -1376,6 +1400,7 @@ class _ModalKukanResultListViewState extends State<ModalKukanResultListView> {
     shareText +=
         '※※※陸上競技のタイム計算に関係することなので、【数値が小さいほど優秀】と捉えてください。(「プラス」は悪い数値、「マイナス」は良い数値。ただし、項目によっては仕様上「プラスの数値」しか出ないものもあります。その場合は「いかにプラスの数値を小さく（0に近く）抑えられたか」を高く評価してください。)※※※\n';
     // ★ここまで追加★
+    if (gakuren != null) shareText += gakurenOpChuui;
     shareText += '【$title 個人成績】\n';
     for (var senshu in filteredSenshu) {
       final UnivData? univ = univDataMap[senshu.univid];
@@ -1383,6 +1408,13 @@ class _ModalKukanResultListViewState extends State<ModalKukanResultListView> {
       final int idx = senshu.gakunen - 1;
 
       final int kukanJuni = senshu.kukanjuni_race[raceBangou][idx] + 1;
+
+      if (gakuren != null &&
+          !gakurenKaita &&
+          kukanJuni - 1 >= gakuren.kukanJuni) {
+        shareText += _gakurenGyou(gakuren);
+        gakurenKaita = true;
+      }
 
       final double kukanTime = senshu.kukantime_race[raceBangou][idx];
 
@@ -1467,6 +1499,8 @@ class _ModalKukanResultListViewState extends State<ModalKukanResultListView> {
         shareText += '\n'; // 通常タイムのみの場合
       }
     }
+
+    if (gakuren != null && !gakurenKaita) shareText += _gakurenGyou(gakuren);
 
     shareText += '\n#箱庭小駅伝SS';
 

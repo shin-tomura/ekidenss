@@ -9,6 +9,7 @@ import 'package:ekiden/constants.dart';
 import 'package:ekiden/kansuu/time_date.dart';
 import 'package:ekiden/kansuu/TrialTime.dart';
 import 'package:ekiden/screens/Modal_senshu.dart';
+import 'package:ekiden/screens/gakuren_copy_button.dart';
 
 /// 学連選抜の区間配置を決める画面(1.8.2)
 /// プレイヤーの大学が正月駅伝に出場できない年に、学連選抜の監督として区間配置を決める
@@ -192,7 +193,12 @@ class _ModalGakurenKukanHenshuuState extends State<ModalGakurenKukanHenshuu> {
                   fontSize: HENSUU.fontsize_honbun - 2,
                 ),
               ),
-              const SizedBox(height: 12),
+              // 区間配置と選手の詳しい情報をコピーする(生成AIとの相談用)
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: GakurenCopyButton(kukanHaiti: true),
+              ),
+              const SizedBox(height: 4),
               for (int kukan = 0; kukan < kukansuu; kukan++)
                 _kukanGyou(
                   kukan: kukan,

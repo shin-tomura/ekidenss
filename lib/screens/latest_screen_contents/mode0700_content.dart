@@ -20,6 +20,7 @@ import 'package:screenshot/screenshot.dart';
 import 'package:ekiden/screens/Modal_kekkagaiyou.dart';
 import 'package:ekiden/screens/Modal_kukanhaitiANDresult.dart';
 import 'package:ekiden/screens/Modal_GakurenKukan.dart';
+import 'package:ekiden/screens/gakuren_copy_button.dart';
 import 'package:ekiden/screens/Modal_kukanhaiti2.dart';
 import 'package:ekiden/screens/Modal_courseshoukai.dart';
 import 'package:ekiden/screens/Modal_tuukajunisuii.dart';
@@ -3311,6 +3312,8 @@ class _Mode0700ContentState extends State<Mode0700Content> {
             ),
           ),
         ),
+        // 学連選抜のレース経過をコピーする(生成AIとの実況用。1.8.2)
+        const GakurenCopyButton(),
         // ForEachのi_kukanループに相当
         for (
           int iKukan = 0;

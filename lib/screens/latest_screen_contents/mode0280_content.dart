@@ -14,6 +14,8 @@ import 'package:ekiden/screens/Modal_TodayChangeList.dart';
 import 'package:ekiden/screens/Modal_courseshoukai.dart';
 import 'package:ekiden/screens/Modal_kukanresult350.dart';
 import 'package:ekiden/screens/Modal_tuukajuni.dart';
+import 'package:ekiden/kansuu/mokuhyou_kingin.dart'; // 目標達成時の金銀(1.8.3)
+import 'package:ekiden/screens/ai_copy_matome.dart'; // 生成AIに渡すテキスト(1.8.3)
 
 class Mode0280Content extends StatefulWidget {
   final Ghensuu ghensuu;
@@ -34,108 +36,12 @@ class _Mode0280Content extends State<Mode0280Content> {
     _loadInitialRank();
   }
 
+  // 目標達成時にもらえる金銀(計算は lib/kansuu/mokuhyou_kingin.dart。
+  // 生成AIに渡すテキストの目標順位相談セットと共通にするため、1.8.3で画面の外に出した)
   int _kakutokugoldsilver() {
-    int _getMaxRank(int raceIdx) {
-      switch (raceIdx) {
-        case 0:
-          return 8;
-        case 1:
-          return 13;
-        case 2:
-          return 18;
-        case 5:
-          return 28;
-        default:
-          return 19;
-      }
-    }
-
-    int _getSeedRank(int raceIdx) {
-      switch (raceIdx) {
-        case 0:
-          return 4;
-        case 1:
-          return 7;
-        case 2:
-          return 9;
-        case 5:
-          return 9;
-        default:
-          return 4;
-      }
-    }
-
-    int kotae = 0;
-    int r = 0;
-    int racebangou = widget.ghensuu.hyojiracebangou;
-    int maxrank = _getMaxRank(racebangou);
-    int seedrank = _getSeedRank(racebangou);
-    //final Box<UnivData> univBox = Hive.box<UnivData>('univBox');
-    //final List<UnivData> sortedUnivData = univBox.values.toList()
-    //  ..sort((a, b) => a.id.compareTo(b.id));
-    int targetrank = _selectedRank - 1;
-    //sortedUnivData[widget.ghensuu.MYunivid].mokuhyojuni[racebangou];
     final kantokuBox = Hive.box<KantokuData>('kantokuBox');
     final KantokuData kantoku = kantokuBox.get('KantokuData')!;
-    if (kantoku.yobiint2[0] == 0) {
-      int rYuushou = 0;
-      int rSeed = 0;
-      if (widget.ghensuu.kazeflag == 0) {
-        //r = 30;
-        rSeed = 30;
-        rYuushou = 50;
-      }
-      if (widget.ghensuu.kazeflag == 1) {
-        //r = 50;
-        rSeed = 50;
-        rYuushou = 100;
-      }
-      if (widget.ghensuu.kazeflag == 2) {
-        //r = 100;
-        rSeed = 100;
-        rYuushou = 200;
-      }
-      if (widget.ghensuu.kazeflag == 3) {
-        //r = 200;
-        rSeed = 200;
-        rYuushou = 300;
-      }
-
-      if (targetrank == 0) {
-        r = rYuushou;
-        //何もしない
-        /*} else if ((racebangou == 0 && targetrank >= 5) ||
-                  (racebangou == 1 && targetrank >= 8) ||
-                  (racebangou == 2 && targetrank >= 10) ||
-                  (racebangou == 5 && targetrank >= 10)) {*/
-      } else if (targetrank == maxrank) {
-        r = 10;
-      } else {
-        int sa = 0;
-        double persa = 0.0;
-        int ryou_koujousin = 0;
-        int plusryou = 0;
-        if (targetrank <= seedrank) {
-          sa = rYuushou - rSeed;
-          persa = sa / (seedrank - 0);
-          ryou_koujousin = seedrank - targetrank;
-          plusryou = (persa * ryou_koujousin).toInt();
-          r = rSeed + plusryou;
-        } else {
-          sa = rSeed - 10;
-          persa = sa / (maxrank - seedrank);
-          ryou_koujousin = maxrank - targetrank;
-          plusryou = (persa * ryou_koujousin).toInt();
-          r = 10 + plusryou;
-        }
-      }
-    }
-    r *= kantoku.yobiint2[12];
-    if (targetrank == 0) {
-      r *= 2;
-    }
-    kotae = r;
-    return kotae;
+    return mokuhyouKakutokuKingin(widget.ghensuu, kantoku, _selectedRank - 1);
   }
 
   /// 初期値の読み込み
@@ -156,20 +62,9 @@ class _Mode0280Content extends State<Mode0280Content> {
     }
   }
 
-  /// レース番号に応じた最大順位を返す
+  /// レース番号に応じた最大順位を返す(lib/kansuu/mokuhyou_kingin.dart と共通。1.8.3)
   int _getMaxRank(int raceIdx) {
-    switch (raceIdx) {
-      case 0:
-        return 9;
-      case 1:
-        return 14;
-      case 2:
-        return 19;
-      case 5:
-        return 29;
-      default:
-        return 20;
-    }
+    return mokuhyouSentakuSaikai(raceIdx);
   }
 
   // 選手詳細モーダルを表示
@@ -519,6 +414,9 @@ class _Mode0280Content extends State<Mode0280Content> {
                 return ListView(
                   children: [
                     Text("目標達成時獲得金銀 $kakutokustr"),
+                    // 生成AIに渡すテキストのまとめボタン(目標順位の相談用。1.8.3。
+                    // 当日変更のあとの画面なので、全大学の区間配置が分かるものも出してよい)
+                    const AiCopyMatomeButton(mokuhyouGamen: true),
                     if (widget.ghensuu.hyojiracebangou == 2 &&
                         widget.ghensuu.nowracecalckukan == 5) ...[
                       const SizedBox(height: 20),

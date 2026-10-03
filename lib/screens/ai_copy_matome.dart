@@ -13,6 +13,9 @@ import 'package:ekiden/screens/Modal_tuukajuni.dart';
 import 'package:ekiden/screens/Modal_matrix.dart';
 // 結果画面の「個人順位タイム表示」の文(ViewModeの名前が個人順位速報と同じなので、名前を付けて読み込む)
 import 'package:ekiden/screens/Modal_kukanresult.dart' as kekka;
+import 'package:ekiden/kantoku_data.dart';
+import 'package:ekiden/kansuu/shiyou_text.dart'; // ゲームの仕様(1.8.3)
+import 'package:ekiden/kansuu/mokuhyou_kingin.dart'; // 目標達成時の金銀(1.8.3)
 
 // ------------------------------------------------------------
 // 生成AIに渡すテキストのまとめボタン(1.8.2)
@@ -31,6 +34,10 @@ import 'package:ekiden/screens/Modal_kukanresult.dart' as kekka;
 //   (エントリーの画面で)
 // ・学連選抜の相談セット: コース情報+学連選抜の区間配置+今季タイム一覧表+駅伝出場履歴
 //   (学連選抜編成・区間エントリーの画面で)
+// ・目標順位相談セット: 選べる目標順位と目標順位ごとの金銀+目標順位と指示の仕様+コースや全大学詳細リストなど
+//   (目標順位を決める画面で、一番上に出す。1.8.3)
+// ・ゲームの仕様(生成AI向け): どの場面でも一番上に出す(結果画面の直近区間結果セットと、
+//   目標順位相談セットだけは、その上。1.8.3)
 // 結果画面では、個人成績を区間を選んで1つずつコピーすることもできる
 // 文はそれぞれの画面のコピーと同じもの(画面の外に出した関数で作る)
 // ------------------------------------------------------------
@@ -98,19 +105,89 @@ String _setMidashi(
   return midashi;
 }
 
+// 目標順位相談セットの文(目標順位を決める画面で使う。1.8.3)
+// スタート前: 見出し(選べる目標順位・目標順位ごとの金銀)+目標順位と指示の仕様+コース情報+全区間・全大学詳細リスト
+// 正月駅伝の復路のスタート前: 見出し+目標順位と指示の仕様+自分の大学のレース経過+直近の通過順位速報
+//   +残りの区間のコース情報と全大学詳細リスト
+String _mokuhyouSoudanSet(Ghensuu gh, int race, bool shutsujou) {
+  final int kukansuu = gh.kukansuu_taikaigoto[race];
+  final int jikai = gh.nowracecalckukan;
+  final KantokuData? kantoku = Hive.box<KantokuData>(
+    'kantokuBox',
+  ).get('KantokuData');
+
+  // 見出し
+  final StringBuffer sb = StringBuffer();
+  if (jikai > 0) {
+    int? juni;
+    for (final UnivData u in Hive.box<UnivData>('univBox').values) {
+      if (u.id == gh.MYunivid && u.tuukajuni_taikai.length >= jikai) {
+        juni = u.tuukajuni_taikai[jikai - 1];
+      }
+    }
+    sb.writeln(
+      '【${courseRaceTitle(race)} 目標順位の相談(${jikai + 1}区のスタート前・$jikai区終了時点${juni == null ? '' : 'で${juni + 1}位'})】',
+    );
+    if (race == 2 && jikai == 5) {
+      sb.writeln('・ここで決め直した目標順位は、7区から効く(6区は判定しない)。');
+    }
+  } else {
+    sb.writeln('【${courseRaceTitle(race)} 目標順位の相談(スタート前)】');
+  }
+  final int saikai = mokuhyouSentakuSaikai(race);
+  String seed = '';
+  if (race == 1) seed = '(シード権は8位まで)';
+  if (race == 2) seed = '(シード権は10位まで)';
+  sb.writeln('・選べる目標順位: 1位〜$saikai位$seed');
+  if (kantoku != null) {
+    final List<int> kingin = [
+      for (int t = 0; t < saikai; t++) mokuhyouKakutokuKingin(gh, kantoku, t),
+    ];
+    if (kingin.every((k) => k == 0)) {
+      sb.writeln('・このデータでは、目標順位を達成しても金銀はもらえない。');
+    } else {
+      sb.writeln('・目標順位を達成したときにもらえる金銀の量(目標順位ごと):');
+      sb.writeln(
+        '  ${[for (int t = 0; t < saikai; t++) '${t + 1}位:${kingin[t]}'].join('、')}',
+      );
+    }
+  }
+
+  final List<String> bun = [sb.toString(), shiyouMokuhyouSijiText()];
+  if (jikai <= 0) {
+    bun.add(courseZenKukanText(gh, race));
+    bun.add(zenKukanZenDaigakuText());
+  } else {
+    if (shutsujou) bun.add(jibunRaceKeikaText(gh));
+    bun.add(tuukaJuniSokuhouText(gh, jikai - 1));
+    bun.add(
+      [
+        for (int k = jikai; k < kukansuu; k++) courseKukanText(gh, race, k),
+      ].where((t) => t.isNotEmpty).join('\n'),
+    );
+    for (int k = jikai; k < kukansuu; k++) {
+      bun.add(kukanZenDaigakuText(k));
+    }
+  }
+  return bun.where((t) => t.trim().isNotEmpty).join(_setKugiri);
+}
+
 /// 生成AIに渡すテキストのまとめボタン
 /// [entryAri] 区間エントリーが済んでいる場面か(一次エントリー・学連選抜編成・区間エントリーの
 ///   画面ではfalse。falseのときは、ほかの大学の区間エントリーが分かってしまう全区間・全大学詳細リストと
 ///   レース前セット、レース経過を出さず、代わりに相談セットを出す)
 /// [kekkaGamen] レースの結果画面か(trueのときは、レース中の速報の代わりに
 ///   振り返りセット・総合成績・全区間の個人成績を出す。文は結果画面のコピーと同じ)
+/// [mokuhyouGamen] 目標順位を決める画面か(trueのときは、一番上に目標順位相談セットを出す。1.8.3)
 class AiCopyMatomeButton extends StatelessWidget {
   final bool entryAri;
   final bool kekkaGamen;
+  final bool mokuhyouGamen;
   const AiCopyMatomeButton({
     super.key,
     this.entryAri = true,
     this.kekkaGamen = false,
+    this.mokuhyouGamen = false,
   });
 
   // 今の場面でコピーできるものの一覧
@@ -154,21 +231,46 @@ class AiCopyMatomeButton extends StatelessWidget {
         tuukaJuniSokuhouText(gh, chokkin);
 
     final List<_AiCopyKoumoku> list = [];
+    // 目標順位を決める画面では、目標順位相談セットを一番上に出す(1.8.3)
+    // (目標順位を決める駅伝(10月・11月・正月・カスタム)だけ。当日変更のあとの画面なので、
+    //  コンピュータの大学の当日変更も済んでいて、全大学の区間配置を出してよい)
+    if (mokuhyouGamen && [0, 1, 2, 5].contains(race)) {
+      list.add(
+        _AiCopyKoumoku(
+          '目標順位相談セット',
+          jikai > 0
+              ? '目標順位ごとの金銀・目標順位と指示の仕様・自分の大学のレース経過・${kukanMei}の通過順位速報と、残りの区間のコース情報・全大学詳細リストをまとめてコピー。目標順位の決め直しの相談に'
+              : '目標順位ごとの金銀・目標順位と指示の仕様・コース情報・全区間・全大学詳細リストをまとめてコピー。目標順位の相談に',
+          Icons.flag_circle,
+          () => _mokuhyouSoudanSet(gh, race, shutsujou),
+        ),
+      );
+    }
     // 結果画面(レース後の振り返り)
+    // 最後の区間を走り終えるとレース画面に戻らず結果画面になるので、
+    // 最後の区間の直近区間結果セットは結果画面の一番上に出す
+    // (文はレース中と同じ。レース中にも出る場面がない正月駅伝予選では出さない。1.8.3)
+    if (kekkaGamen && ekiden && chokkin >= 0 && race != 4) {
+      list.add(
+        _AiCopyKoumoku(
+          '直近区間結果セット($kukanMei)',
+          '走り終えた最後の区間(${kukanMei})の個人順位速報(説明文つき)と通過順位速報をまとめてコピー。実況の締めくくりに',
+          Icons.library_books,
+          chokkinKekkaSet,
+        ),
+      );
+    }
+    // ゲームの仕様(どの場面でも一番上に出す。ただし、結果画面の直近区間結果セットと、
+    // 目標順位を決める画面の目標順位相談セットは、その上に出す。1.8.3)
+    list.add(
+      _AiCopyKoumoku(
+        'ゲームの仕様(生成AI向け)',
+        '能力の意味と効く場面・持ちタイムの読み方・目標順位と指示などの決まり。会話の最初に一度渡すと、相談の精度が上がる',
+        Icons.menu_book,
+        () => gameShiyouText(),
+      ),
+    );
     if (kekkaGamen && ekiden && chokkin >= 0) {
-      // 最後の区間を走り終えるとレース画面に戻らず結果画面になるので、
-      // 最後の区間の直近区間結果セットは結果画面の一番上に出す
-      // (文はレース中と同じ。レース中にも出る場面がない正月駅伝予選では出さない。1.8.3)
-      if (race != 4) {
-        list.add(
-          _AiCopyKoumoku(
-            '直近区間結果セット($kukanMei)',
-            '走り終えた最後の区間(${kukanMei})の個人順位速報(説明文つき)と通過順位速報をまとめてコピー。実況の締めくくりに',
-            Icons.library_books,
-            chokkinKekkaSet,
-          ),
-        );
-      }
       if (shutsujou && race != 4) {
         list.add(
           _AiCopyKoumoku(

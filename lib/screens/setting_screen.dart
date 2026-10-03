@@ -1193,7 +1193,11 @@ class _SettingScreenState extends State<SettingScreen> {
               style: TextStyle(color: Colors.white),
             ),
             const Text(
-              "・レース中の実況には、区間ごとに「区間ごとセット」(直近の区間の個人順位速報(補正の説明つき)と通過順位速報をまとめたもの)や「自分の大学のレース経過」",
+              "・レース中の実況には、区間ごとに「直近区間結果セット」(走り終えた直近の区間の個人順位速報(補正の説明つき)と通過順位速報をまとめたもの)や「自分の大学のレース経過」",
+              style: TextStyle(color: Colors.white),
+            ),
+            const Text(
+              "・次の区間の展開予想には、区間ごとに「次区間予想セット」(直近の通過順位速報と、これから走る区間のコース情報・全大学詳細リストをまとめたもの)",
               style: TextStyle(color: Colors.white),
             ),
             const Text(

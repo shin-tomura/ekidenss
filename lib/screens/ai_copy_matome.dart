@@ -19,7 +19,10 @@ import 'package:ekiden/screens/Modal_kukanresult.dart' as kekka;
 // 押すと、その場面で生成AIに渡すと便利なテキストの一覧が出て、
 // 1回押すだけでコピーできる。いつもいっしょに渡すものはセットでコピーできる。
 // ・レース前セット: コース情報+全区間・全大学詳細リスト(展開予想に)
-// ・区間ごとセット: 直近の区間の個人順位速報(説明文つき)+通過順位速報(実況に)
+// ・直近区間結果セット: 直近の区間の個人順位速報(説明文つき)+通過順位速報(実況に)
+//   (1.8.2では「区間ごとセット」という名前だった。1.8.3で次区間予想セットと区別しやすい名前にした)
+// ・次区間予想セット: 直近の通過順位速報+次の区間のコース情報+次の区間の全大学詳細リスト
+//   (次の区間の展開予想や指示の相談に。1区のスタート前は通過順位速報なし。1.8.3)
 // ・振り返りセット: 総合成績+自分の大学のレース経過(結果画面で、レース後の振り返りに)
 // ・学連選抜の振り返りセット: 総合成績+学連選抜のレース経過+学連選抜の区間配置(結果画面で)
 // ・相談セット: エントリーの状況+コース情報+自分の大学の今季タイム一覧表+駅伝出場履歴
@@ -92,6 +95,17 @@ class AiCopyMatomeButton extends StatelessWidget {
         : gh.nowracecalckukan - 1;
     final bool sokuhouAri = ekiden && entryAri && chokkin >= 0 && !kekkaGamen;
     final String kukanMei = race == 3 ? '${chokkin + 1}組' : '${chokkin + 1}区';
+    // これから走る次の区間(1区のスタート前から最後の区間のスタート前まで。
+    // 全員が一斉に走る正月駅伝予選では出さない。1.8.3)
+    final int jikai = gh.nowracecalckukan;
+    final bool jikaiAri =
+        ekiden &&
+        entryAri &&
+        !kekkaGamen &&
+        race != 4 &&
+        jikai >= 0 &&
+        jikai < kukansuu;
+    final String jikaiMei = race == 3 ? '${jikai + 1}組' : '${jikai + 1}区';
 
     final List<_AiCopyKoumoku> list = [];
     // 結果画面(レース後の振り返り)
@@ -155,8 +169,8 @@ class AiCopyMatomeButton extends StatelessWidget {
     if (sokuhouAri) {
       list.add(
         _AiCopyKoumoku(
-          '区間ごとセット($kukanMei)',
-          '${kukanMei}の個人順位速報(説明文つき)と通過順位速報をまとめてコピー。補正の説明まで入るので、実況が詳しくなる',
+          '直近区間結果セット($kukanMei)',
+          '走り終えた${kukanMei}の個人順位速報(説明文つき)と通過順位速報をまとめてコピー。補正の説明まで入るので、実況が詳しくなる',
           Icons.library_books,
           // 実況が面白くなるように、個人順位速報は補正の説明まで入った説明文つきにする
           () =>
@@ -169,6 +183,26 @@ class AiCopyMatomeButton extends StatelessWidget {
               tuukaJuniSokuhouText(gh, chokkin),
         ),
       );
+    }
+    // 次の区間の展開予想用(直近区間結果セットのすぐ下に出す。1.8.3)
+    if (jikaiAri) {
+      list.add(
+        _AiCopyKoumoku(
+          '次区間予想セット($jikaiMei)',
+          chokkin >= 0
+              ? '${kukanMei}の通過順位速報と、これから走る${jikaiMei}のコース情報・全大学詳細リストをまとめてコピー。次の区間の展開予想や指示の相談に'
+              : 'これから走る${jikaiMei}のコース情報と全大学詳細リストをまとめてコピー。${jikaiMei}の展開予想や指示の相談に',
+          Icons.insights,
+          // 今の状況(通過順位と差)→次の区間のコース→次の区間を走る選手の順
+          () => [
+            if (chokkin >= 0) tuukaJuniSokuhouText(gh, chokkin),
+            courseKukanText(gh, race, jikai),
+            kukanZenDaigakuText(jikai),
+          ].where((t) => t.isNotEmpty).join(_setKugiri),
+        ),
+      );
+    }
+    if (sokuhouAri) {
       list.add(
         _AiCopyKoumoku(
           '個人順位速報($kukanMei)',

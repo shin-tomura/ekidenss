@@ -5,6 +5,12 @@ import 'package:ekiden/ghensuu.dart';
 import 'package:ekiden/constants.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/kantoku_data.dart'; // ★ 追加
+import 'package:ekiden/kansuu/gakuren_text.dart';
+import 'package:ekiden/kansuu/gakuren_kantoku.dart';
+
+// 表示大学・ターゲット大学で学連選抜(OP)を表す値(1.8.2)
+// (ほかは大学id、-1は全大学平均、-2は大会記録。保存のときの-999は未選択)
+const int _gakurenId = -3;
 
 class ModalTimeDifferenceGraph extends StatefulWidget {
   const ModalTimeDifferenceGraph({super.key});
@@ -129,56 +135,77 @@ class _ModalTimeDifferenceGraphState extends State<ModalTimeDifferenceGraph> {
 
         bool settingsAdjusted = false;
 
+        // 今年の学連選抜がいる正月駅伝のときだけ、学連選抜(OP)を選べる(1.8.2)
+        final bool gakurenAri = gakurenKonnenAri(currentGhensuu);
+        final int myUnivId = currentGhensuu.MYunivid;
+        final bool myUnivShutsujou =
+            myUnivId >= 0 &&
+            myUnivId < idjunAllUnivs.length &&
+            idjunAllUnivs[myUnivId].taikaientryflag[raceBangou] == 1;
+        // 学連選抜の監督をしている年(自分の大学は不出場)
+        final bool gakurenKantokuNen =
+            gakurenAri &&
+            kantoku != null &&
+            myUnivId >= 0 &&
+            myUnivId < idjunAllUnivs.length &&
+            gakurenKantokuChuu(kantoku, idjunAllUnivs[myUnivId]);
+
+        // 選べる値か(全大学平均・大会記録・学連選抜(いる年だけ)・出場している大学)
+        bool sentakuDekiru(int id) {
+          if (id == -1 || id == -2) return true;
+          if (id == _gakurenId) return gakurenAri;
+          return id >= 0 &&
+              id < idjunAllUnivs.length &&
+              idjunAllUnivs[id].taikaientryflag[raceBangou] == 1;
+        }
+
+        // 出場している最初の大学(いなければnull)
+        int? saishoNoDaigaku() {
+          for (int i = 0; i < idjunAllUnivs.length; i++) {
+            if (idjunAllUnivs[i].taikaientryflag[raceBangou] == 1) return i;
+          }
+          return null;
+        }
+
         // ★ フェイルセーフ（「全大学平均(-1)」「大会記録(-2)」の時はスキップする）
         if (_selectedUnivIds[0] != null &&
-            _selectedUnivIds[0] != -1 &&
-            _selectedUnivIds[0] != -2) {
-          if (_selectedUnivIds[0]! >= idjunAllUnivs.length ||
-              idjunAllUnivs[_selectedUnivIds[0]!].taikaientryflag[currentGhensuu
-                      .hyojiracebangou] !=
-                  1) {
-            for (int i = 0; i < idjunAllUnivs.length; i++) {
-              if (idjunAllUnivs[i].taikaientryflag[currentGhensuu
-                      .hyojiracebangou] ==
-                  1) {
-                _selectedUnivIds[0] = i;
-                settingsAdjusted = true;
-                break;
-              }
-            }
+            !sentakuDekiru(_selectedUnivIds[0]!)) {
+          int? atarashii;
+          if (gakurenKantokuNen) {
+            // 学連選抜の監督をしている年は、学連選抜を表示する(1.8.2)
+            atarashii = _gakurenId;
+          } else if (_selectedUnivIds[0] == _gakurenId && myUnivShutsujou) {
+            // 学連選抜がいない大会では、自分の大学に戻す(1.8.2)
+            atarashii = myUnivId;
+          } else {
+            atarashii = saishoNoDaigaku();
+          }
+          if (atarashii != null) {
+            _selectedUnivIds[0] = atarashii;
+            settingsAdjusted = true;
           }
         }
-        if (_targetUnivId != null &&
-            _targetUnivId != -1 &&
-            _targetUnivId != -2) {
-          if (_targetUnivId! >= idjunAllUnivs.length ||
-              idjunAllUnivs[_targetUnivId!].taikaientryflag[currentGhensuu
-                      .hyojiracebangou] !=
-                  1) {
-            for (int i = 0; i < idjunAllUnivs.length; i++) {
-              if (idjunAllUnivs[i].taikaientryflag[currentGhensuu
-                      .hyojiracebangou] ==
-                  1) {
-                _targetUnivId = i;
-                settingsAdjusted = true;
-                break;
-              }
-            }
+        if (_targetUnivId != null && !sentakuDekiru(_targetUnivId!)) {
+          int? atarashii;
+          if (_targetUnivId == _gakurenId && myUnivShutsujou) {
+            // 学連選抜がいない大会では、自分の大学に戻す(1.8.2)
+            atarashii = myUnivId;
+          } else {
+            atarashii = saishoNoDaigaku();
+          }
+          if (atarashii != null) {
+            _targetUnivId = atarashii;
+            settingsAdjusted = true;
           }
         }
 
         // ★ 追加: 表示大学1〜3についても出場していなければnullにリセットする
+        // (学連選抜がいない大会の学連選抜も未選択に戻す。1.8.2)
         for (int i = 1; i < 4; i++) {
           if (_selectedUnivIds[i] != null &&
-              _selectedUnivIds[i] != -1 &&
-              _selectedUnivIds[i] != -2) {
-            if (_selectedUnivIds[i]! >= idjunAllUnivs.length ||
-                idjunAllUnivs[_selectedUnivIds[i]!]
-                        .taikaientryflag[currentGhensuu.hyojiracebangou] !=
-                    1) {
-              _selectedUnivIds[i] = null;
-              settingsAdjusted = true;
-            }
+              !sentakuDekiru(_selectedUnivIds[i]!)) {
+            _selectedUnivIds[i] = null;
+            settingsAdjusted = true;
           }
         }
 
@@ -228,6 +255,15 @@ class _ModalTimeDifferenceGraphState extends State<ModalTimeDifferenceGraph> {
               }
             }
 
+            // 学連選抜(OP)の区間ごとの結果(学連選抜がいない大会や区間はnull。1.8.2)
+            // 学連選抜は順位に数えないので、全大学平均や○位ラインは大学だけで計算し、
+            // 学連選抜の順位は大学の中に入れた場合の「○位相当」で表す
+            final List<GakurenKukanKekka?> gakurenKekka = [
+              for (int k = 0; k < calculatedKukans; k++)
+                gakurenAri ? gakurenKukanKekka(currentGhensuu, k) : null,
+            ];
+            final bool gakurenHyouji = activeIds.contains(_gakurenId);
+
             List<List<FlSpot>> allSpots = List.generate(
               activeIds.length,
               (_) => [],
@@ -266,6 +302,14 @@ class _ModalTimeDifferenceGraphState extends State<ModalTimeDifferenceGraph> {
                   } else if (uId == -2) {
                     // 大会記録の場合は順位がないため描画をスキップする
                     continue;
+                  } else if (uId == _gakurenId) {
+                    // 学連選抜(OP)は通過順位相当(1.8.2)
+                    final GakurenKukanKekka? g = gakurenKekka[k];
+                    if (g != null) {
+                      allSpots[i].add(
+                        FlSpot(k.toDouble(), -(g.tuukaJuni + 1).toDouble()),
+                      );
+                    }
                   } else {
                     // 特定の大学の場合
                     UnivData? selectedUniv = participants
@@ -283,7 +327,10 @@ class _ModalTimeDifferenceGraphState extends State<ModalTimeDifferenceGraph> {
                 }
               }
               maxY = -0.5;
-              minY = -(participants.length.toDouble() + 0.5);
+              // 学連選抜は全大学より遅いと(出場大学の数+1)位相当になるので、1つ広げる(1.8.2)
+              minY = -((participants.length + (gakurenHyouji ? 1 : 0))
+                      .toDouble() +
+                  0.5);
             } else {
               // 【タイム差推移モード】
               for (int k = 0; k < calculatedKukans; k++) {
@@ -357,6 +404,13 @@ class _ModalTimeDifferenceGraphState extends State<ModalTimeDifferenceGraph> {
                         hasTargetTime = true;
                       }
                     }
+                  } else if (_targetUnivId == _gakurenId) {
+                    // 学連選抜(OP)(1.8.2)
+                    final GakurenKukanKekka? g = gakurenKekka[k];
+                    if (g != null) {
+                      targetTime = g.tuukaTime;
+                      hasTargetTime = true;
+                    }
                   } else {
                     // 特定の大学
                     UnivData? targetUniv = participants
@@ -388,6 +442,10 @@ class _ModalTimeDifferenceGraphState extends State<ModalTimeDifferenceGraph> {
                           myTime = recInt.toDouble();
                         }
                       }
+                    } else if (uId == _gakurenId) {
+                      // 学連選抜(OP)(1.8.2)
+                      final GakurenKukanKekka? g = gakurenKekka[k];
+                      if (g != null) myTime = g.tuukaTime;
                     } else {
                       UnivData? selectedUniv = participants
                           .where((u) => u.id == uId)
@@ -422,6 +480,8 @@ class _ModalTimeDifferenceGraphState extends State<ModalTimeDifferenceGraph> {
                   color: activeColors[i],
                   barWidth: 3,
                   isStrokeCapRound: true,
+                  // 学連選抜(OP)の線は点線にする(1.8.2)
+                  dashArray: activeIds[i] == _gakurenId ? [8, 4] : null,
                   dotData: FlDotData(
                     show: true,
                     getDotPainter: (spot, percent, barData, index) =>
@@ -637,6 +697,17 @@ class _ModalTimeDifferenceGraphState extends State<ModalTimeDifferenceGraph> {
                                               ),
                                             ),
                                           ),
+                                          // 学連選抜(OP)(1.8.2)
+                                          if (gakurenAri)
+                                            const DropdownMenuItem(
+                                              value: _gakurenId,
+                                              child: Text(
+                                                '学連選抜(OP)',
+                                                style: TextStyle(
+                                                  color: Colors.cyanAccent,
+                                                ),
+                                              ),
+                                            ),
                                           ...participants.map((univ) {
                                             return DropdownMenuItem(
                                               value: univ.id,
@@ -664,18 +735,18 @@ class _ModalTimeDifferenceGraphState extends State<ModalTimeDifferenceGraph> {
                         // 大学1 と 大学2
                         Row(
                           children: [
-                            _buildUnivDropdown(0, participants),
+                            _buildUnivDropdown(0, participants, gakurenAri),
                             const SizedBox(width: 8),
-                            _buildUnivDropdown(1, participants),
+                            _buildUnivDropdown(1, participants, gakurenAri),
                           ],
                         ),
                         const SizedBox(height: 8),
                         // 大学3 と 大学4
                         Row(
                           children: [
-                            _buildUnivDropdown(2, participants),
+                            _buildUnivDropdown(2, participants, gakurenAri),
                             const SizedBox(width: 8),
-                            _buildUnivDropdown(3, participants),
+                            _buildUnivDropdown(3, participants, gakurenAri),
                           ],
                         ),
                       ],
@@ -731,6 +802,8 @@ class _ModalTimeDifferenceGraphState extends State<ModalTimeDifferenceGraph> {
                                               return '全大学平均基準';
                                             if (_targetUnivId == -2)
                                               return '大会記録基準';
+                                            if (_targetUnivId == _gakurenId)
+                                              return '学連選抜(OP)基準';
                                             UnivData? tUniv = participants
                                                 .where(
                                                   (u) => u.id == _targetUnivId,
@@ -800,7 +873,10 @@ class _ModalTimeDifferenceGraphState extends State<ModalTimeDifferenceGraph> {
 
                                   if (_isRankMode) {
                                     final int rank = -value.toInt();
-                                    if (rank <= 0 || rank > participants.length)
+                                    if (rank <= 0 ||
+                                        rank >
+                                            participants.length +
+                                                (gakurenHyouji ? 1 : 0))
                                       return const SizedBox.shrink();
                                     return Text(
                                       '$rank位',
@@ -853,6 +929,8 @@ class _ModalTimeDifferenceGraphState extends State<ModalTimeDifferenceGraph> {
                                         univName = '全大学平均';
                                       } else if (univId == -2) {
                                         univName = '大会記録';
+                                      } else if (univId == _gakurenId) {
+                                        univName = '学連選抜(OP)';
                                       } else {
                                         final UnivData? selectedUniv =
                                             participants
@@ -871,6 +949,8 @@ class _ModalTimeDifferenceGraphState extends State<ModalTimeDifferenceGraph> {
                                               '${rank.toStringAsFixed(1)}位';
                                         } else if (univId == -2) {
                                           rankDisplay = '---';
+                                        } else if (univId == _gakurenId) {
+                                          rankDisplay = '${rank.toInt()}位相当';
                                         } else {
                                           rankDisplay = '${rank.toInt()}位';
                                         }
@@ -890,6 +970,16 @@ class _ModalTimeDifferenceGraphState extends State<ModalTimeDifferenceGraph> {
                                           rankStr = '平均';
                                         } else if (univId == -2) {
                                           rankStr = '記録';
+                                        } else if (univId == _gakurenId) {
+                                          final GakurenKukanKekka? g =
+                                              kukanIndex >= 0 &&
+                                                  kukanIndex <
+                                                      gakurenKekka.length
+                                              ? gakurenKekka[kukanIndex]
+                                              : null;
+                                          if (g != null) {
+                                            rankStr = '${g.tuukaJuni + 1}位相当';
+                                          }
                                         } else {
                                           final UnivData? selectedUniv =
                                               participants
@@ -932,7 +1022,12 @@ class _ModalTimeDifferenceGraphState extends State<ModalTimeDifferenceGraph> {
     );
   }
 
-  Widget _buildUnivDropdown(int index, List<UnivData> participants) {
+  // [gakurenAri] 学連選抜(OP)を選べるとき(今年の学連選抜がいる正月駅伝)はtrue(1.8.2)
+  Widget _buildUnivDropdown(
+    int index,
+    List<UnivData> participants,
+    bool gakurenAri,
+  ) {
     return Expanded(
       child: DropdownButtonFormField<int?>(
         isExpanded: true,
@@ -962,6 +1057,15 @@ class _ModalTimeDifferenceGraphState extends State<ModalTimeDifferenceGraph> {
             value: -2,
             child: Text('大会記録', style: TextStyle(color: Colors.yellowAccent)),
           ),
+          // 学連選抜(OP)(1.8.2)
+          if (gakurenAri)
+            const DropdownMenuItem(
+              value: _gakurenId,
+              child: Text(
+                '学連選抜(OP)',
+                style: TextStyle(color: Colors.cyanAccent),
+              ),
+            ),
           ...participants.map((univ) {
             return DropdownMenuItem(
               value: univ.id,

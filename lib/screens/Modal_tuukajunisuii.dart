@@ -4,6 +4,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ekiden/ghensuu.dart';
 import 'package:ekiden/constants.dart';
 import 'package:ekiden/univ_data.dart';
+import 'package:ekiden/kansuu/gakuren_text.dart';
 
 class ModalRankTransitionView extends StatefulWidget {
   const ModalRankTransitionView({super.key});
@@ -42,13 +43,20 @@ class _ModalRankTransitionViewState extends State<ModalRankTransitionView> {
   }
 
   // クリップボードへマークダウン形式のテキストとしてコピーする関数
+  // [gakurenSaishin] 学連選抜の最新区間の結果(いないときはnull)、[gakurenJuni] 学連選抜の区間ごとの
+  // 通過順位相当(0が1位相当)、[gakurenIchi] 学連選抜の行を差し込む位置(1.8.2)
   Future<void> _exportAsText(
     String title,
     List<UnivData> filteredData,
     int lastKukanIndex,
     String kustring,
+    GakurenKukanKekka? gakurenSaishin,
+    List<int?> gakurenJuni,
+    int gakurenIchi,
   ) async {
-    String shareText = '【$title 順位推移表】\n\n';
+    String shareText = '';
+    if (gakurenSaishin != null) shareText += gakurenOpChuui;
+    shareText += '【$title 順位推移表】\n\n';
 
     // ヘッダー部分の作成
     shareText += '| 最新順位 | 大学名 | ';
@@ -65,8 +73,22 @@ class _ModalRankTransitionViewState extends State<ModalRankTransitionView> {
     }
     shareText += '\n';
 
+    // 学連選抜(OP)の行(1.8.2)
+    String gakurenGyou() {
+      String gyou = '| OP(${gakurenSaishin!.tuukaJuni + 1}位相当) | 学連選抜 | ';
+      for (int i = 0; i <= lastKukanIndex; i++) {
+        final int? juni = i < gakurenJuni.length ? gakurenJuni[i] : null;
+        gyou += '${juni == null ? '---' : juni + 1} | ';
+      }
+      return '$gyou\n';
+    }
+
     // 各大学のデータ行の作成
-    for (var univ in filteredData) {
+    for (int index = 0; index < filteredData.length; index++) {
+      final UnivData univ = filteredData[index];
+      if (gakurenSaishin != null && index == gakurenIchi) {
+        shareText += gakurenGyou();
+      }
       // 最新の順位を取得
       final int latestJuniRaw = univ.tuukajuni_taikai.length > lastKukanIndex
           ? univ.tuukajuni_taikai[lastKukanIndex]
@@ -89,6 +111,10 @@ class _ModalRankTransitionViewState extends State<ModalRankTransitionView> {
         shareText += '$kukanJuniStr | ';
       }
       shareText += '\n';
+    }
+    // 学連選抜がどの大学よりも後ろのときは最後に入れる
+    if (gakurenSaishin != null && gakurenIchi >= filteredData.length) {
+      shareText += gakurenGyou();
     }
 
     shareText += '\n#箱庭小駅伝SS';
@@ -130,6 +156,63 @@ class _ModalRankTransitionViewState extends State<ModalRankTransitionView> {
       child: Text(
         text,
         style: TextStyle(color: HENSUU.textcolor, fontSize: 14),
+      ),
+    );
+  }
+
+  // 学連選抜(OP)の行(正月駅伝のときだけ、最新の通過順位相当の位置に入れる。1.8.2)
+  Widget _buildGakurenRow(
+    GakurenKukanKekka saishin,
+    List<int?> gakurenJuni,
+    int lastKukanIndex,
+    double rankColumnWidth,
+    double nameColumnWidth,
+    double kukanColumnWidth,
+  ) {
+    const TextStyle opStyle = TextStyle(
+      color: Colors.cyanAccent,
+      fontWeight: FontWeight.bold,
+      fontSize: 14,
+    );
+    return Container(
+      color: Colors.cyanAccent.withOpacity(0.08),
+      child: Row(
+        children: [
+          Container(
+            width: rankColumnWidth,
+            height: 48.0,
+            padding: const EdgeInsets.symmetric(horizontal: 4.0),
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'OP\n${saishin.tuukaJuni + 1}位相当',
+              style: const TextStyle(
+                color: Colors.cyanAccent,
+                fontWeight: FontWeight.bold,
+                fontSize: 12,
+              ),
+            ),
+          ),
+          Container(
+            width: nameColumnWidth,
+            height: 48.0,
+            padding: const EdgeInsets.symmetric(horizontal: 12.0),
+            alignment: Alignment.centerLeft,
+            child: const Text('学連選抜', style: opStyle),
+          ),
+          for (int i = 0; i <= lastKukanIndex; i++)
+            Container(
+              width: kukanColumnWidth,
+              height: 48.0,
+              padding: const EdgeInsets.symmetric(horizontal: 12.0),
+              alignment: Alignment.center,
+              child: Text(
+                i < gakurenJuni.length && gakurenJuni[i] != null
+                    ? '${gakurenJuni[i]! + 1}'
+                    : '-',
+                style: opStyle,
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -210,6 +293,27 @@ class _ModalRankTransitionViewState extends State<ModalRankTransitionView> {
               lastKukanIndex,
             );
 
+            // 学連選抜(正月駅伝のときだけ)を、最新の通過順位相当の位置に「OP」として表に入れる(1.8.2)
+            final GakurenKukanKekka? gakurenSaishin = gakurenKukanKekka(
+              currentGhensuu,
+              lastKukanIndex,
+            );
+            final List<int?> gakurenJuni = [
+              for (int i = 0; i <= lastKukanIndex; i++)
+                gakurenSaishin == null
+                    ? null
+                    : gakurenKukanKekka(currentGhensuu, i)?.tuukaJuni,
+            ];
+            final int gakurenIchi = gakurenSaishin == null
+                ? -1
+                : gakurenSounyuuIchi([
+                    for (final u in filteredUnivData)
+                      u.tuukajuni_taikai.length > lastKukanIndex
+                          ? u.tuukajuni_taikai[lastKukanIndex]
+                          : TEISUU.DEFAULTJUNI,
+                  ], gakurenSaishin.tuukaJuni);
+            final int gakurenKazu = gakurenSaishin == null ? 0 : 1;
+
             return Scaffold(
               backgroundColor: HENSUU.backgroundcolor,
               appBar: AppBar(
@@ -230,6 +334,9 @@ class _ModalRankTransitionViewState extends State<ModalRankTransitionView> {
                             filteredUnivData,
                             lastKukanIndex,
                             kustring,
+                            gakurenSaishin,
+                            gakurenJuni,
+                            gakurenIchi,
                           ),
                   ),
                 ],
@@ -244,6 +351,21 @@ class _ModalRankTransitionViewState extends State<ModalRankTransitionView> {
                   // 見出しを固定したカスタムテーブル構造
                   : Column(
                       children: [
+                        // 学連選抜(OP)の説明(1.8.2)
+                        if (gakurenSaishin != null)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12.0,
+                              vertical: 6.0,
+                            ),
+                            child: Text(
+                              '※OPは学連選抜(オープン参加)です。順位には数えず、数字は大学の中に入れた場合の順位相当です',
+                              style: TextStyle(
+                                color: HENSUU.textcolor,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
                         Expanded(
                           child: SingleChildScrollView(
                             scrollDirection: Axis.horizontal,
@@ -289,10 +411,28 @@ class _ModalRankTransitionViewState extends State<ModalRankTransitionView> {
                                   // --- データ行（縦スクロール） ---
                                   Expanded(
                                     child: ListView.builder(
-                                      itemCount: filteredUnivData.length,
+                                      itemCount:
+                                          filteredUnivData.length +
+                                          gakurenKazu,
                                       itemBuilder: (context, index) {
+                                        // 学連選抜の行(1.8.2)
+                                        if (gakurenSaishin != null &&
+                                            index == gakurenIchi) {
+                                          return _buildGakurenRow(
+                                            gakurenSaishin,
+                                            gakurenJuni,
+                                            lastKukanIndex,
+                                            rankColumnWidth,
+                                            nameColumnWidth,
+                                            kukanColumnWidth,
+                                          );
+                                        }
                                         final UnivData univ =
-                                            filteredUnivData[index];
+                                            filteredUnivData[gakurenSaishin !=
+                                                        null &&
+                                                    index > gakurenIchi
+                                                ? index - 1
+                                                : index];
 
                                         // 最新順位
                                         final int latestJuniRaw =

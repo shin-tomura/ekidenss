@@ -1071,11 +1071,58 @@ Future<void> RaceCalc_gakuren({
                 gakurensenshudata[senshuid].time_taikai_total - lasttime;
             gakurensenshudata[senshuid].string_racesetumei +=
                 "モチベーション低下補正:+${sontokutime.toStringAsFixed(1)}秒\n";
+            atai_hosei[senshuid][12] = sontokutime; // 補正計に含めるため
           }
         }
         var temptime_assign = gakurensenshudata[senshuid].time_taikai_total;
         gakurenunivdata[0].time_taikai_total[gh[0].nowracecalckukan] +=
             temptime_assign;
+      }
+    }
+  }
+
+  // 補正計と能力ごとの補正の説明(1.8.2。学連選抜の監督の画面の「ここまでの区間」で見られる)
+  // ・能力ごとの補正は、大学の選手(RaceCalc.dart)と同じく、総監督の見抜く力がついている能力だけを出す
+  //   (経験補正は効いたときだけ出す)
+  // ・学連選抜の計算は1区間に学連選抜の選手1人だけなので、区間内の順位と基本走力差は出さない
+  //   (補正がほぼ0の能力は、大学の選手で区間の誰にも効かないときと同じく「無」と出す)
+  // ・補正計は、能力・経験・調子・指示・集団走・モチベーション低下の補正の合計
+  if (racebangou >= 0 && racebangou <= 5) {
+    for (var senshuid = 0; senshuid < gakurensenshudata.length; senshuid++) {
+      final senshu = gakurensenshudata[senshuid];
+      if (senshu.entrykukan_race[racebangou][senshu.gakunen - 1] !=
+          gh[0].nowracecalckukan) {
+        continue;
+      }
+      double hoseiKei = 0.0;
+      for (int j = 0; j < hoseishuruisuu - 2; j++) {
+        if (j == 8) continue; // 基本走力差は含めない
+        if (atai_hosei[senshuid][j] != TEISUU.DEFAULTTIME) {
+          hoseiKei += atai_hosei[senshuid][j];
+        }
+      }
+      senshu.string_racesetumei +=
+          "${name_hosei[15]}:${hoseiKei.isNegative ? '' : '+'}${hoseiKei.toStringAsFixed(1)}秒\n";
+      for (int j = 0; j < 8; j++) {
+        final double atai = atai_hosei[senshuid][j];
+        final bool kiita =
+            atai != TEISUU.DEFAULTTIME && (atai > 0.001 || atai < -0.001);
+        if (j == 3) {
+          if (kiita && atai < -0.0001) {
+            senshu.string_racesetumei +=
+                "${name_hosei[j]}:${atai.toStringAsFixed(1)}秒\n";
+          }
+          continue;
+        }
+        if (gh[0].nouryokumieruflag[nouryokumieruflagIndex_hosei[j]] != 1) {
+          continue;
+        }
+        if (kiita) {
+          senshu.string_racesetumei +=
+              "${name_hosei[j]}:${atai.isNegative ? '' : '+'}${atai.toStringAsFixed(1)}秒\n";
+        } else {
+          senshu.string_racesetumei += "${name_hosei[j]} 無\n";
+        }
       }
     }
   }

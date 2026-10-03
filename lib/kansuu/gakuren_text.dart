@@ -323,18 +323,21 @@ String gakurenKukanHaitiText(Ghensuu gh) {
   return sb.toString();
 }
 
-/// 学連選抜の選手の指示の内容と結果の文(レース画面の学連選抜の欄と同じ内容)
-List<String> _sijiBun(
+/// 学連選抜の選手の指示の内容と結果の文
+/// レース画面・結果画面の学連選抜の欄と、学連選抜のレース経過のコピーで共通に使う(1.8.3で共通にした)
+/// [midashi] は1行目の見出し(コピーでは「指示」、画面では「指示内容」)
+List<String> gakurenSijiBun(
   Senshu_Gakuren_Data s,
   int kukan,
-  UnivGakurenData u,
-) {
+  UnivGakurenData u, {
+  String midashi = '指示',
+}) {
   const List<String> kekka = ["失敗", "成功"];
   final List<String> options = kukan == 0
       ? ["指示なし", "スタート直後に飛び出す", "スタート直後は飛び出さない"]
       : ["指示なし", "前半から突っ込む", "前半は抑える"];
   final int sijiflag = s.sijiflag.clamp(0, 2).toInt();
-  final List<String> bun = ['指示:${options[sijiflag]}'];
+  final List<String> bun = ['$midashi:${options[sijiflag]}'];
   if (kukan == 0) {
     if (s.startchokugotobidasiflag == 1) {
       bun.add(
@@ -433,7 +436,7 @@ String gakurenRaceKeikaText(Ghensuu gh) {
       }
       sb.writeln('$saGyou)');
     }
-    for (final String bun in _sijiBun(s, kukan, u)) {
+    for (final String bun in gakurenSijiBun(s, kukan, u)) {
       sb.writeln('  $bun');
     }
     if (s.string_racesetumei.trim().isNotEmpty) {

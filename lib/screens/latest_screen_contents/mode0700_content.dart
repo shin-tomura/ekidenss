@@ -26,8 +26,8 @@ import 'package:ekiden/screens/Modal_kukanhaiti2.dart';
 import 'package:ekiden/screens/Modal_courseshoukai.dart';
 import 'package:ekiden/screens/Modal_tuukajunisuii.dart';
 import 'package:ekiden/screens/Modal_timesasuii.dart';
-import 'package:ekiden/kansuu/mokuhyou_hosei.dart';
 import 'package:ekiden/kansuu/gakuren_text.dart';
+import 'package:ekiden/kansuu/gakuren_kantoku.dart'; // 学連選抜の監督をした年か(1.8.3)
 
 // モーダルビューのプレースホルダー
 // 実際にはこれらのファイルを別途作成する必要があります
@@ -3192,8 +3192,10 @@ class _Mode0700ContentState extends State<Mode0700Content> {
               idJunUnivData[senshu.univid]
                       .mokuhyojuniwositamawatteruflag[mokuhyoJuniFlagIndex] ==
                   1)
+            // 根拠(襷を受けた時点の順位・目標順位・差)は、走った時点で記録した補正の説明に出る。
+            // ここで今の目標順位から作ると、レース中に目標を変えたときに補正の説明と食い違うので出さない(1.8.3)
             Text(
-              "チーム目標順位を下回っていた(${_mokuhyouKonkyo(idJunUnivData[senshu.univid], ghensuu.hyojiracebangou, iKukan, univs: idJunUnivData)})ことによる前半突っ込みでのタイム悪化あり",
+              "チーム目標順位を下回っていたことによる前半突っ込みでのタイム悪化あり",
               style: const TextStyle(color: HENSUU.textcolor),
             )
           else if (mokuhyoJuniFlagIndex >= 0 &&
@@ -3206,7 +3208,7 @@ class _Mode0700ContentState extends State<Mode0700Content> {
                       .mokuhyojuniwositamawatteruflag[mokuhyoJuniFlagIndex] <
                   0)
             Text(
-              "チーム目標順位を上回っていた(${_mokuhyouKonkyo(idJunUnivData[senshu.univid], ghensuu.hyojiracebangou, iKukan)})ことによるほっと一息でのタイム悪化あり",
+              "チーム目標順位を上回っていたことによるほっと一息でのタイム悪化あり",
               style: const TextStyle(color: HENSUU.textcolor),
             ),
         ],
@@ -3347,6 +3349,17 @@ class _Mode0700ContentState extends State<Mode0700Content> {
     final gakurenunivdata = gakurenunivBox.values.toList();
     final gakurensenshuBox = Hive.box<Senshu_Gakuren_Data>('gakurenSenshuBox');
     final gakurensenshudata = gakurensenshuBox.values.toList();
+    // 学連選抜の監督をした年は、選手ごとの指示の内容と結果、補正の説明も出す
+    // (レース画面で学連選抜の詳しい表示を出すときと同じ条件。1.8.3)
+    final KantokuData? kantoku = Hive.box<KantokuData>(
+      'kantokuBox',
+    ).get('KantokuData');
+    final bool gakurenKantoku =
+        currentGhensuu.hyojiracebangou == 2 &&
+        kantoku != null &&
+        idJunUnivData.length > currentGhensuu.MYunivid &&
+        gakurenKantokuChuu(kantoku, idJunUnivData[currentGhensuu.MYunivid]) &&
+        gakurenunivdata.isNotEmpty;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -3561,6 +3574,24 @@ class _Mode0700ContentState extends State<Mode0700Content> {
                               .string_racesetumei,
                           style: TextStyle(color: HENSUU.textcolor),
                         ),*/
+                      // 学連選抜の監督をした年は、指示の内容と結果、補正の説明を出す
+                      // (レース画面の学連選抜の欄と同じ内容。文は gakuren_text.dart の gakurenSijiBun。1.8.3)
+                      if (gakurenKantoku) ...[
+                        for (final String bun in gakurenSijiBun(
+                          gakurensenshudata[number],
+                          iKukan,
+                          gakurenunivdata[0],
+                          midashi: '指示内容',
+                        ))
+                          Text(bun, style: TextStyle(color: HENSUU.textcolor)),
+                        if (gakurensenshudata[number]
+                            .string_racesetumei
+                            .isNotEmpty)
+                          Text(
+                            gakurensenshudata[number].string_racesetumei,
+                            style: TextStyle(color: HENSUU.textcolor),
+                          ),
+                      ],
                       const Text(""), // スペース
                     ],
                   ),
@@ -3570,31 +3601,4 @@ class _Mode0700ContentState extends State<Mode0700Content> {
       ],
     );
   }
-}
-
-/// 目標順位による補正の根拠(例: 襷を受けた時点で5位・目標3位)
-/// 判定は襷を受けた時点(前の区間の終了時点)の通過順位と目標順位で行っている
-/// [univs] を渡すと、目標順位を下回っているときは目標順位の大学とのタイム差も付ける
-/// (例: 襷を受けた時点で5位・目標3位・3位と32.0秒差)
-String _mokuhyouKonkyo(
-  UnivData univ,
-  int racebangou,
-  int kukan, {
-  List<UnivData>? univs,
-}) {
-  if (kukan <= 0 ||
-      univ.tuukajuni_taikai.length < kukan ||
-      univ.mokuhyojuni.length <= racebangou) {
-    return '';
-  }
-  final String sa = univs == null
-      ? ''
-      : mokuhyouSaBun(
-          univs: univs,
-          univ: univ,
-          racebangou: racebangou,
-          kukan: kukan,
-        );
-  return '襷を受けた時点で${univ.tuukajuni_taikai[kukan - 1] + 1}位・目標${univ.mokuhyojuni[racebangou] + 1}位'
-      '${sa.isEmpty ? '' : '・$sa'}';
 }

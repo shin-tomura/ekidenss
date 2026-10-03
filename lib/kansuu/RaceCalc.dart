@@ -1647,10 +1647,12 @@ Future<void> RaceCalc({
   print("RaceCalc処理時間: ${_timeToMinuteSecondString(timeInterval)}経過");
 }
 
-/// 目標順位による補正の根拠(例: 襷を受けた時点5位/目標3位)
+/// 目標順位による補正の根拠(例: 襷を受けた時点で5位・目標3位)
 /// 判定は襷を受けた時点(前の区間の終了時点)の通過順位と目標順位で行っている
 /// [univs] を渡すと、目標順位を下回っているときは目標順位の大学とのタイム差も付ける
-/// (例: 襷を受けた時点5位/目標3位・3位と32.0秒差)
+/// (例: 襷を受けた時点で5位・目標3位・3位と32.0秒差)
+/// 1.8.3で、学連選抜の選手の補正の説明(RaceCalc_gakuren.dart)と同じ書き方にした
+/// (1.8.2までは「襷を受けた時点5位/目標3位」)
 String _mokuhyouKonkyo(
   UnivData univ,
   int racebangou,
@@ -1670,6 +1672,6 @@ String _mokuhyouKonkyo(
           racebangou: racebangou,
           kukan: kukan,
         );
-  return '襷を受けた時点${univ.tuukajuni_taikai[kukan - 1] + 1}位/目標${univ.mokuhyojuni[racebangou] + 1}位'
+  return '襷を受けた時点で${univ.tuukajuni_taikai[kukan - 1] + 1}位・目標${univ.mokuhyojuni[racebangou] + 1}位'
       '${sa.isEmpty ? '' : '・$sa'}';
 }

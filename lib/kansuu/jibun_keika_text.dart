@@ -5,40 +5,12 @@ import 'package:ekiden/ghensuu.dart';
 import 'package:ekiden/senshu_data.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/kansuu/time_date.dart';
-import 'package:ekiden/kansuu/mokuhyou_hosei.dart';
 
 // ------------------------------------------------------------
 // 自分の大学のレース経過のテキスト(1.8.2)
 // レース画面の「自分の大学のレース経過をコピー」と、生成AIに渡すテキストのまとめボタンで使う。
-// 目標順位による補正の根拠の文(mokuhyouKonkyoBun)は、レース画面の表示と共通。
+// 目標順位による悪化の文には根拠を付けない(1.8.3。根拠は走った時点で記録した補正の説明に出る)
 // ------------------------------------------------------------
-
-/// 目標順位による補正の根拠(例: 襷を受けた時点で5位・目標3位)
-/// 判定は襷を受けた時点(前の区間の終了時点)の通過順位と目標順位で行っている
-/// [univs] を渡すと、目標順位を下回っているときは目標順位の大学とのタイム差も付ける
-/// (例: 襷を受けた時点で5位・目標3位・3位と32.0秒差)
-String mokuhyouKonkyoBun(
-  UnivData univ,
-  int racebangou,
-  int kukan, {
-  List<UnivData>? univs,
-}) {
-  if (kukan <= 0 ||
-      univ.tuukajuni_taikai.length < kukan ||
-      univ.mokuhyojuni.length <= racebangou) {
-    return '';
-  }
-  final String sa = univs == null
-      ? ''
-      : mokuhyouSaBun(
-          univs: univs,
-          univ: univ,
-          racebangou: racebangou,
-          kukan: kukan,
-        );
-  return '襷を受けた時点で${univ.tuukajuni_taikai[kukan - 1] + 1}位・目標${univ.mokuhyojuni[racebangou] + 1}位'
-      '${sa.isEmpty ? '' : '・$sa'}';
-}
 
 /// 自分の大学のレース経過のテキスト(生成AIに渡して実況や相談を楽しむためのコピー用)
 /// レース画面の「直近区間」「ここまでの全区間」と同じ内容(指示の内容と結果、補正の説明)に、
@@ -198,11 +170,10 @@ String jibunRaceKeikaText(Ghensuu currentGhensuu) {
         if (sijiflag >= 1) {
           sijiResult = "結果:${kekka[x.sijiseikouflag.clamp(0, 1).toInt()]}";
         } else if (my.mokuhyojuniwositamawatteruflag[k - 1] == 1) {
-          sijiResult =
-              "チーム目標順位を下回っていた(${mokuhyouKonkyoBun(my, race, k, univs: univs)})ことによる前半突っ込みでのタイム悪化あり";
+          // 根拠(襷を受けた時点の順位・目標順位・差)は、走った時点で記録した補正の説明に出る(1.8.3)
+          sijiResult = "チーム目標順位を下回っていたことによる前半突っ込みでのタイム悪化あり";
         } else if (my.mokuhyojuniwositamawatteruflag[k - 1] < 0) {
-          sijiResult =
-              "チーム目標順位を上回っていた(${mokuhyouKonkyoBun(my, race, k)})ことによるほっと一息でのタイム悪化あり";
+          sijiResult = "チーム目標順位を上回っていたことによるほっと一息でのタイム悪化あり";
         }
       }
       sb.writeln('  指示内容:${options[sijiflag]}');

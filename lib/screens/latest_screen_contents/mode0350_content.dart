@@ -30,6 +30,7 @@ import 'package:ekiden/kansuu/siji_sontoku.dart';
 import 'package:ekiden/kansuu/gakuren_kantoku.dart';
 import 'package:ekiden/screens/gakuren_copy_button.dart';
 import 'package:ekiden/kansuu/jibun_keika_text.dart';
+import 'package:ekiden/kansuu/gakuren_text.dart'; // 学連選抜の指示の内容と結果の文(1.8.3)
 import 'package:ekiden/screens/ai_copy_matome.dart';
 
 String _getCombinedDifficultyText(KantokuData kantoku, Ghensuu currentGhensuu) {
@@ -1029,39 +1030,20 @@ class _Mode0350ContentState extends State<Mode0350Content> {
   }
 
   // 学連選抜の選手の指示の内容と結果(学連選抜の結果の詳しい表示で使う。1.8.2)
+  // 文は lib/kansuu/gakuren_text.dart の gakurenSijiBun で作る(結果画面・コピーの文と共通。1.8.3)
   List<Widget> _gakurenSijiKekka(
     Senshu_Gakuren_Data senshu,
     int iKukan,
     UnivGakurenData gakurenUniv,
   ) {
-    const List<String> kekka = ["失敗", "成功"];
-    final List<String> options = iKukan == 0
-        ? ["指示なし", "スタート直後に飛び出す", "スタート直後は飛び出さない"]
-        : ["指示なし", "前半から突っ込む", "前半は抑える"];
-    final int sijiflag = senshu.sijiflag.clamp(0, 2).toInt();
-    String sijiResult = "";
-    if (iKukan == 0) {
-      if (senshu.startchokugotobidasiflag == 1) {
-        sijiResult =
-            "スタート直後飛び出して:${kekka[senshu.startchokugotobidasiseikouflag.clamp(0, 1).toInt()]}";
-      }
-    } else if (sijiflag >= 1) {
-      sijiResult = "結果:${kekka[senshu.sijiseikouflag.clamp(0, 1).toInt()]}";
-    } else if (gakurenUniv.mokuhyojuniwositamawatteruflag.length > iKukan - 1 &&
-        gakurenUniv.mokuhyojuniwositamawatteruflag[iKukan - 1] == 1) {
-      sijiResult = "学連選抜の目標順位を下回っていたことによる前半突っ込みでのタイム悪化あり";
-    } else if (gakurenUniv.mokuhyojuniwositamawatteruflag.length > iKukan - 1 &&
-        gakurenUniv.mokuhyojuniwositamawatteruflag[iKukan - 1] < 0) {
-      // 目標を上回ったときのほっと一息(学連選抜の監督をしているときだけ。1.8.2)
-      sijiResult = "学連選抜の目標順位を上回っていたことによるほっと一息でのタイム悪化あり";
-    }
     return [
-      Text(
-        "指示内容:${options[sijiflag]}",
-        style: TextStyle(color: HENSUU.textcolor),
-      ),
-      if (sijiResult.isNotEmpty)
-        Text(sijiResult, style: TextStyle(color: HENSUU.textcolor)),
+      for (final String bun in gakurenSijiBun(
+        senshu,
+        iKukan,
+        gakurenUniv,
+        midashi: '指示内容',
+      ))
+        Text(bun, style: TextStyle(color: HENSUU.textcolor)),
       if (senshu.string_racesetumei.isNotEmpty)
         Text(
           senshu.string_racesetumei,
@@ -2339,12 +2321,14 @@ class _Mode0350ContentState extends State<Mode0350Content> {
                         idjununivdata[currentGhensuu.MYunivid]
                                 .mokuhyojuniwositamawatteruflag[i_kukan - 1] ==
                             1) {
-                      sijiResult = "チーム目標順位を下回っていた(${_mokuhyouKonkyo(idjununivdata[currentGhensuu.MYunivid], currentGhensuu.hyojiracebangou, i_kukan, univs: idjununivdata)})ことによる前半突っ込みでのタイム悪化あり";
+                      // 根拠(襷を受けた時点の順位・目標順位・差)は、走った時点で記録した補正の説明に出る。
+                      // ここで今の目標順位から作ると、レース中に目標を変えたときに補正の説明と食い違うので出さない(1.8.3)
+                      sijiResult = "チーム目標順位を下回っていたことによる前半突っ込みでのタイム悪化あり";
                     } else if (i_kukan > 0 &&
                         idjununivdata[currentGhensuu.MYunivid]
                                 .mokuhyojuniwositamawatteruflag[i_kukan - 1] <
                             0) {
-                      sijiResult = "チーム目標順位を上回っていた(${_mokuhyouKonkyo(idjununivdata[currentGhensuu.MYunivid], currentGhensuu.hyojiracebangou, i_kukan)})ことによるほっと一息でのタイム悪化あり";
+                      sijiResult = "チーム目標順位を上回っていたことによるほっと一息でのタイム悪化あり";
                     }
                   }
 
@@ -2505,12 +2489,14 @@ class _Mode0350ContentState extends State<Mode0350Content> {
                         idjununivdata[currentGhensuu.MYunivid]
                                 .mokuhyojuniwositamawatteruflag[i_kukan - 1] ==
                             1) {
-                      sijiResult = "チーム目標順位を下回っていた(${_mokuhyouKonkyo(idjununivdata[currentGhensuu.MYunivid], currentGhensuu.hyojiracebangou, i_kukan, univs: idjununivdata)})ことによる前半突っ込みでのタイム悪化あり";
+                      // 根拠(襷を受けた時点の順位・目標順位・差)は、走った時点で記録した補正の説明に出る。
+                      // ここで今の目標順位から作ると、レース中に目標を変えたときに補正の説明と食い違うので出さない(1.8.3)
+                      sijiResult = "チーム目標順位を下回っていたことによる前半突っ込みでのタイム悪化あり";
                     } else if (i_kukan > 0 &&
                         idjununivdata[currentGhensuu.MYunivid]
                                 .mokuhyojuniwositamawatteruflag[i_kukan - 1] <
                             0) {
-                      sijiResult = "チーム目標順位を上回っていた(${_mokuhyouKonkyo(idjununivdata[currentGhensuu.MYunivid], currentGhensuu.hyojiracebangou, i_kukan)})ことによるほっと一息でのタイム悪化あり";
+                      sijiResult = "チーム目標順位を上回っていたことによるほっと一息でのタイム悪化あり";
                     }
                   }
 
@@ -2838,18 +2824,4 @@ class ProgressView extends StatelessWidget {
       ],
     );
   }
-}
-
-/// 目標順位による補正の根拠(例: 襷を受けた時点で5位・目標3位)
-/// 判定は襷を受けた時点(前の区間の終了時点)の通過順位と目標順位で行っている
-/// [univs] を渡すと、目標順位を下回っているときは目標順位の大学とのタイム差も付ける
-/// (例: 襷を受けた時点で5位・目標3位・3位と32.0秒差)
-String _mokuhyouKonkyo(
-  UnivData univ,
-  int racebangou,
-  int kukan, {
-  List<UnivData>? univs,
-}) {
-  // 文は lib/kansuu/jibun_keika_text.dart の mokuhyouKonkyoBun で作る(コピーの文と共通。1.8.2)
-  return mokuhyouKonkyoBun(univ, racebangou, kukan, univs: univs);
 }

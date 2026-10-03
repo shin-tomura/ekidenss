@@ -183,6 +183,15 @@ class _ModalGakurenKukanHenshuuState extends State<ModalGakurenKukanHenshuu> {
                   fontSize: HENSUU.fontsize_honbun - 2,
                 ),
               ),
+              const SizedBox(height: 8),
+              // 1区の集団のペースは大学の選手だけで決まる(RaceCalc_gakuren.dartの1区の補正を参照)
+              Text(
+                '※1区の集団のペースは大学の選手だけで決まります。どんなにカリスマが高くても、学連選抜の選手が集団のペースを作ることはありません。',
+                style: TextStyle(
+                  color: Colors.amber,
+                  fontSize: HENSUU.fontsize_honbun - 2,
+                ),
+              ),
               const SizedBox(height: 12),
               for (int kukan = 0; kukan < kukansuu; kukan++)
                 _kukanGyou(

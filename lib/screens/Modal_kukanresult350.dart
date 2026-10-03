@@ -10,6 +10,7 @@ import 'package:ekiden/kansuu/time_date.dart';
 import 'package:ekiden/screens/Modal_senshu.dart';
 import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/kansuu/gakuren_text.dart';
+import 'package:ekiden/senshu_gakuren_data.dart';
 import 'package:screenshot/screenshot.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -361,6 +362,19 @@ class _ModalKukanResultListViewState350
               for (var senshu in filteredSenshuData) senshu.univid: senshu,
             };
 
+            // 学連選抜(正月駅伝のときだけ)を、区間順位相当の位置に「OP」として表に入れる(1.8.2)
+            final GakurenKukanKekka? gakuren = gakurenKukanKekka(
+              currentGhensuu,
+              kukanBangou,
+            );
+            final int gakurenIchi = gakuren == null
+                ? -1
+                : gakurenSounyuuIchi([
+                    for (final u in filteredUnivData)
+                      u.kukanjuni_taikai[kukanBangou],
+                  ], gakuren.kukanJuni);
+            final int gakurenKazu = gakuren == null ? 0 : 1;
+
             final int kukanKyoriRoundedM =
                 (currentGhensuu.kyori_taikai_kukangoto[raceBangou][kukanBangou])
                     .round();
@@ -500,11 +514,14 @@ class _ModalKukanResultListViewState350
                                 // ★変更: 分析モードの時は要素数を1つ増やす（一番下に説明文を入れるため）
                                 itemCount:
                                     filteredUnivData.length +
+                                    gakurenKazu +
                                     (_viewMode == ViewMode.analysis ? 1 : 0),
                                 itemBuilder: (context, index) {
                                   // ★追加: リストの最後尾に到達したら説明文を表示する
                                   if (_viewMode == ViewMode.analysis &&
-                                      index == filteredUnivData.length) {
+                                      index ==
+                                          filteredUnivData.length +
+                                              gakurenKazu) {
                                     return Container(
                                       padding: const EdgeInsets.symmetric(
                                         horizontal: 16.0,
@@ -521,7 +538,15 @@ class _ModalKukanResultListViewState350
                                     );
                                   }
 
-                                  final UnivData univ = filteredUnivData[index];
+                                  // 学連選抜の行
+                                  if (gakuren != null && index == gakurenIchi) {
+                                    return _buildGakurenItem(gakuren);
+                                  }
+                                  final UnivData univ =
+                                      filteredUnivData[gakuren != null &&
+                                              index > gakurenIchi
+                                          ? index - 1
+                                          : index];
                                   final double kukanTime = kukanBangou == 0
                                       ? univ.time_taikai_total[0]
                                       : (univ.time_taikai_total[kukanBangou] <
@@ -660,6 +685,87 @@ class _ModalKukanResultListViewState350
           },
         );
       },
+    );
+  }
+
+  // 学連選抜(オープン参加)の行(区間順位相当の位置に入れる。1.8.2)
+  Widget _buildGakurenItem(GakurenKukanKekka gakuren) {
+    final Senshu_Gakuren_Data senshu = gakuren.senshu;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'OP(${gakuren.kukanJuni + 1}位相当) ${senshu.name}',
+            style: TextStyle(
+              color: Colors.cyanAccent,
+              fontSize: HENSUU.fontsize_honbun,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          Text(
+            "学連選抜（${senshu.gakunen}年 所属:${gakuren.shozoku}）",
+            style: TextStyle(
+              color: HENSUU.textcolor,
+              fontSize: HENSUU.fontsize_honbun,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.only(left: 16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildKukanTimeRow(gakuren.kukanTime, const []),
+                if (_viewMode == ViewMode.description)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4.0),
+                    child: Text(
+                      senshu.string_racesetumei.isEmpty
+                          ? '説明文はありません'
+                          : senshu.string_racesetumei,
+                      style: TextStyle(
+                        color: HENSUU.textcolor.withOpacity(0.9),
+                        fontSize: HENSUU.fontsize_honbun * 1.05,
+                      ),
+                    ),
+                  )
+                else if (_viewMode == ViewMode.analysis) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    '学連選抜の選手には分析データがありません',
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontSize: HENSUU.fontsize_honbun,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              showGeneralDialog(
+                context: context,
+                barrierColor: Colors.black.withOpacity(0.8),
+                barrierDismissible: true,
+                barrierLabel: '選手詳細',
+                pageBuilder: (context, _, __) =>
+                    ModalSenshuDetailView(senshuId: senshu.id),
+              );
+            },
+            child: Text(
+              '選手詳細',
+              style: TextStyle(
+                color: HENSUU.LinkColor,
+                fontSize: HENSUU.fontsize_honbun - 2,
+              ),
+            ),
+          ),
+          const Divider(color: Colors.white12),
+        ],
+      ),
     );
   }
 

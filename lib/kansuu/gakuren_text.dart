@@ -117,6 +117,16 @@ GakurenKukanKekka? gakurenKukanKekka(Ghensuu gh, int kukan) {
   );
 }
 
+/// 順位の良い順に並んだ大学の順位(0が1位)[juniList]の中で、学連選抜(順位相当[gakurenJuni])を
+/// 差し込む位置(順位の数字が学連選抜と同じか大きい、最初の大学の前。なければ最後)
+/// 個人順位速報・通過順位速報などの画面の表で使う(コピーの文と同じ位置になる)
+int gakurenSounyuuIchi(List<int> juniList, int gakurenJuni) {
+  for (int i = 0; i < juniList.length; i++) {
+    if (juniList[i] >= gakurenJuni) return i;
+  }
+  return juniList.length;
+}
+
 /// 個人順位速報のコピーに差し込む学連選抜の行
 /// (例: OP(8位相当) 62分33秒 山田太郎(3年) 学連選抜(所属:〇〇))
 String gakurenKojinSokuhouGyou(GakurenKukanKekka k) {

@@ -1216,18 +1216,30 @@ class _Mode0350ContentState extends State<Mode0350Content> {
             const GakurenCopyButton(),
             // いつものリンク(個人順位速報・通過順位速報など。大学の選手への指示の画面は出さない)
             LinkButtons(gakurenKantoku: true),
+            // 大学の監督のときの指示画面と同じく、直近区間・総合成績・ここまでの全区間の順に出す
             if (kukan > 0) ...[
               const SizedBox(height: 8),
               Text(
-                "==学連選抜のここまでの区間==",
+                "==直近区間==",
                 style: TextStyle(color: HENSUU.textcolor),
               ),
-              gakurenRaceResults(currentGhensuu, idjununivdata, shousai: true),
+              gakurenRaceResults(
+                currentGhensuu,
+                idjununivdata,
+                shousai: true,
+                chokkinNomi: true,
+              ),
               Text(
                 "==総合成績==",
                 style: TextStyle(color: HENSUU.textcolor),
               ),
               AllUnivOverallResults_shougatu(currentGhensuu, timejununivdata),
+              const SizedBox(height: 16),
+              Text(
+                "==ここまでの全区間==",
+                style: TextStyle(color: HENSUU.textcolor),
+              ),
+              gakurenRaceResults(currentGhensuu, idjununivdata, shousai: true),
             ],
             const SizedBox(height: 16),
           ],
@@ -2391,15 +2403,21 @@ class _Mode0350ContentState extends State<Mode0350Content> {
     //List<SenshuData> gakunenjununivfilteredsenshudata,
     // trueなら指示の内容・結果と補正の説明も出す(学連選抜の監督をしているとき。1.8.2)
     bool shousai = false,
+    // trueなら直近の区間だけを出す(学連選抜の監督をしているときの「直近区間」。1.8.2)
+    bool chokkinNomi = false,
   }) {
     final gakurenunivBox = Hive.box<UnivGakurenData>('gakurenUnivBox');
     final gakurenunivdata = gakurenunivBox.values.toList();
     final gakurensenshuBox = Hive.box<Senshu_Gakuren_Data>('gakurenSenshuBox');
     final gakurensenshudata = gakurensenshuBox.values.toList();
+    final int hajime = chokkinNomi && currentGhensuu.nowracecalckukan > 0
+        ? currentGhensuu.nowracecalckukan - 1
+        : 0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
-      children: List.generate(currentGhensuu.nowracecalckukan, (i_kukan) {
+      children: List.generate(currentGhensuu.nowracecalckukan - hajime, (i) {
+        final int i_kukan = hajime + i;
         String kukanLabel = currentGhensuu.hyojiracebangou == 3 ? "組目" : "区";
         String kukanText = "${i_kukan + 1}$kukanLabel";
         String kukanLabel_juni = currentGhensuu.hyojiracebangou == 3

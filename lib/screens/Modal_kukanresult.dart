@@ -20,6 +20,8 @@ import 'package:ekiden/kantoku_data.dart';
 
 import 'package:ekiden/kansuu/gakuren_text.dart';
 
+import 'package:ekiden/senshu_gakuren_data.dart';
+
 import 'package:screenshot/screenshot.dart';
 
 import 'package:path_provider/path_provider.dart';
@@ -531,6 +533,19 @@ class _ModalKukanResultListViewState extends State<ModalKukanResultListView> {
                   raceBangou,
                 );
 
+                // 学連選抜(正月駅伝のときだけ)を、区間順位相当の位置に「OP」として表に入れる(1.8.2)
+                final GakurenKukanKekka? gakuren = gakurenKukanKekka(
+                  currentGhensuu,
+                  kukanBangou,
+                );
+                final int gakurenIchi = gakuren == null
+                    ? -1
+                    : gakurenSounyuuIchi([
+                        for (final s in filteredSenshuData)
+                          s.kukanjuni_race[raceBangou][s.gakunen - 1],
+                      ], gakuren.kukanJuni);
+                final int gakurenKazu = gakuren == null ? 0 : 1;
+
                 final bool isTopRunnerPresent = filteredSenshuData.isNotEmpty;
 
                 final SenshuData? topRunner = isTopRunnerPresent
@@ -730,6 +745,7 @@ class _ModalKukanResultListViewState extends State<ModalKukanResultListView> {
                                     // ★変更: 分析モードの時は要素数を1つ増やす（一番下に説明文を入れるため）
                                     itemCount:
                                         filteredSenshuData.length +
+                                        gakurenKazu +
                                         (_viewMode == ViewMode.analysis
                                             ? 1
                                             : 0),
@@ -738,7 +754,9 @@ class _ModalKukanResultListViewState extends State<ModalKukanResultListView> {
                                       // ★追加: リストの最後尾に到達したら説明文を表示する
 
                                       if (_viewMode == ViewMode.analysis &&
-                                          index == filteredSenshuData.length) {
+                                          index ==
+                                              filteredSenshuData.length +
+                                                  gakurenKazu) {
                                         return Container(
                                           padding: const EdgeInsets.symmetric(
                                             horizontal: 16.0,
@@ -759,8 +777,17 @@ class _ModalKukanResultListViewState extends State<ModalKukanResultListView> {
                                         );
                                       }
 
+                                      // 学連選抜の行
+                                      if (gakuren != null &&
+                                          index == gakurenIchi) {
+                                        return _buildGakurenItem(gakuren);
+                                      }
+
                                       final SenshuData senshu =
-                                          filteredSenshuData[index];
+                                          filteredSenshuData[gakuren != null &&
+                                                  index > gakurenIchi
+                                              ? index - 1
+                                              : index];
 
                                       final UnivData? univ =
                                           univDataMap[senshu.univid];
@@ -1003,6 +1030,85 @@ class _ModalKukanResultListViewState extends State<ModalKukanResultListView> {
           },
         );
       },
+    );
+  }
+
+  // 学連選抜(オープン参加)の行(区間順位相当の位置に入れる。1.8.2)
+  Widget _buildGakurenItem(GakurenKukanKekka gakuren) {
+    final Senshu_Gakuren_Data senshu = gakuren.senshu;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Flexible(
+                child: Text(
+                  'OP(${gakuren.kukanJuni + 1}位相当) ${senshu.name}\n (${senshu.gakunen}年 / 学連選抜 所属:${gakuren.shozoku})',
+                  style: TextStyle(
+                    color: Colors.cyanAccent,
+                    fontSize: HENSUU.fontsize_honbun + 2,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              TextButton(
+                onPressed: () {
+                  showGeneralDialog(
+                    context: context,
+                    barrierColor: Colors.black.withOpacity(0.8),
+                    barrierDismissible: true,
+                    barrierLabel: '詳細',
+                    pageBuilder: (context, _, __) =>
+                        ModalSenshuDetailView(senshuId: senshu.id),
+                  );
+                },
+                child: Text(
+                  '詳細',
+                  style: TextStyle(
+                    color: HENSUU.LinkColor,
+                    fontSize: HENSUU.fontsize_honbun,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.only(left: 16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildKukanTimeRow(gakuren.kukanTime, const []),
+                if (_viewMode == ViewMode.description) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    senshu.string_racesetumei.isEmpty
+                        ? '説明文はありません'
+                        : senshu.string_racesetumei,
+                    style: TextStyle(
+                      color: HENSUU.textcolor.withOpacity(0.9),
+                      fontSize: HENSUU.fontsize_honbun * 1.1,
+                    ),
+                  ),
+                ] else if (_viewMode == ViewMode.analysis) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    '学連選抜の選手には分析データがありません',
+                    style: TextStyle(
+                      color: Colors.grey,
+                      fontSize: HENSUU.fontsize_honbun,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const Divider(color: Colors.white12),
+        ],
+      ),
     );
   }
 

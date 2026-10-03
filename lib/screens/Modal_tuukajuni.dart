@@ -489,6 +489,19 @@ class _ModalKukanResultListViewPassState
                 : TEISUU.DEFAULTTIME;
             final bool isTopTimeValid = topTimeTotal != TEISUU.DEFAULTTIME;
 
+            // 学連選抜(正月駅伝のときだけ)を、通過順位相当の位置に「OP」として表に入れる(1.8.2)
+            final GakurenKukanKekka? gakuren = gakurenKukanKekka(
+              currentGhensuu,
+              kukanBangou,
+            );
+            final int gakurenIchi = gakuren == null
+                ? -1
+                : gakurenSounyuuIchi([
+                    for (final u in filteredUnivData)
+                      u.tuukajuni_taikai[kukanBangou],
+                  ], gakuren.tuukaJuni);
+            final int gakurenKazu = gakuren == null ? 0 : 1;
+
             final int kukanKyori =
                 (currentGhensuu.kyori_taikai_kukangoto[raceBangou][kukanBangou])
                     .round();
@@ -556,9 +569,21 @@ class _ModalKukanResultListViewPassState
                                 ),
                               )
                             : ListView.builder(
-                                itemCount: filteredUnivData.length,
+                                itemCount: filteredUnivData.length + gakurenKazu,
                                 itemBuilder: (context, index) {
-                                  final univ = filteredUnivData[index];
+                                  // 学連選抜の行
+                                  if (gakuren != null && index == gakurenIchi) {
+                                    return _buildGakurenItem(
+                                      gakuren,
+                                      topTimeTotal,
+                                      isTopTimeValid,
+                                    );
+                                  }
+                                  final univ =
+                                      filteredUnivData[gakuren != null &&
+                                              index > gakurenIchi
+                                          ? index - 1
+                                          : index];
                                   final tsuukaJuni =
                                       univ.tuukajuni_taikai[kukanBangou];
                                   final tsuukaTime =
@@ -733,6 +758,70 @@ class _ModalKukanResultListViewPassState
           },
         );
       },
+    );
+  }
+
+  // 学連選抜(オープン参加)の行(通過順位相当の位置に入れる。1.8.2)
+  Widget _buildGakurenItem(
+    GakurenKukanKekka gakuren,
+    double topTimeTotal,
+    bool isTopTimeValid,
+  ) {
+    final Map<String, dynamic>? rankDiffData = gakuren.maeTuukaJuni == null
+        ? null
+        : _getRankDifferenceText(gakuren.maeTuukaJuni! - gakuren.tuukaJuni);
+    String timeDiffStr = '';
+    if (isTopTimeValid) {
+      final double diff = gakuren.tuukaTime - topTimeTotal;
+      if (diff > 0) timeDiffStr = _formatTimeDifference(diff);
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                'OP(${gakuren.tuukaJuni + 1}位相当) 学連選抜',
+                style: TextStyle(
+                  color: Colors.cyanAccent,
+                  fontSize: HENSUU.fontsize_honbun,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(width: 8),
+              if (rankDiffData != null)
+                Text(
+                  rankDiffData['text'],
+                  style: TextStyle(
+                    color: rankDiffData['color'] as Color,
+                    fontSize: HENSUU.fontsize_honbun * 0.9,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.only(left: 16.0),
+            child: _buildTimeDisplay(gakuren.tuukaTime),
+          ),
+          if (timeDiffStr.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(left: 16.0, top: 4.0),
+              child: Text(
+                '1位との差: $timeDiffStr',
+                style: TextStyle(
+                  color: Colors.redAccent,
+                  fontSize: HENSUU.fontsize_honbun * 0.9,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          const Divider(color: Colors.white12),
+        ],
+      ),
     );
   }
 

@@ -4,6 +4,7 @@ import 'package:ekiden/ghensuu.dart';
 import 'package:ekiden/senshu_data.dart';
 import 'package:ekiden/constants.dart'; // HENSUU
 import 'package:ekiden/kansuu/siji_sontoku.dart';
+import 'package:ekiden/album.dart';
 
 /// 「指示ごとの損得予測」の画面(1.8.1)
 /// 駅伝の2区以降で、走り出す直前の選手の、指示なし・前半突っ込み・前半抑えそれぞれの
@@ -136,6 +137,18 @@ class _ModalSijiSontokuViewState extends State<ModalSijiSontokuView> {
                     fontSize: HENSUU.fontsize_honbun - 2,
                   ),
                 ),
+                // 学連選抜の選手には、指示の補正のあとにモチベーション低下補正がかかる(1.8.2)
+                if (widget.gakuren && _motivationHoseiAri())
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      '・学連選抜の選手には、2区以降で「学連選抜モチベーション設定」のモチベーション低下補正もかかります。この補正は指示の補正のあとにかかるので、ここの秒数には入っていません。走ったあとの補正の説明では、指示の補正の秒数とは別に「モチベーション低下補正」として出ます(区間タイムはその分さらに遅くなります)。',
+                      style: TextStyle(
+                        color: Colors.amber,
+                        fontSize: HENSUU.fontsize_honbun - 2,
+                      ),
+                    ),
+                  ),
                 // 補正の強さを初期値から変えているときは、数字が違う理由が分かるように一言出す(1.8.2)
                 if (sontoku.tsuyosaHenkouChuu)
                   Padding(
@@ -154,6 +167,12 @@ class _ModalSijiSontokuViewState extends State<ModalSijiSontokuView> {
         },
       ),
     );
+  }
+
+  /// 学連選抜のモチベーション低下補正をかける設定か(Album.yobiint4が1以上)
+  bool _motivationHoseiAri() {
+    final Album? album = Hive.box<Album>('albumBox').get('AlbumData');
+    return album != null && album.yobiint4 > 0;
   }
 
   /// 襷を受けた時点の状況の文

@@ -1063,7 +1063,15 @@ Future<void> RaceCalc_gakuren({
             //念の為
             hosei = 0.0;
           }*/
+          final double lasttime = gakurensenshudata[senshuid].time_taikai_total;
           gakurensenshudata[senshuid].time_taikai_total *= (1.00 + hosei);
+          // 指示の補正のあとにかかる分なので、補正の説明にも出す(1.8.2)
+          if (hosei > 0) {
+            final double sontokutime =
+                gakurensenshudata[senshuid].time_taikai_total - lasttime;
+            gakurensenshudata[senshuid].string_racesetumei +=
+                "モチベーション低下補正:+${sontokutime.toStringAsFixed(1)}秒\n";
+          }
         }
         var temptime_assign = gakurensenshudata[senshuid].time_taikai_total;
         gakurenunivdata[0].time_taikai_total[gh[0].nowracecalckukan] +=

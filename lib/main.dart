@@ -26,6 +26,7 @@ import 'package:ekiden/kansuu/RetireNew.dart';
 import 'package:ekiden/kansuu/goldsilverTeikiKakutoku.dart';
 import 'package:ekiden/kansuu/goldsilver_com.dart';
 import 'package:ekiden/kansuu/scout_com.dart';
+import 'package:ekiden/kansuu/gakuren_kantoku.dart'; // 学連選抜の監督の移行処理(1.8.2)
 import 'package:ekiden/kansuu/ShoriGuard.dart';
 import 'package:ekiden/kansuu/NameListKoushin.dart';
 import 'package:ekiden/kansuu/SenshuShokiti.dart';
@@ -961,6 +962,22 @@ Future<void> main() async {
         final Ghensuu? gh = ghensuuBox.getAt(0);
         if (gh != null && gh.mode == 9000) {
           await comScoutIkouKakutei(gh: gh);
+        }
+      }
+    }
+
+    {
+      //バージョンアップに伴い付け足す処理を書く
+      //1.8.2の学連選抜の監督に合わせて、正月駅伝の日(1月5日)のレースが終わる前のセーブデータでは、
+      //まだ走っていない学連選抜の選手の指示の印と補正の説明を消す(gakuren_kantoku.dartを参照)
+      //save_load_screenの中の _importFromSlot の中にもあるので、そちらも変更すること！
+      final checkversionValue = int.tryParse(sortedUnivData[7].name_tanshuku);
+      if (checkversionValue == null ||
+          checkversionValue < 21820 ||
+          checkversionValue > 999999999) {
+        final Ghensuu? gh = ghensuuBox.getAt(0);
+        if (gh != null) {
+          await gakurenKantokuIkou(gh: gh);
         }
       }
     }

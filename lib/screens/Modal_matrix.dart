@@ -261,7 +261,9 @@ class _KonkiSeisekiHyou {
     final String csvData = const ListToCsvConverter()
         .convert(csvGyou())
         .replaceAll('\r\n', '\n');
-    return '【$univName 今季成績表(CSV形式)】\n'
+    // 大学の表は「〇〇大学」と書く(駅伝出場履歴などのコピーと揃える。学連選抜はそのまま)
+    final String hyoMei = gakuren ? univName : '$univName大学';
+    return '【$hyoMei 今季成績表(CSV形式)】\n'
         '${chuuiBun()}\n'
         '$csvData\n'
         '#箱庭小駅伝SS';

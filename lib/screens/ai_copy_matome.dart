@@ -22,7 +22,8 @@ import 'package:ekiden/screens/Modal_kukanresult.dart' as kekka;
 // ・区間ごとセット: 直近の区間の個人順位速報(説明文つき)+通過順位速報(実況に)
 // ・振り返りセット: 総合成績+自分の大学のレース経過(結果画面で、レース後の振り返りに)
 // ・学連選抜の振り返りセット: 総合成績+学連選抜のレース経過+学連選抜の区間配置(結果画面で)
-// ・相談セット: コース情報+自分の大学の今季タイム一覧表+駅伝出場履歴(エントリーの画面で)
+// ・相談セット: エントリーの状況+コース情報+自分の大学の今季タイム一覧表+駅伝出場履歴
+//   (エントリーの画面で)
 // ・学連選抜の相談セット: コース情報+学連選抜の区間配置+今季タイム一覧表+駅伝出場履歴
 //   (学連選抜編成・区間エントリーの画面で)
 // 結果画面では、個人成績を区間を選んで1つずつコピーすることもできる
@@ -232,9 +233,10 @@ class AiCopyMatomeButton extends StatelessWidget {
       list.add(
         _AiCopyKoumoku(
           '相談セット',
-          'コース情報・自分の大学の今季タイム一覧表・駅伝出場履歴をまとめてコピー。エントリーや区間配置の相談に',
+          'エントリーの状況(選んでいる選手・今の区間配置)・コース情報・自分の大学の今季タイム一覧表・駅伝出場履歴をまとめてコピー。エントリーや区間配置の相談に',
           Icons.library_books,
           () => [
+            entryJoukyouText(gh, univId: gh.MYunivid),
             courseZenKukanText(gh, race),
             konkiSeisekiHyouText(univId: gh.MYunivid),
             ekidenRirekiText(univId: gh.MYunivid),

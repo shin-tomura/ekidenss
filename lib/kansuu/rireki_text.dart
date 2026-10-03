@@ -13,6 +13,7 @@ import 'package:ekiden/screens/Modal_courseshoukai.dart';
 // エントリーや区間配置の相談で生成AIに渡せるように、選手ごとに出場した大会だけを1行に並べる。
 // ・自分の大学など(駅伝出場履歴一覧(選手ごと)の画面のコピー、生成AIに渡すテキスト)
 // ・学連選抜のメンバー(元の大学で出場した履歴。生成AIに渡すテキスト)
+// あわせて、相談セットの先頭に入れる「エントリーの状況」の文もここで作る。
 // ------------------------------------------------------------
 
 // 1年の中で大会が行われる順
@@ -165,5 +166,95 @@ String gakurenEkidenRirekiText(Ghensuu gh) {
     );
   }
   sb.writeln('#箱庭小駅伝SS');
+  return sb.toString();
+}
+
+/// 今回の大会のエントリーの状況(相談セットの先頭に入れる。1.8.2)
+/// 一次エントリーの画面(モード200より前)では、選んでいる選手と人数。
+/// それより後(学連選抜編成・区間エントリーの画面)では、一次エントリーの選手と今の区間配置・補欠。
+/// 生成AIが一次エントリーに入っていない選手を区間に勧めないように入れる
+String entryJoukyouText(Ghensuu gh, {required int univId}) {
+  final int race = gh.hyojiracebangou;
+  if (race < 0 || race > 5 || gh.kukansuu_taikaigoto.length <= race) {
+    return '';
+  }
+  final int kukansuu = gh.kukansuu_taikaigoto[race];
+  // 一次エントリーの人数(一次エントリーの画面と同じ決まり)
+  final int maxEntry = race == 4
+      ? 12
+      : (kukansuu <= 6 ? 8 : (kukansuu <= 8 ? 13 : 16));
+  String univName = '';
+  for (final UnivData u in Hive.box<UnivData>('univBox').values) {
+    if (u.id == univId) univName = u.name;
+  }
+  final List<SenshuData> senshuList =
+      Hive.box<SenshuData>('senshuBox').values
+          .where((s) => s.univid == univId)
+          .toList()
+        ..sort((a, b) {
+          final int gakunenHikaku = b.gakunen.compareTo(a.gakunen);
+          return gakunenHikaku != 0 ? gakunenHikaku : a.id.compareTo(b.id);
+        });
+  // 今回の大会のエントリーの値(-2はエントリーしていない、-1は一次エントリー、0以上は走る区間)
+  int entryAtai(SenshuData s) {
+    if (s.gakunen < 1 ||
+        s.entrykukan_race.length <= race ||
+        s.entrykukan_race[race].length < s.gakunen) {
+      return -2;
+    }
+    return s.entrykukan_race[race][s.gakunen - 1];
+  }
+
+  String meibo(List<SenshuData> list) => list.isEmpty
+      ? 'なし'
+      : list.map((s) => '${s.name}(${s.gakunen}年)').join('、');
+
+  final List<SenshuData> erabi = senshuList
+      .where((s) => entryAtai(s) != -2)
+      .toList();
+  final List<SenshuData> erabanai = senshuList
+      .where((s) => entryAtai(s) == -2)
+      .toList();
+  final String tani = race == 3 ? '組' : '区';
+  final String kukanMei = race == 3 ? '組' : '区間';
+
+  final StringBuffer sb = StringBuffer();
+  sb.writeln('【${courseRaceTitle(race)} $univName大学 エントリーの状況】');
+  if (gh.mode < 200) {
+    // 一次エントリーの画面
+    if (race == 4) {
+      sb.writeln('※エントリーは$maxEntry人です。');
+      sb.writeln('エントリーに選んでいる選手(${erabi.length}/$maxEntry人):${meibo(erabi)}');
+    } else {
+      sb.writeln(
+        '※一次エントリーは$maxEntry人です。このあとの区間エントリーで、一次エントリーの選手の中から$kukansuu$kukanMeiに配置し、残りは補欠になります。',
+      );
+      sb.writeln('一次エントリーに選んでいる選手(${erabi.length}/$maxEntry人):${meibo(erabi)}');
+    }
+    sb.writeln('選んでいない選手:${meibo(erabanai)}');
+  } else if (race == 4) {
+    sb.writeln('エントリーの選手(${erabi.length}人):${meibo(erabi)}');
+    sb.writeln('エントリーしていない選手:${meibo(erabanai)}');
+  } else {
+    // 学連選抜編成・区間エントリーの画面
+    sb.writeln(
+      '一次エントリーの選手(${erabi.length}人。この中から$kukansuu$kukanMeiに配置し、残りは補欠):${meibo(erabi)}',
+    );
+    sb.writeln('今の区間配置(自分の大学):');
+    for (int k = 0; k < kukansuu; k++) {
+      final List<SenshuData> hashiru = erabi
+          .where((s) => entryAtai(s) == k)
+          .toList();
+      sb.writeln(
+        '${k + 1}$tani ${hashiru.isEmpty ? '未定' : hashiru.map((s) => '${s.name}(${s.gakunen}年)').join('・')}',
+      );
+    }
+    final List<SenshuData> hoketsu = erabi.where((s) {
+      final int e = entryAtai(s);
+      return e < 0 || e >= kukansuu;
+    }).toList();
+    sb.writeln('補欠:${meibo(hoketsu)}');
+    sb.writeln('一次エントリーに入っていない選手(区間に配置できない):${meibo(erabanai)}');
+  }
   return sb.toString();
 }

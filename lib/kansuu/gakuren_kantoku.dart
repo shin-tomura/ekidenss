@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ekiden/ghensuu.dart';
 import 'package:ekiden/kantoku_data.dart';
@@ -43,6 +44,7 @@ bool gakurenKantokuAtaiTadashii(int atai) {
 ///   (1.8.1までは学連選抜の選手を作るときに、元の選手の正月駅伝予選の補正の説明が残っていた。
 ///    1.7.9までに作られた学連選抜の選手には、元の選手の11月駅伝の指示の印が残っていることもある。
 ///    1.8.2からは学連選抜の監督が指示を出し、その内容と補正の説明をレース画面に出すため)
+/// ・まだ走っていない体調不良(調子0)の学連選抜の選手の調子を引き直す(gakurenTaichouFuryouNashiを参照)
 /// ・すでに走った選手の結果はそのまま
 Future<void> gakurenKantokuIkou({required Ghensuu gh}) async {
   if (!(gh.month == 1 && gh.day == 5)) return;
@@ -58,6 +60,10 @@ Future<void> gakurenKantokuIkou({required Ghensuu gh}) async {
   final Box<Senshu_Gakuren_Data> box = Hive.box<Senshu_Gakuren_Data>(
     'gakurenSenshuBox',
   );
+  final KantokuData? kantoku = Hive.box<KantokuData>(
+    'kantokuBox',
+  ).get('KantokuData');
+  final Random random = Random();
   final Map<dynamic, Senshu_Gakuren_Data> kakikae = {};
   for (final dynamic key in box.keys) {
     final Senshu_Gakuren_Data? s = box.get(key);
@@ -74,9 +80,32 @@ Future<void> gakurenKantokuIkou({required Ghensuu gh}) async {
     s.startchokugotobidasiflag = 0;
     s.startchokugotobidasiseikouflag = 0;
     s.string_racesetumei = "";
+    if (kantoku != null) gakurenTaichouFuryouNashi(s, kantoku, random);
     kakikae[key] = s;
   }
   if (kakikae.isNotEmpty) await box.putAll(kakikae);
+}
+
+/// 学連選抜の選手は体調不良(調子0)にしない(1.8.2)
+/// 学連選抜は不出場の大学から1人ずつ選ぶ10人で補欠がいないので、体調不良でもそのまま走るしかない。
+/// そのため、学連選抜を作るときに元の選手から写した調子が0なら、体調不良の抽選だけを外した
+/// 普通の決め方(区間エントリー時ピーキング成功確率で100、それ以外は安定感〜99)で引き直す。
+/// 元の大学の選手のデータは変えない(EntryCalc.dartで学連選抜を作るときと、移行処理で使う)
+void gakurenTaichouFuryouNashi(
+  Senshu_Gakuren_Data s,
+  KantokuData kantoku,
+  Random random,
+) {
+  if (s.chousi != 0) return;
+  if (random.nextInt(100) < kantoku.yobiint2[3]) {
+    s.chousi = 100;
+  } else {
+    int randmoto = 100 - s.anteikan;
+    if (randmoto < 1) randmoto = 1;
+    s.chousi = random.nextInt(randmoto) + s.anteikan;
+  }
+  // 安定感が0のときに、引き直しても0(体調不良と同じ扱い)にならないようにする
+  if (s.chousi < 1) s.chousi = 1;
 }
 
 /// 今年の正月駅伝で、プレイヤーが学連選抜の監督をするか

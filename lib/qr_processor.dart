@@ -386,7 +386,7 @@ class SettingsQrProcessor {
       // 学連選抜モチベーション設定(int)
       album.yobiint4 = dataMap['a_yobiint4'] as int;
       if (album.yobiint4 < 0 || album.yobiint4 > 10) {
-        album.yobiint4 = 5;
+        album.yobiint4 = 0; // 1.8.2から初期値は補正なし
       }
       // 最適解区間配置確率設定(int)
       album.tourokusuu_total = dataMap['a_tourokusuu_total'] as int;

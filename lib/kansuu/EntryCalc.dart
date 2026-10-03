@@ -674,6 +674,8 @@ Future<List<int>> EntryCalc({
             // 正月駅伝予選などの補正の説明が残らないように消す(1.8.2。
             // 学連選抜の監督をしているときは、レース画面で補正の説明を出すため)
             gakurenSenshu.string_racesetumei = "";
+            // 学連選抜の選手は体調不良にしない(補欠がいないため。調子は引き直す。1.8.2)
+            gakurenTaichouFuryouNashi(gakurenSenshu, kantoku, Random());
             await gakurenSenshuBox.put(gakurenSenshu.id, gakurenSenshu);
             break;
           }

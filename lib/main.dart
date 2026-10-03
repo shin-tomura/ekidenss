@@ -982,6 +982,25 @@ Future<void> main() async {
       }
     }
 
+    {
+      //バージョンアップに伴い付け足す処理を書く
+      //1.8.2で学連選抜モチベーション低下補正の初期値を「補正なし」にしたので、
+      //今までのセーブデータも一度だけ「補正なし」にする(そのあと設定で補正ありにもできる)。
+      //新しく始めたゲームも、上の「checkversionValue < 1640」の処理で5になったあと、ここで「補正なし」になる
+      //save_load_screenの中の _importFromSlot の中にもあるので、そちらも変更すること！
+      final checkversionValue = int.tryParse(sortedUnivData[7].name_tanshuku);
+      if (checkversionValue == null ||
+          checkversionValue < 21820 ||
+          checkversionValue > 999999999) {
+        final albumBox = Hive.box<Album>('albumBox');
+        final Album? album = albumBox.get('AlbumData');
+        if (album != null) {
+          album.yobiint4 = 0; //学連選抜モチベーション低下補正なし
+          await album.save();
+        }
+      }
+    }
+
     //1.4.3からバージョン番号保存することにした(この処理は一連の処理の中で1番最後にすること)
     //save_load_screenの中の _importFromSlot の中にもあるので、そちらも変更すること！
     final versionValue = int.tryParse(sortedUnivData[7].name_tanshuku);

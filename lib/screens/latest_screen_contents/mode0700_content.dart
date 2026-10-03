@@ -27,6 +27,7 @@ import 'package:ekiden/screens/Modal_courseshoukai.dart';
 import 'package:ekiden/screens/Modal_tuukajunisuii.dart';
 import 'package:ekiden/screens/Modal_timesasuii.dart';
 import 'package:ekiden/kansuu/mokuhyou_hosei.dart';
+import 'package:ekiden/kansuu/gakuren_text.dart';
 
 // モーダルビューのプレースホルダー
 // 実際にはこれらのファイルを別途作成する必要があります
@@ -78,6 +79,78 @@ String _getCombinedDifficultyText(KantokuData kantoku, Ghensuu currentGhensuu) {
 
   // その他の予期せぬモード値の場合
   return "";
+}
+
+// 学連選抜の区間[kara]から区間[made]までのタイム(1.8.2)
+// (正月駅伝で今年の学連選抜がいて、区間[made]まで走り終えているときだけ。それ以外はnull)
+double? _gakurenKukanGoukei(Ghensuu gh, int kara, int made) {
+  if (!gakurenKonnenAri(gh) || gh.nowracecalckukan <= made) return null;
+  final UnivGakurenData u = Hive.box<UnivGakurenData>(
+    'gakurenUnivBox',
+  ).values.first;
+  if (u.time_taikai_total.length <= made) return null;
+  final double owari = u.time_taikai_total[made];
+  if (owari <= 0 || owari >= TEISUU.DEFAULTTIME) return null;
+  final double hajime = kara <= 0 ? 0.0 : u.time_taikai_total[kara - 1];
+  return owari - hajime;
+}
+
+// 前半区間成績・後半区間成績の行(1.8.2)
+// 大学の行は今まで通り。学連選抜(正月駅伝のときだけ)は、[gakurenTime]の順位相当
+// (大学の中に入れた場合の順位)の位置に「OP」の行として入れる
+List<Widget> _kukanSeisekiGyou({
+  required List<UnivData> timeJunUnivData,
+  required int racebangou,
+  required double Function(UnivData) time,
+  required double? gakurenTime,
+}) {
+  final List<Widget> gyou = [];
+  // 学連選抜より速い大学の数(0なら1位相当)
+  final int gakurenJuni = gakurenTime == null
+      ? -1
+      : timeJunUnivData
+            .where(
+              (u) =>
+                  u.taikaientryflag[racebangou] == 1 && time(u) < gakurenTime,
+            )
+            .length;
+  Widget gakurenGyou() => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 4.0),
+    child: Text(
+      "OP(${gakurenJuni + 1}位相当) 学連選抜 ${TimeDate.timeToJikanFunByouString(gakurenTime!)}",
+      style: TextStyle(
+        color: Colors.cyanAccent,
+        fontSize: HENSUU.fontsize_honbun,
+        fontWeight: FontWeight.bold,
+      ),
+    ),
+  );
+  bool gakurenKaita = gakurenTime == null;
+  int shutsujouKazu = 0;
+  for (int i_timejun = 0; i_timejun < timeJunUnivData.length; i_timejun++) {
+    final UnivData u = timeJunUnivData[i_timejun];
+    if (u.taikaientryflag[racebangou] != 1) continue;
+    if (!gakurenKaita && shutsujouKazu == gakurenJuni) {
+      gyou.add(gakurenGyou());
+      gakurenKaita = true;
+    }
+    gyou.add(
+      Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4.0),
+        child: Text(
+          "${i_timejun + 1}位 ${u.name} ${TimeDate.timeToJikanFunByouString(time(u))}",
+          style: TextStyle(
+            color: HENSUU.textcolor,
+            fontSize: HENSUU.fontsize_honbun,
+          ),
+        ),
+      ),
+    );
+    shutsujouKazu++;
+  }
+  // どの大学よりも遅いときは最後に入れる
+  if (!gakurenKaita) gyou.add(gakurenGyou());
+  return gyou;
 }
 
 // ModalZenhanKekkaView.dart の例
@@ -173,27 +246,17 @@ class ModalZenhanKekkaView extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 16), // スペース
-                          // ForEach(0..<timejununivdata.count, id: \.self) に相当
-                          for (
-                            int i_timejun = 0;
-                            i_timejun < timeJunUnivData.length;
-                            i_timejun++
-                          )
-                            if (timeJunUnivData[i_timejun]
-                                    .taikaientryflag[racebangou] ==
-                                1)
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 4.0,
-                                ),
-                                child: Text(
-                                  "${i_timejun + 1}位 ${timeJunUnivData[i_timejun].name} ${TimeDate.timeToJikanFunByouString(timeJunUnivData[i_timejun].time_taikai_total[4])}",
-                                  style: TextStyle(
-                                    color: HENSUU.textcolor,
-                                    fontSize: HENSUU.fontsize_honbun,
-                                  ),
-                                ),
-                              ),
+                          // 出場大学を往路のタイム順に並べる。学連選抜(OP)も順位相当の位置に入れる(1.8.2)
+                          ..._kukanSeisekiGyou(
+                            timeJunUnivData: timeJunUnivData,
+                            racebangou: racebangou,
+                            time: (u) => u.time_taikai_total[4],
+                            gakurenTime: _gakurenKukanGoukei(
+                              currentGhensuu,
+                              0,
+                              4,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -346,28 +409,22 @@ class ModalKouhanKekkaView extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 16), // スペース
-                          // ForEach(0..<timejununivdata.count, id: \.self) に相当
-                          for (
-                            int i_timejun = 0;
-                            i_timejun < timeJunUnivData.length;
-                            i_timejun++
-                          )
-                            if (timeJunUnivData[i_timejun]
-                                    .taikaientryflag[racebangou] ==
-                                1)
-                              Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 4.0,
-                                ),
-                                child: Text(
-                                  // Swift: timejununivdata[i_timejun].time_taikai_total[gh[0].kukansuu_taikaigoto[racebangou]-1] - timejununivdata[i_timejun].time_taikai_total[4]
-                                  "${i_timejun + 1}位 ${timeJunUnivData[i_timejun].name} ${TimeDate.timeToJikanFunByouString(timeJunUnivData[i_timejun].time_taikai_total[currentGhensuu.kukansuu_taikaigoto[racebangou] - 1] - timeJunUnivData[i_timejun].time_taikai_total[4])}",
-                                  style: TextStyle(
-                                    color: HENSUU.textcolor,
-                                    fontSize: HENSUU.fontsize_honbun,
-                                  ),
-                                ),
-                              ),
+                          // 出場大学を復路のタイム順に並べる。学連選抜(OP)も順位相当の位置に入れる(1.8.2)
+                          ..._kukanSeisekiGyou(
+                            timeJunUnivData: timeJunUnivData,
+                            racebangou: racebangou,
+                            time: (u) =>
+                                u.time_taikai_total[currentGhensuu
+                                        .kukansuu_taikaigoto[racebangou] -
+                                    1] -
+                                u.time_taikai_total[4],
+                            gakurenTime: _gakurenKukanGoukei(
+                              currentGhensuu,
+                              5,
+                              currentGhensuu.kukansuu_taikaigoto[racebangou] -
+                                  1,
+                            ),
+                          ),
                         ],
                       ),
                     ),

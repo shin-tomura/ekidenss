@@ -433,3 +433,35 @@ String gakurenRaceKeikaText(Ghensuu gh) {
   sb.writeln('#箱庭小駅伝SS');
   return sb.toString();
 }
+
+/// 全大学結果概要の「大学別詳細」に入れる学連選抜の結果の文(1.8.2)
+/// (大学の文と同じ形。今年の学連選抜がいないときや、最後の区間まで走り終えていないときは空)
+String gakurenKekkaGaiyouText(Ghensuu gh) {
+  if (!gakurenKonnenAri(gh)) return '';
+  final int kukansuu = gh.kukansuu_taikaigoto[_raceIndex];
+  final GakurenKukanKekka? saigo = gakurenKukanKekka(gh, kukansuu - 1);
+  if (saigo == null) return '';
+  final StringBuffer sb = StringBuffer();
+  sb.writeln('#${gh.year}年${gh.month}月 正月駅伝');
+  sb.writeln('学連選抜(オープン参加)の結果');
+  sb.writeln(
+    '※学連選抜は、正月駅伝に出場できなかった大学の選手で作るオープン参加のチームです。順位には数えず、「○位相当」は大学の中に入れた場合の順位を表します。',
+  );
+  sb.writeln('------');
+  sb.writeln(
+    '総合 ${saigo.tuukaJuni + 1}位相当 ${TimeDate.timeToJikanFunByouString(saigo.tuukaTime)}',
+  );
+  sb.writeln('------');
+  for (int kukan = 0; kukan < kukansuu; kukan++) {
+    final GakurenKukanKekka? k = gakurenKukanKekka(gh, kukan);
+    if (k == null) continue;
+    sb.writeln(
+      '◆${kukan + 1}区 ${k.senshu.name} ${k.senshu.gakunen}年(所属:${k.shozoku})',
+    );
+    sb.writeln(
+      '区間${k.kukanJuni + 1}位相当 ${TimeDate.timeToFunByouString(k.kukanTime)} ${k.tuukaJuni + 1}位相当通過',
+    );
+    sb.writeln('------');
+  }
+  return sb.toString();
+}

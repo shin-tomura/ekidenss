@@ -6,6 +6,7 @@ import 'package:ekiden/senshu_data.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/constants.dart';
 import 'package:ekiden/kansuu/time_date.dart';
+import 'package:ekiden/kansuu/gakuren_text.dart';
 import 'package:share_plus/share_plus.dart';
 
 class ModalEkidenResultListView extends StatefulWidget {
@@ -21,6 +22,9 @@ class _ModalEkidenResultListViewState extends State<ModalEkidenResultListView> {
   List<UnivData> _sortedByOverallRank = [];
   String _totalRankText = ""; // 総合順位一覧のテキスト版
   bool _isLoading = true;
+  // 学連選抜(正月駅伝のときだけ)の最後の区間の結果と、総合順位一覧に差し込む位置(1.8.2)
+  GakurenKukanKekka? _gakurenSaigo;
+  int _gakurenIchi = -1;
 
   @override
   void initState() {
@@ -55,6 +59,19 @@ class _ModalEkidenResultListViewState extends State<ModalEkidenResultListView> {
       results.add({'univName': univ.name, 'resultText': text});
     }
 
+    // 学連選抜(正月駅伝のときだけ)。オープン参加なので大学別詳細では大学の後ろに入れる(1.8.2)
+    final String gakurenText = gakurenKekkaGaiyouText(gh);
+    final GakurenKukanKekka? gakurenSaigo = gakurenText.isEmpty
+        ? null
+        : gakurenKukanKekka(gh, gh.kukansuu_taikaigoto[raceIdx] - 1);
+    if (gakurenSaigo != null) {
+      results.add({
+        'univName': '学連選抜(OP)',
+        'resultText': gakurenText,
+        'gakuren': true,
+      });
+    }
+
     // 2. 総合順位表用のソートとテキスト生成
     final overallRankList = entryUnivs.toList()
       ..sort((a, b) {
@@ -63,8 +80,22 @@ class _ModalEkidenResultListViewState extends State<ModalEkidenResultListView> {
         return aRank.compareTo(bRank);
       });
 
-    String rankText = "【総合順位一覧】\n";
-    for (var univ in overallRankList) {
+    // 学連選抜は総合順位相当の位置に「OP」として入れる(1.8.2)
+    final int gakurenIchi = gakurenSaigo == null
+        ? -1
+        : gakurenSounyuuIchi([
+            for (final u in overallRankList) u.juni_race[raceIdx][0],
+          ], gakurenSaigo.tuukaJuni);
+    String gakurenRankGyou() =>
+        "OP(${gakurenSaigo!.tuukaJuni + 1}位相当) 学連選抜 ${TimeDate.timeToJikanFunByouString(gakurenSaigo!.tuukaTime)}\n";
+
+    String rankText = gakurenSaigo != null ? gakurenOpChuui : "";
+    rankText += "【総合順位一覧】\n";
+    for (int i = 0; i < overallRankList.length; i++) {
+      final UnivData univ = overallRankList[i];
+      if (gakurenSaigo != null && i == gakurenIchi) {
+        rankText += gakurenRankGyou();
+      }
       final lastKukanIdx = gh.kukansuu_taikaigoto[raceIdx] - 1;
       // 予選会等の特殊な集計があるため time_race[raceIdx][0] を優先使用
       final totalTime = univ.time_race[raceIdx][0];
@@ -79,12 +110,18 @@ class _ModalEkidenResultListViewState extends State<ModalEkidenResultListView> {
       }
       rankText += "\n";
     }
+    // 学連選抜がどの大学よりも遅いときは最後に入れる
+    if (gakurenSaigo != null && gakurenIchi >= overallRankList.length) {
+      rankText += gakurenRankGyou();
+    }
 
     if (mounted) {
       setState(() {
         _calculatedResults = results;
         _sortedByOverallRank = overallRankList;
         _totalRankText = rankText;
+        _gakurenSaigo = gakurenSaigo;
+        _gakurenIchi = gakurenIchi;
         _isLoading = false;
       });
     }
@@ -335,54 +372,94 @@ class _ModalEkidenResultListViewState extends State<ModalEkidenResultListView> {
               ),
             ],
           ),
-          ..._sortedByOverallRank.map((univ) {
-            final raceIdx = gh.hyojiracebangou;
-            final totalTime = univ.time_race[raceIdx][0];
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4.0),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 40,
-                    child: Text(
-                      "${univ.juni_race[raceIdx][0] + 1}位",
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: Text(
-                      univ.name,
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                  ),
-                  Text(
-                    TimeDate.timeToJikanFunByouString(totalTime),
-                    style: const TextStyle(color: Colors.white, fontSize: 13),
-                  ),
-                  if (raceIdx != 3 && raceIdx != 4)
-                    if (univ.chokuzentaikai_zentaitaikaisinflag == 1)
-                      const Text(
-                        " *大会新",
-                        style: TextStyle(
-                          color: Color.fromARGB(252, 251, 170, 163),
-                          fontSize: 11,
-                        ),
-                      )
-                    else if (univ.chokuzentaikai_univtaikaisinflag == 1)
-                      const Text(
-                        " *学内新",
-                        style: TextStyle(
-                          color: Color.fromARGB(255, 226, 251, 2),
-                          fontSize: 11,
-                        ),
-                      ),
-                ],
+          // 学連選抜(正月駅伝のときだけ)は総合順位相当の位置に「OP」として入れる(1.8.2)
+          for (int i = 0; i <= _sortedByOverallRank.length; i++) ...[
+            if (_gakurenSaigo != null && i == _gakurenIchi)
+              _buildGakurenRankRow(_gakurenSaigo!),
+            if (i < _sortedByOverallRank.length)
+              _buildRankRow(gh, _sortedByOverallRank[i]),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // 総合順位一覧の大学の行
+  Widget _buildRankRow(Ghensuu gh, UnivData univ) {
+    final raceIdx = gh.hyojiracebangou;
+    final totalTime = univ.time_race[raceIdx][0];
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 40,
+            child: Text(
+              "${univ.juni_race[raceIdx][0] + 1}位",
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
               ),
-            );
-          }).toList(),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              univ.name,
+              style: const TextStyle(color: Colors.white),
+            ),
+          ),
+          Text(
+            TimeDate.timeToJikanFunByouString(totalTime),
+            style: const TextStyle(color: Colors.white, fontSize: 13),
+          ),
+          if (raceIdx != 3 && raceIdx != 4)
+            if (univ.chokuzentaikai_zentaitaikaisinflag == 1)
+              const Text(
+                " *大会新",
+                style: TextStyle(
+                  color: Color.fromARGB(252, 251, 170, 163),
+                  fontSize: 11,
+                ),
+              )
+            else if (univ.chokuzentaikai_univtaikaisinflag == 1)
+              const Text(
+                " *学内新",
+                style: TextStyle(
+                  color: Color.fromARGB(255, 226, 251, 2),
+                  fontSize: 11,
+                ),
+              ),
+        ],
+      ),
+    );
+  }
+
+  // 総合順位一覧の学連選抜(OP)の行(1.8.2)
+  Widget _buildGakurenRankRow(GakurenKukanKekka g) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
+      child: Row(
+        children: [
+          const SizedBox(
+            width: 40,
+            child: Text(
+              "OP",
+              style: TextStyle(
+                color: Colors.cyanAccent,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              "学連選抜(${g.tuukaJuni + 1}位相当)",
+              style: const TextStyle(color: Colors.cyanAccent),
+            ),
+          ),
+          Text(
+            TimeDate.timeToJikanFunByouString(g.tuukaTime),
+            style: const TextStyle(color: Colors.cyanAccent, fontSize: 13),
+          ),
         ],
       ),
     );
@@ -391,6 +468,8 @@ class _ModalEkidenResultListViewState extends State<ModalEkidenResultListView> {
   Widget _buildUnivDetailCard(Map<String, dynamic> item) {
     final String univName = item['univName'];
     final String resultText = item['resultText'];
+    // 学連選抜(OP)のカードは名前を水色にする(1.8.2)
+    final bool gakuren = item['gakuren'] == true;
     return Card(
       color: Colors.white.withOpacity(0.08),
       margin: const EdgeInsets.only(bottom: 12),
@@ -400,8 +479,8 @@ class _ModalEkidenResultListViewState extends State<ModalEkidenResultListView> {
         collapsedIconColor: Colors.white70,
         title: Text(
           univName,
-          style: const TextStyle(
-            color: Colors.white,
+          style: TextStyle(
+            color: gakuren ? Colors.cyanAccent : Colors.white,
             fontSize: 16,
             fontWeight: FontWeight.bold,
           ),

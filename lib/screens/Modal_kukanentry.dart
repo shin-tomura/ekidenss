@@ -6,6 +6,8 @@ import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/senshu_data.dart';
 import 'package:ekiden/kansuu/time_date.dart';
 import 'package:ekiden/screens/Modal_senshu.dart';
+import 'package:ekiden/senshu_gakuren_data.dart';
+import 'package:ekiden/kansuu/gakuren_text.dart';
 
 // 並べ替えの種類を定義
 enum SortType { univId, best5000m, best10000m, bestHalf }
@@ -145,6 +147,31 @@ class _ModalKukanEntryListViewState extends State<ModalKukanEntryListView> {
                 // 2. ソート: 現在のソートタイプに基づいて並べ替え
                 filteredSenshuData = _sortSenshuList(filteredSenshuData);
 
+                // 3. 学連選抜(正月駅伝のときだけ)の、この区間の選手を「OP」として入れる(1.8.2)
+                // 大学ID順のときは最後、タイム順のときはタイムの位置に入れる
+                final Senshu_Gakuren_Data? gakurenSenshu =
+                    gakurenKonnenAri(currentGhensuu)
+                    ? gakurenKukanSenshu(kukanBangou)
+                    : null;
+                int gakurenIchi = filteredSenshuData.length;
+                if (gakurenSenshu != null &&
+                    _currentSortType != SortType.univId) {
+                  final int shumoku = _currentSortType == SortType.best5000m
+                      ? 0
+                      : (_currentSortType == SortType.best10000m ? 1 : 2);
+                  for (int i = 0; i < filteredSenshuData.length; i++) {
+                    if (_compareTime(
+                          gakurenSenshu.time_bestkiroku[shumoku],
+                          filteredSenshuData[i].time_bestkiroku[shumoku],
+                        ) <
+                        0) {
+                      gakurenIchi = i;
+                      break;
+                    }
+                  }
+                }
+                final int gakurenKazu = gakurenSenshu == null ? 0 : 1;
+
                 final int kukanKyoriRoundedM =
                     (currentGhensuu.kyori_taikai_kukangoto[currentGhensuu
                             .hyojiracebangou][kukanBangou])
@@ -213,7 +240,7 @@ class _ModalKukanEntryListViewState extends State<ModalKukanEntryListView> {
 
                       // --- 選手一覧リスト ---
                       Expanded(
-                        child: filteredSenshuData.isEmpty
+                        child: filteredSenshuData.isEmpty && gakurenSenshu == null
                             ? Center(
                                 child: Text(
                                   'この区間のエントリー選手はいません',
@@ -221,10 +248,26 @@ class _ModalKukanEntryListViewState extends State<ModalKukanEntryListView> {
                                 ),
                               )
                             : ListView.builder(
-                                itemCount: filteredSenshuData.length,
+                                itemCount:
+                                    filteredSenshuData.length + gakurenKazu,
                                 itemBuilder: (context, index) {
+                                  // 学連選抜(OP)の選手(1.8.2)
+                                  if (gakurenSenshu != null &&
+                                      index == gakurenIchi) {
+                                    return _buildGakurenItem(
+                                      gakurenSenshu,
+                                      univDataMap,
+                                      currentGhensuu,
+                                    );
+                                  }
+                                  // 大学の選手の番号は今まで通り(学連選抜の行は数えない)
+                                  final int univIndex =
+                                      gakurenSenshu != null &&
+                                          index > gakurenIchi
+                                      ? index - 1
+                                      : index;
                                   final SenshuData senshu =
-                                      filteredSenshuData[index];
+                                      filteredSenshuData[univIndex];
                                   final UnivData? univ =
                                       univDataMap[senshu.univid];
 
@@ -245,7 +288,7 @@ class _ModalKukanEntryListViewState extends State<ModalKukanEntryListView> {
                                             // 選手名・学年・大学名
                                             Flexible(
                                               child: Text(
-                                                '${index + 1}. ${senshu.name}\n    (${senshu.gakunen}年 / ${univ?.name ?? '不明'})',
+                                                '${univIndex + 1}. ${senshu.name}\n    (${senshu.gakunen}年 / ${univ?.name ?? '不明'})',
                                                 style: TextStyle(
                                                   color: HENSUU.textcolor,
                                                   fontSize:
@@ -403,6 +446,88 @@ class _ModalKukanEntryListViewState extends State<ModalKukanEntryListView> {
       child: Text(
         label,
         style: TextStyle(fontSize: HENSUU.fontsize_honbun * 0.9),
+      ),
+    );
+  }
+
+  // 学連選抜(OP)の選手の行(大学の選手の行と同じ形で、名前を水色にし、所属大学を出す。1.8.2)
+  Widget _buildGakurenItem(
+    Senshu_Gakuren_Data g,
+    Map<int, UnivData> univDataMap,
+    Ghensuu currentGhensuu,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Flexible(
+                child: Text(
+                  'OP. ${g.name}\n    (${g.gakunen}年 / 学連選抜・所属:${univDataMap[g.univid]?.name ?? '不明'})',
+                  style: TextStyle(
+                    color: Colors.cyanAccent,
+                    fontSize: HENSUU.fontsize_honbun + 2,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
+              // 詳細ボタン(元の選手の詳細を開く)
+              TextButton(
+                onPressed: () {
+                  showGeneralDialog(
+                    context: context,
+                    barrierColor: Colors.black.withOpacity(0.8),
+                    barrierDismissible: true,
+                    barrierLabel: '詳細',
+                    transitionDuration: const Duration(milliseconds: 300),
+                    pageBuilder: (context, animation, secondaryAnimation) {
+                      return ModalSenshuDetailView(senshuId: g.id);
+                    },
+                    transitionBuilder:
+                        (context, animation, secondaryAnimation, child) {
+                          return FadeTransition(
+                            opacity: CurvedAnimation(
+                              parent: animation,
+                              curve: Curves.easeOut,
+                            ),
+                            child: child,
+                          );
+                        },
+                  );
+                },
+                child: Text(
+                  '詳細',
+                  style: TextStyle(
+                    color: HENSUU.LinkColor,
+                    fontSize: HENSUU.fontsize_honbun,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          // 持ちタイム一覧
+          Padding(
+            padding: const EdgeInsets.only(left: 16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (currentGhensuu.hyojiracebangou <= 2 ||
+                    currentGhensuu.hyojiracebangou == 5)
+                  Text('調子 ${g.chousi}'),
+                _buildTimeRow('5000m', g.time_bestkiroku[0]),
+                _buildTimeRow('10000m', g.time_bestkiroku[1]),
+                _buildTimeRow('ハーフ', g.time_bestkiroku[2]),
+              ],
+            ),
+          ),
+          const Divider(color: Colors.white12),
+        ],
       ),
     );
   }

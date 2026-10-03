@@ -53,6 +53,8 @@ Future<void> RaceCalc({
   final kantokuBox = Hive.box<KantokuData>('kantokuBox');
   // Boxからデータを読み込む
   final KantokuData kantoku = kantokuBox.get('KantokuData')!;
+  // 目標順位・指示の補正の強さ(全大学共通の設定。1.8.2)
+  final HoseiTsuyosa hoseiTsuyosa = HoseiTsuyosa.fromKantoku(kantoku);
 
   // Randomインスタンスを作成
   final random = Random();
@@ -840,11 +842,11 @@ Future<void> RaceCalc({
               final lasttime = sortedsenshudata[senshuid].time_taikai_total;
               if (Random().nextInt(100) < sortedsenshudata[senshuid].konjou) {
                 sortedsenshudata[senshuid].time_taikai_total *=
-                    sijiTsukkomiSeikouBairitsu;
+                    sijiTsukkomiSeikouBairitsu(hoseiTsuyosa);
                 sortedsenshudata[senshuid].sijiseikouflag = 1;
               } else {
                 sortedsenshudata[senshuid].time_taikai_total *=
-                    sijiTsukkomiShippaiBairitsu;
+                    sijiTsukkomiShippaiBairitsu(hoseiTsuyosa);
               }
               final sontokutime =
                   sortedsenshudata[senshuid].time_taikai_total - lasttime;
@@ -863,7 +865,7 @@ Future<void> RaceCalc({
                 if (Random().nextInt(100) <
                     sortedsenshudata[senshuid].heijousin) {
                   sortedsenshudata[senshuid].time_taikai_total *=
-                      sijiOsaeSeikouShitamawariBairitsu;
+                      sijiOsaeSeikouShitamawariBairitsu(hoseiTsuyosa);
                   sortedsenshudata[senshuid].sijiseikouflag = 1;
                 } else {
                   // 失敗したときは、指示なしの場合の前半突っ込みの悪化の1.5倍(最小0.5%、最大1.2%)
@@ -882,6 +884,7 @@ Future<void> RaceCalc({
                         kyoriMeter: gh[0]
                             .kyori_taikai_kukangoto[racebangou][gh[0]
                             .nowracecalckukan],
+                        tsuyosa: hoseiTsuyosa,
                       );
                 }
                 final sontokutime =
@@ -895,7 +898,7 @@ Future<void> RaceCalc({
                 if (Random().nextInt(100) <
                     sortedsenshudata[senshuid].heijousin) {
                   sortedsenshudata[senshuid].time_taikai_total *=
-                      sijiOsaeSeikouBairitsu;
+                      sijiOsaeSeikouBairitsu(hoseiTsuyosa);
                   sortedsenshudata[senshuid].sijiseikouflag = 1;
                 } else {
                   // 失敗したときは、ほっと一息の悪化+0.1%
@@ -908,6 +911,7 @@ Future<void> RaceCalc({
                   sortedsenshudata[senshuid].time_taikai_total *=
                       mokuhyouOsaeShippaiUwamawariBairitsu(
                         flag < 0 ? -flag : 0,
+                        hoseiTsuyosa,
                       );
                 }
                 final sontokutime =
@@ -941,6 +945,7 @@ Future<void> RaceCalc({
                       kyoriMeter: gh[0]
                           .kyori_taikai_kukangoto[racebangou][gh[0]
                           .nowracecalckukan],
+                      tsuyosa: hoseiTsuyosa,
                     );
                 final sontokutime =
                     sortedsenshudata[senshuid].time_taikai_total - lasttime;
@@ -959,6 +964,7 @@ Future<void> RaceCalc({
                           .mokuhyojuniwositamawatteruflag[gh[0]
                               .nowracecalckukan -
                           1],
+                      hoseiTsuyosa,
                     );
                 final sontokutime =
                     sortedsenshudata[senshuid].time_taikai_total - lasttime;

@@ -15,6 +15,7 @@ import 'package:ekiden/kansuu/chousi_keiken_hosei.dart';
 // タイムが何秒変わるかを出す(レース画面の指示の欄の下から開く画面で使う)。
 //
 // ・倍率は RaceCalc.dart と同じ関数・定数(mokuhyou_hosei.dart)を使う
+//   (1.8.2から、「目標順位・指示の補正設定」の強さも同じように掛かる)
 // ・倍率をかける元のタイム(指示の補正がかかる直前のタイム)は、
 //   ±0.5%の濁しをかけない試走タイム(経験補正込み)×調子補正で出す。
 //   本番ではこれに基本のタイムの±0.1%の揺れが入るだけなので、秒数のずれは0.1秒未満
@@ -66,6 +67,9 @@ class SijiSontoku {
   final double osaeSeikou;
   final double osaeShippai;
 
+  /// 補正の強さを初期値(100%)から変えているか(1.8.2)
+  final bool tsuyosaHenkouChuu;
+
   const SijiSontoku({
     required this.joukyou,
     required this.juni,
@@ -78,6 +82,7 @@ class SijiSontoku {
     required this.tsukkomiShippai,
     required this.osaeSeikou,
     required this.osaeShippai,
+    required this.tsuyosaHenkouChuu,
   });
 }
 
@@ -142,6 +147,9 @@ Future<SijiSontoku?> sijiSontokuKeisan(int senshuId) async {
   );
   mikomiTime *= chousiHoseiBairitsu(senshu, kantoku);
 
+  // 目標順位・指示の補正の強さ(全大学共通の設定。RaceCalcと同じ)
+  final HoseiTsuyosa tsuyosa = HoseiTsuyosa.fromKantoku(kantoku);
+
   // 目標順位の大学とのタイム差(下回っているときだけ使う)
   double? timeSa;
   if (flag == 1) {
@@ -163,17 +171,24 @@ Future<SijiSontoku?> sijiSontokuKeisan(int senshuId) async {
     nashiBairitsu = mokuhyouTsukkomiBairitsu(
       timeSa: timeSaKeisan,
       kyoriMeter: kyoriMeter,
+      tsuyosa: tsuyosa,
     );
-    osaeSeikouBairitsu = sijiOsaeSeikouShitamawariBairitsu;
+    osaeSeikouBairitsu = sijiOsaeSeikouShitamawariBairitsu(tsuyosa);
     osaeShippaiBairitsu = mokuhyouOsaeShippaiBairitsu(
       timeSa: timeSaKeisan,
       kyoriMeter: kyoriMeter,
+      tsuyosa: tsuyosa,
     );
   } else {
     final int uwamawari = flag < 0 ? -flag : 0;
-    nashiBairitsu = flag < 0 ? mokuhyouHitoikiBairitsu(uwamawari) : 1.0;
-    osaeSeikouBairitsu = sijiOsaeSeikouBairitsu;
-    osaeShippaiBairitsu = mokuhyouOsaeShippaiUwamawariBairitsu(uwamawari);
+    nashiBairitsu = flag < 0
+        ? mokuhyouHitoikiBairitsu(uwamawari, tsuyosa)
+        : 1.0;
+    osaeSeikouBairitsu = sijiOsaeSeikouBairitsu(tsuyosa);
+    osaeShippaiBairitsu = mokuhyouOsaeShippaiUwamawariBairitsu(
+      uwamawari,
+      tsuyosa,
+    );
   }
 
   // 正月駅伝の6区は、往路のゴールの時点で目標順位の判定を0(ちょうど扱い)にしている
@@ -198,9 +213,10 @@ Future<SijiSontoku?> sijiSontokuKeisan(int senshuId) async {
     tsukkomiSeikouritsu: senshu.konjou.clamp(0, 100).toInt(),
     osaeSeikouritsu: senshu.heijousin.clamp(0, 100).toInt(),
     nashi: byou(nashiBairitsu),
-    tsukkomiSeikou: byou(sijiTsukkomiSeikouBairitsu),
-    tsukkomiShippai: byou(sijiTsukkomiShippaiBairitsu),
+    tsukkomiSeikou: byou(sijiTsukkomiSeikouBairitsu(tsuyosa)),
+    tsukkomiShippai: byou(sijiTsukkomiShippaiBairitsu(tsuyosa)),
     osaeSeikou: byou(osaeSeikouBairitsu),
     osaeShippai: byou(osaeShippaiBairitsu),
+    tsuyosaHenkouChuu: !tsuyosa.shokiti,
   );
 }

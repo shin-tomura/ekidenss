@@ -13,6 +13,7 @@ import 'package:ekiden/save_load_screen.dart';
 import 'package:ekiden/screens/Modal_choukyoritimehosei.dart';
 import 'package:ekiden/screens/Modal_ayumi.dart';
 import 'package:ekiden/screens/Modal_chousi.dart';
+import 'package:ekiden/screens/Modal_hoseiTsuyosa.dart';
 import 'package:ekiden/screens/Modal_bairitu_goldsilver.dart';
 import 'package:ekiden/screens/Modal_racejiki.dart';
 import 'package:ekiden/screens/Modal_shumihihyouji.dart';
@@ -385,6 +386,42 @@ class _SettingScreenState extends State<SettingScreen> {
               },
               child: Text(
                 "調子関連設定",
+                style: TextStyle(
+                  color: const Color.fromARGB(255, 0, 255, 0),
+                  decoration: TextDecoration.underline,
+                  decorationColor: HENSUU.textcolor,
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            // 目標順位・指示の補正の強さの設定(1.8.2)
+            TextButton(
+              onPressed: () {
+                showGeneralDialog(
+                  context: context,
+                  barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                  barrierDismissible: true, // 背景タップで閉じられるようにする
+                  barrierLabel: '目標順位・指示の補正設定', // アクセシビリティ用ラベル
+                  transitionDuration: const Duration(
+                    milliseconds: 300,
+                  ), // アニメーション時間
+                  pageBuilder: (context, animation, secondaryAnimation) {
+                    return const ModalHoseiTsuyosa();
+                  },
+                  transitionBuilder:
+                      (context, animation, secondaryAnimation, child) {
+                        return FadeTransition(
+                          opacity: CurvedAnimation(
+                            parent: animation,
+                            curve: Curves.easeOut,
+                          ),
+                          child: child,
+                        );
+                      },
+                );
+              },
+              child: Text(
+                "目標順位・指示の補正設定",
                 style: TextStyle(
                   color: const Color.fromARGB(255, 0, 255, 0),
                   decoration: TextDecoration.underline,
@@ -1006,6 +1043,10 @@ class _SettingScreenState extends State<SettingScreen> {
               style: TextStyle(color: Colors.white),
             ),
             const Text(
+              "目標順位を下回ったときの悪化や、ほっと一息の強さは、この画面の上の方にある「目標順位・指示の補正設定」で変えたり、なくしたりできます(全大学共通)。",
+              style: TextStyle(color: Colors.white),
+            ),
+            const Text(
               "一方、この目標順位をクリアすると、金または銀を獲得できたり、総監督が選手の能力を見抜くことができるようになったりします。",
               style: TextStyle(color: Colors.white),
             ),
@@ -1064,11 +1105,15 @@ class _SettingScreenState extends State<SettingScreen> {
               style: TextStyle(color: Colors.white),
             ),
             const Text(
-              "目標順位を下回った順位でタスキを受けた場合、「前半抑え」に失敗した時のタイム損は、目標順位の大学とのタイム差が大きいほど大きくなります(最大でも「前半突っ込み」に失敗した時より小さいです)。",
+              "目標順位を下回った順位でタスキを受けた場合、「前半抑え」に失敗した時のタイム損は、目標順位の大学とのタイム差が大きいほど大きくなります(初期設定では、最大でも「前半突っ込み」に失敗した時より小さいです)。",
               style: TextStyle(color: Colors.white),
             ),
             const Text(
               "駅伝の2区以降では、指示を選ぶ欄の下の「指示ごとの損得予測」で、走り出す選手が指示なし・前半突っ込み・前半抑えのそれぞれの場合に何秒ほど損や得をしそうか(成功した時・失敗した時)を確認できます。",
+              style: TextStyle(color: Colors.white),
+            ),
+            const Text(
+              "「前半突っ込み」「前半抑え」が成功した時の効果や失敗した時の損の強さは、「目標順位・指示の補正設定」で変えられます(全大学共通。コンピュータの大学がどの選手に指示を出すかは変わりません)。",
               style: TextStyle(color: Colors.white),
             ),
             const Text(

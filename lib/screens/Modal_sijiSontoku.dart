@@ -130,6 +130,18 @@ class _ModalSijiSontokuViewState extends State<ModalSijiSontokuView> {
                     fontSize: HENSUU.fontsize_honbun - 2,
                   ),
                 ),
+                // 補正の強さを初期値から変えているときは、数字が違う理由が分かるように一言出す(1.8.2)
+                if (sontoku.tsuyosaHenkouChuu)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      '・補正の強さを設定で変更しています(説明書画面の「目標順位・指示の補正設定」)。',
+                      style: TextStyle(
+                        color: Colors.amber,
+                        fontSize: HENSUU.fontsize_honbun - 2,
+                      ),
+                    ),
+                  ),
               ],
             ),
           );
@@ -158,10 +170,12 @@ class _ModalSijiSontokuViewState extends State<ModalSijiSontokuView> {
     return '襷を受けた時点で$juni位(目標順位ちょうど)';
   }
 
-  /// 指示なしの行(理由も付ける)
+  /// 指示なしの行(理由も付ける。補正の強さが0%で損得がないときは理由を出さない)
   Widget _nashiGyou(SijiSontoku s) {
     String riyuu = '';
-    if (s.joukyou == SijiSontokuJoukyou.shitamawari) {
+    if (s.nashi == 0.0) {
+      riyuu = '';
+    } else if (s.joukyou == SijiSontokuJoukyou.shitamawari) {
       riyuu = '目標順位を下回ったため、前半無理に突っ込んでしまう分';
     } else if (s.joukyou == SijiSontokuJoukyou.uwamawari) {
       riyuu = '目標順位を上回ったため、ほっと一息ついてしまう分';

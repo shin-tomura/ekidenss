@@ -727,6 +727,7 @@ Future<void> RaceCalc_gakuren({
                       kyoriMeter: gh[0]
                           .kyori_taikai_kukangoto[racebangou][gh[0]
                           .nowracecalckukan],
+                      tsuyosa: HoseiTsuyosa.fromKantoku(kantoku),
                     );
                 final sontokutime =
                     gakurensenshudata[senshuid].time_taikai_total - lasttime;

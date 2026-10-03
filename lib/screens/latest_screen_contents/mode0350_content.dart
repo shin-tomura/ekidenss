@@ -1105,14 +1105,40 @@ class _Mode0350ContentState extends State<Mode0350Content> {
       joukyou = "スタート前 (学連選抜の目標:${mokuhyou + 1}位)";
     } else {
       final int juni = gakurenUniv.tuukajuni_taikai[kukan - 1] + 1;
+      // 前の区間終了時点からの順位の変化(大学と同じく2区終了時点から出す。1.8.2)
+      String yajirushi = "";
+      if (kukan > 1) {
+        final int hendou =
+            gakurenUniv.tuukajuni_taikai[kukan - 1] -
+            gakurenUniv.tuukajuni_taikai[kukan - 2];
+        yajirushi = hendou > 0
+            ? " ↓ $hendou"
+            : (hendou < 0 ? " ↑ ${hendou.abs()}" : " →");
+      }
       joukyou =
-          "${kukan}区終了時点 $juni位相当 (学連選抜の目標:${mokuhyou + 1}位)";
+          "${kukan}区終了時点 $juni位相当$yajirushi (学連選抜の目標:${mokuhyou + 1}位)";
+      // 通過(区間)順位の経過(大学と同じく2区終了時点から出す。1.8.2)
+      if (kukan > 1) {
+        saBun = "通過(区間)順位経過(相当):";
+        for (int i = 0; i < kukan; i++) {
+          saBun +=
+              "${gakurenUniv.tuukajuni_taikai[i] + 1}(${gakurenUniv.kukanjuni_taikai[i] + 1})-";
+        }
+        saBun += "\n";
+      }
       final double jibun = gakurenUniv.time_taikai_total[kukan - 1];
-      saBun =
+      saBun +=
           "トップとの差:${_gakurenSaBun(jibun - timejununivdata[0].time_taikai_total[kukan - 1])}";
       if (mokuhyou < timejununivdata.length) {
         saBun +=
             "\n目標(${mokuhyou + 1}位)との差:${_gakurenSaBun(jibun - timejununivdata[mokuhyou].time_taikai_total[kukan - 1])}";
+      }
+      // シード権ライン(10位)との差(学連選抜にシード権はないが目安として出す。
+      // 目標が10位のときは目標との差と同じなので出さない。1.8.2)
+      const int seedIndex = 9;
+      if (mokuhyou != seedIndex && seedIndex < shutsujouSuu) {
+        saBun +=
+            "\n${seedIndex + 1}位(シード権ライン)との差:${_gakurenSaBun(jibun - timejununivdata[seedIndex].time_taikai_total[kukan - 1])}";
       }
     }
 

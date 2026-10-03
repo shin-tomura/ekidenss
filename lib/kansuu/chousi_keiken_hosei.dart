@@ -15,12 +15,18 @@ import 'package:ekiden/kantoku_data.dart';
 /// ・体調不良(調子0)は、設定の体調不良タイム悪化パーセント(yobiint2[11])だけ悪くなる
 /// ・それ以外は、(100−調子)×0.1%×影響度だけ悪くなる
 double chousiHoseiBairitsu(SenshuData s, KantokuData kantoku) {
+  return chousiHoseiBairitsuAtai(s.chousi, kantoku);
+}
+
+/// 調子の値[chousi]から、調子によるタイム補正の倍率を出す(式は上と同じ)
+/// 学連選抜の選手(Senshu_Gakuren_Data)の調子にも使う(1.8.2)
+double chousiHoseiBairitsuAtai(int chousi, KantokuData kantoku) {
   if (kantoku.yobiint2[2] == 0) return 1.0;
-  if (s.chousi == 0) {
+  if (chousi == 0) {
     return 1.0 + kantoku.yobiint2[11].toDouble() / 100.0;
   }
   return 1.0 +
-      (100 - s.chousi).toDouble() *
+      (100 - chousi).toDouble() *
           0.001 *
           (kantoku.yobiint2[2].toDouble() / 100.0);
 }

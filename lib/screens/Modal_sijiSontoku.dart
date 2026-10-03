@@ -14,10 +14,14 @@ class ModalSijiSontokuView extends StatefulWidget {
   /// レース画面で選んでいる指示(0指示なし、1前半突っ込み、2前半抑え。それ以外は印を付けない)
   final int sentakuchuu;
 
+  /// 学連選抜の選手か(学連選抜の監督をしているとき。1.8.2)
+  final bool gakuren;
+
   const ModalSijiSontokuView({
     super.key,
     required this.senshuId,
     this.sentakuchuu = -1,
+    this.gakuren = false,
   });
 
   @override
@@ -34,7 +38,9 @@ class _ModalSijiSontokuViewState extends State<ModalSijiSontokuView> {
   void initState() {
     super.initState();
     // 乱数を使わない計算なので、開いたときに1回だけ計算する
-    _keisan = sijiSontokuKeisan(widget.senshuId);
+    _keisan = widget.gakuren
+        ? sijiSontokuKeisanGakuren(widget.senshuId)
+        : sijiSontokuKeisan(widget.senshuId);
   }
 
   @override
@@ -154,6 +160,16 @@ class _ModalSijiSontokuViewState extends State<ModalSijiSontokuView> {
   String _joukyouBun(SijiSontoku s) {
     final int juni = s.juni + 1;
     final int mokuhyou = s.mokuhyou + 1;
+    if (s.joukyou == SijiSontokuJoukyou.gakurenMokuhyouNai) {
+      return '襷を受けた時点で$juni位相当(学連選抜の目標の$mokuhyou位以内。学連選抜にはほっと一息はありません)';
+    }
+    if (widget.gakuren && s.joukyou == SijiSontokuJoukyou.shitamawari) {
+      final double? sa = s.timeSa;
+      final String saBun = sa == null
+          ? ''
+          : '・$mokuhyou位と${sa.toStringAsFixed(1)}秒差';
+      return '襷を受けた時点で$juni位相当(学連選抜の目標の$mokuhyou位を下回っています$saBun)';
+    }
     if (s.joukyou == SijiSontokuJoukyou.fukuroStart) {
       return '6区は復路のスタートなので、往路の順位による目標順位の補正はありません';
     }

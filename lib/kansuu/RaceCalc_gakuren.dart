@@ -43,6 +43,8 @@ Future<void> RaceCalc_gakuren({
     kantoku,
     racebangou,
   );
+  // 目標順位・指示の補正の強さ(全大学共通の設定。1.8.2)
+  final HoseiTsuyosa hoseiTsuyosa = HoseiTsuyosa.fromKantoku(kantoku);
 
   final gakurenunivBox = Hive.box<UnivGakurenData>('gakurenUnivBox');
   final gakurenunivdata = gakurenunivBox.values.toList();
@@ -674,83 +676,83 @@ Future<void> RaceCalc_gakuren({
               atai_hosei[senshuid][9] = sontokutime;
             }
           } else {
+            // 2区以降の指示(1.8.2から、学連選抜の監督をしているプレイヤーが出す。
+            // コンピュータが監督のときは指示の印が0なので、指示なしの計算だけになる)
+            // 倍率は大学の選手と同じ(mokuhyou_hosei.dart)。学連選抜は目標をいつも10位とし、
+            // ほっと一息はないので、10位以内で襷を受けたときは目標順位ちょうどと同じ扱い
+            final int gakurenFlag = gakurenunivdata[0]
+                .mokuhyojuniwositamawatteruflag[gh[0].nowracecalckukan - 1];
+            final double kyoriMeter = gh[0]
+                .kyori_taikai_kukangoto[racebangou][gh[0].nowracecalckukan];
+            // 目標(10位)の大学とのタイム差(下回っているときだけ使う)
+            final double? mokuhyouSa = gakurenFlag == 1
+                ? mokuhyouJuniTimeSa(
+                    univs: sortedunivdata,
+                    jibunTime: gakurenunivdata[0]
+                        .time_taikai_total[gh[0].nowracecalckukan - 1],
+                    mokuhyou: 9,
+                    kukan: gh[0].nowracecalckukan,
+                  )
+                : null;
+            final String saBun = mokuhyouSa == null
+                ? ''
+                : '(10位と${mokuhyouSa.toStringAsFixed(1)}秒差)';
             if (gakurensenshudata[senshuid].sijiflag == 1) {
               final lasttime = gakurensenshudata[senshuid].time_taikai_total;
               if (Random().nextInt(100) < gakurensenshudata[senshuid].konjou) {
-                gakurensenshudata[senshuid].time_taikai_total *= 0.99;
+                gakurensenshudata[senshuid].time_taikai_total *=
+                    sijiTsukkomiSeikouBairitsu(hoseiTsuyosa);
                 gakurensenshudata[senshuid].sijiseikouflag = 1;
               } else {
-                gakurensenshudata[senshuid].time_taikai_total *= 1.015;
+                gakurensenshudata[senshuid].time_taikai_total *=
+                    sijiTsukkomiShippaiBairitsu(hoseiTsuyosa);
               }
               final sontokutime =
                   gakurensenshudata[senshuid].time_taikai_total - lasttime;
               gakurensenshudata[senshuid].string_racesetumei +=
                   "指示(前半突っ込み)補正:${sontokutime.isNegative ? '' : '+'}${sontokutime.toStringAsFixed(1)}秒\n";
-              //atai_hosei[senshuid][11] = sontokutime;
               atai_hosei[senshuid][9] = sontokutime;
             } else if (gakurensenshudata[senshuid].sijiflag == 2) {
-              if (gakurenunivdata[0].mokuhyojuniwositamawatteruflag[gh[0]
-                          .nowracecalckukan -
-                      1] ==
-                  1) {
-                final lasttime = gakurensenshudata[senshuid].time_taikai_total;
-                if (Random().nextInt(100) <
-                    gakurensenshudata[senshuid].heijousin) {
-                  gakurensenshudata[senshuid].time_taikai_total *= 0.999;
-                  gakurensenshudata[senshuid].sijiseikouflag = 1;
-                } else {
-                  gakurensenshudata[senshuid].time_taikai_total *= 1.015;
-                }
-                final sontokutime =
-                    gakurensenshudata[senshuid].time_taikai_total - lasttime;
-                gakurensenshudata[senshuid].string_racesetumei +=
-                    "指示(前半抑え)補正:${sontokutime.isNegative ? '' : '+'}${sontokutime.toStringAsFixed(1)}秒\n";
-                //atai_hosei[senshuid][12] = sontokutime;
-                atai_hosei[senshuid][9] = sontokutime;
+              final lasttime = gakurensenshudata[senshuid].time_taikai_total;
+              if (Random().nextInt(100) <
+                  gakurensenshudata[senshuid].heijousin) {
+                gakurensenshudata[senshuid].time_taikai_total *=
+                    gakurenFlag == 1
+                    ? sijiOsaeSeikouShitamawariBairitsu(hoseiTsuyosa)
+                    : sijiOsaeSeikouBairitsu(hoseiTsuyosa);
+                gakurensenshudata[senshuid].sijiseikouflag = 1;
               } else {
-                final lasttime = gakurensenshudata[senshuid].time_taikai_total;
-                if (Random().nextInt(100) <
-                    gakurensenshudata[senshuid].heijousin) {
-                  gakurensenshudata[senshuid].time_taikai_total *= 0.997;
-                  gakurensenshudata[senshuid].sijiseikouflag = 1;
-                } else {
-                  gakurensenshudata[senshuid].time_taikai_total *= 1.005;
-                }
-                final sontokutime =
-                    gakurensenshudata[senshuid].time_taikai_total - lasttime;
-                gakurensenshudata[senshuid].string_racesetumei +=
-                    "指示(前半抑え)補正:${sontokutime.isNegative ? '' : '+'}${sontokutime.toStringAsFixed(1)}秒\n";
-                //atai_hosei[senshuid][12] = sontokutime;
-                atai_hosei[senshuid][9] = sontokutime;
+                gakurensenshudata[senshuid].time_taikai_total *=
+                    gakurenFlag == 1
+                    ? mokuhyouOsaeShippaiBairitsu(
+                        // 差が分からない場合(通常は起こらない)は最大
+                        timeSa: mokuhyouSa ?? double.infinity,
+                        kyoriMeter: kyoriMeter,
+                        tsuyosa: hoseiTsuyosa,
+                      )
+                    : mokuhyouOsaeShippaiUwamawariBairitsu(0, hoseiTsuyosa);
               }
+              final sontokutime =
+                  gakurensenshudata[senshuid].time_taikai_total - lasttime;
+              gakurensenshudata[senshuid].string_racesetumei +=
+                  "指示(前半抑え)補正$saBun:${sontokutime.isNegative ? '' : '+'}${sontokutime.toStringAsFixed(1)}秒\n";
+              atai_hosei[senshuid][9] = sontokutime;
             } else {
-              if (gakurenunivdata[0].mokuhyojuniwositamawatteruflag[gh[0]
-                          .nowracecalckukan -
-                      1] ==
-                  1) {
+              if (gakurenFlag == 1) {
                 final lasttime = gakurensenshudata[senshuid].time_taikai_total;
                 // 目標(学連選抜はいつも10位)の大学とのタイム差に比例(最大0.8%。
                 // 最大の損になる差は1kmあたり3秒×これから走る区間の距離)
-                final double? mokuhyouSa = mokuhyouJuniTimeSa(
-                  univs: sortedunivdata,
-                  jibunTime: gakurenunivdata[0]
-                      .time_taikai_total[gh[0].nowracecalckukan - 1],
-                  mokuhyou: 9,
-                  kukan: gh[0].nowracecalckukan,
-                );
                 gakurensenshudata[senshuid].time_taikai_total *=
                     mokuhyouTsukkomiBairitsu(
                       // 差が分からない場合(通常は起こらない)は今まで通り最大の0.8%
                       timeSa: mokuhyouSa ?? double.infinity,
-                      kyoriMeter: gh[0]
-                          .kyori_taikai_kukangoto[racebangou][gh[0]
-                          .nowracecalckukan],
-                      tsuyosa: HoseiTsuyosa.fromKantoku(kantoku),
+                      kyoriMeter: kyoriMeter,
+                      tsuyosa: hoseiTsuyosa,
                     );
                 final sontokutime =
                     gakurensenshudata[senshuid].time_taikai_total - lasttime;
                 gakurensenshudata[senshuid].string_racesetumei +=
-                    "目標順位下回って突っ込み補正${mokuhyouSa == null ? '' : '(10位と${mokuhyouSa.toStringAsFixed(1)}秒差)'}:${sontokutime.isNegative ? '' : '+'}${sontokutime.toStringAsFixed(1)}秒\n";
+                    "目標順位下回って突っ込み補正$saBun:${sontokutime.isNegative ? '' : '+'}${sontokutime.toStringAsFixed(1)}秒\n";
                 //atai_hosei[senshuid][13] = sontokutime;
                 atai_hosei[senshuid][9] = sontokutime;
               }
@@ -988,9 +990,10 @@ Future<void> RaceCalc_gakuren({
       if (senshu.startchokugotobidasiflag == 1) {
         continue; // 前もって飛び出しの印が付いている(指示の計算で補正済み)
       }
-      if (senshu.konjou >= 85 &&
+      if (senshu.sijiflag == 0 &&
+          senshu.konjou >= 85 &&
           Random().nextInt(100) < TEISUU.STARTTOBIDASIKAKURITU) {
-        // 指示なしの自動の飛び出し
+        // 指示なしの自動の飛び出し(「飛び出さない」の指示(sijiflag 2)のときは抽選しない)
         senshu.startchokugotobidasiflag = 1;
         final lasttime = senshu.time_taikai_total;
         if (Random().nextInt(100) < senshu.konjou) {

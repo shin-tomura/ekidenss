@@ -26,6 +26,7 @@ import 'package:ekiden/kansuu/mokuhyou_hosei.dart';
 import 'package:ekiden/screens/Modal_senshu_race_bunseki.dart';
 import 'package:ekiden/screens/Modal_sijiSontoku.dart';
 import 'package:ekiden/kansuu/siji_sontoku.dart';
+import 'package:ekiden/kansuu/gakuren_kantoku.dart';
 
 String _getCombinedDifficultyText(KantokuData kantoku, Ghensuu currentGhensuu) {
   // 難易度モードを取得 (0:通常, 1:極, 2:天)
@@ -382,7 +383,10 @@ class _Mode0350ContentState extends State<Mode0350Content> {
               if (idjununivdata[currentGhensuu.MYunivid]
                       .taikaientryflag[currentGhensuu.hyojiracebangou] ==
                   0)
-                NoEntrySection(currentGhensuu)
+                // 学連選抜の監督をしているときは、学連選抜の指示と途中経過を出す(1.8.2)
+                (_gakurenKantokuMode(currentGhensuu)
+                    ? GakurenKantokuSection(currentGhensuu, timejununivdata)
+                    : NoEntrySection(currentGhensuu))
               else
                 Expanded(
                   child: Column(
@@ -969,6 +973,258 @@ class _Mode0350ContentState extends State<Mode0350Content> {
         raceName = "";
     }
     return Text(raceName, style: TextStyle(color: HENSUU.textcolor));
+  }
+
+  // 学連選抜の監督としてレースに臨んでいるか(1.8.2)
+  // 正月駅伝で、自分の大学が不出場で、学連選抜の監督をする設定で、学連選抜のデータがあるとき
+  // (スキップ中はこの画面を通らないので、今まで通りコンピュータに任せる)
+  bool _gakurenKantokuMode(Ghensuu currentGhensuu) {
+    if (currentGhensuu.hyojiracebangou != 2) return false;
+    final KantokuData? kantoku = Hive.box<KantokuData>(
+      'kantokuBox',
+    ).get('KantokuData');
+    if (kantoku == null) return false;
+    if (!gakurenKantokuChuu(kantoku, idjununivdata[currentGhensuu.MYunivid])) {
+      return false;
+    }
+    return Hive.box<UnivGakurenData>('gakurenUnivBox').isNotEmpty &&
+        Hive.box<Senshu_Gakuren_Data>('gakurenSenshuBox').isNotEmpty;
+  }
+
+  // タイム差の文(例: +12秒、-1分5秒)
+  String _gakurenSaBun(double sa) {
+    final String fugou = sa.isNegative ? '-' : '+';
+    final int byou = sa.abs().round();
+    if (byou < 60) return '$fugou$byou秒';
+    return '$fugou${byou ~/ 60}分${byou % 60}秒';
+  }
+
+  // 学連選抜の選手の指示の内容と結果(学連選抜の結果の詳しい表示で使う。1.8.2)
+  List<Widget> _gakurenSijiKekka(
+    Senshu_Gakuren_Data senshu,
+    int iKukan,
+    UnivGakurenData gakurenUniv,
+  ) {
+    const List<String> kekka = ["失敗", "成功"];
+    final List<String> options = iKukan == 0
+        ? ["指示なし", "スタート直後に飛び出す", "スタート直後は飛び出さない"]
+        : ["指示なし", "前半から突っ込む", "前半は抑える"];
+    final int sijiflag = senshu.sijiflag.clamp(0, 2).toInt();
+    String sijiResult = "";
+    if (iKukan == 0) {
+      if (senshu.startchokugotobidasiflag == 1) {
+        sijiResult =
+            "スタート直後飛び出して:${kekka[senshu.startchokugotobidasiseikouflag.clamp(0, 1).toInt()]}";
+      }
+    } else if (sijiflag >= 1) {
+      sijiResult = "結果:${kekka[senshu.sijiseikouflag.clamp(0, 1).toInt()]}";
+    } else if (gakurenUniv.mokuhyojuniwositamawatteruflag.length > iKukan - 1 &&
+        gakurenUniv.mokuhyojuniwositamawatteruflag[iKukan - 1] == 1) {
+      sijiResult = "学連選抜の目標(10位)を下回っていたことによる前半突っ込みでのタイム悪化あり";
+    }
+    return [
+      Text(
+        "指示内容:${options[sijiflag]}",
+        style: TextStyle(color: HENSUU.textcolor),
+      ),
+      if (sijiResult.isNotEmpty)
+        Text(sijiResult, style: TextStyle(color: HENSUU.textcolor)),
+      if (senshu.string_racesetumei.isNotEmpty)
+        Text(
+          senshu.string_racesetumei,
+          style: TextStyle(color: HENSUU.textcolor),
+        ),
+    ];
+  }
+
+  // 学連選抜の監督をしているときの表示(1.8.2)
+  // 走る学連選抜の選手への指示、学連選抜の順位と差、ここまでの結果を出す。
+  // 指示はプルダウンで選んだときに選手のデータに保存し、「進む」で計算する
+  Widget GakurenKantokuSection(
+    Ghensuu currentGhensuu,
+    List<UnivData> timejununivdata,
+  ) {
+    final int kukan = currentGhensuu.nowracecalckukan;
+    final UnivGakurenData gakurenUniv = Hive.box<UnivGakurenData>(
+      'gakurenUnivBox',
+    ).values.first;
+    Senshu_Gakuren_Data? runner;
+    for (final Senshu_Gakuren_Data s in Hive.box<Senshu_Gakuren_Data>(
+      'gakurenSenshuBox',
+    ).values) {
+      if (s.entrykukan_race[2][s.gakunen - 1] == kukan) runner = s;
+    }
+    final Senshu_Gakuren_Data? sonoSenshu = runner;
+
+    String joukyou;
+    String saBun = "";
+    if (kukan == 0) {
+      joukyou = "スタート前 (学連選抜の目標:10位)";
+    } else {
+      final int juni = gakurenUniv.tuukajuni_taikai[kukan - 1] + 1;
+      joukyou = "${kukan}区終了時点 $juni位相当 (学連選抜の目標:10位)";
+      final double jibun = gakurenUniv.time_taikai_total[kukan - 1];
+      saBun =
+          "トップとの差:${_gakurenSaBun(jibun - timejununivdata[0].time_taikai_total[kukan - 1])}\n"
+          "10位との差:${_gakurenSaBun(jibun - timejununivdata[9].time_taikai_total[kukan - 1])}";
+    }
+
+    final List<String> options = kukan == 0
+        ? ["指示なし", "スタート直後に飛び出す", "スタート直後は飛び出さない"]
+        : ["指示なし", "前半から突っ込む", "前半は抑える"];
+
+    return Expanded(
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "${idjununivdata[currentGhensuu.MYunivid].name}大学は不出場です。学連選抜の監督として指示を出せます。",
+              style: TextStyle(color: HENSUU.textcolor),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              joukyou,
+              style: const TextStyle(
+                color: Colors.amber,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            if (saBun.isNotEmpty)
+              Text(saBun, style: TextStyle(color: HENSUU.textcolor)),
+            const SizedBox(height: 12),
+            if (sonoSenshu == null)
+              Text(
+                "${kukan + 1}区を走る学連選抜の選手はいません",
+                style: TextStyle(color: HENSUU.textcolor),
+              )
+            else ...[
+              Text(
+                "${kukan + 1}区の学連選抜の選手(${sonoSenshu.name}(${sonoSenshu.gakunen}) ${idjununivdata[sonoSenshu.univid].name})へ指示をしますか？\n"
+                "駅伝男${sonoSenshu.konjou}${kukan > 0 ? ' 平常心${sonoSenshu.heijousin}' : ''}",
+                style: TextStyle(color: HENSUU.textcolor),
+              ),
+              TextButton(
+                onPressed: () {
+                  showGeneralDialog(
+                    context: context,
+                    barrierColor: Colors.black.withOpacity(0.8),
+                    barrierDismissible: true,
+                    barrierLabel: '選手詳細',
+                    transitionDuration: const Duration(milliseconds: 300),
+                    pageBuilder: (context, animation, secondaryAnimation) {
+                      return ModalSenshuDetailView(senshuId: sonoSenshu.id);
+                    },
+                  );
+                },
+                child: Text(
+                  '選手詳細',
+                  style: TextStyle(
+                    color: HENSUU.LinkColor,
+                    fontSize: HENSUU.fontsize_honbun,
+                  ),
+                ),
+              ),
+              DropdownButton<int>(
+                value: sonoSenshu.sijiflag.clamp(0, 2).toInt(),
+                dropdownColor: const Color.fromARGB(255, 30, 30, 30),
+                style: TextStyle(color: HENSUU.textcolor),
+                iconEnabledColor: HENSUU.textcolor,
+                isExpanded: true,
+                onChanged: (int? v) async {
+                  if (v == null) return;
+                  sonoSenshu.sijiflag = v;
+                  // 1区は飛び出しの印も付ける(指示なしは計算のときに自動の飛び出しの抽選をする)
+                  sonoSenshu.startchokugotobidasiflag = (kukan == 0 && v == 1)
+                      ? 1
+                      : 0;
+                  await sonoSenshu.save();
+                  if (mounted) setState(() {});
+                },
+                items: [
+                  for (int i = 0; i < options.length; i++)
+                    DropdownMenuItem<int>(
+                      value: i,
+                      child: Text(
+                        options[i],
+                        style: TextStyle(
+                          fontSize: HENSUU.fontsize_honbun,
+                          color: HENSUU.LinkColor,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                ],
+              ),
+              if (kukan > 0) ...[
+                const SizedBox(height: 16),
+                TextButton(
+                  onPressed: () {
+                    showGeneralDialog(
+                      context: context,
+                      barrierColor: Colors.black.withOpacity(0.8),
+                      barrierDismissible: true,
+                      barrierLabel: '指示ごとの損得予測',
+                      transitionDuration: const Duration(milliseconds: 300),
+                      pageBuilder: (context, animation, secondaryAnimation) {
+                        return ModalSijiSontokuView(
+                          senshuId: sonoSenshu.id,
+                          sentakuchuu: sonoSenshu.sijiflag,
+                          gakuren: true,
+                        );
+                      },
+                    );
+                  },
+                  child: Text(
+                    '指示ごとの損得予測',
+                    style: TextStyle(
+                      color: HENSUU.LinkColor,
+                      fontSize: HENSUU.fontsize_honbun,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () {
+                showGeneralDialog(
+                  context: context,
+                  barrierColor: Colors.black.withOpacity(0.8),
+                  barrierDismissible: true,
+                  barrierLabel: '学連選抜区間配置',
+                  transitionDuration: const Duration(milliseconds: 300),
+                  pageBuilder: (context, _, __) =>
+                      const ModalGakurenKukanView(),
+                );
+              },
+              child: const Text(
+                "学連選抜区間配置",
+                style: TextStyle(
+                  color: Color.fromARGB(255, 0, 255, 0),
+                  decoration: TextDecoration.underline,
+                ),
+              ),
+            ),
+            if (kukan > 0) ...[
+              const SizedBox(height: 8),
+              Text(
+                "==学連選抜のここまでの区間==",
+                style: TextStyle(color: HENSUU.textcolor),
+              ),
+              gakurenRaceResults(currentGhensuu, idjununivdata, shousai: true),
+              Text(
+                "==総合成績==",
+                style: TextStyle(color: HENSUU.textcolor),
+              ),
+              AllUnivOverallResults_shougatu(currentGhensuu, timejununivdata),
+            ],
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
   }
 
   // 不出場の場合の表示をWidgetに分離
@@ -2118,9 +2374,11 @@ class _Mode0350ContentState extends State<Mode0350Content> {
 
   Widget gakurenRaceResults(
     Ghensuu currentGhensuu,
-    List<UnivData> idjununivdata,
+    List<UnivData> idjununivdata, {
     //List<SenshuData> gakunenjununivfilteredsenshudata,
-  ) {
+    // trueなら指示の内容・結果と補正の説明も出す(学連選抜の監督をしているとき。1.8.2)
+    bool shousai = false,
+  }) {
     final gakurenunivBox = Hive.box<UnivGakurenData>('gakurenUnivBox');
     final gakurenunivdata = gakurenunivBox.values.toList();
     final gakurensenshuBox = Hive.box<Senshu_Gakuren_Data>('gakurenSenshuBox');
@@ -2213,6 +2471,12 @@ class _Mode0350ContentState extends State<Mode0350Content> {
                         Text(
                           "組内順位:${senshu.temp_juni + 1}位 ${TimeDate.timeToFunByouString(senshu.time_taikai_total)}",
                           style: TextStyle(color: HENSUU.textcolor),
+                        ),
+                      if (shousai)
+                        ..._gakurenSijiKekka(
+                          senshu,
+                          i_kukan,
+                          gakurenunivdata[0],
                         ),
                       /*Text(
                         sijiContent,
@@ -2354,8 +2618,10 @@ class _Mode0350ContentState extends State<Mode0350Content> {
     //print('_hyojijunbi内　MYunivid: ${currentGhensuu.MYunivid}');
 
     if (idjununivdata[currentGhensuu.MYunivid].taikaientryflag[currentGhensuu
-            .hyojiracebangou] ==
-        0) {
+                .hyojiracebangou] ==
+            0 &&
+        !_gakurenKantokuMode(currentGhensuu)) {
+      // 学連選抜の監督をしているときは自動で進まず、「進む」ボタンを待つ(1.8.2)
       await Future.delayed(const Duration(milliseconds: 200)); // 0.5 seconds
       currentGhensuu.mode = 400;
       await currentGhensuu.save(); // 変更を保存

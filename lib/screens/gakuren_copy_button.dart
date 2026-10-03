@@ -4,6 +4,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ekiden/ghensuu.dart';
 import 'package:ekiden/constants.dart';
 import 'package:ekiden/kansuu/gakuren_text.dart';
+import 'package:ekiden/screens/Modal_matrix.dart';
 
 /// 学連選抜のテキストをワンタッチでコピーするボタン(1.8.2)
 /// 生成AIに渡して、実況や区間配置・指示の相談を楽しめるようにする。
@@ -42,6 +43,46 @@ class GakurenCopyButton extends StatelessWidget {
         style: const TextStyle(
           color: HENSUU.LinkColor,
           fontSize: HENSUU.fontsize_honbun - 2,
+        ),
+      ),
+    );
+  }
+}
+
+/// 学連選抜の今季タイム一覧表を開くリンク(1.8.2)
+/// 学連選抜のメンバーの今季の成績と能力の表。テキストでコピーして生成AIとの相談にも使える
+class GakurenKonkiTimeLink extends StatelessWidget {
+  const GakurenKonkiTimeLink({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return TextButton(
+      onPressed: () {
+        showGeneralDialog(
+          context: context,
+          barrierColor: Colors.black.withOpacity(0.8),
+          barrierDismissible: true,
+          barrierLabel: '学連選抜の今季タイム一覧表',
+          transitionDuration: const Duration(milliseconds: 300),
+          pageBuilder: (context, animation, secondaryAnimation) {
+            return const ModalUnivSenshuMatrixView(
+              targetUnivId: -1,
+              gakuren: true,
+            );
+          },
+          transitionBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(
+              opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+              child: child,
+            );
+          },
+        );
+      },
+      child: const Text(
+        "学連選抜の今季タイム一覧表",
+        style: TextStyle(
+          color: HENSUU.LinkColor,
+          decoration: TextDecoration.underline,
         ),
       ),
     );

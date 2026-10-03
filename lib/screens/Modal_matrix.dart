@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:two_dimensional_scrollables/two_dimensional_scrollables.dart';
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:hive/hive.dart';
@@ -6,6 +7,7 @@ import 'package:ekiden/ghensuu.dart';
 import 'package:ekiden/constants.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/senshu_data.dart';
+import 'package:ekiden/senshu_gakuren_data.dart';
 import 'package:ekiden/screens/Modal_senshu.dart';
 import 'dart:io';
 import 'package:csv/csv.dart';
@@ -33,7 +35,14 @@ class _ExtraColDef {
 
 class ModalUnivSenshuMatrixView extends StatefulWidget {
   final int targetUnivId;
-  const ModalUnivSenshuMatrixView({super.key, required this.targetUnivId});
+
+  /// trueなら学連選抜のメンバーの表にする(targetUnivIdは使わない。1.8.2)
+  final bool gakuren;
+  const ModalUnivSenshuMatrixView({
+    super.key,
+    required this.targetUnivId,
+    this.gakuren = false,
+  });
 
   @override
   State<ModalUnivSenshuMatrixView> createState() =>
@@ -45,6 +54,11 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
 
   late List<SenshuData> _sortedSenshu;
   String _univName = "";
+
+  // 大学のidから名前を引く表(学連選抜の表で、選手の所属大学を出すのに使う)
+  Map<int, String> _shozokuMei = {};
+
+  String _shozoku(SenshuData senshu) => _shozokuMei[senshu.univid] ?? '---';
   bool _isInitialized = false;
   bool _isExporting = false;
 
@@ -122,48 +136,85 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
   final Color _seriesBorderColor = Colors.white.withOpacity(0.5);
   final double _seriesBorderWidth = 2.0;
 
+  // CSVの行(見出しの行と選手ごとの行)。共有とテキストのコピーで使う
+  // 学連選抜の表では、選手名の後ろに所属大学の列を入れる(1.8.2)
+  List<List<dynamic>> _csvGyou() {
+    List<dynamic> header = ['選手名'];
+    if (widget.gakuren) header.add('所属大学');
+    header.addAll(['駅伝男', '平常心']);
+    for (int i = 3; i < _eventLabels.length; i++) {
+      header.add('${_eventLabels[i]}(順位)');
+      header.add(_eventLabels[i]);
+    }
+    for (final def in _extraCols) {
+      header.add(def.label);
+    }
+
+    List<List<dynamic>> rows = [header];
+
+    for (var senshu in _sortedSenshu) {
+      List<dynamic> row = ['${senshu.name}(${senshu.gakunen}年)'];
+      if (widget.gakuren) row.add(_shozoku(senshu));
+      row.addAll([senshu.konjou, senshu.heijousin]);
+      for (int raceIdx in _raceIndices) {
+        final double time = senshu.kukantime_race[raceIdx][senshu.gakunen - 1];
+        final int? rank = _rankMap[raceIdx]?[senshu.id];
+        if (time <= 0 || time >= TEISUU.DEFAULTTIME) {
+          row.add("");
+          row.add("---");
+        } else {
+          final int m = (time / 60).floor();
+          final int s = (time % 60).floor();
+          row.add(rank ?? "");
+          row.add("$m:${s.toString().padLeft(2, '0')}");
+        }
+      }
+      for (final def in _extraCols) {
+        row.add(_extraText(def, senshu));
+      }
+      rows.add(row);
+    }
+    return rows;
+  }
+
+  // 共有やコピーのときに付ける注意書き
+  String _chuuiBun() {
+    String bun =
+        '※能力値は1〜99で、数値が大きいほど優れています。「??」はまだ判明していない能力のため、値を推測しないでください。\n'
+        '※年間強化は、レース時に対応する能力を一時的に上乗せするもので、表の能力値そのものは変わりません（バランス：平均的に上乗せ、スピード：スパート力とペース変動対応力、距離走：長距離粘りとロード適性、登り：登り適性、下り：下り適性、アップダウン：アップダウン対応力）。';
+    if (widget.gakuren) {
+      bun +=
+          '\n※学連選抜は、正月駅伝に出場できなかった大学の選手で作るオープン参加のチームです。今季の成績は所属大学の選手として出したものです。';
+    }
+    return bun;
+  }
+
+  // --- テキストでコピー(生成AIに渡して区間配置などを相談するとき用。1.8.2) ---
+  Future<void> _copyAsText() async {
+    final String csvData = const ListToCsvConverter()
+        .convert(_csvGyou())
+        .replaceAll('\r\n', '\n');
+    final String text =
+        '【$_univName 今季成績表(CSV形式)】\n'
+        '${_chuuiBun()}\n'
+        '※「(順位)」の列は、この表の選手の中での順位です。\n'
+        '$csvData\n'
+        '#箱庭小駅伝SS';
+    await Clipboard.setData(ClipboardData(text: text));
+    if (mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('$_univName の今季成績表をコピーしました')));
+    }
+  }
+
   // --- CSV出力機能 ---
   Future<void> _exportAndShareCsv() async {
     if (_isExporting) return;
     setState(() => _isExporting = true);
 
     try {
-      List<dynamic> header = ['選手名', '駅伝男', '平常心'];
-      for (int i = 3; i < _eventLabels.length; i++) {
-        header.add('${_eventLabels[i]}(順位)');
-        header.add(_eventLabels[i]);
-      }
-      for (final def in _extraCols) {
-        header.add(def.label);
-      }
-
-      List<List<dynamic>> rows = [header];
-
-      for (var senshu in _sortedSenshu) {
-        List<dynamic> row = [
-          '${senshu.name}(${senshu.gakunen}年)',
-          senshu.konjou,
-          senshu.heijousin,
-        ];
-        for (int raceIdx in _raceIndices) {
-          final double time =
-              senshu.kukantime_race[raceIdx][senshu.gakunen - 1];
-          final int? rank = _rankMap[raceIdx]?[senshu.id];
-          if (time <= 0 || time >= TEISUU.DEFAULTTIME) {
-            row.add("");
-            row.add("---");
-          } else {
-            final int m = (time / 60).floor();
-            final int s = (time % 60).floor();
-            row.add(rank ?? "");
-            row.add("$m:${s.toString().padLeft(2, '0')}");
-          }
-        }
-        for (final def in _extraCols) {
-          row.add(_extraText(def, senshu));
-        }
-        rows.add(row);
-      }
+      final List<List<dynamic>> rows = _csvGyou();
 
       String csvData = const ListToCsvConverter().convert(rows);
       final List<int> bom = [0xEF, 0xBB, 0xBF];
@@ -178,10 +229,7 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
         ShareParams(
           files: [XFile(path)],
           subject: '$_univName 選手記録データ',
-          text:
-              '$_univName の今季成績表(CSV)を共有します。\n'
-              '※能力値は1〜99で、数値が大きいほど優れています。「??」はまだ判明していない能力のため、値を推測しないでください。\n'
-              '※年間強化は、レース時に対応する能力を一時的に上乗せするもので、表の能力値そのものは変わりません（バランス：平均的に上乗せ、スピード：スパート力とペース変動対応力、距離走：長距離粘りとロード適性、登り：登り適性、下り：下り適性、アップダウン：アップダウン対応力）。',
+          text: '$_univName の今季成績表(CSV)を共有します。\n${_chuuiBun()}',
           sharePositionOrigin: const Rect.fromLTWH(0, 0, 1, 1),
         ),
       );
@@ -271,7 +319,9 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
                       constraints: const BoxConstraints(minHeight: 65),
                       alignment: Alignment.centerLeft,
                       child: Text(
-                        '${senshu.name}\n(${senshu.gakunen}年)',
+                        widget.gakuren
+                            ? '${senshu.name}(${senshu.gakunen}年)\n${_shozoku(senshu)}'
+                            : '${senshu.name}\n(${senshu.gakunen}年)',
                         style: TextStyle(
                           color: HENSUU.LinkColor,
                           fontSize: 10,
@@ -546,15 +596,37 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
 
     //final int targetUnivId = currentGhensuu.hyojiunivnum;
 
-    _univName = univBox.get(widget.targetUnivId)?.name ?? "";
+    _shozokuMei = {for (final u in univBox.values) u.id: u.name};
 
-    _sortedSenshu = senshuBox.values
-        .where((s) => s.univid == widget.targetUnivId)
-        .toList();
-    _sortedSenshu.sort((a, b) {
-      int gradeComp = b.gakunen.compareTo(a.gakunen);
-      return gradeComp != 0 ? gradeComp : a.id.compareTo(b.id);
-    });
+    if (widget.gakuren) {
+      // 学連選抜のメンバーの表(学連選抜の選手のidは元の選手と同じ。1.8.2)
+      // 正月駅伝予選の順位の良い順に並べる
+      _univName = "学連選抜";
+      final Map<int, Senshu_Gakuren_Data> gakurenMap = {
+        for (final g in Hive.box<Senshu_Gakuren_Data>(
+          'gakurenSenshuBox',
+        ).values)
+          g.id: g,
+      };
+      _sortedSenshu = senshuBox.values
+          .where((s) => gakurenMap[s.id]?.univid == s.univid)
+          .toList();
+      int yosenJuni(SenshuData s) => s.kukanjuni_race[4][s.gakunen - 1];
+      _sortedSenshu.sort((a, b) {
+        final int juniComp = yosenJuni(a).compareTo(yosenJuni(b));
+        return juniComp != 0 ? juniComp : a.id.compareTo(b.id);
+      });
+    } else {
+      _univName = univBox.get(widget.targetUnivId)?.name ?? "";
+
+      _sortedSenshu = senshuBox.values
+          .where((s) => s.univid == widget.targetUnivId)
+          .toList();
+      _sortedSenshu.sort((a, b) {
+        int gradeComp = b.gakunen.compareTo(a.gakunen);
+        return gradeComp != 0 ? gradeComp : a.id.compareTo(b.id);
+      });
+    }
 
     for (int raceIdx in _raceIndices) {
       List<SenshuData> rankList = _sortedSenshu.where((s) {
@@ -592,6 +664,12 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
             foregroundColor: Colors.white,
             elevation: 0,
             actions: [
+              // テキストでコピー(CSV形式の文をクリップボードに入れる。1.8.2)
+              IconButton(
+                icon: const Icon(Icons.copy),
+                tooltip: 'テキストでコピー',
+                onPressed: _isExporting ? null : _copyAsText,
+              ),
               IconButton(
                 icon: const Icon(Icons.image),
                 onPressed: _isExporting ? null : _shareFullTableImage,
@@ -745,7 +823,9 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
             ),
           ),
           child: AutoSizeText(
-            '${p.name}\n(${p.gakunen}年)',
+            widget.gakuren
+                ? '${p.name}(${p.gakunen}年)\n${_shozoku(p)}'
+                : '${p.name}\n(${p.gakunen}年)',
             maxLines: 2,
             minFontSize: 8,
             style: TextStyle(

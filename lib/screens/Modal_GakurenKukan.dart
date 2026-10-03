@@ -141,10 +141,16 @@ class ModalGakurenKukanView extends StatelessWidget {
                   ],
                 ),
               ),
-              // 区間配置と選手の詳しい情報をコピーする(生成AIとの相談用。1.8.2)
+              // 区間配置と選手の詳しい情報をコピーする(生成AIとの相談用)と、今季タイム一覧表(1.8.2)
               const Align(
                 alignment: Alignment.centerLeft,
-                child: GakurenCopyButton(kukanHaiti: true),
+                child: Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    GakurenCopyButton(kukanHaiti: true),
+                    GakurenKonkiTimeLink(),
+                  ],
+                ),
               ),
 
               // ヘッダー行

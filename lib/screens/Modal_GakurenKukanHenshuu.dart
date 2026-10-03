@@ -193,10 +193,13 @@ class _ModalGakurenKukanHenshuuState extends State<ModalGakurenKukanHenshuu> {
                   fontSize: HENSUU.fontsize_honbun - 2,
                 ),
               ),
-              // 区間配置と選手の詳しい情報をコピーする(生成AIとの相談用)
-              const Align(
-                alignment: Alignment.centerLeft,
-                child: GakurenCopyButton(kukanHaiti: true),
+              // 区間配置と選手の詳しい情報をコピーする(生成AIとの相談用)と、今季タイム一覧表
+              const Wrap(
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  GakurenCopyButton(kukanHaiti: true),
+                  GakurenKonkiTimeLink(),
+                ],
               ),
               const SizedBox(height: 4),
               for (int kukan = 0; kukan < kukansuu; kukan++)

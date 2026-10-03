@@ -1,5 +1,6 @@
 import 'dart:math'; // Randomクラスを使用するため
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ekiden/ghensuu.dart';
 import 'package:ekiden/senshu_data.dart';
@@ -400,6 +401,25 @@ class _Mode0350ContentState extends State<Mode0350Content> {
                               Text(timesastr),
                               // リンクボタン
                               LinkButtons(),
+                              // 自分の大学のレース経過をコピーする(生成AIとの実況や相談用。1.8.2)
+                              // 正月駅伝予選は区間がなく形が違うので出さない
+                              if (currentGhensuu.hyojiracebangou != 4)
+                                TextButton.icon(
+                                  onPressed: () =>
+                                      _jibunKeikaCopy(currentGhensuu),
+                                  icon: const Icon(
+                                    Icons.copy,
+                                    size: 18,
+                                    color: HENSUU.LinkColor,
+                                  ),
+                                  label: const Text(
+                                    '自分の大学のレース経過をコピー',
+                                    style: TextStyle(
+                                      color: HENSUU.LinkColor,
+                                      fontSize: HENSUU.fontsize_honbun - 2,
+                                    ),
+                                  ),
+                                ),
                               // 選手への指示と区間成績表示
                               SenshuSijiSection(
                                 currentGhensuu,
@@ -2267,6 +2287,206 @@ class _Mode0350ContentState extends State<Mode0350Content> {
         );
       }).toList(),
     );
+  }
+
+  // 自分の大学のレース経過をコピーする(1.8.2)
+  Future<void> _jibunKeikaCopy(Ghensuu currentGhensuu) async {
+    await Clipboard.setData(
+      ClipboardData(text: _jibunKeikaText(currentGhensuu)),
+    );
+    if (mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('自分の大学のレース経過をコピーしました')));
+    }
+  }
+
+  // 自分の大学のレース経過のテキスト(生成AIに渡して実況や相談を楽しむためのコピー用。1.8.2)
+  // 画面の「直近区間」「ここまでの全区間」と同じ内容(指示の内容と結果、補正の説明)に、
+  // 順位・タイム差・結果分析と、まだ走っていない区間の選手を加える
+  String _jibunKeikaText(Ghensuu currentGhensuu) {
+    const List<String> bunsekiKoumoku = [
+      '調子',
+      'メンタル',
+      '集団走(1区)',
+      '基本走力',
+      '登り',
+      '下り',
+      'アップダウン',
+      '経験',
+      'ロード適性',
+      'ペース変動',
+      '長距離粘り',
+      'スパート力',
+    ];
+    const List<String> kekka = ["失敗", "成功"];
+    final int race = currentGhensuu.hyojiracebangou;
+    final List<UnivData> univs = idjununivdata;
+    final UnivData my = univs[currentGhensuu.MYunivid];
+    final int kukansuu = currentGhensuu.kukansuu_taikaigoto[race];
+    final int hashitta = min(currentGhensuu.nowracecalckukan, kukansuu);
+    final bool kumi = race == 3; // 11月駅伝予選は「組」
+    final String kuLabel = kumi ? "組" : "区";
+    final String juniLabel = kumi ? "組内" : "区間";
+    final int mokuhyou = my.mokuhyojuni[race]; // 0が1位
+    int seed = -1; // シード権の最下位(0が1位)
+    if (race == 1) seed = 7;
+    if (race == 2) seed = 9;
+    final List<UnivData> shutsujou = univs
+        .where(
+          (u) => u.taikaientryflag.length > race && u.taikaientryflag[race] == 1,
+        )
+        .toList();
+    final List<SenshuData> senshu = gakunenjununivfilteredsenshudata;
+    String raceMei;
+    switch (race) {
+      case 0:
+        raceMei = "10月駅伝";
+        break;
+      case 1:
+        raceMei = "11月駅伝";
+        break;
+      case 2:
+        raceMei = "正月駅伝";
+        break;
+      case 3:
+        raceMei = "11月駅伝予選";
+        break;
+      case 5:
+        raceMei = univs[0].name_tanshuku;
+        break;
+      default:
+        raceMei = "";
+    }
+    String saBun(double sa) {
+      final String fugou = sa.isNegative ? '-' : '+';
+      final int byou = sa.abs().round();
+      if (byou < 60) return '$fugou$byou秒';
+      return '$fugou${byou ~/ 60}分${byou % 60}秒';
+    }
+
+    final StringBuffer sb = StringBuffer();
+    sb.write(
+      '※※※陸上競技のタイム計算に関係することなので、【数値が小さいほど優秀】と捉えてください。(「プラス」は悪い数値、「マイナス」は良い数値。ただし、項目によっては仕様上「プラスの数値」しか出ないものもあります。その場合は「いかにプラスの数値を小さく（0に近く）抑えられたか」を高く評価してください。)※※※\n',
+    );
+    sb.write(
+      '※[分析]は、各項目が走破タイムに与えた影響度を相対値で示しています。マイナスの数値は平均よりタイムを短縮させた好影響、プラスの数値はタイムを悪化させた悪影響を表します。\n',
+    );
+    sb.writeln('【$raceMei ${my.name}大学 レース経過】');
+    sb.writeln('目標順位:${mokuhyou + 1}位');
+    sb.writeln("-----------------------------------");
+    for (int k = 0; k < kukansuu; k++) {
+      final int kyori = currentGhensuu.kyori_taikai_kukangoto[race][k].round();
+      final List<SenshuData> hashiru = senshu
+          .where((x) => x.entrykukan_race[race][x.gakunen - 1] == k)
+          .toList();
+      final String namae = hashiru.isEmpty
+          ? '(選手が決まっていません)'
+          : hashiru.map((x) => '${x.name}(${x.gakunen}年)').join('、');
+      sb.writeln('${k + 1}$kuLabel(${kyori}m) $namae');
+      if (k >= hashitta) {
+        sb.writeln('  これから走る');
+        sb.writeln("-----------------------------------");
+        continue;
+      }
+      // チームの順位とタイム
+      final double tuuka = my.time_taikai_total[k];
+      final double kukanTime = k == 0
+          ? tuuka
+          : tuuka - my.time_taikai_total[k - 1];
+      sb.writeln(
+        '  $juniLabel順位:${my.kukanjuni_taikai[k] + 1}位 '
+        '${TimeDate.timeToFunByouString(kukanTime)}',
+      );
+      String hendou = '';
+      if (k > 0) {
+        final int sa = my.tuukajuni_taikai[k - 1] - my.tuukajuni_taikai[k];
+        hendou = sa > 0 ? ' ↑$sa' : (sa < 0 ? ' ↓${sa.abs()}' : ' →');
+      }
+      sb.writeln(
+        '  通過順位:${my.tuukajuni_taikai[k] + 1}位 '
+        '${TimeDate.timeToJikanFunByouString(tuuka)}$hendou',
+      );
+      // トップ・目標順位・シード権との差
+      final List<double> times =
+          shutsujou
+              .where((u) => u.time_taikai_total.length > k)
+              .map((u) => u.time_taikai_total[k])
+              .where((t) => t > 0 && t < TEISUU.DEFAULTTIME)
+              .toList()
+            ..sort();
+      final List<String> saList = [];
+      if (times.isNotEmpty) {
+        saList.add('トップとの差:${saBun(tuuka - times[0])}');
+      }
+      if (mokuhyou >= 0 && mokuhyou < times.length) {
+        saList.add('目標順位(${mokuhyou + 1}位)との差:${saBun(tuuka - times[mokuhyou])}');
+      }
+      if (seed >= 0 && seed < times.length) {
+        saList.add('シード権(${seed + 1}位)との差:${saBun(tuuka - times[seed])}');
+      }
+      if (saList.isNotEmpty) sb.writeln('  (${saList.join('、')})');
+      // 走った選手ごとの指示の内容と結果、補正の説明、結果分析(画面と同じ決まり)
+      for (final SenshuData x in hashiru) {
+        if (hashiru.length > 1 || kumi) sb.writeln('  ${x.name}(${x.gakunen}年)');
+        if (kumi) {
+          sb.writeln(
+            '  組内順位:${x.temp_juni + 1}位 '
+            '${TimeDate.timeToFunByouString(x.time_taikai_total)}',
+          );
+        }
+        final int sijiflag = x.sijiflag.clamp(0, 2).toInt();
+        String sijiResult = "";
+        List<String> options;
+        if (k == 0 || kumi) {
+          options = ["指示なし", "スタート直後に飛び出す", "スタート直後は飛び出さない"];
+          if (x.startchokugotobidasiflag == 1) {
+            sijiResult =
+                "スタート直後飛び出して:${kekka[x.startchokugotobidasiseikouflag.clamp(0, 1).toInt()]}";
+          }
+        } else {
+          options = ["指示なし", "前半から突っ込む", "前半は抑える"];
+          if (sijiflag >= 1) {
+            sijiResult = "結果:${kekka[x.sijiseikouflag.clamp(0, 1).toInt()]}";
+          } else if (my.mokuhyojuniwositamawatteruflag[k - 1] == 1) {
+            sijiResult =
+                "チーム目標順位を下回っていた(${_mokuhyouKonkyo(my, race, k, univs: univs)})ことによる前半突っ込みでのタイム悪化あり";
+          } else if (my.mokuhyojuniwositamawatteruflag[k - 1] < 0) {
+            sijiResult =
+                "チーム目標順位を上回っていた(${_mokuhyouKonkyo(my, race, k)})ことによるほっと一息でのタイム悪化あり";
+          }
+        }
+        sb.writeln('  指示内容:${options[sijiflag]}');
+        if (sijiResult.isNotEmpty) sb.writeln('  $sijiResult');
+        if (x.string_racesetumei.trim().isNotEmpty) {
+          sb.writeln('  [補正の説明]');
+          for (final String gyou in x.string_racesetumei.trimRight().split(
+            '\n',
+          )) {
+            sb.writeln('   $gyou');
+          }
+        }
+        if (x.racechuukakuseiflag != 0) {
+          final List<String> bunseki = [];
+          for (int i = 0; i < bunsekiKoumoku.length; i++) {
+            final int score = ((x.racechuukakuseiflag >> (i * 4)) & 0xF) - 7;
+            bunseki.add('${bunsekiKoumoku[i]}:${score > 0 ? '+' : ''}$score');
+          }
+          sb.writeln('  [分析] ${bunseki.join(' ')}');
+        }
+      }
+      sb.writeln("-----------------------------------");
+    }
+    if (hashitta >= kukansuu && kukansuu > 0) {
+      final int last = kukansuu - 1;
+      sb.writeln(
+        '総合:${my.tuukajuni_taikai[last] + 1}位 '
+        '${TimeDate.timeToJikanFunByouString(my.time_taikai_total[last])}',
+      );
+    }
+    sb.writeln('');
+    sb.writeln('#箱庭小駅伝SS');
+    return sb.toString();
   }
 
   // 自分の大学のここまでの区間ごとの成績をWidgetに分離

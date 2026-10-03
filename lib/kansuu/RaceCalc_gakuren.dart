@@ -15,6 +15,7 @@ import 'package:ekiden/album.dart';
 import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/kansuu/univkosei.dart';
 import 'package:ekiden/kansuu/mokuhyou_hosei.dart';
+import 'package:ekiden/kansuu/nouryoku_eikyodo.dart';
 
 String _timeToMinuteSecondString(double time) {
   if (time == TEISUU.DEFAULTTIME) {
@@ -37,6 +38,11 @@ Future<void> RaceCalc_gakuren({
   final kantokuBox = Hive.box<KantokuData>('kantokuBox');
   // Boxからデータを読み込む
   final KantokuData kantoku = kantokuBox.get('KantokuData')!;
+  // 能力のタイムへの影響度(全大学共通の設定。駅伝と駅伝予選だけ。1.8.2)
+  final NouryokuEikyodo nouryokuEikyodo = NouryokuEikyodo.forRace(
+    kantoku,
+    racebangou,
+  );
 
   final gakurenunivBox = Hive.box<UnivGakurenData>('gakurenUnivBox');
   final gakurenunivdata = gakurenunivBox.values.toList();
@@ -58,8 +64,8 @@ Future<void> RaceCalc_gakuren({
   var heikinkoubai_nobori = 0.0;
   var heikinkoubai_kudari = 0.0;
   var noborikudari_kirikaekaisuu = 0;
-  var temptandokusou = 0;
-  var temppaceagesagetaiouryoku = 0;
+  double temptandokusou = 0; // ロード適性(影響度を反映した小数。1.8.2から)
+  double temppaceagesagetaiouryoku = 0; // ペース変動対応力(同じ)
   var tekiyouritu_tandokusouhosei = 1.0;
   var tekiyouritu_paceagesagehosei = 1.0;
   int hoseishuruisuu = 17;
@@ -250,6 +256,18 @@ Future<void> RaceCalc_gakuren({
         set_pacehendou += kyoudo;
       }
       if (set_pacehendou < 1) set_pacehendou = 1;
+      // 能力のタイムへの影響度(1.8.2)を反映した能力の値(小数)。能力50を基準に差を広げたり縮めたりする
+      // (駅伝と駅伝予選だけ。初期値(100%)では元の値と全く同じ値になる)
+      final double eikyou_nebari = eikyodoNouryoku(set_nebari, nouryokuEikyodo.nebari);
+      final double eikyou_spurt = eikyodoNouryoku(set_spurt, nouryokuEikyodo.spurt);
+      final double eikyou_nobori = eikyodoNouryoku(set_nobori, nouryokuEikyodo.nobori);
+      final double eikyou_kudari = eikyodoNouryoku(set_kudari, nouryokuEikyodo.kudari);
+      final double eikyou_updown = eikyodoNouryoku(set_updown, nouryokuEikyodo.updown);
+      final double eikyou_road = eikyodoNouryoku(set_road, nouryokuEikyodo.road);
+      final double eikyou_pacehendou = eikyodoNouryoku(
+        set_pacehendou,
+        nouryokuEikyodo.pace,
+      );
 
       // Theoretical time calculation
       final kyori = tempkyori;
@@ -423,13 +441,13 @@ Future<void> RaceCalc_gakuren({
       double hyoukousasisuu = 0.0;
 
       // Uphill
-      double hosei = 0.044 - 0.00017 * set_nobori * TEISUU.CHOUSEI_NOBORI;
+      double hosei = 0.044 - 0.00017 * eikyou_nobori * TEISUU.CHOUSEI_NOBORI;
       hyoukousasisuu = kyoriwariai_nobori * heikinkoubai_nobori;
       hosei = hosei * (hyoukousasisuu / 0.01);
       hosei_nobori = -hosei;
 
       // Downhill
-      hosei = 0.00965 + 0.00018 * set_kudari * TEISUU.CHOUSEI_KUDARI;
+      hosei = 0.00965 + 0.00018 * eikyou_kudari * TEISUU.CHOUSEI_KUDARI;
       hyoukousasisuu = kyoriwariai_kudari * heikinkoubai_kudari;
       hosei = hosei * (-hyoukousasisuu / 0.01);
       hosei_kudari = hosei;
@@ -439,7 +457,7 @@ Future<void> RaceCalc_gakuren({
           TEISUU.CHOUSEI_KIRIKAE *
           noborikudari_kirikaekaisuu *
           //(100.0 - set_updown);
-          (135.0 - set_updown);
+          (135.0 - eikyou_updown);
       hosei_kirikae = -hosei;
 
       double hosei_total_altitude =
@@ -465,19 +483,19 @@ Future<void> RaceCalc_gakuren({
         if ((racebangou != 4 && gh[0].nowracecalckukan == 0) ||
             racebangou == 3) {
           temptandokusou = 100;
-          temppaceagesagetaiouryoku = set_pacehendou;
+          temppaceagesagetaiouryoku = eikyou_pacehendou;
         } else if (racebangou == 4) {
-          temptandokusou = set_road;
+          temptandokusou = eikyou_road;
           tekiyouritu_tandokusouhosei = 0.5;
-          temppaceagesagetaiouryoku = set_pacehendou;
+          temppaceagesagetaiouryoku = eikyou_pacehendou;
           tekiyouritu_paceagesagehosei = 0.5;
         } else if (gh[0].nowracecalckukan >= 1 && gh[0].nowracecalckukan <= 2) {
-          temptandokusou = set_road;
+          temptandokusou = eikyou_road;
           tekiyouritu_tandokusouhosei = 0.5;
-          temppaceagesagetaiouryoku = set_pacehendou;
+          temppaceagesagetaiouryoku = eikyou_pacehendou;
           tekiyouritu_paceagesagehosei = 0.5;
         } else {
-          temptandokusou = set_road;
+          temptandokusou = eikyou_road;
           temppaceagesagetaiouryoku = 100;
         }
       }
@@ -560,7 +578,7 @@ Future<void> RaceCalc_gakuren({
       // Long-distance endurance correction
       final choukyoriHosei = ChoukyoriNebariHoseitime_gakuren(
         kyori: tempkyori,
-        choukyorinebari: set_nebari,
+        choukyorinebari: eikyou_nebari,
         zentaiyokuseiti: kantoku.yobiint2[13],
         //senshuid: senshuid,
         //gakurensenshudata: gakurensenshudata,
@@ -578,7 +596,7 @@ Future<void> RaceCalc_gakuren({
       // Sprint power correction
       final spurtHosei = SpurtRyokuHoseitime_gakuren(
         kyori: tempkyori,
-        spurtRyoku: set_spurt,
+        spurtRyoku: eikyou_spurt,
         //senshuid: senshuid,
         //gakurensenshudata: gakurensenshudata,
       );

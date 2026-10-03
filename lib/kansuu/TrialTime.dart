@@ -14,6 +14,7 @@ import 'package:ekiden/kansuu/SpurtRyokuHoseitime.dart';
 import 'package:ekiden/kansuu/ChoukyoriNebariHoseitime.dart';
 import 'package:ekiden/kansuu/univkosei.dart';
 import 'package:ekiden/kansuu/chousi_keiken_hosei.dart';
+import 'package:ekiden/kansuu/nouryoku_eikyodo.dart';
 import 'package:ekiden/kantoku_data.dart';
 
 // このメソッドは、各区間の走破タイム（秒単位のdouble型）を計算します。
@@ -67,6 +68,11 @@ Future<double> runTrialCalculation(
   //final KantokuData kantoku = kantokuBox.get('KantokuData')!;
   //強化練習強度を取得
   final int kyoudo = kantoku.yobiint2[16];
+  // 能力のタイムへの影響度(全大学共通の設定。駅伝と駅伝予選だけ。1.8.2)
+  final NouryokuEikyodo nouryokuEikyodo = NouryokuEikyodo.forRace(
+    kantoku,
+    currentGhensuu.hyojiracebangou,
+  );
   //強化練習番号を取得
   final int trainingNum = sortedsenshudata[senshuid].kaifukuryoku;
   // 関数を呼び出してマップを取得(大学の個性)
@@ -169,6 +175,18 @@ Future<double> runTrialCalculation(
     set_pacehendou += kyoudo;
   }
   if (set_pacehendou < 1) set_pacehendou = 1;
+  // 能力のタイムへの影響度(1.8.2)を反映した能力の値(小数)。能力50を基準に差を広げたり縮めたりする
+  // (駅伝と駅伝予選だけ。初期値(100%)では元の値と全く同じ値になる)
+  final double eikyou_nebari = eikyodoNouryoku(set_nebari, nouryokuEikyodo.nebari);
+  final double eikyou_spurt = eikyodoNouryoku(set_spurt, nouryokuEikyodo.spurt);
+  final double eikyou_nobori = eikyodoNouryoku(set_nobori, nouryokuEikyodo.nobori);
+  final double eikyou_kudari = eikyodoNouryoku(set_kudari, nouryokuEikyodo.kudari);
+  final double eikyou_updown = eikyodoNouryoku(set_updown, nouryokuEikyodo.updown);
+  final double eikyou_road = eikyodoNouryoku(set_road, nouryokuEikyodo.road);
+  final double eikyou_pacehendou = eikyodoNouryoku(
+    set_pacehendou,
+    nouryokuEikyodo.pace,
+  );
 
   // Theoretical time calculation
   final kyori = tempkyori;
@@ -260,13 +278,13 @@ Future<double> runTrialCalculation(
   double hyoukousasisuu = 0.0;
 
   // Uphill
-  double hosei = 0.044 - 0.00017 * set_nobori * TEISUU.CHOUSEI_NOBORI;
+  double hosei = 0.044 - 0.00017 * eikyou_nobori * TEISUU.CHOUSEI_NOBORI;
   hyoukousasisuu = kyoriwariai_nobori * heikinkoubai_nobori;
   hosei = hosei * (hyoukousasisuu / 0.01);
   hosei_nobori = -hosei;
 
   // Downhill
-  hosei = 0.00965 + 0.00018 * set_kudari * TEISUU.CHOUSEI_KUDARI;
+  hosei = 0.00965 + 0.00018 * eikyou_kudari * TEISUU.CHOUSEI_KUDARI;
   hyoukousasisuu = kyoriwariai_kudari * heikinkoubai_kudari;
   hosei = hosei * (-hyoukousasisuu / 0.01);
   hosei_kudari = hosei;
@@ -276,7 +294,7 @@ Future<double> runTrialCalculation(
       TEISUU.CHOUSEI_KIRIKAE *
       noborikudari_kirikaekaisuu *
       //(100.0 - set_updown);
-      (135.0 - set_updown);
+      (135.0 - eikyou_updown);
   hosei_kirikae = -hosei;
 
   double hosei_total_altitude =
@@ -284,8 +302,8 @@ Future<double> runTrialCalculation(
   double_speed = double_speed * hosei_total_altitude;
   kotaetime = tempkyori / double_speed;
 
-  int temptandokusou = 0;
-  int temppaceagesagetaiouryoku = 0;
+  double temptandokusou = 0; // ロード適性(影響度を反映した小数。1.8.2から)
+  double temppaceagesagetaiouryoku = 0; // ペース変動対応力(同じ)
   double tekiyouritu_tandokusouhosei = 1.0;
   double tekiyouritu_paceagesagehosei = 1.0;
   // Solo Run / Pace Adjustment Adaptability
@@ -296,7 +314,7 @@ Future<double> runTrialCalculation(
     if (currentGhensuu.hyojiracebangou == 8 ||
         currentGhensuu.hyojiracebangou == 12 ||
         currentGhensuu.hyojiracebangou == 15) {
-      temptandokusou = set_road;
+      temptandokusou = eikyou_road;
       temppaceagesagetaiouryoku = 100;
     } else if (currentGhensuu.hyojiracebangou == 13 ||
         currentGhensuu.hyojiracebangou == 14) {
@@ -304,7 +322,7 @@ Future<double> runTrialCalculation(
       temppaceagesagetaiouryoku = 100;
     } else {
       temptandokusou = 100;
-      temppaceagesagetaiouryoku = set_pacehendou;
+      temppaceagesagetaiouryoku = eikyou_pacehendou;
     }
   }
   if (currentGhensuu.hyojiracebangou >= 0 &&
@@ -312,15 +330,15 @@ Future<double> runTrialCalculation(
     if ((currentGhensuu.hyojiracebangou != 4 && i_kukan == 0) ||
         currentGhensuu.hyojiracebangou == 3) {
       temptandokusou = 100;
-      temppaceagesagetaiouryoku = set_pacehendou;
+      temppaceagesagetaiouryoku = eikyou_pacehendou;
     } else if (currentGhensuu.hyojiracebangou == 4 ||
         (i_kukan >= 1 && i_kukan <= 2)) {
-      temptandokusou = set_road;
+      temptandokusou = eikyou_road;
       tekiyouritu_tandokusouhosei = 0.5;
-      temppaceagesagetaiouryoku = set_pacehendou;
+      temppaceagesagetaiouryoku = eikyou_pacehendou;
       tekiyouritu_paceagesagehosei = 0.5;
     } else {
-      temptandokusou = set_road;
+      temptandokusou = eikyou_road;
       temppaceagesagetaiouryoku = 100;
     }
   }
@@ -358,7 +376,7 @@ Future<double> runTrialCalculation(
   // Long-distance endurance correction
   final choukyoriHosei = ChoukyoriNebariHoseitime(
     kyori: tempkyori,
-    choukyorinebari: set_nebari,
+    choukyorinebari: eikyou_nebari,
     zentaiyokuseiti: kantoku.yobiint2[13],
     //senshuid: senshuid,
     //sortedsenshudata: sortedsenshudata,
@@ -370,7 +388,7 @@ Future<double> runTrialCalculation(
   // Sprint power correction
   final spurtHosei = SpurtRyokuHoseitime(
     kyori: tempkyori,
-    spurtRyoku: set_spurt,
+    spurtRyoku: eikyou_spurt,
     //senshuid: senshuid,
     //sortedsenshudata: sortedsenshudata,
   );

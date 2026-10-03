@@ -14,6 +14,7 @@ import 'package:ekiden/screens/Modal_choukyoritimehosei.dart';
 import 'package:ekiden/screens/Modal_ayumi.dart';
 import 'package:ekiden/screens/Modal_chousi.dart';
 import 'package:ekiden/screens/Modal_hoseiTsuyosa.dart';
+import 'package:ekiden/screens/Modal_nouryokuEikyodo.dart';
 import 'package:ekiden/screens/Modal_bairitu_goldsilver.dart';
 import 'package:ekiden/screens/Modal_racejiki.dart';
 import 'package:ekiden/screens/Modal_shumihihyouji.dart';
@@ -422,6 +423,42 @@ class _SettingScreenState extends State<SettingScreen> {
               },
               child: Text(
                 "目標順位・指示の補正設定",
+                style: TextStyle(
+                  color: const Color.fromARGB(255, 0, 255, 0),
+                  decoration: TextDecoration.underline,
+                  decorationColor: HENSUU.textcolor,
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            // 能力のタイムへの影響度の設定(1.8.2)
+            TextButton(
+              onPressed: () {
+                showGeneralDialog(
+                  context: context,
+                  barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                  barrierDismissible: true, // 背景タップで閉じられるようにする
+                  barrierLabel: '能力のタイムへの影響度設定', // アクセシビリティ用ラベル
+                  transitionDuration: const Duration(
+                    milliseconds: 300,
+                  ), // アニメーション時間
+                  pageBuilder: (context, animation, secondaryAnimation) {
+                    return const ModalNouryokuEikyodo();
+                  },
+                  transitionBuilder:
+                      (context, animation, secondaryAnimation, child) {
+                        return FadeTransition(
+                          opacity: CurvedAnimation(
+                            parent: animation,
+                            curve: Curves.easeOut,
+                          ),
+                          child: child,
+                        );
+                      },
+                );
+              },
+              child: Text(
+                "能力のタイムへの影響度設定",
                 style: TextStyle(
                   color: const Color.fromARGB(255, 0, 255, 0),
                   decoration: TextDecoration.underline,
@@ -1212,6 +1249,10 @@ class _SettingScreenState extends State<SettingScreen> {
             ),
             const Text(
               "【ペース変動対応力】　5千・1万のトラックレース、駅伝の1区から3区までと11月駅伝予選、正月駅伝予選、クロカン1万に関係する能力。",
+              style: TextStyle(color: Colors.white),
+            ),
+            const Text(
+              "長距離粘り・スパート力・登り適性・下り適性・アップダウン対応力・ロード適性・ペース変動対応力の差が、駅伝と駅伝予選のタイムにどのくらい効くかは、この画面の上の方にある「能力のタイムへの影響度設定」で変えられます(全大学共通。記録会などのタイムには関係しません)。",
               style: TextStyle(color: Colors.white),
             ),
             const SizedBox(height: 24),

@@ -234,7 +234,8 @@ class _SettingsQrPageState extends State<SettingsQrPage> {
             '・年間強化練習効果設定\n'
             '・コンピュータ金銀使用設定(ON/OFF・大学ごとの支給レベルと銀の使い道)\n'
             '・コンピュータスカウト設定(ON/OFF・積極性・ラウンド回数・評価の割合・大学ごとのスカウト方針と性格)\n'
-            '・目標順位・指示の補正設定\n',
+            '・目標順位・指示の補正設定\n'
+            '・能力のタイムへの影響度設定\n',
 
             style: TextStyle(color: Colors.white70, fontSize: 14),
           ),

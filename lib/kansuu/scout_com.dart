@@ -6,6 +6,7 @@ import 'package:ekiden/ghensuu.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/senshu_data.dart';
 import 'package:ekiden/kantoku_data.dart';
+import 'package:ekiden/kansuu/nouryoku_eikyodo.dart'; // 能力のタイムへの影響度
 import 'package:ekiden/kansuu/ShozokusakiKettei_By_Univmeisei.dart'; // 振り分けの抽選の重み
 
 // ------------------------------------------------------------
@@ -298,6 +299,8 @@ class _Mekiki {
   final int seikaku; // 性格(1〜3。自動は名声順位で決めたもの)
   final List<int> hokyou; // 自動のときの補強ポイント(3登り・4下り・5アップダウン)
   final int timeWariai; // 評価のタイムの割合(0〜100%。全大学共通の設定)
+  // 能力のタイムへの影響度(全大学共通の設定。自動のときの重みに掛ける。1.8.2)
+  final NouryokuEikyodo eikyodo;
 
   _Mekiki({
     required this.univid,
@@ -305,11 +308,12 @@ class _Mekiki {
     required this.seikaku,
     required this.hokyou,
     required this.timeWariai,
+    required this.eikyodo,
   });
 
   /// 能力点(重視する能力の重み付き平均)
   double nouryokuTen(SenshuData s) {
-    final List<List<int>> atai = []; // [能力値, 重み]
+    final List<List<num>> atai = []; // [能力値, 重み]
     switch (houshin) {
       case 1: // スピード重視
         atai.add([s.spurtryoku, 1]);
@@ -331,21 +335,21 @@ class _Mekiki {
       case 6: // 駅伝男重視(駅伝男だけ)
         atai.add([s.konjou, 1]);
         break;
-      default: // 自動
-        atai.add([s.choukyorinebari, 2]);
-        atai.add([s.tandokusou, 2]);
-        atai.add([s.paceagesagetaiouryoku, 1]);
+      default: // 自動(重みに能力のタイムへの影響度を掛ける。初期値(100%)では今まで通り)
+        atai.add([s.choukyorinebari, 2 * eikyodo.nebari]);
+        atai.add([s.tandokusou, 2 * eikyodo.road]);
+        atai.add([s.paceagesagetaiouryoku, 1 * eikyodo.pace]);
         for (final int menu in hokyou) {
-          atai.add([_menuNouryoku(s, menu), 2]);
+          atai.add([_menuNouryoku(s, menu), 2 * _menuEikyodo(eikyodo, menu)]);
         }
     }
-    int goukei = 0;
-    int omomi = 0;
-    for (final List<int> a in atai) {
+    num goukei = 0;
+    num omomi = 0;
+    for (final List<num> a in atai) {
       goukei += a[0] * a[1];
       omomi += a[1];
     }
-    return omomi == 0 ? 0 : goukei / omomi;
+    return omomi == 0 ? 0.0 : goukei / omomi;
   }
 
   /// 点数(タイム点×タイムの割合+能力点×(1−タイムの割合)。初期値はタイム50%・能力50%
@@ -379,6 +383,20 @@ int _menuNouryoku(SenshuData s, int menu) {
       return s.noborikudarikirikaenouryoku;
     default:
       return 0;
+  }
+}
+
+/// 山の能力(3登り・4下り・5アップダウン)の、能力のタイムへの影響度
+double _menuEikyodo(NouryokuEikyodo eikyodo, int menu) {
+  switch (menu) {
+    case 3:
+      return eikyodo.nobori;
+    case 4:
+      return eikyodo.kudari;
+    case 5:
+      return eikyodo.updown;
+    default:
+      return 1.0;
   }
 }
 
@@ -416,6 +434,7 @@ _Mekiki _mekikiTsukuru(
     }
   }
   final List<int> hokyou = [];
+  final NouryokuEikyodo eikyodo = NouryokuEikyodo.fromKantoku(kantoku);
   if (houshin == _houshinJidou) {
     // 来年も残る選手に、得意な選手が2人いない山の能力を補強ポイントにする
     final List<SenshuData> nokoru = zenSenshu
@@ -430,7 +449,10 @@ _Mekiki _mekikiTsukuru(
       final int tokui = nokoru
           .where((s) => _menuNouryoku(s, menu) >= _tokuiSakaime)
           .length;
-      if (tokui < _tokuiNinzuu) hokyou.add(menu);
+      // 影響度が0%の能力は、タイムに差がつかないので補強しない(1.8.2)
+      if (tokui < _tokuiNinzuu && _menuEikyodo(eikyodo, menu) > 0) {
+        hokyou.add(menu);
+      }
     }
   }
   return _Mekiki(
@@ -439,6 +461,7 @@ _Mekiki _mekikiTsukuru(
     seikaku: seikaku,
     hokyou: hokyou,
     timeWariai: comScoutTimeWariai(kantoku),
+    eikyodo: eikyodo,
   );
 }
 

@@ -11,7 +11,7 @@ import 'package:ekiden/senshu_gakuren_data.dart';
 /// 戻り値: 計算されたタイム補正値 (Double)。
 double SpurtRyokuHoseitime({
   required double kyori,
-  required int spurtRyoku,
+  required num spurtRyoku, // 1.8.2から小数も可(能力のタイムへの影響度を反映した値)
   //required int senshuid,
   //required List<SenshuData> sortedsenshudata,
 }) {
@@ -56,7 +56,7 @@ double SpurtRyokuHoseitime({
 
 double SpurtRyokuHoseitime_gakuren({
   required double kyori,
-  required int spurtRyoku,
+  required num spurtRyoku, // 1.8.2から小数も可(能力のタイムへの影響度を反映した値)
   //required int senshuid,
   //required List<Senshu_Gakuren_Data> gakurensenshudata,
 }) {

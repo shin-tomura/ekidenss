@@ -11,6 +11,7 @@ import 'ghensuu.dart'; // Ghensuu
 import 'qr_data_model.dart';
 import 'kansuu/scout_com.dart'; // コンピュータスカウト設定の確認
 import 'kansuu/mokuhyou_hosei.dart'; // 目標順位・指示の補正設定の確認
+import 'kansuu/nouryoku_eikyodo.dart'; // 能力のタイムへの影響度設定の確認
 
 // 読み込み時に複数枚のデータを一時的に保持する状態管理クラス
 class QrReceiveState {
@@ -152,6 +153,8 @@ class SettingsQrProcessor {
       data['k_yobiint2_63'] = kantoku.yobiint2[63];
       // 目標順位・指示の補正設定(int) [64]〜[67] (1.8.2で追加)
       data['k_yobiint2_64_67'] = kantoku.yobiint2.sublist(64, 68);
+      // 能力のタイムへの影響度設定(int) [68]〜[74] (1.8.2で追加)
+      data['k_yobiint2_68_74'] = kantoku.yobiint2.sublist(68, 75);
     } else if (department == SettingsDepartment.octoberTime) {
       //区間ごとタイム調整(int)
       data['k_yobiint5_30_39_time'] = kantoku.yobiint5.sublist(30, 40);
@@ -540,6 +543,18 @@ class SettingsQrProcessor {
           final dynamic v = yobiint2_64_67[i];
           if (v is int && hoseiTsuyosaAtaiTadashii(v)) {
             kantoku.yobiint2[64 + i] = v;
+          }
+        }
+      }
+      // 能力のタイムへの影響度設定(int) kantoku.yobiint2[68]〜[74]
+      //   長距離粘り・スパート力・登り・下り・アップダウン・ロード・ペース変動の影響度
+      //   (0なら100%(初期値)、1〜31なら(値−1)×10%)
+      final dynamic yobiint2_68_74 = dataMap['k_yobiint2_68_74'];
+      if (yobiint2_68_74 is List && yobiint2_68_74.length == 7) {
+        for (int i = 0; i < 7; i++) {
+          final dynamic v = yobiint2_68_74[i];
+          if (v is int && nouryokuEikyodoAtaiTadashii(v)) {
+            kantoku.yobiint2[68 + i] = v;
           }
         }
       }

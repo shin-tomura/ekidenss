@@ -18,7 +18,7 @@ import 'package:ekiden/screens/Modal_kukanresult.dart' as kekka;
 // 押すと、その場面で生成AIに渡すと便利なテキストの一覧が出て、
 // 1回押すだけでコピーできる。いつもいっしょに渡すものはセットでコピーできる。
 // ・レース前セット: コース情報+全区間・全大学詳細リスト(展開予想に)
-// ・区間ごとセット: 直近の区間の個人順位速報+通過順位速報(実況に)
+// ・区間ごとセット: 直近の区間の個人順位速報(説明文つき)+通過順位速報(実況に)
 // ・振り返りセット: 総合成績+自分の大学のレース経過(結果画面で、レース後の振り返りに)
 // ・学連選抜の振り返りセット: 総合成績+学連選抜のレース経過+学連選抜の区間配置(結果画面で)
 // 結果画面では、個人成績を区間を選んで1つずつコピーすることもできる
@@ -150,10 +150,15 @@ class AiCopyMatomeButton extends StatelessWidget {
       list.add(
         _AiCopyKoumoku(
           '区間ごとセット($kukanMei)',
-          '${kukanMei}の個人順位速報と通過順位速報をまとめてコピー。実況に',
+          '${kukanMei}の個人順位速報(説明文つき)と通過順位速報をまとめてコピー。補正の説明まで入るので、実況が詳しくなる',
           Icons.library_books,
+          // 実況が面白くなるように、個人順位速報は補正の説明まで入った説明文つきにする
           () =>
-              kojinJuniSokuhouText(gh, chokkin) +
+              kojinJuniSokuhouText(
+                gh,
+                chokkin,
+                viewMode: ViewMode.description,
+              ) +
               _setKugiri +
               tuukaJuniSokuhouText(gh, chokkin),
         ),

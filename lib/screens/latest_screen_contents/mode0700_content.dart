@@ -21,6 +21,7 @@ import 'package:ekiden/screens/Modal_kekkagaiyou.dart';
 import 'package:ekiden/screens/Modal_kukanhaitiANDresult.dart';
 import 'package:ekiden/screens/Modal_GakurenKukan.dart';
 import 'package:ekiden/screens/gakuren_copy_button.dart';
+import 'package:ekiden/screens/ai_copy_matome.dart';
 import 'package:ekiden/screens/Modal_kukanhaiti2.dart';
 import 'package:ekiden/screens/Modal_courseshoukai.dart';
 import 'package:ekiden/screens/Modal_tuukajunisuii.dart';
@@ -1293,6 +1294,13 @@ class _Mode0700ContentState extends State<Mode0700Content> {
                                                 ),
                                               ), // ★コンマを追加★
 
+                                            // 生成AIに渡すテキストのまとめボタン(レース後の振り返り用。1.8.2)
+                                            if (currentGhensuu
+                                                    .hyojiracebangou <=
+                                                5)
+                                              const AiCopyMatomeButton(
+                                                kekkaGamen: true,
+                                              ),
                                             if (currentGhensuu
                                                     .hyojiracebangou <=
                                                 5)

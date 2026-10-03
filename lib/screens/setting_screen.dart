@@ -1181,7 +1181,7 @@ class _SettingScreenState extends State<SettingScreen> {
               style: TextStyle(color: Colors.white),
             ),
             const Text(
-              "一次エントリー・区間エントリー・レース中の画面にある「生成AIに渡すテキスト」ボタンを押すと、その場面で役に立つテキストの一覧が出て、1回押すだけでコピーできます。いつもいっしょに渡すものは、まとめてコピーできます。",
+              "一次エントリー・区間エントリー・レース中・レース結果の画面にある「生成AIに渡すテキスト」ボタンを押すと、その場面で役に立つテキストの一覧が出て、1回押すだけでコピーできます。いつもいっしょに渡すものは、まとめてコピーできます。",
               style: TextStyle(color: Colors.white),
             ),
             const Text(
@@ -1198,6 +1198,10 @@ class _SettingScreenState extends State<SettingScreen> {
             ),
             const Text(
               "・指示の相談には「自分の大学のレース経過」と「全区間・全大学詳細リスト」を渡して、この先の展開を予想してもらう",
+              style: TextStyle(color: Colors.white),
+            ),
+            const Text(
+              "・レース後の振り返りには、レース結果の画面の「振り返りセット」(総合成績と自分の大学のレース経過をまとめたもの)や「全区間の個人成績」",
               style: TextStyle(color: Colors.white),
             ),
             const Text(

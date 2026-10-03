@@ -10,6 +10,8 @@ import 'package:ekiden/screens/Modal_kukanhaiti2.dart';
 import 'package:ekiden/screens/Modal_kukanresult350.dart';
 import 'package:ekiden/screens/Modal_tuukajuni.dart';
 import 'package:ekiden/screens/Modal_matrix.dart';
+// 結果画面の「個人順位タイム表示」の文(ViewModeの名前が個人順位速報と同じなので、名前を付けて読み込む)
+import 'package:ekiden/screens/Modal_kukanresult.dart' as kekka;
 
 // ------------------------------------------------------------
 // 生成AIに渡すテキストのまとめボタン(1.8.2)
@@ -17,6 +19,7 @@ import 'package:ekiden/screens/Modal_matrix.dart';
 // 1回押すだけでコピーできる。いつもいっしょに渡すものはセットでコピーできる。
 // ・レース前セット: コース情報+全区間・全大学詳細リスト(展開予想に)
 // ・区間ごとセット: 直近の区間の個人順位速報+通過順位速報(実況に)
+// ・振り返りセット: 総合成績+自分の大学のレース経過(結果画面で、レース後の振り返りに)
 // 文はそれぞれの画面のコピーと同じもの(画面の外に出した関数で作る)
 // ------------------------------------------------------------
 
@@ -35,9 +38,16 @@ const String _setKugiri = '\n\n==============================\n\n';
 /// 生成AIに渡すテキストのまとめボタン
 /// [entryAri] 区間エントリーが済んでいる場面か(一次エントリーの画面ではfalse。
 ///   falseのときは、全区間・全大学詳細リストとレース経過を出さない)
+/// [kekkaGamen] レースの結果画面か(trueのときは、レース中の速報の代わりに
+///   振り返りセット・総合成績・全区間の個人成績を出す。文は結果画面のコピーと同じ)
 class AiCopyMatomeButton extends StatelessWidget {
   final bool entryAri;
-  const AiCopyMatomeButton({super.key, this.entryAri = true});
+  final bool kekkaGamen;
+  const AiCopyMatomeButton({
+    super.key,
+    this.entryAri = true,
+    this.kekkaGamen = false,
+  });
 
   // 今の場面でコピーできるものの一覧
   List<_AiCopyKoumoku> _koumokuList(Ghensuu gh) {
@@ -57,10 +67,45 @@ class AiCopyMatomeButton extends StatelessWidget {
     final int chokkin = gh.nowracecalckukan > kukansuu
         ? kukansuu - 1
         : gh.nowracecalckukan - 1;
-    final bool sokuhouAri = ekiden && entryAri && chokkin >= 0;
+    final bool sokuhouAri = ekiden && entryAri && chokkin >= 0 && !kekkaGamen;
     final String kukanMei = race == 3 ? '${chokkin + 1}組' : '${chokkin + 1}区';
 
     final List<_AiCopyKoumoku> list = [];
+    // 結果画面(レース後の振り返り)
+    if (kekkaGamen && ekiden && chokkin >= 0) {
+      final bool jibunAri = shutsujou && race != 4;
+      list.add(
+        _AiCopyKoumoku(
+          '振り返りセット',
+          jibunAri
+              ? '総合成績と自分の大学のレース経過をまとめてコピー。振り返りに'
+              : '総合成績をコピー。振り返りに',
+          Icons.library_books,
+          () => [
+            tuukaJuniSokuhouText(gh, chokkin),
+            if (jibunAri) jibunRaceKeikaText(gh),
+          ].join(_setKugiri),
+        ),
+      );
+      list.add(
+        _AiCopyKoumoku(
+          '総合成績',
+          '最後の${race == 3 ? '組' : '区'}の通過順位(結果画面の通過順位タイム表示と同じ)',
+          Icons.emoji_events,
+          () => tuukaJuniSokuhouText(gh, chokkin),
+        ),
+      );
+      list.add(
+        _AiCopyKoumoku(
+          '全区間の個人成績',
+          '区間ごとの全選手の順位とタイム(結果画面の個人順位タイム表示と同じ)',
+          Icons.directions_run,
+          () => [
+            for (int k = 0; k <= chokkin; k++) kekka.kojinSeisekiText(gh, k),
+          ].join(_setKugiri),
+        ),
+      );
+    }
     if (sokuhouAri) {
       list.add(
         _AiCopyKoumoku(
@@ -119,7 +164,7 @@ class AiCopyMatomeButton extends StatelessWidget {
         ),
       );
     }
-    if (ekiden && entryAri) {
+    if (ekiden && entryAri && !kekkaGamen) {
       list.add(
         _AiCopyKoumoku(
           'レース前セット',

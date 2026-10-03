@@ -965,30 +965,74 @@ Future<void> RaceCalc_gakuren({
   }*/
 
   //1区の補正
+  // 1.8.2で大学の選手(RaceCalc.dartの集団走補正)と同じ決まりにそろえた
+  // ・集団のペースは、大学の選手のうち飛び出さなかった選手の中でカリスマが一番高い選手のタイム
+  //   (RaceCalc.dartでalbum.yobiint5に保存したもの。学連選抜の選手はペースを作る側にはならない)
+  // ・自分のペースが集団より速い: 集団との平均(タイム損)
+  //   集団より遅いが1%以内: 集団との平均(少しタイム得)
+  //   1〜3%遅い: 損得なし  3%を超えて遅い: 無理して付いていって大失速(2.5%悪化)
+  //   (1.8.1までは、遅れの大きさに関係なくいつも集団との平均だった)
+  // ・指示なしで自動で飛び出すのは、大学と同じく駅伝男85以上の選手だけ(15%の確率)
+  //   (1.8.1までは駅伝男に関係なく15%)。前もって飛び出しの印が付いている選手は、
+  //   上の指示の計算ですでに飛び出しの補正をしているので、ここでは何もしない
   final albumBox = Hive.box<Album>('albumBox');
   final Album album = albumBox.get('AlbumData')!;
   if (gh[0].nowracecalckukan == 0) {
+    final double kijuntime = album.yobiint5.toDouble();
     for (var senshuid = 0; senshuid < gakurensenshudata.length; senshuid++) {
-      if (gakurensenshudata[senshuid]
-              .entrykukan_race[racebangou][gakurensenshudata[senshuid].gakunen -
-              1] ==
+      final senshu = gakurensenshudata[senshuid];
+      if (senshu.entrykukan_race[racebangou][senshu.gakunen - 1] !=
           gh[0].nowracecalckukan) {
-        if (TEISUU.STARTTOBIDASIKAKURITU >
-            (DateTime.now().microsecondsSinceEpoch % 100)) {
-          gakurensenshudata[senshuid].startchokugotobidasiflag = 1;
-        }
-        if (gakurensenshudata[senshuid].startchokugotobidasiflag != 1) {
-          gakurensenshudata[senshuid].time_taikai_total =
-              (gakurensenshudata[senshuid].time_taikai_total +
-                  album.yobiint5.toDouble()) /
-              2.0;
+        continue;
+      }
+      if (senshu.startchokugotobidasiflag == 1) {
+        continue; // 前もって飛び出しの印が付いている(指示の計算で補正済み)
+      }
+      if (senshu.konjou >= 85 &&
+          Random().nextInt(100) < TEISUU.STARTTOBIDASIKAKURITU) {
+        // 指示なしの自動の飛び出し
+        senshu.startchokugotobidasiflag = 1;
+        final lasttime = senshu.time_taikai_total;
+        if (Random().nextInt(100) < senshu.konjou) {
+          senshu.time_taikai_total *= 0.99;
+          senshu.startchokugotobidasiseikouflag = 1;
         } else {
-          if (Random().nextInt(100) < gakurensenshudata[senshuid].konjou) {
-            gakurensenshudata[senshuid].time_taikai_total *= 0.99;
-            gakurensenshudata[senshuid].startchokugotobidasiseikouflag = 1;
-          } else {
-            gakurensenshudata[senshuid].time_taikai_total *= 1.015;
-          }
+          senshu.time_taikai_total *= 1.015;
+        }
+        final sontokutime = senshu.time_taikai_total - lasttime;
+        senshu.string_racesetumei +=
+            "スタート直後飛び出し補正:${sontokutime.isNegative ? '' : '+'}${sontokutime.toStringAsFixed(1)}秒\n";
+        atai_hosei[senshuid][9] = sontokutime;
+        continue;
+      }
+      // 集団走の補正(集団のペースが分からない場合はかけない)
+      if (kijuntime <= 0) continue;
+      if (senshu.time_taikai_total < kijuntime) {
+        final lasttime = senshu.time_taikai_total;
+        senshu.time_taikai_total = (kijuntime + senshu.time_taikai_total) / 2.0;
+        final sontokutime = senshu.time_taikai_total - lasttime;
+        senshu.string_racesetumei +=
+            "集団のペースは自分の本来のペースよりも遅かった→タイム損(${sontokutime.isNegative ? '' : '+'}${sontokutime.toStringAsFixed(1)}秒)\n";
+        atai_hosei[senshuid][14] = sontokutime;
+      } else if (senshu.time_taikai_total > kijuntime) {
+        if (kijuntime * 1.01 > senshu.time_taikai_total) {
+          final lasttime = senshu.time_taikai_total;
+          senshu.time_taikai_total =
+              (kijuntime + senshu.time_taikai_total) / 2.0;
+          final sontokutime = senshu.time_taikai_total - lasttime;
+          senshu.string_racesetumei +=
+              "集団のペースは自分の本来のペースよりも速かったが速すぎるというほどではなかった→少しタイム得(${sontokutime.isNegative ? '' : '+'}${sontokutime.toStringAsFixed(1)}秒)\n";
+          atai_hosei[senshuid][14] = sontokutime;
+        } else if (kijuntime * 1.03 > senshu.time_taikai_total) {
+          senshu.string_racesetumei +=
+              "集団のペースは自分の本来のペースよりも速かったが後半の大失速は免れた→タイム損得なし\n";
+        } else {
+          final lasttime = senshu.time_taikai_total;
+          senshu.time_taikai_total *= 1.025;
+          final sontokutime = senshu.time_taikai_total - lasttime;
+          senshu.string_racesetumei +=
+              "集団のペースは自分の本来のペースよりも速すぎた→無理して付いていって後半大失速→大きくタイム損(${sontokutime.isNegative ? '' : '+'}${sontokutime.toStringAsFixed(1)}秒)\n";
+          atai_hosei[senshuid][14] = sontokutime;
         }
       }
     }

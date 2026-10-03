@@ -12,6 +12,7 @@ import 'qr_data_model.dart';
 import 'kansuu/scout_com.dart'; // コンピュータスカウト設定の確認
 import 'kansuu/mokuhyou_hosei.dart'; // 目標順位・指示の補正設定の確認
 import 'kansuu/nouryoku_eikyodo.dart'; // 能力のタイムへの影響度設定の確認
+import 'kansuu/gakuren_kantoku.dart'; // 学連選抜の監督の設定の確認
 
 // 読み込み時に複数枚のデータを一時的に保持する状態管理クラス
 class QrReceiveState {
@@ -155,6 +156,8 @@ class SettingsQrProcessor {
       data['k_yobiint2_64_67'] = kantoku.yobiint2.sublist(64, 68);
       // 能力のタイムへの影響度設定(int) [68]〜[74] (1.8.2で追加)
       data['k_yobiint2_68_74'] = kantoku.yobiint2.sublist(68, 75);
+      // 学連選抜の監督をするか(int) [75] (1.8.2で追加。0=する、1=しない)
+      data['k_yobiint2_75'] = kantoku.yobiint2[75];
     } else if (department == SettingsDepartment.octoberTime) {
       //区間ごとタイム調整(int)
       data['k_yobiint5_30_39_time'] = kantoku.yobiint5.sublist(30, 40);
@@ -557,6 +560,11 @@ class SettingsQrProcessor {
             kantoku.yobiint2[68 + i] = v;
           }
         }
+      }
+      // 学連選抜の監督をするか(int) kantoku.yobiint2[75] (0=する(初期値)、1=しない)
+      final dynamic yobiint2_75 = dataMap['k_yobiint2_75'];
+      if (yobiint2_75 is int && gakurenKantokuAtaiTadashii(yobiint2_75)) {
+        kantoku.yobiint2[75] = yobiint2_75;
       }
       // 育成力(int) & 名声(int) & 留学生受け入れ設定(int) (UnivData 0から29)
       final List<dynamic> ikuseiryokuList = dataMap['ud_ikuseiryoku'] ?? [];

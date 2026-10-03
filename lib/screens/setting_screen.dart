@@ -30,7 +30,7 @@ import 'package:ekiden/screens/Modal_TTmode.dart';
 import 'package:ekiden/screens/Modal_Skip.dart';
 import 'package:ekiden/share_exporter.dart';
 import 'package:ekiden/screens/Modal_memo.dart';
-import 'package:ekiden/screens/setsumeisho_tab.dart'; // 説明書タブ(折りたたみ・検索)
+import 'package:ekiden/screens/setsumeisho_tab.dart'; // 説明書タブ(折りたたみ)
 
 class SettingScreen extends StatefulWidget {
   const SettingScreen({super.key});
@@ -928,7 +928,7 @@ class _SettingScreenState extends State<SettingScreen>
   }
 
   // 説明書タブ(版・変更履歴・アップデートの確認と、説明書の本文)
-  // 本文の折りたたみ・検索は lib/screens/setsumeisho_tab.dart
+  // 本文の折りたたみは lib/screens/setsumeisho_tab.dart
   Widget _setsumeishoTab(BuildContext context) {
     const TextStyle linkStyle = TextStyle(
       color: Colors.blue, // リンクの色

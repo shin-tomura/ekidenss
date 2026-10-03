@@ -14,6 +14,9 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:screenshot/screenshot.dart';
 
+// 大学を選ぶ欄で学連選抜(OP)を表す値(1.8.2)
+const int _gakurenId = -3;
+
 class ModalKukanHaitiView extends StatefulWidget {
   final int targetUnivid;
   const ModalKukanHaitiView({super.key, required this.targetUnivid});
@@ -234,10 +237,16 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
 
         final List<UnivData> allUnivs = univdataBox.values.toList()
           ..sort((a, b) => a.id.compareTo(b.id));
+        // 学連選抜(OP)を選べるのは、今年の学連選抜がいる正月駅伝のときだけ(1.8.2)
+        final bool gakurenAri = gakurenKonnenAri(currentGhensuu);
+        if (_selectedUnivId == _gakurenId && !gakurenAri) {
+          _selectedUnivId = widget.targetUnivid;
+        }
         bool selectedUnivIdEntryflag = false;
-        if (allUnivs[_selectedUnivId!].taikaientryflag[currentGhensuu
-                .hyojiracebangou] ==
-            1) {
+        if (_selectedUnivId == _gakurenId ||
+            allUnivs[_selectedUnivId!].taikaientryflag[currentGhensuu
+                    .hyojiracebangou] ==
+                1) {
           selectedUnivIdEntryflag = true;
         }
         if (selectedUnivIdEntryflag == false) {
@@ -305,13 +314,15 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
                       ),
                       body: Column(
                         children: [
-                          _buildUnivSelector(entryUnivs),
+                          _buildUnivSelector(entryUnivs, gakurenAri),
                           const Divider(color: Colors.white24, height: 1),
                           Expanded(
-                            child: _buildMainList(
-                              currentGhensuu,
-                              displaySenshuData,
-                            ),
+                            child: _selectedUnivId == _gakurenId
+                                ? _buildGakurenList(currentGhensuu)
+                                : _buildMainList(
+                                    currentGhensuu,
+                                    displaySenshuData,
+                                  ),
                           ),
                           _buildBottomBar(context),
                         ],
@@ -361,48 +372,66 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
                 ),
               ),
 
-              // --- 画像セクション ---
-              _buildMenuTitle("画像(スクリーンショット) - 表示中の大学"),
-              _buildMenuItem(
-                context,
-                Icons.image,
-                "標準画像を保存",
-                () => _exportAsImage(showDetail: false),
-              ),
-              _buildMenuItem(
-                context,
-                Icons.grid_view,
-                "詳細画像を保存",
-                () => _exportAsImage(showDetail: true),
-              ),
+              // 学連選抜(OP)を表示中は、画像の代わりに学連選抜の区間配置のテキストを出す(1.8.2)
+              if (_selectedUnivId == _gakurenId) ...[
+                _buildMenuTitle("テキスト情報 - 学連選抜"),
+                _buildMenuItem(
+                  context,
+                  Icons.content_copy,
+                  "学連選抜の区間配置をコピー",
+                  () {
+                    Clipboard.setData(
+                      ClipboardData(text: gakurenKukanHaitiText(currentGhensuu)),
+                    );
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("学連選抜の区間配置をコピーしました")),
+                    );
+                  },
+                ),
+              ] else ...[
+                // --- 画像セクション ---
+                _buildMenuTitle("画像(スクリーンショット) - 表示中の大学"),
+                _buildMenuItem(
+                  context,
+                  Icons.image,
+                  "標準画像を保存",
+                  () => _exportAsImage(showDetail: false),
+                ),
+                _buildMenuItem(
+                  context,
+                  Icons.grid_view,
+                  "詳細画像を保存",
+                  () => _exportAsImage(showDetail: true),
+                ),
 
-              const Divider(color: Colors.white24),
+                const Divider(color: Colors.white24),
 
-              // --- 個別大学テキストセクション ---
-              _buildMenuTitle("テキスト情報 - 表示中の大学"),
-              _buildMenuItem(
-                context,
-                Icons.short_text,
-                "超簡易版を共有 (名前のみ)",
-                () => Share.share(_generateHaitiText(0)),
-              ),
-              _buildMenuItem(
-                context,
-                Icons.notes,
-                "簡易版を共有 (主要記録)",
-                () => Share.share(_generateHaitiText(1)),
-              ),
-              _buildMenuItem(
-                context,
-                Icons.content_copy,
-                "詳細版をコピー (パネル全情報)",
-                () {
-                  Clipboard.setData(ClipboardData(text: _generateHaitiText(2)));
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("詳細版をクリップボードにコピーしました")),
-                  );
-                },
-              ),
+                // --- 個別大学テキストセクション ---
+                _buildMenuTitle("テキスト情報 - 表示中の大学"),
+                _buildMenuItem(
+                  context,
+                  Icons.short_text,
+                  "超簡易版を共有 (名前のみ)",
+                  () => Share.share(_generateHaitiText(0)),
+                ),
+                _buildMenuItem(
+                  context,
+                  Icons.notes,
+                  "簡易版を共有 (主要記録)",
+                  () => Share.share(_generateHaitiText(1)),
+                ),
+                _buildMenuItem(
+                  context,
+                  Icons.content_copy,
+                  "詳細版をコピー (パネル全情報)",
+                  () {
+                    Clipboard.setData(ClipboardData(text: _generateHaitiText(2)));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("詳細版をクリップボードにコピーしました")),
+                    );
+                  },
+                ),
+              ],
 
               const Divider(color: Colors.white24),
 
@@ -515,9 +544,15 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
   );
   // --- UI構成部品 (元のコードを維持) ---
 
-  Widget _buildUnivSelector(List<UnivData> entryUnivs) {
+  // [gakurenAri] 学連選抜(OP)を選べるとき(今年の学連選抜がいる正月駅伝)はtrue。
+  // 学連選抜は大学の後ろ(最後)に入れる(1.8.2)
+  Widget _buildUnivSelector(List<UnivData> entryUnivs, bool gakurenAri) {
     if (entryUnivs.isEmpty) return const SizedBox.shrink();
-    final currentIndex = entryUnivs.indexWhere((u) => u.id == _selectedUnivId);
+    final List<int> ids = [
+      for (final u in entryUnivs) u.id,
+      if (gakurenAri) _gakurenId,
+    ];
+    final currentIndex = ids.indexOf(_selectedUnivId ?? -1);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -530,13 +565,8 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
               size: 20,
             ),
             onPressed: currentIndex > 0
-                ? () => setState(
-                    () => _selectedUnivId = entryUnivs[currentIndex - 1].id,
-                  )
-                : () => setState(
-                    () =>
-                        _selectedUnivId = entryUnivs[entryUnivs.length - 1].id,
-                  ),
+                ? () => setState(() => _selectedUnivId = ids[currentIndex - 1])
+                : () => setState(() => _selectedUnivId = ids[ids.length - 1]),
           ),
           Expanded(
             child: Container(
@@ -552,21 +582,35 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
                   dropdownColor: Colors.grey[900],
                   isExpanded: true,
                   icon: const Icon(Icons.swap_vert, color: Colors.cyanAccent),
-                  items: entryUnivs
-                      .map(
-                        (u) => DropdownMenuItem(
-                          value: u.id,
-                          child: Text(
-                            u.name,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
+                  items: [
+                    ...entryUnivs.map(
+                      (u) => DropdownMenuItem(
+                        value: u.id,
+                        child: Text(
+                          u.name,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                      )
-                      .toList(),
+                      ),
+                    ),
+                    if (gakurenAri)
+                      const DropdownMenuItem(
+                        value: _gakurenId,
+                        child: Text(
+                          "学連選抜(OP)",
+                          style: TextStyle(
+                            color: Colors.cyanAccent,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
                   onChanged: (val) => setState(() => _selectedUnivId = val),
                 ),
               ),
@@ -578,11 +622,9 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
               color: Colors.cyanAccent,
               size: 20,
             ),
-            onPressed: currentIndex < entryUnivs.length - 1
-                ? () => setState(
-                    () => _selectedUnivId = entryUnivs[currentIndex + 1].id,
-                  )
-                : () => setState(() => _selectedUnivId = entryUnivs[0].id),
+            onPressed: currentIndex < ids.length - 1
+                ? () => setState(() => _selectedUnivId = ids[currentIndex + 1])
+                : () => setState(() => _selectedUnivId = ids[0]),
           ),
         ],
       ),
@@ -607,6 +649,274 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
               .toList(),
         );
       },
+    );
+  }
+
+  // 学連選抜(OP)を選んだときのリスト(区間順に、走る学連選抜の選手のカードを出す。1.8.2)
+  Widget _buildGakurenList(Ghensuu gh) {
+    final int kukanCount = gh.kukansuu_taikaigoto[gh.hyojiracebangou];
+    final List<Senshu_Gakuren_Data> hashiru = [
+      for (int i = 0; i < kukanCount; i++)
+        if (gakurenKukanSenshu(i) != null) gakurenKukanSenshu(i)!,
+    ];
+    return ListView(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      children: [
+        for (final g in hashiru) _buildGakurenCard(gh, gakurenEntry(g), g),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+          child: Text(
+            "${gakurenOpChuui}※学連選抜(OP)の選手の「区」は、その区間を走る大学の選手と比べた場合の持ちタイムの順位(○位相当)、「学」は所属大学の中での順位です。",
+            style: const TextStyle(color: Colors.white70, fontSize: 12),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // 学連選抜(OP)の選手のカード(大学の選手のカードと同じ形で、所属大学を出す。1.8.2)
+  Widget _buildGakurenCard(Ghensuu gh, int kukanIdx, Senshu_Gakuren_Data g) {
+    final String kukanLabel = "${kukanIdx + 1}区";
+    // 前の学年までに正月駅伝の同じ区間を走った回数(所属大学で走ったもの)
+    int keikenkaisuu = 0;
+    for (int i_gakunen = 0; i_gakunen < g.gakunen - 1; i_gakunen++) {
+      if (g.entrykukan_race[gh.hyojiracebangou][i_gakunen] == kukanIdx) {
+        keikenkaisuu++;
+      }
+    }
+    final List<Map<String, dynamic>> records = [
+      {'label': '5千best', 'idx': 0, 'showRank': true},
+      {'label': '1万', 'idx': 1, 'showRank': true},
+      {'label': 'ハーフ', 'idx': 2, 'showRank': true},
+      {'label': '登り1万', 'idx': 4, 'showRank': false},
+      {'label': '下り1万', 'idx': 5, 'showRank': false},
+      {'label': 'ロード1万', 'idx': 6, 'showRank': false},
+      {'label': 'クロカン1万', 'idx': 7, 'showRank': false},
+    ];
+
+    return Card(
+      color: Colors.white.withOpacity(0.09),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          trailing: const SizedBox.shrink(),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.cyanAccent.withOpacity(0.25),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  kukanLabel,
+                  style: const TextStyle(
+                    color: Colors.cyanAccent,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  g.name,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              Text(
+                "${g.gakunen}年",
+                style: const TextStyle(color: Colors.white, fontSize: 14),
+              ),
+              TextButton(
+                onPressed: () => _showSenshuDetail(context, g.id),
+                child: Text(
+                  '詳細',
+                  style: TextStyle(color: HENSUU.LinkColor, fontSize: 15),
+                ),
+              ),
+            ],
+          ),
+          subtitle: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // 所属大学の名前が入って長くなるので、文字が大きい設定でもはみ出さないよう折り返す
+              Flexible(
+                child: Text(
+                  "${_formatDoubleToFixed(gh.kyori_taikai_kukangoto[gh.hyojiracebangou][kukanIdx], 0)}m 所属:${gakurenShozoku(g)}",
+                  style: const TextStyle(color: Colors.white70, fontSize: 13),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                height: 28,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.white54),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Center(
+                  child: Text(
+                    "表示 / 閉じる",
+                    style: TextStyle(color: Colors.white, fontSize: 12),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          children: [
+            const Divider(color: Colors.white24),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Wrap(
+                spacing: 12,
+                runSpacing: 8,
+                children: [
+                  _nouryokuItem(
+                    "駅伝男",
+                    gh.nouryokumieruflag[0] == 1 ? "${g.konjou}" : "??",
+                  ),
+                  _nouryokuItem(
+                    "平常心",
+                    gh.nouryokumieruflag[1] == 1 ? "${g.heijousin}" : "??",
+                  ),
+                  _nouryokuItem("調子", "${g.chousi}"),
+                  if (keikenkaisuu > 0)
+                    _nouryokuItem("この区間の経験回数", "$keikenkaisuu"),
+                ],
+              ),
+            ),
+            Column(
+              children: records
+                  .map(
+                    (r) => _buildGakurenRecordRow(
+                      gh,
+                      g,
+                      r['label'],
+                      r['idx'],
+                      r['showRank'],
+                    ),
+                  )
+                  .toList(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 学連選抜(OP)の選手の持ちタイムの行(「区」は○位相当。1.8.2)
+  Widget _buildGakurenRecordRow(
+    Ghensuu gh,
+    Senshu_Gakuren_Data g,
+    String label,
+    int idx,
+    bool showRank,
+  ) {
+    final bool hasRecord =
+        g.time_bestkiroku.length > idx &&
+        g.time_bestkiroku[idx] != TEISUU.DEFAULTTIME;
+    final int kukanJuni = gakurenKukanJuniSoutou(g, idx, gh);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 85,
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 13,
+                decoration: TextDecoration.none,
+              ),
+            ),
+          ),
+          if (!hasRecord)
+            const Text(
+              "記録無",
+              style: TextStyle(
+                color: Colors.white38,
+                fontSize: 13,
+                decoration: TextDecoration.none,
+              ),
+            )
+          else ...[
+            Text(
+              TimeDate.timeToFunByouString(g.time_bestkiroku[idx]),
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                decoration: TextDecoration.none,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Wrap(
+                alignment: WrapAlignment.end,
+                spacing: 4,
+                runSpacing: 4,
+                children: [
+                  if (showRank && kukanJuni > 0)
+                    _rankTagBun("区", "$kukanJuni相当"),
+                  _rankTag("学", g.gakunaijuni_bestkiroku[idx] + 1),
+                  if (showRank)
+                    _rankTag("全", g.zentaijuni_bestkiroku[idx] + 1),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // 順位のタグ(数字の代わりに文を出す。学連選抜の「○相当」で使う。1.8.2)
+  Widget _rankTagBun(String label, String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.white30),
+        borderRadius: BorderRadius.circular(5),
+        color: Colors.white.withOpacity(0.05),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.cyanAccent,
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              decoration: TextDecoration.none,
+            ),
+          ),
+          const SizedBox(width: 2),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              decoration: TextDecoration.none,
+            ),
+          ),
+        ],
+      ),
     );
   }
 

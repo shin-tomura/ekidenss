@@ -247,6 +247,28 @@ void gakurenSenshuShousaiKaku(
   sb.writeln("-----------------------------------");
 }
 
+/// 学連選抜の選手[s]の種目[idx]の持ちタイムを、走る区間の大学の選手と比べた順位相当(1が1位相当)。
+/// 区間を走らない(補欠)ときや記録がないときは0(区間配置確認の画面の「区」で使う。1.8.2)
+int gakurenKukanJuniSoutou(Senshu_Gakuren_Data s, int idx, Ghensuu gh) {
+  final int kukan = gakurenEntry(s);
+  if (kukan < 0 || kukan >= gh.kukansuu_taikaigoto[_raceIndex]) return 0;
+  if (s.time_bestkiroku.length <= idx ||
+      s.time_bestkiroku[idx] == TEISUU.DEFAULTTIME) {
+    return 0;
+  }
+  final double time = s.time_bestkiroku[idx];
+  int juni = 1;
+  for (final d in _kukanDaigakuSenshu(kukan)) {
+    if (d.time_bestkiroku.length > idx && d.time_bestkiroku[idx] < time) {
+      juni++;
+    }
+  }
+  return juni;
+}
+
+/// 学連選抜の選手の所属大学の名前(大学の画面で使う。1.8.2)
+String gakurenShozoku(Senshu_Gakuren_Data s) => _univMei()[s.univid] ?? '---';
+
 /// 区間配置確認の「区」「学」「全」の説明(学連選抜の「区」は○位相当)
 const String gakurenKukanJuniChuui =
     '※学連選抜(OP)の選手の「区」は、その区間にエントリーされている大学の選手と比べた場合の、その種目の持ちタイムの順位(○位相当)です。';

@@ -9,11 +9,15 @@ import 'package:ekiden/constants.dart';
 import 'package:ekiden/kansuu/time_date.dart';
 import 'package:ekiden/screens/Modal_senshu.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:ekiden/kansuu/gakuren_text.dart';
 
 // --------------------------------------------------
 // ★ 追加: 表示モードを管理する列挙型 ★
 // --------------------------------------------------
 enum ViewMode { time, description, analysis }
+
+// 大学を選ぶ欄で学連選抜(OP)を表す値(1.8.2)
+const int _gakurenId = -3;
 
 class ModalKukanHaitiResultView extends StatefulWidget {
   const ModalKukanHaitiResultView({super.key});
@@ -186,12 +190,18 @@ class _ModalKukanHaitiResultView extends State<ModalKukanHaitiResultView> {
         if (currentGhensuu == null)
           return const Scaffold(body: Center(child: Text("データエラー")));
         if (_selectedUnivId == null) _selectedUnivId = currentGhensuu.MYunivid;
+        // 学連選抜(OP)を選べるのは、今年の学連選抜がいる正月駅伝のときだけ(1.8.2)
+        final bool gakurenAri = gakurenKonnenAri(currentGhensuu);
+        if (_selectedUnivId == _gakurenId && !gakurenAri) {
+          _selectedUnivId = currentGhensuu.MYunivid;
+        }
 
         final List<UnivData> idjunAllUnivs = univdataBox.values.toList()
           ..sort((a, b) => a.id.compareTo(b.id));
-        if (idjunAllUnivs[_selectedUnivId!].taikaientryflag[currentGhensuu
-                .hyojiracebangou] !=
-            1) {
+        if (_selectedUnivId != _gakurenId &&
+            idjunAllUnivs[_selectedUnivId!].taikaientryflag[currentGhensuu
+                    .hyojiracebangou] !=
+                1) {
           for (int i = 0; i < idjunAllUnivs.length; i++) {
             if (idjunAllUnivs[i].taikaientryflag[currentGhensuu
                     .hyojiracebangou] ==
@@ -243,15 +253,17 @@ class _ModalKukanHaitiResultView extends State<ModalKukanHaitiResultView> {
                   ),
                   body: Column(
                     children: [
-                      _buildUnivSelector(entryUnivs),
+                      _buildUnivSelector(entryUnivs, gakurenAri),
                       _buildDisplayModeToggle(),
                       const Divider(color: Colors.white24, height: 1),
                       Expanded(
-                        child: _buildMainList(
-                          currentGhensuu,
-                          displaySenshuData,
-                          kantoku,
-                        ),
+                        child: _selectedUnivId == _gakurenId
+                            ? _buildGakurenList(currentGhensuu, kantoku)
+                            : _buildMainList(
+                                currentGhensuu,
+                                displaySenshuData,
+                                kantoku,
+                              ),
                       ),
                       _buildBottomBar(context),
                     ],
@@ -320,12 +332,18 @@ class _ModalKukanHaitiResultView extends State<ModalKukanHaitiResultView> {
     );
   }
 
-  Widget _buildUnivSelector(List<UnivData> entryUnivs) {
+  // [gakurenAri] 学連選抜(OP)を選べるとき(今年の学連選抜がいる正月駅伝)はtrue。
+  // 学連選抜は大学の後ろ(最後)に入れる(1.8.2)
+  Widget _buildUnivSelector(List<UnivData> entryUnivs, bool gakurenAri) {
     if (entryUnivs.isEmpty) return const SizedBox.shrink();
-    if (!entryUnivs.any((u) => u.id == _selectedUnivId)) {
+    final List<int> ids = [
+      for (final u in entryUnivs) u.id,
+      if (gakurenAri) _gakurenId,
+    ];
+    if (!ids.contains(_selectedUnivId)) {
       _selectedUnivId = entryUnivs.first.id;
     }
-    final idx = entryUnivs.indexWhere((u) => u.id == _selectedUnivId);
+    final idx = ids.indexOf(_selectedUnivId!);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: Row(
@@ -337,8 +355,7 @@ class _ModalKukanHaitiResultView extends State<ModalKukanHaitiResultView> {
               size: 20,
             ),
             onPressed: () => setState(
-              () => _selectedUnivId =
-                  entryUnivs[idx > 0 ? idx - 1 : entryUnivs.length - 1].id,
+              () => _selectedUnivId = ids[idx > 0 ? idx - 1 : ids.length - 1],
             ),
           ),
           Expanded(
@@ -359,12 +376,21 @@ class _ModalKukanHaitiResultView extends State<ModalKukanHaitiResultView> {
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
-                  items: entryUnivs
-                      .map(
-                        (u) =>
-                            DropdownMenuItem(value: u.id, child: Text(u.name)),
-                      )
-                      .toList(),
+                  items: [
+                    ...entryUnivs.map(
+                      (u) => DropdownMenuItem(value: u.id, child: Text(u.name)),
+                    ),
+                    if (gakurenAri)
+                      const DropdownMenuItem(
+                        value: _gakurenId,
+                        child: Text(
+                          "学連選抜(OP)",
+                          style: TextStyle(color: Colors.cyanAccent),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
                   onChanged: (val) => setState(() => _selectedUnivId = val),
                 ),
               ),
@@ -377,8 +403,156 @@ class _ModalKukanHaitiResultView extends State<ModalKukanHaitiResultView> {
               size: 20,
             ),
             onPressed: () => setState(
-              () => _selectedUnivId =
-                  entryUnivs[idx < entryUnivs.length - 1 ? idx + 1 : 0].id,
+              () => _selectedUnivId = ids[idx < ids.length - 1 ? idx + 1 : 0],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 学連選抜(OP)を選んだときのリスト(区間順に、学連選抜の選手の結果のカードを出す。1.8.2)
+  Widget _buildGakurenList(Ghensuu gh, KantokuData? kantoku) {
+    final int kukanCount = gh.kukansuu_taikaigoto[gh.hyojiracebangou];
+    final List<GakurenKukanKekka> kekka = [
+      for (int i = 0; i < kukanCount; i++)
+        if (gakurenKukanKekka(gh, i) != null) gakurenKukanKekka(gh, i)!,
+    ];
+    return ListView(
+      padding: const EdgeInsets.all(12),
+      children: [
+        for (int i = 0; i < kekka.length; i++)
+          _buildGakurenCard(gh, gakurenEntry(kekka[i].senshu), kekka[i], kantoku),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          child: Text(
+            gakurenOpChuui.trim(),
+            style: const TextStyle(color: Colors.white70, fontSize: 12),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // 学連選抜(OP)の選手の結果のカード(大学の選手のカードと同じ形。順位は○位相当で、
+  // 学内記録比はなし。分析データは記録していないので「ありません」と出す。1.8.2)
+  Widget _buildGakurenCard(
+    Ghensuu gh,
+    int kIdx,
+    GakurenKukanKekka r,
+    KantokuData? kantoku,
+  ) {
+    return Card(
+      color: Colors.white.withOpacity(0.09),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ExpansionTile(
+        initiallyExpanded: true, // パネルを開いた状態で表示
+        title: Row(
+          children: [
+            Text(
+              "${kIdx + 1}区",
+              style: const TextStyle(
+                color: Colors.cyanAccent,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                r.senshu.name,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            Text(
+              "${r.senshu.gakunen}年",
+              style: const TextStyle(color: Colors.white, fontSize: 13),
+            ),
+          ],
+        ),
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        children: [
+          const Divider(color: Colors.white24),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // 文字が大きい設定でもはみ出さないよう折り返せるようにする
+                  Flexible(
+                    child: Text(
+                      "${r.kukanJuni + 1}位相当",
+                      style: const TextStyle(
+                        color: Colors.orangeAccent,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    TimeDate.timeToFunByouString(r.kukanTime),
+                    style: const TextStyle(
+                      color: Colors.yellowAccent,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                "学連選抜(所属:${r.shozoku}) ${r.tuukaJuni + 1}位相当で通過",
+                style: const TextStyle(color: Colors.white70, fontSize: 12),
+              ),
+              if (kantoku != null)
+                ..._buildDiffWidgets(
+                  r.kukanTime,
+                  kIdx,
+                  r.kukanJuni,
+                  _gakurenId,
+                  gh,
+                  kantoku,
+                ),
+              if (_viewMode == ViewMode.description &&
+                  r.senshu.string_racesetumei.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.black26,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      r.senshu.string_racesetumei,
+                      style: const TextStyle(color: Colors.white, fontSize: 13),
+                    ),
+                  ),
+                )
+              else if (_viewMode == ViewMode.analysis)
+                const Padding(
+                  padding: EdgeInsets.only(top: 12),
+                  child: Text(
+                    '学連選抜は分析データがありません',
+                    style: TextStyle(color: Colors.grey, fontSize: 12),
+                  ),
+                ),
+            ],
+          ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: () => _showSenshuDetail(r.senshu.id),
+              child: Text(
+                "詳細プロフ",
+                style: TextStyle(color: HENSUU.LinkColor, fontSize: 12),
+              ),
             ),
           ),
         ],
@@ -750,43 +924,64 @@ class _ModalKukanHaitiResultView extends State<ModalKukanHaitiResultView> {
                 ),
               ),
               const SizedBox(height: 10),
-              _exportListTile(context, Icons.copy, "簡易版をコピー", () {
-                Clipboard.setData(
-                  ClipboardData(text: _generateResultText(mode: ViewMode.time)),
-                );
-                ScaffoldMessenger.of(
+              // 学連選抜(OP)を表示中は、学連選抜のレース経過のテキストを出す(1.8.2)
+              if (_selectedUnivId == _gakurenId)
+                _exportListTile(
                   context,
-                ).showSnackBar(const SnackBar(content: Text("簡易版をコピーしました")));
-              }),
-              _exportListTile(context, Icons.share, "簡易版を共有", () {
-                Share.share(_generateResultText(mode: ViewMode.time));
-              }),
-              const Divider(color: Colors.white12),
-              _exportListTile(context, Icons.content_copy, "詳細版をコピー", () {
-                Clipboard.setData(
-                  ClipboardData(
-                    text: _generateResultText(mode: ViewMode.description),
-                  ),
-                );
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(const SnackBar(content: Text("詳細版をコピーしました")));
-              }),
-              _exportListTile(context, Icons.description, "詳細版を共有", () {
-                Share.share(_generateResultText(mode: ViewMode.description));
-              }),
-              // ★ 追加: 分析版のコピー・共有メニュー
-              const Divider(color: Colors.white12),
-              _exportListTile(context, Icons.analytics, "分析版をコピー", () {
-                Clipboard.setData(
-                  ClipboardData(
-                    text: _generateResultText(mode: ViewMode.analysis),
-                  ),
-                );
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(const SnackBar(content: Text("分析版をコピーしました")));
-              }),
+                  Icons.copy,
+                  "学連選抜のレース経過をコピー",
+                  () {
+                    final Ghensuu? gh = Hive.box<Ghensuu>(
+                      'ghensuuBox',
+                    ).getAt(0);
+                    if (gh == null) return;
+                    Clipboard.setData(
+                      ClipboardData(text: gakurenRaceKeikaText(gh)),
+                    );
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("学連選抜のレース経過をコピーしました")),
+                    );
+                  },
+                )
+              else ...[
+                _exportListTile(context, Icons.copy, "簡易版をコピー", () {
+                  Clipboard.setData(
+                    ClipboardData(text: _generateResultText(mode: ViewMode.time)),
+                  );
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(const SnackBar(content: Text("簡易版をコピーしました")));
+                }),
+                _exportListTile(context, Icons.share, "簡易版を共有", () {
+                  Share.share(_generateResultText(mode: ViewMode.time));
+                }),
+                const Divider(color: Colors.white12),
+                _exportListTile(context, Icons.content_copy, "詳細版をコピー", () {
+                  Clipboard.setData(
+                    ClipboardData(
+                      text: _generateResultText(mode: ViewMode.description),
+                    ),
+                  );
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(const SnackBar(content: Text("詳細版をコピーしました")));
+                }),
+                _exportListTile(context, Icons.description, "詳細版を共有", () {
+                  Share.share(_generateResultText(mode: ViewMode.description));
+                }),
+                // ★ 追加: 分析版のコピー・共有メニュー
+                const Divider(color: Colors.white12),
+                _exportListTile(context, Icons.analytics, "分析版をコピー", () {
+                  Clipboard.setData(
+                    ClipboardData(
+                      text: _generateResultText(mode: ViewMode.analysis),
+                    ),
+                  );
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(const SnackBar(content: Text("分析版をコピーしました")));
+                }),
+              ],
             ],
           ),
         ),

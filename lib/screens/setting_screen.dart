@@ -1068,7 +1068,7 @@ class _SettingScreenState extends State<SettingScreen> {
               style: TextStyle(color: Colors.white),
             ),
             const Text(
-              "駅伝の2区以降では、指示を選ぶ欄の下の「指示ごとの損得」で、走り出す選手が指示なし・前半突っ込み・前半抑えのそれぞれの場合に何秒ほど損や得をするか(成功した時・失敗した時)を確認できます。",
+              "駅伝の2区以降では、指示を選ぶ欄の下の「指示ごとの損得予測」で、走り出す選手が指示なし・前半突っ込み・前半抑えのそれぞれの場合に何秒ほど損や得をしそうか(成功した時・失敗した時)を確認できます。",
               style: TextStyle(color: Colors.white),
             ),
             const Text(

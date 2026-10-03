@@ -8,7 +8,7 @@ import 'package:ekiden/kansuu/mokuhyou_hosei.dart';
 import 'package:ekiden/kansuu/chousi_keiken_hosei.dart';
 
 // ------------------------------------------------------------
-// 「指示ごとの損得」の計算(1.8.1)
+// 「指示ごとの損得予測」の画面の計算(1.8.1)
 //
 // 駅伝(10月・11月・正月・カスタム)の2区以降で、走り出す直前の選手について、
 // 指示なし・前半突っ込み(成功・失敗)・前半抑え(成功・失敗)のそれぞれで
@@ -81,7 +81,7 @@ class SijiSontoku {
   });
 }
 
-/// 「指示ごとの損得」を出せる場面か(駅伝の2区以降)
+/// 「指示ごとの損得予測」を出せる場面か(駅伝の2区以降)
 /// [racebangou] 大会番号、[kukan] 今から走る区間(0が1区)
 bool sijiSontokuTaishou(int racebangou, int kukan) {
   return ((racebangou >= 0 && racebangou <= 2) || racebangou == 5) &&

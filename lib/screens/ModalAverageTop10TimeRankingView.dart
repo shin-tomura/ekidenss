@@ -699,7 +699,7 @@ $analysis
                 borderRadius: BorderRadius.circular(4),
               ),
               child: const Text(
-                "SP:スピード  ST:スタミナ  山適:山適性\nRD:ロード  起伏:起伏耐性\n\n※説明書画面上部の「夏TT開催大学変更」で全大学開催を選択していないと正確な分析はできません",
+                "SP:スピード  ST:スタミナ  山適:山適性\nRD:ロード  起伏:起伏耐性\n\n※説明画面の設定タブの「夏TT開催大学変更」で全大学開催を選択していないと正確な分析はできません",
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Colors.white70,

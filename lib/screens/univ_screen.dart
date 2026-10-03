@@ -5086,7 +5086,7 @@ class _UnivScreenState extends State<UnivScreen> {
             ),
           ),
         ),
-        Text("(カスタム駅伝設定は説明書画面上部に移動しました)"),
+        Text("(カスタム駅伝設定は説明画面の設定タブに移動しました)"),
 
         if (currentGhensuu.mode != 300 &&
             currentGhensuu.mode != 330 &&

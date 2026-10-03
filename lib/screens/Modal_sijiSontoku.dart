@@ -154,7 +154,7 @@ class _ModalSijiSontokuViewState extends State<ModalSijiSontokuView> {
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
                     child: Text(
-                      '・補正の強さを設定で変更しています(説明書画面の「目標順位・指示の補正設定」)。',
+                      '・補正の強さを設定で変更しています(説明画面の設定タブの「目標順位・指示の補正設定」)。',
                       style: TextStyle(
                         color: Colors.amber,
                         fontSize: HENSUU.fontsize_honbun - 2,

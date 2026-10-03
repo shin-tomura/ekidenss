@@ -508,7 +508,7 @@ class _SenshuRadarAnalysisViewState extends State<SenshuRadarAnalysisView> {
             ),
             const SizedBox(height: 12),
             const Text(
-              "※説明書画面上部の「夏TT開催大学変更」で全大学開催を選択していないと正確な分析はできません",
+              "※説明画面の設定タブの「夏TT開催大学変更」で全大学開催を選択していないと正確な分析はできません",
               style: TextStyle(
                 color: Colors.white70,
                 fontSize: 9,

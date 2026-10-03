@@ -38,7 +38,13 @@ class SettingScreen extends StatefulWidget {
   State<SettingScreen> createState() => _SettingScreenState();
 }
 
-class _SettingScreenState extends State<SettingScreen> {
+class _SettingScreenState extends State<SettingScreen>
+    with SingleTickerProviderStateMixin {
+  // 開いているタブ(0: 設定、1: 説明書)。アプリを起動している間だけ覚える
+  // (ほかの画面に移って戻ってきても同じタブを開く。セーブデータには保存しない)
+  static int _hirakiTabIndex = 0;
+  late TabController _tabController;
+
   // Hive Boxの参照を保持
   //late Box<Ghensuu> _ghensuuBox;
   //late Box<SenshuData> _senshuBox; // 表示には直接使用しませんが、完全性のために保持
@@ -47,10 +53,26 @@ class _SettingScreenState extends State<SettingScreen> {
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(
+      length: 2,
+      vsync: this,
+      initialIndex: _hirakiTabIndex,
+    );
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging) {
+        _hirakiTabIndex = _tabController.index;
+      }
+    });
     // initStateでHive Boxの参照を取得
     //_ghensuuBox = Hive.box<Ghensuu>('ghensuuBox');
     //_senshuBox = Hive.box<SenshuData>('senshuBox');
     //_univBox = Hive.box<UnivData>('univBox');
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   // App StoreのURL（TODO: ご自身のApp IDに置き換えてください）
@@ -96,923 +118,900 @@ class _SettingScreenState extends State<SettingScreen> {
     return Scaffold(
       // Scaffoldを追加してAppBarなどを配置できるようにする
       appBar: AppBar(
-        title: const Text('説明書', style: TextStyle(color: Colors.white)),
+        title: const Text('設定・説明書', style: TextStyle(color: Colors.white)),
         backgroundColor: Colors.grey[900], // AppBarの背景色
         centerTitle: true, // タイトルを中央に配置
+        // 設定タブと説明書タブ
+        bottom: TabBar(
+          controller: _tabController,
+          tabs: const [
+            Tab(text: '設定'),
+            Tab(text: '説明書'),
+          ],
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.grey[400],
+          indicatorColor: Colors.white,
+        ),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0), // 全体にパディング
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start, // テキストを左寄せにする
-          children: [
-            const SizedBox(height: 20),
-            TextButton(
-              onPressed: () async {
-                // Navigator.push を使用して Senshu_R_Screen へ遷移
-                await Navigator.push(
-                  context,
-                  // MaterialPageRoute を使用して新しい画面を定義
-                  MaterialPageRoute(builder: (context) => const MemoScreen()),
-                );
-              },
-              child: Text(
-                "フリーメモ",
-                style: TextStyle(
-                  color: HENSUU.LinkColor,
-                  decoration: TextDecoration.underline,
-                  decorationColor: HENSUU.textcolor,
-                  //fontSize: HENSUU.fontsize_honbun,
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            TextButton(
-              onPressed: () async {
-                // Navigator.push を使用して Senshu_R_Screen へ遷移
-                await Navigator.push(
-                  context,
-                  // MaterialPageRoute を使用して新しい画面を定義
-                  MaterialPageRoute(
-                    builder: (context) =>
-                        const SaveLoadScreen(hozonmosuruflag: true),
-                  ),
-                );
-              },
-              child: Text(
-                "データセーブ・ロード",
-                style: TextStyle(
-                  color: HENSUU.LinkColor,
-                  decoration: TextDecoration.underline,
-                  decorationColor: HENSUU.textcolor,
-                  //fontSize: HENSUU.fontsize_honbun,
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            TextButton(
-              onPressed: () async {
-                // Navigator.push を使用して Senshu_R_Screen へ遷移
-                await Navigator.push(
-                  context,
-                  // MaterialPageRoute を使用して新しい画面を定義
-                  MaterialPageRoute(
-                    builder: (context) => const ShareWorldScreen(),
-                  ),
-                );
-              },
-              child: Text(
-                "データ共有(世界を共有)",
-                style: TextStyle(
-                  color: HENSUU.LinkColor,
-                  decoration: TextDecoration.underline,
-                  decorationColor: HENSUU.textcolor,
-                  //fontSize: HENSUU.fontsize_honbun,
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            TextButton(
-              onPressed: () {
-                showGeneralDialog(
-                  context: context,
-                  barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
-                  barrierDismissible: true, // 背景タップで閉じられるようにする
-                  barrierLabel: '夏TT開催大学変更', // アクセシビリティ用ラベル
-                  transitionDuration: const Duration(
-                    milliseconds: 300,
-                  ), // アニメーション時間
-                  pageBuilder: (context, animation, secondaryAnimation) {
-                    // ここに表示したいモーダルのウィジェットを指定
-                    return const SummerTTModeSelectScreen(); // const を追加
-                  },
-                  transitionBuilder:
-                      (context, animation, secondaryAnimation, child) {
-                        // モーダル表示時のアニメーション (例: フェードイン)
-                        return FadeTransition(
-                          opacity: CurvedAnimation(
-                            parent: animation,
-                            curve: Curves.easeOut,
-                          ),
-                          child: child,
-                        );
-                      },
-                );
-              },
-              child: Text(
-                "夏TT開催大学変更",
-                style: TextStyle(
-                  color: const Color.fromARGB(255, 0, 255, 0),
-                  decoration: TextDecoration.underline,
-                  decorationColor: HENSUU.textcolor,
-                ),
-              ),
-            ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          _setteiTab(context, ghensuu),
+          _setsumeishoTab(context),
+        ],
+      ),
+    );
+  }
 
-            const SizedBox(height: 20),
-
-            TextButton(
-              onPressed: () {
-                showGeneralDialog(
-                  context: context,
-                  barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
-                  barrierDismissible: true, // 背景タップで閉じられるようにする
-                  barrierLabel: '箱庭モード/通常モード切替', // アクセシビリティ用ラベル
-                  transitionDuration: const Duration(
-                    milliseconds: 300,
-                  ), // アニメーション時間
-                  pageBuilder: (context, animation, secondaryAnimation) {
-                    // ここに表示したいモーダルのウィジェットを指定
-                    return const SimulationModeSelectScreen(); // const を追加
-                  },
-                  transitionBuilder:
-                      (context, animation, secondaryAnimation, child) {
-                        // モーダル表示時のアニメーション (例: フェードイン)
-                        return FadeTransition(
-                          opacity: CurvedAnimation(
-                            parent: animation,
-                            curve: Curves.easeOut,
-                          ),
-                          child: child,
-                        );
-                      },
-                );
-              },
-              child: Text(
-                "箱庭モード/通常モード切替",
-                style: TextStyle(
-                  color: const Color.fromARGB(255, 0, 255, 0),
-                  decoration: TextDecoration.underline,
-                  decorationColor: HENSUU.textcolor,
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            TextButton(
-              onPressed: () {
-                showGeneralDialog(
-                  context: context,
-                  barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
-                  barrierDismissible: true, // 背景タップで閉じられるようにする
-                  barrierLabel: '最適解区間配置確率設定', // アクセシビリティ用ラベル
-                  transitionDuration: const Duration(
-                    milliseconds: 300,
-                  ), // アニメーション時間
-                  pageBuilder: (context, animation, secondaryAnimation) {
-                    // ここに表示したいモーダルのウィジェットを指定
-                    return const ModalComputerTeamProb(); // const を追加
-                  },
-                  transitionBuilder:
-                      (context, animation, secondaryAnimation, child) {
-                        // モーダル表示時のアニメーション (例: フェードイン)
-                        return FadeTransition(
-                          opacity: CurvedAnimation(
-                            parent: animation,
-                            curve: Curves.easeOut,
-                          ),
-                          child: child,
-                        );
-                      },
-                );
-              },
-              child: Text(
-                "最適解区間配置確率設定",
-                style: TextStyle(
-                  color: const Color.fromARGB(255, 0, 255, 0),
-                  decoration: TextDecoration.underline,
-                  decorationColor: HENSUU.textcolor,
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            TextButton(
-              onPressed: () {
-                showGeneralDialog(
-                  context: context,
-                  barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
-                  barrierDismissible: true, // 背景タップで閉じられるようにする
-                  barrierLabel: '全体・区間ごとタイム調整', // アクセシビリティ用ラベル
-                  transitionDuration: const Duration(
-                    milliseconds: 300,
-                  ), // アニメーション時間
-                  pageBuilder: (context, animation, secondaryAnimation) {
-                    // ここに表示したいモーダルのウィジェットを指定
-                    return const ModalTimeAdjustmentSettings(); // const を追加
-                  },
-                  transitionBuilder:
-                      (context, animation, secondaryAnimation, child) {
-                        // モーダル表示時のアニメーション (例: フェードイン)
-                        return FadeTransition(
-                          opacity: CurvedAnimation(
-                            parent: animation,
-                            curve: Curves.easeOut,
-                          ),
-                          child: child,
-                        );
-                      },
-                );
-              },
-              child: Text(
-                "全体・区間ごとタイム調整",
-                style: TextStyle(
-                  color: const Color.fromARGB(255, 0, 255, 0),
-                  decoration: TextDecoration.underline,
-                  decorationColor: HENSUU.textcolor,
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            TextButton(
-              onPressed: () {
-                showGeneralDialog(
-                  context: context,
-                  barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
-                  barrierDismissible: true, // 背景タップで閉じられるようにする
-                  barrierLabel: '長距離タイム抑制設定', // アクセシビリティ用ラベル
-                  transitionDuration: const Duration(
-                    milliseconds: 300,
-                  ), // アニメーション時間
-                  pageBuilder: (context, animation, secondaryAnimation) {
-                    // ここに表示したいモーダルのウィジェットを指定
-                    return const ModalPaceAdjustment(); // const を追加
-                  },
-                  transitionBuilder:
-                      (context, animation, secondaryAnimation, child) {
-                        // モーダル表示時のアニメーション (例: フェードイン)
-                        return FadeTransition(
-                          opacity: CurvedAnimation(
-                            parent: animation,
-                            curve: Curves.easeOut,
-                          ),
-                          child: child,
-                        );
-                      },
-                );
-              },
-              child: Text(
-                "長距離タイム抑制設定",
-                style: TextStyle(
-                  color: const Color.fromARGB(255, 0, 255, 0),
-                  decoration: TextDecoration.underline,
-                  decorationColor: HENSUU.textcolor,
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            TextButton(
-              onPressed: () {
-                showGeneralDialog(
-                  context: context,
-                  barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
-                  barrierDismissible: true, // 背景タップで閉じられるようにする
-                  barrierLabel: '調子関連設定', // アクセシビリティ用ラベル
-                  transitionDuration: const Duration(
-                    milliseconds: 300,
-                  ), // アニメーション時間
-                  pageBuilder: (context, animation, secondaryAnimation) {
-                    // ここに表示したいモーダルのウィジェットを指定
-                    return const ModalConditionSettings(); // const を追加
-                  },
-                  transitionBuilder:
-                      (context, animation, secondaryAnimation, child) {
-                        // モーダル表示時のアニメーション (例: フェードイン)
-                        return FadeTransition(
-                          opacity: CurvedAnimation(
-                            parent: animation,
-                            curve: Curves.easeOut,
-                          ),
-                          child: child,
-                        );
-                      },
-                );
-              },
-              child: Text(
-                "調子関連設定",
-                style: TextStyle(
-                  color: const Color.fromARGB(255, 0, 255, 0),
-                  decoration: TextDecoration.underline,
-                  decorationColor: HENSUU.textcolor,
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            // 目標順位・指示の補正の強さの設定(1.8.2)
-            TextButton(
-              onPressed: () {
-                showGeneralDialog(
-                  context: context,
-                  barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
-                  barrierDismissible: true, // 背景タップで閉じられるようにする
-                  barrierLabel: '目標順位・指示の補正設定', // アクセシビリティ用ラベル
-                  transitionDuration: const Duration(
-                    milliseconds: 300,
-                  ), // アニメーション時間
-                  pageBuilder: (context, animation, secondaryAnimation) {
-                    return const ModalHoseiTsuyosa();
-                  },
-                  transitionBuilder:
-                      (context, animation, secondaryAnimation, child) {
-                        return FadeTransition(
-                          opacity: CurvedAnimation(
-                            parent: animation,
-                            curve: Curves.easeOut,
-                          ),
-                          child: child,
-                        );
-                      },
-                );
-              },
-              child: Text(
-                "目標順位・指示の補正設定",
-                style: TextStyle(
-                  color: const Color.fromARGB(255, 0, 255, 0),
-                  decoration: TextDecoration.underline,
-                  decorationColor: HENSUU.textcolor,
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            // 能力のタイムへの影響度の設定(1.8.2)
-            TextButton(
-              onPressed: () {
-                showGeneralDialog(
-                  context: context,
-                  barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
-                  barrierDismissible: true, // 背景タップで閉じられるようにする
-                  barrierLabel: '能力のタイムへの影響度設定', // アクセシビリティ用ラベル
-                  transitionDuration: const Duration(
-                    milliseconds: 300,
-                  ), // アニメーション時間
-                  pageBuilder: (context, animation, secondaryAnimation) {
-                    return const ModalNouryokuEikyodo();
-                  },
-                  transitionBuilder:
-                      (context, animation, secondaryAnimation, child) {
-                        return FadeTransition(
-                          opacity: CurvedAnimation(
-                            parent: animation,
-                            curve: Curves.easeOut,
-                          ),
-                          child: child,
-                        );
-                      },
-                );
-              },
-              child: Text(
-                "能力のタイムへの影響度設定",
-                style: TextStyle(
-                  color: const Color.fromARGB(255, 0, 255, 0),
-                  decoration: TextDecoration.underline,
-                  decorationColor: HENSUU.textcolor,
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            TextButton(
-              onPressed: () {
-                showGeneralDialog(
-                  context: context,
-                  barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
-                  barrierDismissible: true, // 背景タップで閉じられるようにする
-                  barrierLabel: '金銀支給量倍率設定', // アクセシビリティ用ラベル
-                  transitionDuration: const Duration(
-                    milliseconds: 300,
-                  ), // アニメーション時間
-                  pageBuilder: (context, animation, secondaryAnimation) {
-                    // ここに表示したいモーダルのウィジェットを指定
-                    return const ModalMoneySettings(); // const を追加
-                  },
-                  transitionBuilder:
-                      (context, animation, secondaryAnimation, child) {
-                        // モーダル表示時のアニメーション (例: フェードイン)
-                        return FadeTransition(
-                          opacity: CurvedAnimation(
-                            parent: animation,
-                            curve: Curves.easeOut,
-                          ),
-                          child: child,
-                        );
-                      },
-                );
-              },
-              child: Text(
-                "金銀支給量倍率設定",
-                style: TextStyle(
-                  color: const Color.fromARGB(255, 0, 255, 0),
-                  decoration: TextDecoration.underline,
-                  decorationColor: HENSUU.textcolor,
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            TextButton(
-              onPressed: () {
-                showGeneralDialog(
-                  context: context,
-                  barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
-                  barrierDismissible: true, // 背景タップで閉じられるようにする
-                  barrierLabel: '記録会時期設定', // アクセシビリティ用ラベル
-                  transitionDuration: const Duration(
-                    milliseconds: 300,
-                  ), // アニメーション時間
-                  pageBuilder: (context, animation, secondaryAnimation) {
-                    // ここに表示したいモーダルのウィジェットを指定
-                    return const ModalRaceTimeSettings(); // const を追加
-                  },
-                  transitionBuilder:
-                      (context, animation, secondaryAnimation, child) {
-                        // モーダル表示時のアニメーション (例: フェードイン)
-                        return FadeTransition(
-                          opacity: CurvedAnimation(
-                            parent: animation,
-                            curve: Curves.easeOut,
-                          ),
-                          child: child,
-                        );
-                      },
-                );
-              },
-              child: Text(
-                "記録会時期設定",
-                style: TextStyle(
-                  color: const Color.fromARGB(255, 0, 255, 0),
-                  decoration: TextDecoration.underline,
-                  decorationColor: HENSUU.textcolor,
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            TextButton(
-              onPressed: () {
-                showGeneralDialog(
-                  context: context,
-                  barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
-                  barrierDismissible: true, // 背景タップで閉じられるようにする
-                  barrierLabel: '趣味非表示設定', // アクセシビリティ用ラベル
-                  transitionDuration: const Duration(
-                    milliseconds: 300,
-                  ), // アニメーション時間
-                  pageBuilder: (context, animation, secondaryAnimation) {
-                    // ここに表示したいモーダルのウィジェットを指定
-                    return const ModalHobbyDisplaySettings(); // const を追加
-                  },
-                  transitionBuilder:
-                      (context, animation, secondaryAnimation, child) {
-                        // モーダル表示時のアニメーション (例: フェードイン)
-                        return FadeTransition(
-                          opacity: CurvedAnimation(
-                            parent: animation,
-                            curve: Curves.easeOut,
-                          ),
-                          child: child,
-                        );
-                      },
-                );
-              },
-              child: Text(
-                "趣味非表示設定",
-                style: TextStyle(
-                  color: const Color.fromARGB(255, 0, 255, 0),
-                  decoration: TextDecoration.underline,
-                  decorationColor: HENSUU.textcolor,
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 20),
-            TextButton(
-              onPressed: () {
-                showGeneralDialog(
-                  context: context,
-                  barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
-                  barrierDismissible: true, // 背景タップで閉じられるようにする
-                  barrierLabel: '年間強化練習効果設定', // アクセシビリティ用ラベル
-                  transitionDuration: const Duration(
-                    milliseconds: 300,
-                  ), // アニメーション時間
-                  pageBuilder: (context, animation, secondaryAnimation) {
-                    // ここに表示したいモーダルのウィジェットを指定
-                    return const ModalTrainingEffectSettings(); // const を追加
-                  },
-                  transitionBuilder:
-                      (context, animation, secondaryAnimation, child) {
-                        // モーダル表示時のアニメーション (例: フェードイン)
-                        return FadeTransition(
-                          opacity: CurvedAnimation(
-                            parent: animation,
-                            curve: Curves.easeOut,
-                          ),
-                          child: child,
-                        );
-                      },
-                );
-              },
-              child: Text(
-                "年間強化練習効果設定",
-                style: TextStyle(
-                  color: const Color.fromARGB(255, 0, 255, 0),
-                  decoration: TextDecoration.underline,
-                  decorationColor: HENSUU.textcolor,
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 20),
-            TextButton(
-              onPressed: () {
-                showGeneralDialog(
-                  context: context,
-                  barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
-                  barrierDismissible: true, // 背景タップで閉じられるようにする
-                  barrierLabel: '自分のチームの歩み', // アクセシビリティ用ラベル
-                  transitionDuration: const Duration(
-                    milliseconds: 300,
-                  ), // アニメーション時間
-                  pageBuilder: (context, animation, secondaryAnimation) {
-                    // ここに表示したいモーダルのウィジェットを指定
-                    return const ModalTeamHistoryView(); // const を追加
-                  },
-                  transitionBuilder:
-                      (context, animation, secondaryAnimation, child) {
-                        // モーダル表示時のアニメーション (例: フェードイン)
-                        return FadeTransition(
-                          opacity: CurvedAnimation(
-                            parent: animation,
-                            curve: Curves.easeOut,
-                          ),
-                          child: child,
-                        );
-                      },
-                );
-              },
-              child: Text(
-                "自分のチームの歩み",
-                style: TextStyle(
-                  color: const Color.fromARGB(255, 0, 255, 0),
-                  decoration: TextDecoration.underline,
-                  decorationColor: HENSUU.textcolor,
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 20),
-            TextButton(
-              onPressed: () {
-                showGeneralDialog(
-                  context: context,
-                  barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
-                  barrierDismissible: true, // 背景タップで閉じられるようにする
-                  barrierLabel: 'スキップして統計データ取得', // アクセシビリティ用ラベル
-                  transitionDuration: const Duration(
-                    milliseconds: 300,
-                  ), // アニメーション時間
-                  pageBuilder: (context, animation, secondaryAnimation) {
-                    // ここに表示したいモーダルのウィジェットを指定
-                    return const StatisticsSimulationScreen();
-                  },
-                  transitionBuilder:
-                      (context, animation, secondaryAnimation, child) {
-                        // モーダル表示時のアニメーション (例: フェードイン)
-                        return FadeTransition(
-                          opacity: CurvedAnimation(
-                            parent: animation,
-                            curve: Curves.easeOut,
-                          ),
-                          child: child,
-                        );
-                      },
-                );
-              },
-              child: Text(
-                "スキップして統計データ取得",
-                style: TextStyle(
-                  color: const Color.fromARGB(255, 0, 255, 0),
-                  decoration: TextDecoration.underline,
-                  decorationColor: HENSUU.textcolor,
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 20),
-            TextButton(
-              onPressed: () {
-                showGeneralDialog(
-                  context: context,
-                  barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
-                  barrierDismissible: true, // 背景タップで閉じられるようにする
-                  barrierLabel: '駅伝コース紹介', // アクセシビリティ用ラベル
-                  transitionDuration: const Duration(
-                    milliseconds: 300,
-                  ), // アニメーション時間
-                  pageBuilder: (context, animation, secondaryAnimation) {
-                    // ここに表示したいモーダルのウィジェットを指定
-                    return const RaceCourseSelectionView();
-                  },
-                  transitionBuilder:
-                      (context, animation, secondaryAnimation, child) {
-                        // モーダル表示時のアニメーション (例: フェードイン)
-                        return FadeTransition(
-                          opacity: CurvedAnimation(
-                            parent: animation,
-                            curve: Curves.easeOut,
-                          ),
-                          child: child,
-                        );
-                      },
-                );
-              },
-              child: Text(
-                "駅伝コース紹介",
-                style: TextStyle(
-                  color: const Color.fromARGB(255, 0, 255, 0),
-                  decoration: TextDecoration.underline,
-                  decorationColor: HENSUU.textcolor,
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 20),
-            if (ghensuu.mode == 110 ||
-                (!(ghensuu.month == 2 && ghensuu.day == 25)))
-              TextButton(
-                onPressed: () {
-                  showGeneralDialog(
-                    context: context,
-                    barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
-                    barrierDismissible: true, // 背景タップで閉じられるようにする
-                    barrierLabel: 'カスタム駅伝設定', // アクセシビリティ用ラベル
-                    transitionDuration: const Duration(
-                      milliseconds: 300,
-                    ), // アニメーション時間
-                    pageBuilder: (context, animation, secondaryAnimation) {
-                      // ここに表示したいモーダルのウィジェットを指定
-                      return const ModalCustomEkidenSettings(); // const を追加
-                    },
-                    transitionBuilder:
-                        (context, animation, secondaryAnimation, child) {
-                          // モーダル表示時のアニメーション (例: フェードイン)
-                          return FadeTransition(
-                            opacity: CurvedAnimation(
-                              parent: animation,
-                              curve: Curves.easeOut,
-                            ),
-                            child: child,
-                          );
-                        },
-                  );
-                },
-                child: Text(
-                  "カスタム駅伝設定",
-                  style: TextStyle(
-                    color: const Color.fromARGB(255, 0, 255, 0),
-                    decoration: TextDecoration.underline,
-                    decorationColor: HENSUU.textcolor,
-                  ),
-                ),
-              ),
-            if (ghensuu.mode != 110 &&
-                (ghensuu.month == 2 && ghensuu.day == 25))
-              Text("(カスタム駅伝当日にはカスタム駅伝設定はできません)"),
-
-            const SizedBox(height: 20),
-            if (ghensuu.mode == 110 ||
-                (!(ghensuu.month == 10 && ghensuu.day == 5) &&
-                    !(ghensuu.month == 11 && ghensuu.day == 5) &&
-                    !(ghensuu.month == 1 && ghensuu.day == 5) &&
-                    !(ghensuu.month == 2 && ghensuu.day == 25)))
-              TextButton(
-                onPressed: () {
-                  showGeneralDialog(
-                    context: context,
-                    barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
-                    barrierDismissible: true, // 背景タップで閉じられるようにする
-                    barrierLabel: '駅伝コース編集', // アクセシビリティ用ラベル
-                    transitionDuration: const Duration(
-                      milliseconds: 300,
-                    ), // アニメーション時間
-                    pageBuilder: (context, animation, secondaryAnimation) {
-                      // ここに表示したいモーダルのウィジェットを指定
-                      return const RaceCourseEditSelectionView(); // const を追加
-                    },
-                    transitionBuilder:
-                        (context, animation, secondaryAnimation, child) {
-                          // モーダル表示時のアニメーション (例: フェードイン)
-                          return FadeTransition(
-                            opacity: CurvedAnimation(
-                              parent: animation,
-                              curve: Curves.easeOut,
-                            ),
-                            child: child,
-                          );
-                        },
-                  );
-                },
-                child: Text(
-                  "駅伝コース編集",
-                  style: TextStyle(
-                    color: const Color.fromARGB(255, 0, 255, 0),
-                    decoration: TextDecoration.underline,
-                    decorationColor: HENSUU.textcolor,
-                  ),
-                ),
-              ),
-            if (!(ghensuu.mode == 110 ||
-                (!(ghensuu.month == 10 && ghensuu.day == 5) &&
-                    !(ghensuu.month == 11 && ghensuu.day == 5) &&
-                    !(ghensuu.month == 1 && ghensuu.day == 5) &&
-                    !(ghensuu.month == 2 && ghensuu.day == 25))))
-              Text("(駅伝開催日には駅伝コース編集はできません)"),
-
-            const SizedBox(height: 20),
-            if (ghensuu.mode == 110 ||
-                (!(ghensuu.month == 6 && ghensuu.day == 15) &&
-                    !(ghensuu.month == 10 && ghensuu.day == 5) &&
-                    !(ghensuu.month == 10 && ghensuu.day == 15) &&
-                    !(ghensuu.month == 11 && ghensuu.day == 5) &&
-                    !(ghensuu.month == 1 && ghensuu.day == 5) &&
-                    !(ghensuu.month == 2 && ghensuu.day == 25)))
-              TextButton(
-                onPressed: () {
-                  showGeneralDialog(
-                    context: context,
-                    barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
-                    barrierDismissible: true, // 背景タップで閉じられるようにする
-                    barrierLabel: 'QRコードで設定入出力', // アクセシビリティ用ラベル
-                    transitionDuration: const Duration(
-                      milliseconds: 300,
-                    ), // アニメーション時間
-                    pageBuilder: (context, animation, secondaryAnimation) {
-                      // ここに表示したいモーダルのウィジェットを指定
-                      return const SettingsQrPage(); // const を追加
-                    },
-                    transitionBuilder:
-                        (context, animation, secondaryAnimation, child) {
-                          // モーダル表示時のアニメーション (例: フェードイン)
-                          return FadeTransition(
-                            opacity: CurvedAnimation(
-                              parent: animation,
-                              curve: Curves.easeOut,
-                            ),
-                            child: child,
-                          );
-                        },
-                  );
-                },
-                child: Text(
-                  "QRコードで設定入出力",
-                  style: TextStyle(
-                    color: const Color.fromARGB(255, 0, 255, 0),
-                    decoration: TextDecoration.underline,
-                    decorationColor: HENSUU.textcolor,
-                  ),
-                ),
-              ),
-            if (!(ghensuu.mode == 110 ||
-                (!(ghensuu.month == 6 && ghensuu.day == 15) &&
-                    !(ghensuu.month == 10 && ghensuu.day == 5) &&
-                    !(ghensuu.month == 10 && ghensuu.day == 15) &&
-                    !(ghensuu.month == 11 && ghensuu.day == 5) &&
-                    !(ghensuu.month == 1 && ghensuu.day == 5) &&
-                    !(ghensuu.month == 2 && ghensuu.day == 25))))
-              Text("(駅伝・駅伝予選開催日にはQRコード設定入出力はできません)"),
-
-            const SizedBox(height: 40),
-            // リンクボタン
-            //LinkButtons(context, ghensuu!),
-
-            //const SizedBox(height: 32),
-
-            // 💡 ------------------ ここから追加 ------------------
-            TextButton(
-              onPressed: () {
-                // ⬇︎ showLicensePage() の代わりにこちらを使います
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => Theme(
-                      // ⬇︎ ここで「ライセンス画面の中だけ」で有効になる色を指定します
-                      data: Theme.of(context).copyWith(
-                        // 画面全体の背景色を指定（例として白にしています）
-                        scaffoldBackgroundColor: Colors.white,
-                        // パッケージ名などが載るカードの背景色
-                        cardColor: Colors.white,
-                        // 文字色を黒（見やすい色）に強制的に上書きします
-                        textTheme: Theme.of(context).textTheme.copyWith(
-                          // ライセンス詳細の本文（ここが一番重要です）
-                          bodySmall: const TextStyle(
-                            color: Colors.black87,
-                            fontSize: 14.0,
-                          ),
-                          // パッケージ名などの文字
-                          bodyMedium: const TextStyle(color: Colors.black87),
-                          titleLarge: const TextStyle(color: Colors.black),
-                          titleMedium: const TextStyle(color: Colors.black),
-                        ),
-                        // 上部のヘッダー（AppBar）の色も指定しておくと安心です
-                        appBarTheme: const AppBarTheme(
-                          backgroundColor: Colors.white, // ヘッダーの背景色
-                          foregroundColor: Colors.black, // ヘッダーの文字・戻るボタンの色
-                        ),
-                      ),
-                      // 実際のライセンス画面の表示部分
-                      child: const LicensePage(
-                        applicationName: '箱庭小駅伝SS',
-                        applicationVersion: '1.8.3',
-                        // applicationIcon: Image.asset('lib/assets/icon/icon_ss1024.png', width: 48, height: 48),
-                      ),
-                    ),
-                  ),
-                );
-              },
-              child: Text(
-                "ライセンス",
-                style: TextStyle(
-                  color: HENSUU.LinkColor,
-                  decoration: TextDecoration.underline,
-                  decorationColor: HENSUU.textcolor,
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            // 💡 ------------------ ここまで追加 ------------------
-
-            // constを削除して、可変的なウィジェットを追加できるようにする
-            const Text(
-              "SS 1.8.3 (21830)",
-              style: TextStyle(color: Colors.white),
-            ),
-            const SizedBox(height: 8), // 適度な余白
-            InkWell(
-              onTap: _launchUrl,
-              /*child: Text(
-                // iOSの場合のみApp Storeへのリンクを表示
-                'App Storeでアップデートを確認',
-                style: const TextStyle(
-                  color: Colors.blue,
-                  decoration: TextDecoration.underline,
-                ),
-              ),*/
-              child: Text(
-                // 実行中のOSによって表示テキストを切り替える
-                Platform.isIOS
-                    ? 'App Storeでアップデートを確認'
-                    : 'Google Playでアップデートを確認',
-                style: const TextStyle(
-                  color: Colors.blue, // リンクの色
-                  decoration: TextDecoration.underline, // 下線
-                ),
-              ),
-            ),
-            const SizedBox(height: 8), // 適度な余白
-            // 変更履歴(ToDo.txtの箱庭小駅伝SSの部分を表示)
-            InkWell(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const HenkouRirekiScreen(),
-                  ),
-                );
-              },
-              child: const Text(
-                '変更履歴',
-                style: TextStyle(
-                  color: Colors.blue, // リンクの色
-                  decoration: TextDecoration.underline, // 下線
-                ),
-              ),
-            ),
-            const SizedBox(height: 8), // 適度な余白
-            const Text(
-              "⭐️はじめに",
+  // 設定タブ(各種設定・データ・コースなどの画面へのボタン)
+  // 慣れてからもよく使うので、折りたたまずに並べる
+  Widget _setteiTab(BuildContext context, Ghensuu ghensuu) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0), // 全体にパディング
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start, // テキストを左寄せにする
+        children: [
+          const SizedBox(height: 20),
+          TextButton(
+            onPressed: () async {
+              // Navigator.push を使用して Senshu_R_Screen へ遷移
+              await Navigator.push(
+                context,
+                // MaterialPageRoute を使用して新しい画面を定義
+                MaterialPageRoute(builder: (context) => const MemoScreen()),
+              );
+            },
+            child: Text(
+              "フリーメモ",
               style: TextStyle(
-                color: Colors.white,
-                fontSize: HENSUU.fontsize_honbun,
-                fontWeight: FontWeight.bold,
+                color: HENSUU.LinkColor,
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+                //fontSize: HENSUU.fontsize_honbun,
               ),
             ),
-            const SizedBox(height: 8), // 適度な余白
-            const Text(
-              "箱庭小駅伝SSをダウンロードしていただき誠にありがとうございます。",
-              style: TextStyle(color: Colors.white),
+          ),
+          const SizedBox(height: 20),
+          TextButton(
+            onPressed: () async {
+              // Navigator.push を使用して Senshu_R_Screen へ遷移
+              await Navigator.push(
+                context,
+                // MaterialPageRoute を使用して新しい画面を定義
+                MaterialPageRoute(
+                  builder: (context) =>
+                      const SaveLoadScreen(hozonmosuruflag: true),
+                ),
+              );
+            },
+            child: Text(
+              "データセーブ・ロード",
+              style: TextStyle(
+                color: HENSUU.LinkColor,
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+                //fontSize: HENSUU.fontsize_honbun,
+              ),
             ),
-            const Text(
-              "このゲームは文字情報だけの駅伝シミュレーションゲームです。",
-              style: TextStyle(color: Colors.white),
+          ),
+          const SizedBox(height: 20),
+          TextButton(
+            onPressed: () async {
+              // Navigator.push を使用して Senshu_R_Screen へ遷移
+              await Navigator.push(
+                context,
+                // MaterialPageRoute を使用して新しい画面を定義
+                MaterialPageRoute(
+                  builder: (context) => const ShareWorldScreen(),
+                ),
+              );
+            },
+            child: Text(
+              "データ共有(世界を共有)",
+              style: TextStyle(
+                color: HENSUU.LinkColor,
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+                //fontSize: HENSUU.fontsize_honbun,
+              ),
             ),
-            const Text(
-              "総監督(あなた)ができることは、選手の区間配置とレース中の指示、新入生スカウト、練習メニューの選択、金特訓・銀特訓など、限られたことだけです。選手は基本的に勝手に成長します。",
-              style: TextStyle(color: Colors.white),
+          ),
+          const SizedBox(height: 20),
+          TextButton(
+            onPressed: () {
+              showGeneralDialog(
+                context: context,
+                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                barrierDismissible: true, // 背景タップで閉じられるようにする
+                barrierLabel: '夏TT開催大学変更', // アクセシビリティ用ラベル
+                transitionDuration: const Duration(
+                  milliseconds: 300,
+                ), // アニメーション時間
+                pageBuilder: (context, animation, secondaryAnimation) {
+                  // ここに表示したいモーダルのウィジェットを指定
+                  return const SummerTTModeSelectScreen(); // const を追加
+                },
+                transitionBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                      // モーダル表示時のアニメーション (例: フェードイン)
+                      return FadeTransition(
+                        opacity: CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOut,
+                        ),
+                        child: child,
+                      );
+                    },
+              );
+            },
+            child: Text(
+              "夏TT開催大学変更",
+              style: TextStyle(
+                color: const Color.fromARGB(255, 0, 255, 0),
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+              ),
             ),
-            const Text(
-              "肩の力を抜いて、ご自身のペースでお付き合いいただければ幸いです。",
-              style: TextStyle(color: Colors.white),
+          ),
+
+          const SizedBox(height: 20),
+
+          TextButton(
+            onPressed: () {
+              showGeneralDialog(
+                context: context,
+                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                barrierDismissible: true, // 背景タップで閉じられるようにする
+                barrierLabel: '箱庭モード/通常モード切替', // アクセシビリティ用ラベル
+                transitionDuration: const Duration(
+                  milliseconds: 300,
+                ), // アニメーション時間
+                pageBuilder: (context, animation, secondaryAnimation) {
+                  // ここに表示したいモーダルのウィジェットを指定
+                  return const SimulationModeSelectScreen(); // const を追加
+                },
+                transitionBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                      // モーダル表示時のアニメーション (例: フェードイン)
+                      return FadeTransition(
+                        opacity: CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOut,
+                        ),
+                        child: child,
+                      );
+                    },
+              );
+            },
+            child: Text(
+              "箱庭モード/通常モード切替",
+              style: TextStyle(
+                color: const Color.fromARGB(255, 0, 255, 0),
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+              ),
             ),
-            const Text(
-              "なお、このゲームに登場する団体名・個人名は実在する団体・個人とは一切関係ありません。",
-              style: TextStyle(color: Colors.white),
+          ),
+          const SizedBox(height: 20),
+          TextButton(
+            onPressed: () {
+              showGeneralDialog(
+                context: context,
+                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                barrierDismissible: true, // 背景タップで閉じられるようにする
+                barrierLabel: '最適解区間配置確率設定', // アクセシビリティ用ラベル
+                transitionDuration: const Duration(
+                  milliseconds: 300,
+                ), // アニメーション時間
+                pageBuilder: (context, animation, secondaryAnimation) {
+                  // ここに表示したいモーダルのウィジェットを指定
+                  return const ModalComputerTeamProb(); // const を追加
+                },
+                transitionBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                      // モーダル表示時のアニメーション (例: フェードイン)
+                      return FadeTransition(
+                        opacity: CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOut,
+                        ),
+                        child: child,
+                      );
+                    },
+              );
+            },
+            child: Text(
+              "最適解区間配置確率設定",
+              style: TextStyle(
+                color: const Color.fromARGB(255, 0, 255, 0),
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+              ),
             ),
-            const Text(""),
-            const Text("""⭐️プライバシーポリシー
+          ),
+          const SizedBox(height: 20),
+          TextButton(
+            onPressed: () {
+              showGeneralDialog(
+                context: context,
+                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                barrierDismissible: true, // 背景タップで閉じられるようにする
+                barrierLabel: '全体・区間ごとタイム調整', // アクセシビリティ用ラベル
+                transitionDuration: const Duration(
+                  milliseconds: 300,
+                ), // アニメーション時間
+                pageBuilder: (context, animation, secondaryAnimation) {
+                  // ここに表示したいモーダルのウィジェットを指定
+                  return const ModalTimeAdjustmentSettings(); // const を追加
+                },
+                transitionBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                      // モーダル表示時のアニメーション (例: フェードイン)
+                      return FadeTransition(
+                        opacity: CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOut,
+                        ),
+                        child: child,
+                      );
+                    },
+              );
+            },
+            child: Text(
+              "全体・区間ごとタイム調整",
+              style: TextStyle(
+                color: const Color.fromARGB(255, 0, 255, 0),
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          TextButton(
+            onPressed: () {
+              showGeneralDialog(
+                context: context,
+                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                barrierDismissible: true, // 背景タップで閉じられるようにする
+                barrierLabel: '長距離タイム抑制設定', // アクセシビリティ用ラベル
+                transitionDuration: const Duration(
+                  milliseconds: 300,
+                ), // アニメーション時間
+                pageBuilder: (context, animation, secondaryAnimation) {
+                  // ここに表示したいモーダルのウィジェットを指定
+                  return const ModalPaceAdjustment(); // const を追加
+                },
+                transitionBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                      // モーダル表示時のアニメーション (例: フェードイン)
+                      return FadeTransition(
+                        opacity: CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOut,
+                        ),
+                        child: child,
+                      );
+                    },
+              );
+            },
+            child: Text(
+              "長距離タイム抑制設定",
+              style: TextStyle(
+                color: const Color.fromARGB(255, 0, 255, 0),
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          TextButton(
+            onPressed: () {
+              showGeneralDialog(
+                context: context,
+                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                barrierDismissible: true, // 背景タップで閉じられるようにする
+                barrierLabel: '調子関連設定', // アクセシビリティ用ラベル
+                transitionDuration: const Duration(
+                  milliseconds: 300,
+                ), // アニメーション時間
+                pageBuilder: (context, animation, secondaryAnimation) {
+                  // ここに表示したいモーダルのウィジェットを指定
+                  return const ModalConditionSettings(); // const を追加
+                },
+                transitionBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                      // モーダル表示時のアニメーション (例: フェードイン)
+                      return FadeTransition(
+                        opacity: CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOut,
+                        ),
+                        child: child,
+                      );
+                    },
+              );
+            },
+            child: Text(
+              "調子関連設定",
+              style: TextStyle(
+                color: const Color.fromARGB(255, 0, 255, 0),
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          // 目標順位・指示の補正の強さの設定(1.8.2)
+          TextButton(
+            onPressed: () {
+              showGeneralDialog(
+                context: context,
+                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                barrierDismissible: true, // 背景タップで閉じられるようにする
+                barrierLabel: '目標順位・指示の補正設定', // アクセシビリティ用ラベル
+                transitionDuration: const Duration(
+                  milliseconds: 300,
+                ), // アニメーション時間
+                pageBuilder: (context, animation, secondaryAnimation) {
+                  return const ModalHoseiTsuyosa();
+                },
+                transitionBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                      return FadeTransition(
+                        opacity: CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOut,
+                        ),
+                        child: child,
+                      );
+                    },
+              );
+            },
+            child: Text(
+              "目標順位・指示の補正設定",
+              style: TextStyle(
+                color: const Color.fromARGB(255, 0, 255, 0),
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          // 能力のタイムへの影響度の設定(1.8.2)
+          TextButton(
+            onPressed: () {
+              showGeneralDialog(
+                context: context,
+                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                barrierDismissible: true, // 背景タップで閉じられるようにする
+                barrierLabel: '能力のタイムへの影響度設定', // アクセシビリティ用ラベル
+                transitionDuration: const Duration(
+                  milliseconds: 300,
+                ), // アニメーション時間
+                pageBuilder: (context, animation, secondaryAnimation) {
+                  return const ModalNouryokuEikyodo();
+                },
+                transitionBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                      return FadeTransition(
+                        opacity: CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOut,
+                        ),
+                        child: child,
+                      );
+                    },
+              );
+            },
+            child: Text(
+              "能力のタイムへの影響度設定",
+              style: TextStyle(
+                color: const Color.fromARGB(255, 0, 255, 0),
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          TextButton(
+            onPressed: () {
+              showGeneralDialog(
+                context: context,
+                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                barrierDismissible: true, // 背景タップで閉じられるようにする
+                barrierLabel: '金銀支給量倍率設定', // アクセシビリティ用ラベル
+                transitionDuration: const Duration(
+                  milliseconds: 300,
+                ), // アニメーション時間
+                pageBuilder: (context, animation, secondaryAnimation) {
+                  // ここに表示したいモーダルのウィジェットを指定
+                  return const ModalMoneySettings(); // const を追加
+                },
+                transitionBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                      // モーダル表示時のアニメーション (例: フェードイン)
+                      return FadeTransition(
+                        opacity: CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOut,
+                        ),
+                        child: child,
+                      );
+                    },
+              );
+            },
+            child: Text(
+              "金銀支給量倍率設定",
+              style: TextStyle(
+                color: const Color.fromARGB(255, 0, 255, 0),
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          TextButton(
+            onPressed: () {
+              showGeneralDialog(
+                context: context,
+                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                barrierDismissible: true, // 背景タップで閉じられるようにする
+                barrierLabel: '記録会時期設定', // アクセシビリティ用ラベル
+                transitionDuration: const Duration(
+                  milliseconds: 300,
+                ), // アニメーション時間
+                pageBuilder: (context, animation, secondaryAnimation) {
+                  // ここに表示したいモーダルのウィジェットを指定
+                  return const ModalRaceTimeSettings(); // const を追加
+                },
+                transitionBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                      // モーダル表示時のアニメーション (例: フェードイン)
+                      return FadeTransition(
+                        opacity: CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOut,
+                        ),
+                        child: child,
+                      );
+                    },
+              );
+            },
+            child: Text(
+              "記録会時期設定",
+              style: TextStyle(
+                color: const Color.fromARGB(255, 0, 255, 0),
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          TextButton(
+            onPressed: () {
+              showGeneralDialog(
+                context: context,
+                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                barrierDismissible: true, // 背景タップで閉じられるようにする
+                barrierLabel: '趣味非表示設定', // アクセシビリティ用ラベル
+                transitionDuration: const Duration(
+                  milliseconds: 300,
+                ), // アニメーション時間
+                pageBuilder: (context, animation, secondaryAnimation) {
+                  // ここに表示したいモーダルのウィジェットを指定
+                  return const ModalHobbyDisplaySettings(); // const を追加
+                },
+                transitionBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                      // モーダル表示時のアニメーション (例: フェードイン)
+                      return FadeTransition(
+                        opacity: CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOut,
+                        ),
+                        child: child,
+                      );
+                    },
+              );
+            },
+            child: Text(
+              "趣味非表示設定",
+              style: TextStyle(
+                color: const Color.fromARGB(255, 0, 255, 0),
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 20),
+          TextButton(
+            onPressed: () {
+              showGeneralDialog(
+                context: context,
+                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                barrierDismissible: true, // 背景タップで閉じられるようにする
+                barrierLabel: '年間強化練習効果設定', // アクセシビリティ用ラベル
+                transitionDuration: const Duration(
+                  milliseconds: 300,
+                ), // アニメーション時間
+                pageBuilder: (context, animation, secondaryAnimation) {
+                  // ここに表示したいモーダルのウィジェットを指定
+                  return const ModalTrainingEffectSettings(); // const を追加
+                },
+                transitionBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                      // モーダル表示時のアニメーション (例: フェードイン)
+                      return FadeTransition(
+                        opacity: CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOut,
+                        ),
+                        child: child,
+                      );
+                    },
+              );
+            },
+            child: Text(
+              "年間強化練習効果設定",
+              style: TextStyle(
+                color: const Color.fromARGB(255, 0, 255, 0),
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 20),
+          TextButton(
+            onPressed: () {
+              showGeneralDialog(
+                context: context,
+                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                barrierDismissible: true, // 背景タップで閉じられるようにする
+                barrierLabel: '自分のチームの歩み', // アクセシビリティ用ラベル
+                transitionDuration: const Duration(
+                  milliseconds: 300,
+                ), // アニメーション時間
+                pageBuilder: (context, animation, secondaryAnimation) {
+                  // ここに表示したいモーダルのウィジェットを指定
+                  return const ModalTeamHistoryView(); // const を追加
+                },
+                transitionBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                      // モーダル表示時のアニメーション (例: フェードイン)
+                      return FadeTransition(
+                        opacity: CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOut,
+                        ),
+                        child: child,
+                      );
+                    },
+              );
+            },
+            child: Text(
+              "自分のチームの歩み",
+              style: TextStyle(
+                color: const Color.fromARGB(255, 0, 255, 0),
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 20),
+          TextButton(
+            onPressed: () {
+              showGeneralDialog(
+                context: context,
+                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                barrierDismissible: true, // 背景タップで閉じられるようにする
+                barrierLabel: 'スキップして統計データ取得', // アクセシビリティ用ラベル
+                transitionDuration: const Duration(
+                  milliseconds: 300,
+                ), // アニメーション時間
+                pageBuilder: (context, animation, secondaryAnimation) {
+                  // ここに表示したいモーダルのウィジェットを指定
+                  return const StatisticsSimulationScreen();
+                },
+                transitionBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                      // モーダル表示時のアニメーション (例: フェードイン)
+                      return FadeTransition(
+                        opacity: CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOut,
+                        ),
+                        child: child,
+                      );
+                    },
+              );
+            },
+            child: Text(
+              "スキップして統計データ取得",
+              style: TextStyle(
+                color: const Color.fromARGB(255, 0, 255, 0),
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 20),
+          TextButton(
+            onPressed: () {
+              showGeneralDialog(
+                context: context,
+                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                barrierDismissible: true, // 背景タップで閉じられるようにする
+                barrierLabel: '駅伝コース紹介', // アクセシビリティ用ラベル
+                transitionDuration: const Duration(
+                  milliseconds: 300,
+                ), // アニメーション時間
+                pageBuilder: (context, animation, secondaryAnimation) {
+                  // ここに表示したいモーダルのウィジェットを指定
+                  return const RaceCourseSelectionView();
+                },
+                transitionBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                      // モーダル表示時のアニメーション (例: フェードイン)
+                      return FadeTransition(
+                        opacity: CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOut,
+                        ),
+                        child: child,
+                      );
+                    },
+              );
+            },
+            child: Text(
+              "駅伝コース紹介",
+              style: TextStyle(
+                color: const Color.fromARGB(255, 0, 255, 0),
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 20),
+          if (ghensuu.mode == 110 ||
+              (!(ghensuu.month == 2 && ghensuu.day == 25)))
+            TextButton(
+              onPressed: () {
+                showGeneralDialog(
+                  context: context,
+                  barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                  barrierDismissible: true, // 背景タップで閉じられるようにする
+                  barrierLabel: 'カスタム駅伝設定', // アクセシビリティ用ラベル
+                  transitionDuration: const Duration(
+                    milliseconds: 300,
+                  ), // アニメーション時間
+                  pageBuilder: (context, animation, secondaryAnimation) {
+                    // ここに表示したいモーダルのウィジェットを指定
+                    return const ModalCustomEkidenSettings(); // const を追加
+                  },
+                  transitionBuilder:
+                      (context, animation, secondaryAnimation, child) {
+                        // モーダル表示時のアニメーション (例: フェードイン)
+                        return FadeTransition(
+                          opacity: CurvedAnimation(
+                            parent: animation,
+                            curve: Curves.easeOut,
+                          ),
+                          child: child,
+                        );
+                      },
+                );
+              },
+              child: Text(
+                "カスタム駅伝設定",
+                style: TextStyle(
+                  color: const Color.fromARGB(255, 0, 255, 0),
+                  decoration: TextDecoration.underline,
+                  decorationColor: HENSUU.textcolor,
+                ),
+              ),
+            ),
+          if (ghensuu.mode != 110 &&
+              (ghensuu.month == 2 && ghensuu.day == 25))
+            Text("(カスタム駅伝当日にはカスタム駅伝設定はできません)"),
+
+          const SizedBox(height: 20),
+          if (ghensuu.mode == 110 ||
+              (!(ghensuu.month == 10 && ghensuu.day == 5) &&
+                  !(ghensuu.month == 11 && ghensuu.day == 5) &&
+                  !(ghensuu.month == 1 && ghensuu.day == 5) &&
+                  !(ghensuu.month == 2 && ghensuu.day == 25)))
+            TextButton(
+              onPressed: () {
+                showGeneralDialog(
+                  context: context,
+                  barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                  barrierDismissible: true, // 背景タップで閉じられるようにする
+                  barrierLabel: '駅伝コース編集', // アクセシビリティ用ラベル
+                  transitionDuration: const Duration(
+                    milliseconds: 300,
+                  ), // アニメーション時間
+                  pageBuilder: (context, animation, secondaryAnimation) {
+                    // ここに表示したいモーダルのウィジェットを指定
+                    return const RaceCourseEditSelectionView(); // const を追加
+                  },
+                  transitionBuilder:
+                      (context, animation, secondaryAnimation, child) {
+                        // モーダル表示時のアニメーション (例: フェードイン)
+                        return FadeTransition(
+                          opacity: CurvedAnimation(
+                            parent: animation,
+                            curve: Curves.easeOut,
+                          ),
+                          child: child,
+                        );
+                      },
+                );
+              },
+              child: Text(
+                "駅伝コース編集",
+                style: TextStyle(
+                  color: const Color.fromARGB(255, 0, 255, 0),
+                  decoration: TextDecoration.underline,
+                  decorationColor: HENSUU.textcolor,
+                ),
+              ),
+            ),
+          if (!(ghensuu.mode == 110 ||
+              (!(ghensuu.month == 10 && ghensuu.day == 5) &&
+                  !(ghensuu.month == 11 && ghensuu.day == 5) &&
+                  !(ghensuu.month == 1 && ghensuu.day == 5) &&
+                  !(ghensuu.month == 2 && ghensuu.day == 25))))
+            Text("(駅伝開催日には駅伝コース編集はできません)"),
+
+          const SizedBox(height: 20),
+          if (ghensuu.mode == 110 ||
+              (!(ghensuu.month == 6 && ghensuu.day == 15) &&
+                  !(ghensuu.month == 10 && ghensuu.day == 5) &&
+                  !(ghensuu.month == 10 && ghensuu.day == 15) &&
+                  !(ghensuu.month == 11 && ghensuu.day == 5) &&
+                  !(ghensuu.month == 1 && ghensuu.day == 5) &&
+                  !(ghensuu.month == 2 && ghensuu.day == 25)))
+            TextButton(
+              onPressed: () {
+                showGeneralDialog(
+                  context: context,
+                  barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                  barrierDismissible: true, // 背景タップで閉じられるようにする
+                  barrierLabel: 'QRコードで設定入出力', // アクセシビリティ用ラベル
+                  transitionDuration: const Duration(
+                    milliseconds: 300,
+                  ), // アニメーション時間
+                  pageBuilder: (context, animation, secondaryAnimation) {
+                    // ここに表示したいモーダルのウィジェットを指定
+                    return const SettingsQrPage(); // const を追加
+                  },
+                  transitionBuilder:
+                      (context, animation, secondaryAnimation, child) {
+                        // モーダル表示時のアニメーション (例: フェードイン)
+                        return FadeTransition(
+                          opacity: CurvedAnimation(
+                            parent: animation,
+                            curve: Curves.easeOut,
+                          ),
+                          child: child,
+                        );
+                      },
+                );
+              },
+              child: Text(
+                "QRコードで設定入出力",
+                style: TextStyle(
+                  color: const Color.fromARGB(255, 0, 255, 0),
+                  decoration: TextDecoration.underline,
+                  decorationColor: HENSUU.textcolor,
+                ),
+              ),
+            ),
+          if (!(ghensuu.mode == 110 ||
+              (!(ghensuu.month == 6 && ghensuu.day == 15) &&
+                  !(ghensuu.month == 10 && ghensuu.day == 5) &&
+                  !(ghensuu.month == 10 && ghensuu.day == 15) &&
+                  !(ghensuu.month == 11 && ghensuu.day == 5) &&
+                  !(ghensuu.month == 1 && ghensuu.day == 5) &&
+                  !(ghensuu.month == 2 && ghensuu.day == 25))))
+            Text("(駅伝・駅伝予選開催日にはQRコード設定入出力はできません)"),
+          const SizedBox(height: 60), // 下部の余白
+        ],
+      ),
+    );
+  }
+
+  // 説明書タブ(版・変更履歴と説明書の本文)
+  Widget _setsumeishoTab(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16.0), // 全体にパディング
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start, // テキストを左寄せにする
+        children: [
+          const SizedBox(height: 20),
+          // constを削除して、可変的なウィジェットを追加できるようにする
+          const Text(
+            "SS 1.8.4 (21840)",
+            style: TextStyle(color: Colors.white),
+          ),
+          const SizedBox(height: 8), // 適度な余白
+          InkWell(
+            onTap: _launchUrl,
+            /*child: Text(
+              // iOSの場合のみApp Storeへのリンクを表示
+              'App Storeでアップデートを確認',
+              style: const TextStyle(
+                color: Colors.blue,
+                decoration: TextDecoration.underline,
+              ),
+            ),*/
+            child: Text(
+              // 実行中のOSによって表示テキストを切り替える
+              Platform.isIOS
+                  ? 'App Storeでアップデートを確認'
+                  : 'Google Playでアップデートを確認',
+              style: const TextStyle(
+                color: Colors.blue, // リンクの色
+                decoration: TextDecoration.underline, // 下線
+              ),
+            ),
+          ),
+          const SizedBox(height: 8), // 適度な余白
+          // 変更履歴(ToDo.txtの箱庭小駅伝SSの部分を表示)
+          InkWell(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const HenkouRirekiScreen(),
+                ),
+              );
+            },
+            child: const Text(
+              '変更履歴',
+              style: TextStyle(
+                color: Colors.blue, // リンクの色
+                decoration: TextDecoration.underline, // 下線
+              ),
+            ),
+          ),
+          const SizedBox(height: 8), // 適度な余白
+          const Text(
+            "⭐️はじめに",
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: HENSUU.fontsize_honbun,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 8), // 適度な余白
+          const Text(
+            "箱庭小駅伝SSをダウンロードしていただき誠にありがとうございます。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(
+            "このゲームは文字情報だけの駅伝シミュレーションゲームです。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(
+            "総監督(あなた)ができることは、選手の区間配置とレース中の指示、新入生スカウト、練習メニューの選択、金特訓・銀特訓など、限られたことだけです。選手は基本的に勝手に成長します。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(
+            "肩の力を抜いて、ご自身のペースでお付き合いいただければ幸いです。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(
+            "なお、このゲームに登場する団体名・個人名は実在する団体・個人とは一切関係ありません。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(""),
+          const Text("""⭐️プライバシーポリシー
 1. 利用者情報の取り扱いについて
 情報の取得・利用: 当アプリは、ユーザーの氏名、連絡先、位置情報などの個人情報を取得・利用することはありません。
 
@@ -1033,473 +1032,522 @@ class _SettingScreenState extends State<SettingScreen> {
 共有先管理: データの送信先（共有先）はユーザー自身が選択・管理するものとし、アプリが自動的に情報を外部送信することはありません。
 
 """, style: TextStyle(color: Colors.white)),
-            const SizedBox(height: 24),
+          const SizedBox(height: 24),
 
-            const Text(
-              "⭐️名声について",
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: HENSUU.fontsize_honbun,
-                fontWeight: FontWeight.bold,
-              ),
+          const Text(
+            "⭐️名声について",
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: HENSUU.fontsize_honbun,
+              fontWeight: FontWeight.bold,
             ),
-            const SizedBox(height: 8),
-            const Text(
-              "各大学は過去10年の成績に基づいて名声という値を保持しています。名声が高いほど有力な新入生が入学しやすくなります。",
-              style: TextStyle(color: Colors.white),
-            ),
-            const Text(
-              "コンピュータスカウトがONのときは、名声は新入生スカウトの交渉の成功率や、同じ選手に複数の大学が交渉に成功したときの抽選、交渉で決まらなかった選手が自ら志望して進学先を選ぶときの選ばれやすさに影響します(詳しくは大学画面の「コンピュータスカウト」の説明をご覧ください)。",
-              style: TextStyle(color: Colors.white),
-            ),
-            const SizedBox(height: 24),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            "各大学は過去10年の成績に基づいて名声という値を保持しています。名声が高いほど有力な新入生が入学しやすくなります。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(
+            "コンピュータスカウトがONのときは、名声は新入生スカウトの交渉の成功率や、同じ選手に複数の大学が交渉に成功したときの抽選、交渉で決まらなかった選手が自ら志望して進学先を選ぶときの選ばれやすさに影響します(詳しくは大学画面の「コンピュータスカウト」の説明をご覧ください)。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const SizedBox(height: 24),
 
-            const Text(
-              "⭐️チームの目標順位について",
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: HENSUU.fontsize_honbun,
-                fontWeight: FontWeight.bold,
-              ),
+          const Text(
+            "⭐️チームの目標順位について",
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: HENSUU.fontsize_honbun,
+              fontWeight: FontWeight.bold,
             ),
-            const SizedBox(height: 8),
-            const Text(
-              "駅伝の目標順位は総監督(あなた)が決定します。ただ、対校戦は常に8位、11月駅伝予選は常に7位、正月駅伝予選は常に10位が目標順位になります。",
-              style: TextStyle(color: Colors.white),
-            ),
-            const Text(
-              "このゲームの駅伝の2区以降では、目標順位を下回った順位でタスキを受けると、前半無理に突っ込んで入ってしまいタイムが悪化するという現象が起きます。悪化の大きさは、タスキを受けた時点の目標順位の大学とのタイム差に応じて大きくなり、これから走る区間の距離1kmあたり3秒以上の差で最大になります(例: 20kmの区間なら60秒差以上)。",
-              style: TextStyle(color: Colors.white),
-            ),
-            const Text(
-              "逆に、目標順位を上回った順位でタスキを受けると、ほっと一息ついてしまい、タイムが少しだけ悪化します(上回っている順位の数が多いほど少し大きくなります)。",
-              style: TextStyle(color: Colors.white),
-            ),
-            const Text(
-              "これらの補正は、「前半突っ込み」や「前半抑え」の指示を出した選手にはかからず、代わりに指示の成否による補正がかかります(「レース中の指示について」をご覧ください)。",
-              style: TextStyle(color: Colors.white),
-            ),
-            const Text(
-              "目標順位を下回ったときの悪化や、ほっと一息の強さは、この画面の上の方にある「目標順位・指示の補正設定」で変えたり、なくしたりできます(全大学共通)。",
-              style: TextStyle(color: Colors.white),
-            ),
-            const Text(
-              "一方、この目標順位をクリアすると、金または銀を獲得できたり、総監督が選手の能力を見抜くことができるようになったりします。",
-              style: TextStyle(color: Colors.white),
-            ),
-            const SizedBox(height: 24),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            "駅伝の目標順位は総監督(あなた)が決定します。ただ、対校戦は常に8位、11月駅伝予選は常に7位、正月駅伝予選は常に10位が目標順位になります。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(
+            "このゲームの駅伝の2区以降では、目標順位を下回った順位でタスキを受けると、前半無理に突っ込んで入ってしまいタイムが悪化するという現象が起きます。悪化の大きさは、タスキを受けた時点の目標順位の大学とのタイム差に応じて大きくなり、これから走る区間の距離1kmあたり3秒以上の差で最大になります(例: 20kmの区間なら60秒差以上)。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(
+            "逆に、目標順位を上回った順位でタスキを受けると、ほっと一息ついてしまい、タイムが少しだけ悪化します(上回っている順位の数が多いほど少し大きくなります)。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(
+            "これらの補正は、「前半突っ込み」や「前半抑え」の指示を出した選手にはかからず、代わりに指示の成否による補正がかかります(「レース中の指示について」をご覧ください)。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(
+            "目標順位を下回ったときの悪化や、ほっと一息の強さは、設定タブの「目標順位・指示の補正設定」で変えたり、なくしたりできます(全大学共通)。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(
+            "一方、この目標順位をクリアすると、金または銀を獲得できたり、総監督が選手の能力を見抜くことができるようになったりします。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const SizedBox(height: 24),
 
-            const Text(
-              "⭐️金と銀について",
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: HENSUU.fontsize_honbun,
-                fontWeight: FontWeight.bold,
-              ),
+          const Text(
+            "⭐️金と銀について",
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: HENSUU.fontsize_honbun,
+              fontWeight: FontWeight.bold,
             ),
-            const SizedBox(height: 8),
-            const Text(
-              "夏合宿で各選手の個性を伸ばす金特訓と銀特訓を行うことができます。",
-              style: TextStyle(color: Colors.white),
-            ),
-            const Text(
-              "春の定期支給と、チームの目標順位を達成した場合の支給があります。",
-              style: TextStyle(color: Colors.white),
-            ),
-            const Text(
-              "春の定期支給の支給額の多少は以下の基準に基づいています。（上の方が支給額が多い）。",
-              style: TextStyle(color: Colors.white),
-            ),
-            const Text(
-              "・三冠\n・駅伝か対校戦優勝\n・駅伝すべて3位以内\n・駅伝か対校戦どれか３位以内\n・対校戦8位以内もしくは10月駅伝5位以内もしくは11月駅伝8位以内もしくは正月駅伝10位以内\n・11月駅伝予選突破もしくは正月駅伝予選突破\n・上記のどれも未達成(最低額)",
-              style: TextStyle(color: Colors.white),
-            ),
-            const Text(
-              "コンピュータの大学も金銀を獲得し、夏合宿で選手の能力強化に使います(大学画面の「コンピュータ金銀使用」で設定できます)。",
-              style: TextStyle(color: Colors.white),
-            ),
-            const SizedBox(height: 24),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            "夏合宿で各選手の個性を伸ばす金特訓と銀特訓を行うことができます。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(
+            "春の定期支給と、チームの目標順位を達成した場合の支給があります。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(
+            "春の定期支給の支給額の多少は以下の基準に基づいています。（上の方が支給額が多い）。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(
+            "・三冠\n・駅伝か対校戦優勝\n・駅伝すべて3位以内\n・駅伝か対校戦どれか３位以内\n・対校戦8位以内もしくは10月駅伝5位以内もしくは11月駅伝8位以内もしくは正月駅伝10位以内\n・11月駅伝予選突破もしくは正月駅伝予選突破\n・上記のどれも未達成(最低額)",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(
+            "コンピュータの大学も金銀を獲得し、夏合宿で選手の能力強化に使います(大学画面の「コンピュータ金銀使用」で設定できます)。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const SizedBox(height: 24),
 
-            const Text(
-              "⭐️レース中の指示について",
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: HENSUU.fontsize_honbun,
-                fontWeight: FontWeight.bold,
-              ),
+          const Text(
+            "⭐️レース中の指示について",
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: HENSUU.fontsize_honbun,
+              fontWeight: FontWeight.bold,
             ),
-            const SizedBox(height: 8),
-            const Text(
-              "駅伝と11月駅伝予選では、レース中走り出す直前に選手に指示を出すことができます。駅伝の1区と11月駅伝予選では「スタート直後飛び出し」を、駅伝の2区以降では「前半突っ込み」か「前半抑え」を指示できます。「スタート直後飛び出し」と「前半突っ込み」の成功確率は駅伝男の能力と、「前半抑え」の成功確率は平常心の能力と直結します。",
-              style: TextStyle(color: Colors.white),
-            ),
-            const Text(
-              "駅伝の2区以降での指示である「前半突っ込み」と「前半抑え」では「前半突っ込み」の方が効果は大きいです。ただ、その分失敗した時のタイム損も大きいです。",
-              style: TextStyle(color: Colors.white),
-            ),
-            const Text(
-              "「前半抑え」は、目標順位を下回ったときの悪化や、上回ったときのほっと一息を防ぐための指示です。成功するとこれらの悪化がなくなり、少しタイムが良くなりますが、失敗すると指示を出さなかった場合よりタイムが悪くなります。",
-              style: TextStyle(color: Colors.white),
-            ),
-            const Text(
-              "目標順位を下回った順位でタスキを受けた場合、「前半抑え」に失敗した時のタイム損は、目標順位の大学とのタイム差が大きいほど大きくなります(初期設定では、最大でも「前半突っ込み」に失敗した時より小さいです)。",
-              style: TextStyle(color: Colors.white),
-            ),
-            const Text(
-              "駅伝の2区以降では、指示を選ぶ欄の下の「指示ごとの損得予測」で、走り出す選手が指示なし・前半突っ込み・前半抑えのそれぞれの場合に何秒ほど損や得をしそうか(成功した時・失敗した時)を確認できます。",
-              style: TextStyle(color: Colors.white),
-            ),
-            const Text(
-              "「前半突っ込み」「前半抑え」が成功した時の効果や失敗した時の損の強さは、「目標順位・指示の補正設定」で変えられます(全大学共通。コンピュータの大学がどの選手に指示を出すかは変わりません)。",
-              style: TextStyle(color: Colors.white),
-            ),
-            const Text(
-              "正月駅伝予選では、各選手ごとにフリー走か集団走を選べます。フリー走では「前半突っ込み」か「前半抑え」も指示できます。集団走は最大6つの集団を作れます。集団走には設定タイムを指示しなくてはなりません。",
-              style: TextStyle(color: Colors.white),
-            ),
-            const Text(
-              "コンピュータの大学も、駅伝男や平常心の高い選手には指示を出すことがあります。コンピュータが監督の学連選抜の選手には指示は出ません(1区で飛び出すことはあります)。",
-              style: TextStyle(color: Colors.white),
-            ),
-            const Text(
-              "あなたの大学が正月駅伝に出場できない年は、学連選抜の監督として、学連選抜の区間配置を決めたり、レース中に学連選抜の選手へ指示を出したりできます(正月駅伝の学連選抜編成の画面で「学連選抜の監督をする」をオンにしている場合。初期値はオン)。学連選抜の目標順位は学連選抜編成の画面で決められ(毎年10位から始まります)、正月駅伝の6区のスタート前にも決め直せます。大学と同じく、目標順位を下回ったときの悪化と上回ったときのほっと一息があり、6区は判定しません(学連選抜には金銀や名声はないので、実力に見合った目標を選ぶのがおすすめです)。コンピュータが監督のときの学連選抜は、目標がいつも10位で、ほっと一息はありません。また、1区の集団のペースは大学の選手だけで決まり、学連選抜の選手が集団のペースを作ることはありません。",
-              style: TextStyle(color: Colors.white),
-            ),
-            const SizedBox(height: 24),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            "駅伝と11月駅伝予選では、レース中走り出す直前に選手に指示を出すことができます。駅伝の1区と11月駅伝予選では「スタート直後飛び出し」を、駅伝の2区以降では「前半突っ込み」か「前半抑え」を指示できます。「スタート直後飛び出し」と「前半突っ込み」の成功確率は駅伝男の能力と、「前半抑え」の成功確率は平常心の能力と直結します。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(
+            "駅伝の2区以降での指示である「前半突っ込み」と「前半抑え」では「前半突っ込み」の方が効果は大きいです。ただ、その分失敗した時のタイム損も大きいです。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(
+            "「前半抑え」は、目標順位を下回ったときの悪化や、上回ったときのほっと一息を防ぐための指示です。成功するとこれらの悪化がなくなり、少しタイムが良くなりますが、失敗すると指示を出さなかった場合よりタイムが悪くなります。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(
+            "目標順位を下回った順位でタスキを受けた場合、「前半抑え」に失敗した時のタイム損は、目標順位の大学とのタイム差が大きいほど大きくなります(初期設定では、最大でも「前半突っ込み」に失敗した時より小さいです)。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(
+            "駅伝の2区以降では、指示を選ぶ欄の下の「指示ごとの損得予測」で、走り出す選手が指示なし・前半突っ込み・前半抑えのそれぞれの場合に何秒ほど損や得をしそうか(成功した時・失敗した時)を確認できます。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(
+            "「前半突っ込み」「前半抑え」が成功した時の効果や失敗した時の損の強さは、「目標順位・指示の補正設定」で変えられます(全大学共通。コンピュータの大学がどの選手に指示を出すかは変わりません)。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(
+            "正月駅伝予選では、各選手ごとにフリー走か集団走を選べます。フリー走では「前半突っ込み」か「前半抑え」も指示できます。集団走は最大6つの集団を作れます。集団走には設定タイムを指示しなくてはなりません。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(
+            "コンピュータの大学も、駅伝男や平常心の高い選手には指示を出すことがあります。コンピュータが監督の学連選抜の選手には指示は出ません(1区で飛び出すことはあります)。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(
+            "あなたの大学が正月駅伝に出場できない年は、学連選抜の監督として、学連選抜の区間配置を決めたり、レース中に学連選抜の選手へ指示を出したりできます(正月駅伝の学連選抜編成の画面で「学連選抜の監督をする」をオンにしている場合。初期値はオン)。学連選抜の目標順位は学連選抜編成の画面で決められ(毎年10位から始まります)、正月駅伝の6区のスタート前にも決め直せます。大学と同じく、目標順位を下回ったときの悪化と上回ったときのほっと一息があり、6区は判定しません(学連選抜には金銀や名声はないので、実力に見合った目標を選ぶのがおすすめです)。コンピュータが監督のときの学連選抜は、目標がいつも10位で、ほっと一息はありません。また、1区の集団のペースは大学の選手だけで決まり、学連選抜の選手が集団のペースを作ることはありません。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const SizedBox(height: 24),
 
-            const Text(
-              "⭐️生成AIと遊ぶ(テキストのコピー)",
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: HENSUU.fontsize_honbun,
-                fontWeight: FontWeight.bold,
-              ),
+          const Text(
+            "⭐️生成AIと遊ぶ(テキストのコピー)",
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: HENSUU.fontsize_honbun,
+              fontWeight: FontWeight.bold,
             ),
-            const SizedBox(height: 8),
-            const Text(
-              "各画面のコピーのボタンでテキストをコピーして生成AIに貼り付けると、レースの実況や、エントリー・区間配置・指示の相談を楽しめます。コピーしたテキストには、生成AIが読み違えないように、数値の意味などの注意書きも入っています。",
-              style: TextStyle(color: Colors.white),
-            ),
-            const Text(
-              "一次エントリー・学連選抜編成・区間エントリー・当日変更・目標順位の決定・レース中・レース結果の画面にある「生成AIに渡すテキスト」ボタンを押すと、その場面で役に立つテキストの一覧が出て、1回押すだけでコピーできます。いつもいっしょに渡すものは、まとめてコピーできます。エントリーの画面では、ほかの大学の区間エントリーが分かってしまうもの(全区間・全大学詳細リストなど)は出ません。",
-              style: TextStyle(color: Colors.white),
-            ),
-            const Text(
-              "・どの場面でも、会話の最初に「ゲームの仕様(生成AI向け)」(能力の意味と効く場面、持ちタイムの読み方、目標順位と指示などの決まりをまとめたもの)を一度渡しておくと、能力の名前だけから推測した誤った判断が減り、相談の精度が上がります",
-              style: TextStyle(color: Colors.white),
-            ),
-            const Text(
-              "・エントリーや区間配置の相談には、エントリーの画面の「相談セット」(エントリーの状況(選んでいる選手・今の区間配置)とコース情報・自分の大学の今季タイム一覧表・駅伝出場履歴をまとめたもの。今季タイム一覧表と駅伝出場履歴一覧(選手ごと)は、それぞれの画面の右上のコピーのボタンでもコピーできます)。学連選抜の監督をするときは「学連選抜の相談セット」(コース情報と学連選抜の区間配置・今季タイム一覧表・駅伝出場履歴をまとめたもの)",
-              style: TextStyle(color: Colors.white),
-            ),
-            const Text(
-              "・当日変更の相談には、当日変更の画面の「当日変更相談セット」(この場面の当日変更のルール、自分の大学の区間配置と補欠(当日の調子つき)、変えられる区間のコース情報、自分の大学の今季タイム一覧表・駅伝出場履歴をまとめたもの。正月駅伝の復路のスタート前は、自分の大学のレース経過と5区の通過順位速報も入ります)",
-              style: TextStyle(color: Colors.white),
-            ),
-            const Text(
-              "・目標順位の相談には、目標順位を決める画面の「目標順位相談セット」(選べる目標順位と目標順位ごとにもらえる金銀、目標順位と指示の決まり、コース情報と全大学詳細リストをまとめたもの。正月駅伝の復路のスタート前は、自分の大学のレース経過と、残りの区間のコース情報・全大学詳細リストなどになります)",
-              style: TextStyle(color: Colors.white),
-            ),
-            const Text(
-              "・レース前の展開予想には、レース画面(スタート前)の「レース前セット」(コース情報と全区間・全大学詳細リストをまとめたもの)",
-              style: TextStyle(color: Colors.white),
-            ),
-            const Text(
-              "・レース中の実況には、区間ごとに「直近区間結果セット」(走り終えた直近の区間の個人順位速報(補正の説明つき)と通過順位速報をまとめたもの。最後の区間の分は、レース結果の画面の「生成AIに渡すテキスト」から)や「自分の大学のレース経過」",
-              style: TextStyle(color: Colors.white),
-            ),
-            const Text(
-              "・次の区間の展開予想には、区間ごとに「次区間予想セット」(直近の通過順位速報と、これから走る区間のコース情報・全大学詳細リストをまとめたもの)",
-              style: TextStyle(color: Colors.white),
-            ),
-            const Text(
-              "・指示の相談には「自分の大学のレース経過」と「全区間・全大学詳細リスト」を渡して、この先の展開を予想してもらう",
-              style: TextStyle(color: Colors.white),
-            ),
-            const Text(
-              "・レース後の振り返りには、レース結果の画面の「振り返りセット」(総合成績と自分の大学のレース経過をまとめたもの)や「全区間の個人成績」(長すぎるときは、区間を選んで1つずつコピーできます)。正月駅伝では「学連選抜の振り返りセット」(総合成績と学連選抜のレース経過・区間配置をまとめたもの)もあります",
-              style: TextStyle(color: Colors.white),
-            ),
-            const Text(
-              "正月駅伝の個人順位速報・通過順位速報には、学連選抜も「OP」として入ります(順位は大学の中に入れた場合の「○位相当」)。学連選抜区間配置の画面などからは、学連選抜の区間配置・レース経過・今季タイム一覧表もコピーできます。",
-              style: TextStyle(color: Colors.white),
-            ),
-            const Text(
-              "生成AIによっては、一度に貼り付けられる文字数に限りがあります。長すぎるときは、まとめたものではなく一つずつ渡してください。",
-              style: TextStyle(color: Colors.white),
-            ),
-            const SizedBox(height: 24),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            "各画面のコピーのボタンでテキストをコピーして生成AIに貼り付けると、レースの実況や、エントリー・区間配置・指示の相談を楽しめます。コピーしたテキストには、生成AIが読み違えないように、数値の意味などの注意書きも入っています。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(
+            "一次エントリー・学連選抜編成・区間エントリー・当日変更・目標順位の決定・レース中・レース結果の画面にある「生成AIに渡すテキスト」ボタンを押すと、その場面で役に立つテキストの一覧が出て、1回押すだけでコピーできます。いつもいっしょに渡すものは、まとめてコピーできます。エントリーの画面では、ほかの大学の区間エントリーが分かってしまうもの(全区間・全大学詳細リストなど)は出ません。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(
+            "・どの場面でも、会話の最初に「ゲームの仕様(生成AI向け)」(能力の意味と効く場面、持ちタイムの読み方、目標順位と指示などの決まりをまとめたもの)を一度渡しておくと、能力の名前だけから推測した誤った判断が減り、相談の精度が上がります",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(
+            "・エントリーや区間配置の相談には、エントリーの画面の「相談セット」(エントリーの状況(選んでいる選手・今の区間配置)とコース情報・自分の大学の今季タイム一覧表・駅伝出場履歴をまとめたもの。今季タイム一覧表と駅伝出場履歴一覧(選手ごと)は、それぞれの画面の右上のコピーのボタンでもコピーできます)。学連選抜の監督をするときは「学連選抜の相談セット」(コース情報と学連選抜の区間配置・今季タイム一覧表・駅伝出場履歴をまとめたもの)",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(
+            "・当日変更の相談には、当日変更の画面の「当日変更相談セット」(この場面の当日変更のルール、自分の大学の区間配置と補欠(当日の調子つき)、変えられる区間のコース情報、自分の大学の今季タイム一覧表・駅伝出場履歴をまとめたもの。正月駅伝の復路のスタート前は、自分の大学のレース経過と5区の通過順位速報も入ります)",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(
+            "・目標順位の相談には、目標順位を決める画面の「目標順位相談セット」(選べる目標順位と目標順位ごとにもらえる金銀、目標順位と指示の決まり、コース情報と全大学詳細リストをまとめたもの。正月駅伝の復路のスタート前は、自分の大学のレース経過と、残りの区間のコース情報・全大学詳細リストなどになります)",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(
+            "・レース前の展開予想には、レース画面(スタート前)の「レース前セット」(コース情報と全区間・全大学詳細リストをまとめたもの)",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(
+            "・レース中の実況には、区間ごとに「直近区間結果セット」(走り終えた直近の区間の個人順位速報(補正の説明つき)と通過順位速報をまとめたもの。最後の区間の分は、レース結果の画面の「生成AIに渡すテキスト」から)や「自分の大学のレース経過」",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(
+            "・次の区間の展開予想には、区間ごとに「次区間予想セット」(直近の通過順位速報と、これから走る区間のコース情報・全大学詳細リストをまとめたもの)",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(
+            "・指示の相談には「自分の大学のレース経過」と「全区間・全大学詳細リスト」を渡して、この先の展開を予想してもらう",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(
+            "・レース後の振り返りには、レース結果の画面の「振り返りセット」(総合成績と自分の大学のレース経過をまとめたもの)や「全区間の個人成績」(長すぎるときは、区間を選んで1つずつコピーできます)。正月駅伝では「学連選抜の振り返りセット」(総合成績と学連選抜のレース経過・区間配置をまとめたもの)もあります",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(
+            "正月駅伝の個人順位速報・通過順位速報には、学連選抜も「OP」として入ります(順位は大学の中に入れた場合の「○位相当」)。学連選抜区間配置の画面などからは、学連選抜の区間配置・レース経過・今季タイム一覧表もコピーできます。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(
+            "生成AIによっては、一度に貼り付けられる文字数に限りがあります。長すぎるときは、まとめたものではなく一つずつ渡してください。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const SizedBox(height: 24),
 
-            const Text(
-              "⭐️経験補正について",
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: HENSUU.fontsize_honbun,
-                fontWeight: FontWeight.bold,
-              ),
+          const Text(
+            "⭐️経験補正について",
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: HENSUU.fontsize_honbun,
+              fontWeight: FontWeight.bold,
             ),
-            const SizedBox(height: 8),
-            const Text(
-              "同じ駅伝の同じ区間を過去に走ったことがあると、経験からタイムが少し良くなります。回数が増えるほど良くなります。",
-              style: TextStyle(color: Colors.white),
-            ),
-            const SizedBox(height: 24),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            "同じ駅伝の同じ区間を過去に走ったことがあると、経験からタイムが少し良くなります。回数が増えるほど良くなります。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const SizedBox(height: 24),
 
-            const Text(
-              "⭐️選手の能力について",
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: HENSUU.fontsize_honbun,
-                fontWeight: FontWeight.bold,
-              ),
+          const Text(
+            "⭐️選手の能力について",
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: HENSUU.fontsize_honbun,
+              fontWeight: FontWeight.bold,
             ),
-            const SizedBox(height: 8),
-            const Text(
-              "【基本走力】　走力の基本となる能力。全てのタイム計算のもとになる。成長とともに変化する。春と夏の2回成長する。なお、選手の能力を見抜く総監督の能力を持ってしてもこの数値は見抜けませんし、金銀も使えません。",
-              style: TextStyle(color: Colors.white),
-            ),
-            const Text(
-              "【調子】　駅伝(駅伝予選は除く)で影響する能力で、調子の数値が低いほどタイムが悪くなります。ただ、駅伝男の能力や平常心の能力には影響を与えませんので、飛び出しや突っ込み、抑えといった指示の成否には影響を与えません。なお、この画面の上部の「調子関連設定」で調子のタイムへの影響度などを設定できます。そのほか、コース編集画面での試走やコンピュータが区間配置を決める際のタイムの見積もりには調子の影響は入っていません。",
-              style: TextStyle(color: Colors.white),
-            ),
-            const Text(
-              "【安定感】　調子を決定する際に参照する能力です。調子の最低保証値となります(当日の突発的体調不良を除く)。",
-              style: TextStyle(color: Colors.white),
-            ),
-            const Text(
-              "***この後説明するすべての能力の値は、金銀を使わない限り入学から卒業まで変わりません。***",
-              style: TextStyle(
-                color: Colors.white,
-                fontStyle: FontStyle.italic,
-              ), // イタリック体を適用
-            ),
-            const Text(
-              "なお、レースでは、選手ごとの練習メニュー(年間強化練習)と、大学画面の「大学の個性(実力発揮度)設定」によって、能力の効き方が変わります。",
-              style: TextStyle(color: Colors.white),
-            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            "【基本走力】　走力の基本となる能力。全てのタイム計算のもとになる。成長とともに変化する。春と夏の2回成長する。なお、選手の能力を見抜く総監督の能力を持ってしてもこの数値は見抜けませんし、金銀も使えません。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(
+            "【調子】　駅伝(駅伝予選は除く)で影響する能力で、調子の数値が低いほどタイムが悪くなります。ただ、駅伝男の能力や平常心の能力には影響を与えませんので、飛び出しや突っ込み、抑えといった指示の成否には影響を与えません。なお、設定タブの「調子関連設定」で調子のタイムへの影響度などを設定できます。そのほか、コース編集画面での試走やコンピュータが区間配置を決める際のタイムの見積もりには調子の影響は入っていません。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(
+            "【安定感】　調子を決定する際に参照する能力です。調子の最低保証値となります(当日の突発的体調不良を除く)。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(
+            "***この後説明するすべての能力の値は、金銀を使わない限り入学から卒業まで変わりません。***",
+            style: TextStyle(
+              color: Colors.white,
+              fontStyle: FontStyle.italic,
+            ), // イタリック体を適用
+          ),
+          const Text(
+            "なお、レースでは、選手ごとの練習メニュー(年間強化練習)と、大学画面の「大学の個性(実力発揮度)設定」によって、能力の効き方が変わります。",
+            style: TextStyle(color: Colors.white),
+          ),
 
-            const Text(
-              "【駅伝男】　ゾーンへの入りやすさです。スタート直後の飛び出しや前半突っ込みの成功確率と直結します。この能力の値については、値が低い選手が多くなるような調整を加えている点をご了承ください。",
-              style: TextStyle(color: Colors.white),
-            ),
-            const Text(
-              "【平常心】　常に冷静でいられるかの能力です。前半抑えの成功確率と直結します。",
-              style: TextStyle(color: Colors.white),
-            ),
-            const Text(
-              "【長距離粘り】　長い距離を走る際に必要になる能力。15km以上の距離から影響が出ます。",
-              style: TextStyle(color: Colors.white),
-            ),
-            const Text(
-              "【スパート力】　フィニッシュの直前の走力。この能力が高いと短い距離の方が得意になる傾向。",
-              style: TextStyle(color: Colors.white),
-            ),
-            const Text(
-              "【カリスマ】　11月駅伝予選の全組と駅伝1区で、ペースメーカーになれる能力。走る選手の中で一番この能力が高い選手がペースメークする仕様になっています。",
-              style: TextStyle(color: Colors.white),
-            ),
-            const Text(
-              "【登り適性】　登り坂を走る能力。登りの多い区間や登り1万、クロカン1万に関係。",
-              style: TextStyle(color: Colors.white),
-            ),
-            const Text(
-              "【下り適性】　下り坂を走る能力。下りの多い区間や下り1万、クロカン1万に関係。",
-              style: TextStyle(color: Colors.white),
-            ),
-            const Text(
-              "【アップダウン対応力】　アップダウンが多い道を走る能力。アップダウンの多い区間やクロカン1万に関係。\nなお、このゲームでは、登り適正・下り適性・アップダウン対応力は全く無関係に値を設定しています。現実世界だと、クロカンが強ければ登りも強そうな気もするのですが、このゲームではそうはなっていません。",
-              style: TextStyle(color: Colors.white),
-            ),
-            const Text(
-              "【ロード適性】　駅伝の2区以降および正月駅伝予選、対校戦ハーフ、市民ハーフ、ロード1万に関係する能力。",
-              style: TextStyle(color: Colors.white),
-            ),
-            const Text(
-              "【ペース変動対応力】　5千・1万のトラックレース、駅伝の1区から3区までと11月駅伝予選、正月駅伝予選、クロカン1万に関係する能力。",
-              style: TextStyle(color: Colors.white),
-            ),
-            const Text(
-              "長距離粘り・スパート力・登り適性・下り適性・アップダウン対応力・ロード適性・ペース変動対応力の差が、駅伝と駅伝予選のタイムにどのくらい効くかは、この画面の上の方にある「能力のタイムへの影響度設定」で変えられます(全大学共通。記録会などのタイムには関係しません)。",
-              style: TextStyle(color: Colors.white),
-            ),
-            const SizedBox(height: 24),
+          const Text(
+            "【駅伝男】　ゾーンへの入りやすさです。スタート直後の飛び出しや前半突っ込みの成功確率と直結します。この能力の値については、値が低い選手が多くなるような調整を加えている点をご了承ください。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(
+            "【平常心】　常に冷静でいられるかの能力です。前半抑えの成功確率と直結します。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(
+            "【長距離粘り】　長い距離を走る際に必要になる能力。15km以上の距離から影響が出ます。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(
+            "【スパート力】　フィニッシュの直前の走力。この能力が高いと短い距離の方が得意になる傾向。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(
+            "【カリスマ】　11月駅伝予選の全組と駅伝1区で、ペースメーカーになれる能力。走る選手の中で一番この能力が高い選手がペースメークする仕様になっています。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(
+            "【登り適性】　登り坂を走る能力。登りの多い区間や登り1万、クロカン1万に関係。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(
+            "【下り適性】　下り坂を走る能力。下りの多い区間や下り1万、クロカン1万に関係。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(
+            "【アップダウン対応力】　アップダウンが多い道を走る能力。アップダウンの多い区間やクロカン1万に関係。\nなお、このゲームでは、登り適正・下り適性・アップダウン対応力は全く無関係に値を設定しています。現実世界だと、クロカンが強ければ登りも強そうな気もするのですが、このゲームではそうはなっていません。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(
+            "【ロード適性】　駅伝の2区以降および正月駅伝予選、対校戦ハーフ、市民ハーフ、ロード1万に関係する能力。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(
+            "【ペース変動対応力】　5千・1万のトラックレース、駅伝の1区から3区までと11月駅伝予選、正月駅伝予選、クロカン1万に関係する能力。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(
+            "長距離粘り・スパート力・登り適性・下り適性・アップダウン対応力・ロード適性・ペース変動対応力の差が、駅伝と駅伝予選のタイムにどのくらい効くかは、設定タブの「能力のタイムへの影響度設定」で変えられます(全大学共通。記録会などのタイムには関係しません)。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const SizedBox(height: 24),
 
-            const Text(
-              "⭐️総監督の能力について",
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: HENSUU.fontsize_honbun,
-                fontWeight: FontWeight.bold,
-              ),
+          const Text(
+            "⭐️総監督の能力について",
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: HENSUU.fontsize_honbun,
+              fontWeight: FontWeight.bold,
             ),
-            const SizedBox(height: 8),
-            const Text(
-              "チーム目標順位をクリアすると、総監督(あなた)の能力が覚醒し、選手の能力を見抜く力がつくことがあります。",
-              style: TextStyle(color: Colors.white),
-            ),
-            const Text(
-              "なお、選手の能力を見抜く力がつくと、駅伝や11月駅伝予選に出場した場合の各選手の結果表示に各種能力のタイム補正値も表示されるようになりますが、マイナス表記はタイム良化、プラス表記はタイム悪化をあらわしています。",
-              style: TextStyle(color: Colors.white),
-            ),
-            const SizedBox(height: 24),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            "チーム目標順位をクリアすると、総監督(あなた)の能力が覚醒し、選手の能力を見抜く力がつくことがあります。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(
+            "なお、選手の能力を見抜く力がつくと、駅伝や11月駅伝予選に出場した場合の各選手の結果表示に各種能力のタイム補正値も表示されるようになりますが、マイナス表記はタイム良化、プラス表記はタイム悪化をあらわしています。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const SizedBox(height: 24),
 
-            const Text(
-              "⭐️学内記録・学内順位について",
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: HENSUU.fontsize_honbun,
-                fontWeight: FontWeight.bold,
-              ),
+          const Text(
+            "⭐️学内記録・学内順位について",
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: HENSUU.fontsize_honbun,
+              fontWeight: FontWeight.bold,
             ),
-            const SizedBox(height: 8),
-            const Text(
-              "学内記録と学内順位は、処理の軽量化のため、プレイヤーが総監督をしている大学のみ計算・記録しています。ですので、もし、別の大学の総監督になる場合には、移籍先の大学の学内記録・学内順位については、就任時から計算・記録を取り始めることになりますのでご了承ください。",
-              style: TextStyle(color: Colors.white),
-            ),
-            const SizedBox(height: 24),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            "学内記録と学内順位は、処理の軽量化のため、プレイヤーが総監督をしている大学のみ計算・記録しています。ですので、もし、別の大学の総監督になる場合には、移籍先の大学の学内記録・学内順位については、就任時から計算・記録を取り始めることになりますのでご了承ください。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const SizedBox(height: 24),
 
-            const Text(
-              "⭐️正月駅伝予選について",
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: HENSUU.fontsize_honbun,
-                fontWeight: FontWeight.bold,
-              ),
+          const Text(
+            "⭐️正月駅伝予選について",
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: HENSUU.fontsize_honbun,
+              fontWeight: FontWeight.bold,
             ),
-            const SizedBox(height: 8),
-            const Text(
-              "チーム全員が完全にフラットなコースのハーフマラソンを走り、各大学上位10名のタイムの合計で争います。\n選手ごとにフリー走かチーム内で集団走をするかを選べます。",
-              style: TextStyle(color: Colors.white),
-            ),
-            const SizedBox(height: 24),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            "チーム全員が完全にフラットなコースのハーフマラソンを走り、各大学上位10名のタイムの合計で争います。\n選手ごとにフリー走かチーム内で集団走をするかを選べます。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const SizedBox(height: 24),
 
-            const Text(
-              "⭐️監督とコーチについて",
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: HENSUU.fontsize_honbun,
-                fontWeight: FontWeight.bold,
-              ),
+          const Text(
+            "⭐️監督とコーチについて",
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: HENSUU.fontsize_honbun,
+              fontWeight: FontWeight.bold,
             ),
-            const SizedBox(height: 8),
-            const Text(
-              "ゲーム内の計算には一切影響を与えません。OBが就任します。30歳以上でないと就任しない仕様なので、最初の10年くらいは不在が続きます。また、はじめのうちは若い監督・コーチばかりになります。",
-              style: TextStyle(color: Colors.white),
-            ),
-            const SizedBox(height: 24),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            "ゲーム内の計算には一切影響を与えません。OBが就任します。30歳以上でないと就任しない仕様なので、最初の10年くらいは不在が続きます。また、はじめのうちは若い監督・コーチばかりになります。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const SizedBox(height: 24),
 
-            const Text(
-              "⭐️PC版(箱庭小駅伝・箱庭小駅伝2)のプレイ経験のある方へ",
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: HENSUU.fontsize_honbun,
-                fontWeight: FontWeight.bold,
-              ),
+          const Text(
+            "⭐️PC版(箱庭小駅伝・箱庭小駅伝2)のプレイ経験のある方へ",
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: HENSUU.fontsize_honbun,
+              fontWeight: FontWeight.bold,
             ),
-            const SizedBox(height: 8),
-            const Text(
-              "似ている部分もありますが、異なる部分もあります。先入観を持たずに全く別のゲームだと思ってプレイしていただいた方が混乱しないかもしれません。",
-              style: TextStyle(color: Colors.white),
-            ),
-            const Text(
-              "主な相違点としては、天候や疲労・怪我はありません。距離適性は自動で合わせるようになったので、ゲーム中に意識する必要はなくなりました。\n一方で、チームの目標順位をクリアすると、ポイントのようなものを獲得でき、そのポイントを使用して選手の能力を上げられる機能が追加されました。\nまた、初期状態では選手の能力を見ることはできず、タイムから推測するしかないようにしてみました。\nその他、駅伝の経験補正は、同じ駅伝の同じ区間を走ったことがある場合のみになりました。\n２までは100ｍ単位で計算を行っていたので区間途中での集団走も考慮に入れていて、その集団走のペースをカリスマが一番高い選手が決める、というのがありましたが、今作では１区間まるごと一つの計算で行なっているので、カリスマが影響するのは11月駅伝予選の全組と駅伝1区だけです。",
-              style: TextStyle(color: Colors.white),
-            ),
-            const SizedBox(height: 24),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            "似ている部分もありますが、異なる部分もあります。先入観を持たずに全く別のゲームだと思ってプレイしていただいた方が混乱しないかもしれません。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const Text(
+            "主な相違点としては、天候や疲労・怪我はありません。距離適性は自動で合わせるようになったので、ゲーム中に意識する必要はなくなりました。\n一方で、チームの目標順位をクリアすると、ポイントのようなものを獲得でき、そのポイントを使用して選手の能力を上げられる機能が追加されました。\nまた、初期状態では選手の能力を見ることはできず、タイムから推測するしかないようにしてみました。\nその他、駅伝の経験補正は、同じ駅伝の同じ区間を走ったことがある場合のみになりました。\n２までは100ｍ単位で計算を行っていたので区間途中での集団走も考慮に入れていて、その集団走のペースをカリスマが一番高い選手が決める、というのがありましたが、今作では１区間まるごと一つの計算で行なっているので、カリスマが影響するのは11月駅伝予選の全組と駅伝1区だけです。",
+            style: TextStyle(color: Colors.white),
+          ),
+          const SizedBox(height: 24),
 
-            const Text(
-              "⭐️最後に",
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: HENSUU.fontsize_honbun,
-                fontWeight: FontWeight.bold,
-              ),
+          const Text(
+            "⭐️最後に",
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: HENSUU.fontsize_honbun,
+              fontWeight: FontWeight.bold,
             ),
-            const SizedBox(height: 8),
-            const Text(
-              "攻略法がどうのこうのというより、ただの運ゲーかもしれません。電車での移動時間などのちょっとした暇つぶしにでもなれば幸いです。",
-              style: TextStyle(color: Colors.white),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            "攻略法がどうのこうのというより、ただの運ゲーかもしれません。電車での移動時間などのちょっとした暇つぶしにでもなれば幸いです。",
+            style: TextStyle(color: Colors.white),
+          ),
+          // ここからモーダルではなく、直接画像を配置するコード
+          const SizedBox(height: 24),
+          const Text(
+            "[参考資料]\nロード適性・ペース変動対応力と各競技との関係性",
+            style: TextStyle(
+              color: HENSUU.textcolor,
+              fontSize: HENSUU.fontsize_honbun,
+              fontWeight: FontWeight.bold,
             ),
-            // ここからモーダルではなく、直接画像を配置するコード
-            const SizedBox(height: 24),
-            const Text(
-              "[参考資料]\nロード適性・ペース変動対応力と各競技との関係性",
-              style: TextStyle(
-                color: HENSUU.textcolor,
-                fontSize: HENSUU.fontsize_honbun,
-                fontWeight: FontWeight.bold,
-              ),
+          ),
+          const SizedBox(height: 16),
+          // 横長の画像を画面幅に合わせて表示
+          Center(
+            child: Image.asset(
+              'lib/assets/gazou/nouryoku.png',
+              fit: BoxFit.contain,
             ),
-            const SizedBox(height: 16),
-            // 横長の画像を画面幅に合わせて表示
-            Center(
-              child: Image.asset(
-                'lib/assets/gazou/nouryoku.png',
-                fit: BoxFit.contain,
-              ),
-            ),
+          ),
 
-            const SizedBox(height: 24),
-            const Text(
-              "[参考資料]\n各大会での獲得名声初期値一覧(目標順位1位の場合)",
+          const SizedBox(height: 24),
+          const Text(
+            "[参考資料]\n各大会での獲得名声初期値一覧(目標順位1位の場合)",
+            style: TextStyle(
+              color: HENSUU.textcolor,
+              fontSize: HENSUU.fontsize_honbun,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 16),
+          // 横長の画像を画面幅に合わせて表示
+          Center(
+            child: Image.asset(
+              'lib/assets/gazou/meisei_10.png',
+              fit: BoxFit.contain,
+            ),
+          ),
+          const SizedBox(height: 16),
+          // 横長の画像を画面幅に合わせて表示
+          Center(
+            child: Image.asset(
+              'lib/assets/gazou/meisei_11.png',
+              fit: BoxFit.contain,
+            ),
+          ),
+          const SizedBox(height: 16),
+          // 横長の画像を画面幅に合わせて表示
+          Center(
+            child: Image.asset(
+              'lib/assets/gazou/meisei_01.png',
+              fit: BoxFit.contain,
+            ),
+          ),
+          const SizedBox(height: 16),
+          // 横長の画像を画面幅に合わせて表示
+          Center(
+            child: Image.asset(
+              'lib/assets/gazou/meisei_custom.png',
+              fit: BoxFit.contain,
+            ),
+          ),
+          const SizedBox(height: 16),
+          // 横長の画像を画面幅に合わせて表示
+          Center(
+            child: Image.asset(
+              'lib/assets/gazou/meisei_taikousen.png',
+              fit: BoxFit.contain,
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Center(
+            child: Text(
+              "",
+              style: TextStyle(color: Colors.white70, fontSize: 12),
+            ),
+          ),
+          const SizedBox(height: 24),
+          TextButton(
+            onPressed: () {
+              // ⬇︎ showLicensePage() の代わりにこちらを使います
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => Theme(
+                    // ⬇︎ ここで「ライセンス画面の中だけ」で有効になる色を指定します
+                    data: Theme.of(context).copyWith(
+                      // 画面全体の背景色を指定（例として白にしています）
+                      scaffoldBackgroundColor: Colors.white,
+                      // パッケージ名などが載るカードの背景色
+                      cardColor: Colors.white,
+                      // 文字色を黒（見やすい色）に強制的に上書きします
+                      textTheme: Theme.of(context).textTheme.copyWith(
+                        // ライセンス詳細の本文（ここが一番重要です）
+                        bodySmall: const TextStyle(
+                          color: Colors.black87,
+                          fontSize: 14.0,
+                        ),
+                        // パッケージ名などの文字
+                        bodyMedium: const TextStyle(color: Colors.black87),
+                        titleLarge: const TextStyle(color: Colors.black),
+                        titleMedium: const TextStyle(color: Colors.black),
+                      ),
+                      // 上部のヘッダー（AppBar）の色も指定しておくと安心です
+                      appBarTheme: const AppBarTheme(
+                        backgroundColor: Colors.white, // ヘッダーの背景色
+                        foregroundColor: Colors.black, // ヘッダーの文字・戻るボタンの色
+                      ),
+                    ),
+                    // 実際のライセンス画面の表示部分
+                    child: const LicensePage(
+                      applicationName: '箱庭小駅伝SS',
+                      applicationVersion: '1.8.4',
+                      // applicationIcon: Image.asset('lib/assets/icon/icon_ss1024.png', width: 48, height: 48),
+                    ),
+                  ),
+                ),
+              );
+            },
+            child: Text(
+              "ライセンス",
               style: TextStyle(
-                color: HENSUU.textcolor,
-                fontSize: HENSUU.fontsize_honbun,
-                fontWeight: FontWeight.bold,
+                color: HENSUU.LinkColor,
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
               ),
             ),
-            const SizedBox(height: 16),
-            // 横長の画像を画面幅に合わせて表示
-            Center(
-              child: Image.asset(
-                'lib/assets/gazou/meisei_10.png',
-                fit: BoxFit.contain,
-              ),
-            ),
-            const SizedBox(height: 16),
-            // 横長の画像を画面幅に合わせて表示
-            Center(
-              child: Image.asset(
-                'lib/assets/gazou/meisei_11.png',
-                fit: BoxFit.contain,
-              ),
-            ),
-            const SizedBox(height: 16),
-            // 横長の画像を画面幅に合わせて表示
-            Center(
-              child: Image.asset(
-                'lib/assets/gazou/meisei_01.png',
-                fit: BoxFit.contain,
-              ),
-            ),
-            const SizedBox(height: 16),
-            // 横長の画像を画面幅に合わせて表示
-            Center(
-              child: Image.asset(
-                'lib/assets/gazou/meisei_custom.png',
-                fit: BoxFit.contain,
-              ),
-            ),
-            const SizedBox(height: 16),
-            // 横長の画像を画面幅に合わせて表示
-            Center(
-              child: Image.asset(
-                'lib/assets/gazou/meisei_taikousen.png',
-                fit: BoxFit.contain,
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Center(
-              child: Text(
-                "",
-                style: TextStyle(color: Colors.white70, fontSize: 12),
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            const SizedBox(height: 60), // 下部の余白
-          ],
-        ),
+          ),
+          const SizedBox(height: 20),
+          const SizedBox(height: 60), // 下部の余白
+        ],
       ),
     );
   }

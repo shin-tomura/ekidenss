@@ -133,29 +133,43 @@ class _SenshuEditViewState extends State<SenshuEditView> {
   }
 
   /// 保存したときの基本走力の上限(magicnumber)(1.8.5)
-  /// [kihon]・[joukai]は、基本走力と上限の欄の値(どちらも小さいほど速い目盛り)
-  /// ・上限の欄を変えたとき: 入力した上限。ただし、基本走力と同じかそれより遅い(大きい)ときは、
-  ///   基本走力−25にする(上限を基本走力より遅くすると、次の育成で基本走力が上限まで引き戻されて
-  ///   選手が遅くなってしまうため)
-  /// ・基本走力の欄だけを変えたとき: 今の上限。ただし、基本走力を上限より速くしたときは、
-  ///   基本走力−25にする(1.8.4までと同じ)
-  /// ・どちらの欄も変えていないとき: 今の上限のまま(目盛りの値に直すときの端数で、保存のたびにずれないように)
-  double _hozonJoukaiMagicnumber(int kihon, int joukai) {
-    final double oldMagicNumber = _editingSenshu!.magicnumber;
-    final bool kihonHenkou = kihon != _kihonShokiti;
-    final bool joukaiHenkou = joukai != _joukaiShokiti;
-    if (!kihonHenkou && !joukaiHenkou) return oldMagicNumber;
-    // 基本走力の値がちょうど上限になるmagicnumber
-    final double kihonMagicNumber = magicnumberFromJoukaiHyouji(kihon);
-    if (joukaiHenkou) {
-      final double joukaiMagicNumber = magicnumberFromJoukaiHyouji(joukai);
-      return joukaiMagicNumber >= kihonMagicNumber
-          ? kihonMagicNumber - 25.0
-          : joukaiMagicNumber;
+  /// [joukai]は上限の欄の値(小さいほど速い目盛り)
+  /// ・上限の欄を変えたとき: 入力した上限
+  /// ・上限の欄を変えていないとき: 今の上限のまま(目盛りの値に直すときの端数で、保存のたびにずれないように)
+  /// (基本走力が上限より速い入力は、_kihonJoukaiMujun で保存の前に止める。
+  /// 1.8.4までは、基本走力を上限より速くすると上限を黙って基本走力−25に動かしていたが、
+  /// 入力と違う値で保存されて分かりにくいので、やめた)
+  double _hozonJoukaiMagicnumber(int joukai) {
+    if (joukai == _joukaiShokiti) return _editingSenshu!.magicnumber;
+    return magicnumberFromJoukaiHyouji(joukai);
+  }
+
+  /// 基本走力が上限より小さい(速い)入力になっているか(1.8.5)
+  /// 上限は基本走力が伸びていく先なので、基本走力が上限より速いことは本来ない(同じ値はよい)。
+  /// 基本走力と上限の欄をどちらも変えていないときは見ない
+  /// (開いたままの値は、目盛りの値に直すときの端数で1だけずれることがあるため)
+  bool _kihonJoukaiMujun(int kihon, int joukai) {
+    if (kihon == _kihonShokiti && joukai == _joukaiShokiti) return false;
+    return kihon < joukai;
+  }
+
+  /// 基本走力が上限より小さい(速い)入力のあいだ、上限の欄の下に出す注意(1.8.5)
+  Widget _buildMujunChuui() {
+    final int? kihon = int.tryParse(_baseAbilityAController.text.trim());
+    final int? joukai = int.tryParse(_joukaiController.text.trim());
+    if (kihon == null || joukai == null || !_kihonJoukaiMujun(kihon, joukai)) {
+      return const SizedBox.shrink();
     }
-    return oldMagicNumber > kihonMagicNumber
-        ? kihonMagicNumber - 25.0
-        : oldMagicNumber;
+    return const Padding(
+      padding: EdgeInsets.only(bottom: 8.0),
+      child: Text(
+        '基本走力が上限より小さく(速く)なっています。このままでは保存できません。',
+        style: TextStyle(
+          color: Colors.redAccent,
+          fontSize: HENSUU.fontsize_honbun - 2,
+        ),
+      ),
+    );
   }
 
   /// 説明書きの行(1.8.5)
@@ -202,9 +216,11 @@ class _SenshuEditViewState extends State<SenshuEditView> {
     ).get('KantokuData');
     final SenshuData senshu = _editingSenshu!;
     // 上限に届いたときの基本走力(保存したときの上限)
-    final int? joukaiKihon = (kihon == null || joukai == null)
+    // (基本走力が上限より速い入力のあいだは保存できないので「−」にする)
+    final int? joukaiKihon =
+        (kihon == null || joukai == null || _kihonJoukaiMujun(kihon, joukai))
         ? null
-        : joukaiHyouji(_hozonJoukaiMagicnumber(kihon, joukai));
+        : joukaiHyouji(_hozonJoukaiMagicnumber(joukai));
 
     String timeMojiretsu(int? kihonHyouji, double kyori) {
       if (kihonHyouji == null ||
@@ -366,6 +382,15 @@ class _SenshuEditViewState extends State<SenshuEditView> {
       }
     }
 
+    // 基本走力は上限より小さく(速く)できない(1.8.5)
+    if (_kihonJoukaiMujun(
+      int.parse(_baseAbilityAController.text.trim()),
+      int.parse(_joukaiController.text.trim()),
+    )) {
+      _showErrorSnackBar('基本走力は上限と同じか、それより大きい値にしてください(上限より速くはなれません)');
+      return false;
+    }
+
     if (_selectedMenu == null) {
       _showErrorSnackBar('年間強化練習メニューを選択してください');
       return false;
@@ -393,8 +418,7 @@ class _SenshuEditViewState extends State<SenshuEditView> {
 
     // 基本走力の上限(1.8.5で、素質の代わりに上限を編集できるようにした)
     double newMagicNumber = _hozonJoukaiMagicnumber(
-      int.parse(_baseAbilityAController.text),
-      int.parse(_joukaiController.text),
+      int.parse(_joukaiController.text.trim()),
     );
 
     double originalA = aIntInput * 0.000000001;
@@ -537,10 +561,11 @@ class _SenshuEditViewState extends State<SenshuEditView> {
               ),
               _buildNumberInputField('基本走力', _baseAbilityAController, 0, 6000),
               _buildNumberInputField('上限', _joukaiController, 0, 6000),
+              _buildMujunChuui(),
               _buildSetsumei(const [
                 '・上限: 基本走力が伸びていく先の値です(小さいほど速い)。',
                 '・基本走力が上限に届くと、育成のたびに限界突破の判定があり、成功すると上限が少し小さくなります。',
-                '・保存するとき、上限は基本走力より少し小さい値までにそろえます(上限の編集で選手が遅くならないように)。',
+                '・基本走力は上限より小さく(速く)できません。もっと速くしたいときは、上限も小さくしてください。',
                 '・選手を遅くしたいときは、基本走力と上限の両方を大きくしてください。',
               ]),
               const Divider(color: Colors.white24, height: 32),

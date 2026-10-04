@@ -57,8 +57,8 @@ List<SetsumeishoGroup> setsumeishoGroupList() {
       SetsumeishoKoumoku(shiyouMochiTime(setsumeisho: true)),
       SetsumeishoKoumoku(shiyouSuuchi(setsumeisho: true)),
     ]),
-    SetsumeishoGroup('金銀と名声', [
-      SetsumeishoKoumoku(shiyouKinGin(setsumeisho: true)),
+    SetsumeishoGroup('育成と名声', [
+      SetsumeishoKoumoku(shiyouIkusei(setsumeisho: true)),
       SetsumeishoKoumoku(
         shiyouMeisei(setsumeisho: true),
         zuSetsumei: '参考資料: 各大会での獲得名声初期値一覧(目標順位1位の場合)',

@@ -4,6 +4,7 @@ import 'package:two_dimensional_scrollables/two_dimensional_scrollables.dart';
 import 'package:auto_size_text/auto_size_text.dart';
 import 'package:hive/hive.dart';
 import 'package:ekiden/ghensuu.dart';
+import 'package:ekiden/kantoku_data.dart'; // 年間強化練習の効果の大きさ(1.8.4)
 import 'package:ekiden/constants.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/senshu_data.dart';
@@ -238,9 +239,17 @@ class _KonkiSeisekiHyou {
 
   // 共有やコピーのときに付ける注意書き
   String chuuiBun() {
+    // 年間強化練習の効果の大きさ(KantokuData.yobiint2[16]。0は効果なし。1.8.4)
+    final KantokuData? kantoku = Hive.box<KantokuData>(
+      'kantokuBox',
+    ).get('KantokuData');
+    final bool kyoukaNashi =
+        kantoku != null &&
+        kantoku.yobiint2.length > 16 &&
+        kantoku.yobiint2[16] == 0;
     String bun =
         '※能力値は1〜99で、数値が大きいほど優れています。「??」はまだ判明していない能力のため、値を推測しないでください。\n'
-        '※年間強化は、レース時に対応する能力を一時的に上乗せするもので、表の能力値そのものは変わりません（バランス：平均的に上乗せ、スピード：スパート力とペース変動対応力、距離走：長距離粘りとロード適性、登り：登り適性、下り：下り適性、アップダウン：アップダウン対応力）。\n'
+        '${kyoukaNashi ? '※年間強化は、このデータでは効果がありません(表の能力値にもレースにも影響しません)。\n' : '※年間強化は、レース時に対応する能力を一時的に上乗せするもので、表の能力値そのものは変わりません（バランス：平均的に上乗せ、スピード：スパート力とペース変動対応力、距離走：長距離粘りとロード適性、登り：登り適性、下り：下り適性、アップダウン：アップダウン対応力）。上乗せが表れるのは、その能力が効く区間・種目だけです(例: 登りは登りの多い区間でだけ効きます)。\n'}'
         '※安定感は、調子を決めるときの最低保証値になる能力です(当日の突発的な体調不良は除く)。\n'
         '※タイムは「分:秒」です(例: 60:43は1時間0分43秒)。\n'
         '※タイムが「---」で順位が空欄の種目は、今季まだ走っていないことを表します(遅いという意味ではありません)。\n'

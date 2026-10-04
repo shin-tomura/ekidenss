@@ -364,7 +364,7 @@ class AiCopyMatomeButton extends StatelessWidget {
     list.add(
       _AiCopyKoumoku(
         'ゲームの仕様(生成AI向け)',
-        '能力の意味と効く場面・持ちタイムの読み方・目標順位と指示などの決まり。会話の最初に一度渡すと、相談の精度が上がる',
+        '能力の意味と効く場面・持ちタイムの読み方・目標順位と指示・育成と名声などの決まり。会話の最初に一度渡すと、相談の精度が上がる',
         Icons.menu_book,
         () => gameShiyouText(),
       ),

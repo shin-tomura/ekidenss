@@ -2,6 +2,8 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ekiden/ghensuu.dart';
 import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/album.dart';
+import 'package:ekiden/univ_data.dart';
+import 'package:ekiden/screens/Modal_courseshoukai.dart'; // カスタム駅伝の名前(courseRaceTitle)
 import 'package:ekiden/kansuu/nouryoku_eikyodo.dart';
 import 'package:ekiden/kansuu/mokuhyou_hosei.dart';
 
@@ -14,9 +16,11 @@ import 'package:ekiden/kansuu/mokuhyou_hosei.dart';
 // ・setsumeisho: true のときだけ出す行は、プレイヤーへの案内(設定タブの設定や画面の場所など)。
 //   生成AI向けには、設定の名前や値は書かない。
 //   また、生成AIが自分のことと読み違えないように、生成AI向けでは「あなた」を「プレイヤー」と書く。
-// ・計算式や内部の係数は書かない。仕組みそのものがなくなる設定(0%)のときだけ、その部分の文を書き換える
-//   (能力のタイムへの影響度、目標順位・指示の補正設定、調子のタイムへの影響度)。
+// ・計算式や内部の係数は書かない。仕組みそのものがなくなる・減る設定のときだけ、その部分の文を書き換える
+//   (能力のタイムへの影響度・目標順位と指示の補正設定・調子のタイムへの影響度が0%、
+//    年間強化練習の効果が0、難易度モードの「極」「天」、コンピュータの大学の金銀使用がオフ。1.8.4で後ろの3つを足した)。
 //   学連選抜モチベーション低下補正は、初期値が「補正なし」なので、補正をかけているときだけ文を足す。
+// ・獲得名声は、このデータでの量(倍率を掛けた量)を一覧で書く(目標順位相談セットの金銀と同じ考え方。1.8.4)。
 // ・目標順位を決める画面の説明で仕様を変えたら、ここも直す(CLAUDE.mdにも書いてある)
 // ------------------------------------------------------------
 
@@ -40,6 +44,11 @@ String gameShiyouText() {
     '以下は説明書に書かれている仕様を、相談のためにまとめたものです。計算式の細部はここには書いていないので、'
     'ここにないことを推測で答えるときは、推測であることを伝えてください。',
   );
+  // 一般的な育成ゲームの感覚で「基本走力を鍛える」などと答えないように(1.8.4)
+  sb.writeln(
+    '総監督(プレイヤー)ができることは、エントリー・区間配置・目標順位・レース中の指示・新入生スカウト・年間強化練習の選択・夏合宿の金特訓と銀特訓などに限られます。選手の基本走力は自動で成長します。',
+  );
+  sb.writeln('設定で変わる部分は、このデータの今の設定に合わせて書いています。');
   sb.writeln('');
   for (final ShiyouSetsu setsu in [
     shiyouSuuchi(),
@@ -50,7 +59,7 @@ String gameShiyouText() {
     shiyouShuudansou(),
     shiyouMokuhyou(),
     shiyouSiji(),
-    shiyouKinGin(),
+    shiyouIkusei(),
     shiyouMeisei(),
     shiyouGakuren(),
   ]) {
@@ -130,7 +139,7 @@ ShiyouSetsu shiyouNouryoku({bool setsumeisho = false}) {
   final KantokuData? kantoku = _kantoku();
   final List<String> gyou = [
     '・基本走力: 走力の基本となる能力で、すべてのタイムのもとになります。春と夏の2回成長します。',
-    '・基本走力は、選手の能力を見抜く力がついても見えず、金銀も使えません。',
+    '・基本走力は、選手の能力を見抜く力がついても見えません。金銀の特訓でも上げられません。',
     ..._chousiGyou(kantoku, setsumeisho),
     '・安定感: 調子を決めるときの最低保証値です(当日の突発的な体調不良を除く)。',
     '・駅伝男: スタート直後の飛び出しと前半突っ込みの指示の成功確率に直結します。',
@@ -163,10 +172,11 @@ ShiyouSetsu shiyouNouryoku({bool setsumeisho = false}) {
       '・ペース変動対応力: 駅伝の1区と11月駅伝予選でよく効きます。駅伝の2区と3区、正月駅伝予選では少し効き、駅伝の4区以降では効きません。',
       '・ペース変動対応力は、5千・1万(トラック)の持ちタイムに関係し、クロカン1万にも少し関係します。',
     ]),
-    '・駅伝男からペース変動対応力までの能力は、金銀を使った特訓をしない限り、入学から卒業まで変わりません。',
-    setsumeisho
-        ? '・選手ごとの練習メニュー(年間強化練習)と、大学画面の「大学の個性(実力発揮度)設定」によって、レースでの能力の効き方が変わります。'
-        : '・選手ごとの練習メニュー(年間強化練習)と、大学の個性(実力発揮度)によって、レースでの能力の効き方が変わります。',
+    // 「金銀を使えない」「能力値は不動」と読み違えないように書く(1.8.4)
+    _nanidoMode(kantoku) == 2
+        ? '・駅伝男からペース変動対応力までの能力は自然には変わりません。${_konoData(setsumeisho)}、金銀が支給されないので、入学から卒業まで変わりません。'
+        : '・駅伝男からペース変動対応力までの能力は自然には変わりませんが、夏合宿の金特訓・銀特訓で上げられます。',
+    _kouseiGyou(kantoku, setsumeisho),
   ];
   if (setsumeisho) {
     gyou.addAll([
@@ -223,8 +233,14 @@ ShiyouSetsu shiyouMokuhyou({bool setsumeisho = false}) {
     '・駅伝の目標順位は総監督(${_anata(setsumeisho)})が決めます。',
     '・対校戦は常に8位、11月駅伝予選は常に7位、正月駅伝予選は常に10位が目標順位です。',
     '・正月駅伝では、復路のスタート前に目標順位を決め直せます。',
-    '・目標順位を達成すると金銀がもらえ、総監督の能力が覚醒して、選手の能力を見抜く力がつくことがあります。',
-    '・目標順位が高いほど、達成したときにもらえる金銀は多くなります。',
+    // 難易度モードの「極」「天」では、目標順位を達成しても金銀はもらえない(1.8.4)
+    if (_nanidoMode(kantoku) == 0) ...[
+      '・目標順位を達成すると金銀がもらえ、総監督の能力が覚醒して、選手の能力を見抜く力がつくことがあります。',
+      '・目標順位が高いほど、達成したときにもらえる金銀は多くなります。',
+    ] else ...[
+      '・目標順位を達成すると、総監督の能力が覚醒して、選手の能力を見抜く力がつくことがあります。',
+      '・$kd、目標順位を達成しても金銀はもらえません。',
+    ],
   ];
   if (nashi(hoseiTsuyosaShitamawariIndex)) {
     gyou.add('・$kd、目標順位を下回った順位で襷を受けても、タイムは悪化しません。');
@@ -311,42 +327,85 @@ ShiyouSetsu shiyouSiji({bool setsumeisho = false}) {
   return ShiyouSetsu('レース中の指示', gyou);
 }
 
-/// 金と銀
-ShiyouSetsu shiyouKinGin({bool setsumeisho = false}) {
+/// 育成(年間強化練習と金銀)
+/// 1.8.3までの「金と銀」を広げた(1.8.4)。基本走力は直接上げられないこと、
+/// 年間強化練習は見た目の能力値を変えないこと、金特訓・銀特訓で上がる能力を書く
+ShiyouSetsu shiyouIkusei({bool setsumeisho = false}) {
+  final KantokuData? kantoku = _kantoku();
+  final String kd = _konoData(setsumeisho);
+  final int mode = _nanidoMode(kantoku);
   final List<String> gyou = [
-    '・金銀は、夏合宿で選手の能力を伸ばす金特訓・銀特訓に使います。',
-    '・春の定期支給と、チームの目標順位を達成したときの支給があります。',
-    '・春の定期支給の額は、次の成績で決まります(上ほど多い)。',
-    '　・三冠',
-    '　・駅伝か対校戦で優勝',
-    '　・駅伝すべてで3位以内',
-    '　・駅伝か対校戦のどれかで3位以内',
-    '　・対校戦8位以内、10月駅伝5位以内、11月駅伝8位以内、正月駅伝10位以内のどれか',
-    '　・11月駅伝予選突破か正月駅伝予選突破',
-    '　・上のどれも達成していない(最低額)',
-    '・コンピュータの大学も金銀を獲得し、夏合宿で選手の能力強化に使います。',
+    '・基本走力は、春と夏の2回、自動で成長します。総監督が直接上げる方法はありません。',
   ];
-  if (setsumeisho) {
-    gyou.add('・コンピュータの大学の金銀の使い方は、大学画面の「コンピュータ金銀使用」で設定できます。');
+  // 年間強化練習(効果が0のときは、効果がないことを書く)
+  if (_kyoukaKyoudo(kantoku) == 0) {
+    gyou.add('・年間強化練習: 選手ごとに1年間の練習メニューを決めます。$kd、年間強化練習の効果はありません。');
+  } else {
+    gyou.addAll([
+      '・年間強化練習: 選手ごとに1年間の練習メニューを決めます。見た目の能力値は変わらず、レースのときだけ、メニューに対応する能力に上乗せされます。',
+      '　・メニュー: バランス(全体に平均的)・スピード(スパート力とペース変動対応力)・距離走(長距離粘りとロード適性)・登り・下り・アップダウン',
+      '　・上乗せが表れるのは、その能力が効く区間・種目だけです(例: 登りのメニューは、登りの多い区間でだけ効きます)。',
+    ]);
   }
-  return ShiyouSetsu('金と銀', gyou);
+  // 金特訓・銀特訓(画面に出ている決まり)
+  gyou.addAll([
+    '・夏合宿の金特訓・銀特訓: 金銀を10使うごとに、能力値が10上がります(90以上になった能力は、それ以上上げられません。カリスマは除く)。',
+    '　・金特訓: 駅伝男・平常心・安定感',
+    '　・銀特訓: 長距離粘り・スパート力・カリスマ・登り適性・下り適性・アップダウン対応力・ロード適性・ペース変動対応力',
+  ]);
+  // 金銀の支給(難易度モードの「極」は春の定期支給だけ、「天」は支給なし)
+  if (mode == 2) {
+    gyou.add('・$kd、金銀は支給されないので、金特訓・銀特訓はできません。');
+  } else {
+    gyou.add(
+      mode == 1
+          ? '・$kd、金銀は春の定期支給だけです(目標順位を達成してももらえません)。'
+          : '・金銀は、春の定期支給と、チームの目標順位を達成したときにもらえます。',
+    );
+    gyou.addAll([
+      '・春の定期支給の額は、次の成績で決まります(上ほど多い)。',
+      '　・三冠',
+      '　・駅伝か対校戦で優勝',
+      '　・駅伝すべてで3位以内',
+      '　・駅伝か対校戦のどれかで3位以内',
+      '　・対校戦8位以内、10月駅伝5位以内、11月駅伝8位以内、正月駅伝10位以内のどれか',
+      '　・11月駅伝予選突破か正月駅伝予選突破',
+      '　・上のどれも達成していない(最低額)',
+    ]);
+  }
+  // コンピュータの大学の金銀使用(オフのときは使わない)
+  gyou.add(
+    _comKinginOff(kantoku)
+        ? '・$kd、コンピュータの大学は金銀を使いません。'
+        : '・コンピュータの大学も金銀を獲得し、夏合宿で選手の能力強化に使います。',
+  );
+  if (setsumeisho) {
+    gyou.addAll([
+      '・金銀の支給量は、大学画面の「難易度変更」「難易度「極」「天」設定」と、設定タブの「金銀支給量倍率設定」で変えられます。',
+      '・年間強化練習の効果の大きさは、設定タブの「年間強化練習効果設定」で変えられます。',
+      '・コンピュータの大学の金銀の使い方は、大学画面の「コンピュータ金銀使用」で設定できます。',
+    ]);
+  }
+  return ShiyouSetsu('育成(年間強化練習と金銀)', gyou);
 }
 
 /// 名声
 ShiyouSetsu shiyouMeisei({bool setsumeisho = false}) {
   final List<String> gyou = [
-    '・各大学は、過去10年の成績から決まる名声を持っています。',
+    '・各大学の名声は、過去10年に得た名声の合計です。',
     '・名声が高いほど、有力な新入生が入学しやすくなります。',
     '・コンピュータスカウトがONのときは、名声は新入生スカウトの次のことにも影響します。',
     '　・交渉の成功率',
     '　・同じ選手に複数の大学が交渉に成功したときの抽選',
     '　・交渉で決まらなかった選手が、自ら志望して進学先を選ぶときの選ばれやすさ',
+    ..._kakutokuMeiseiGyou(setsumeisho),
     '・目標順位と名声の関係は、「チームの目標順位」に書いています。',
   ];
   if (setsumeisho) {
     gyou.addAll([
+      '・駅伝で得られる名声の倍率は、大学画面の「駅伝名声設定」で変えられます(カスタム駅伝は、設定タブの「カスタム駅伝設定」)。',
       '・コンピュータスカウトの詳しいことは、大学画面の「コンピュータスカウト」の説明をご覧ください。',
-      '・各大会で得られる名声の初期値は、下の参考資料の表をご覧ください。',
+      '・下の参考資料の表は、倍率を変えていないとき(初期値)の量です。',
     ]);
   }
   return ShiyouSetsu('名声', gyou);
@@ -431,6 +490,123 @@ const String _karisumaDouchiGyou =
 // 駅伝予選には経験補正と調子がないこと(経験補正と、駅伝予選の決まりで使う)
 const String _keikenYosenGyou =
     '・駅伝予選(11月駅伝予選・正月駅伝予選)には、経験補正はありません。調子も関係しません。';
+
+// 難易度モード(0: 通常、1: 極(春の定期支給だけ)、2: 天(金銀の支給なし))。KantokuData.yobiint2[0]
+int _nanidoMode(KantokuData? kantoku) {
+  if (kantoku == null || kantoku.yobiint2.isEmpty) return 0;
+  final int mode = kantoku.yobiint2[0];
+  return (mode == 1 || mode == 2) ? mode : 0;
+}
+
+// 年間強化練習の効果の大きさ(0〜5。0は効果なし)。KantokuData.yobiint2[16]
+int _kyoukaKyoudo(KantokuData? kantoku) {
+  if (kantoku == null || kantoku.yobiint2.length <= 16) return 4;
+  return kantoku.yobiint2[16];
+}
+
+// コンピュータの大学の金銀使用がオフか(KantokuData.yobiint2[33]。0=オン(初期値)、1=オフ)
+bool _comKinginOff(KantokuData? kantoku) =>
+    kantoku != null &&
+    kantoku.yobiint2.length > 33 &&
+    kantoku.yobiint2[33] == 1;
+
+// 練習メニューと大学の個性の行(年間強化練習の効果が0のときは、大学の個性だけ)
+String _kouseiGyou(KantokuData? kantoku, bool setsumeisho) {
+  final String kosei = setsumeisho
+      ? '大学画面の「大学の個性(実力発揮度)設定」'
+      : '大学の個性(実力発揮度)';
+  if (_kyoukaKyoudo(kantoku) == 0) {
+    return '・$koseiによって、レースでの能力の効き方が変わります。';
+  }
+  return '・選手ごとの練習メニュー(年間強化練習)と、$koseiによって、レースでの能力の効き方が変わります。';
+}
+
+// 獲得名声の一覧(このデータでの量。目標順位1位のとき)。1.8.4
+// 順位ごとの基本の量と計算は、KirokuKousin.dart の名声加算と同じ
+// (駅伝: 基本の量×「駅伝名声設定」の倍率÷目標順位。区間賞: 1位の量×0.2×倍率で、目標順位で割らない。
+//  カスタム駅伝: 正月駅伝の量×正月駅伝の倍率×カスタム駅伝の倍率。対校戦は倍率なし・目標順位で割らない。駅伝予選はなし)
+const List<int> _meisei10gatsu = [500, 250, 200, 90, 80, 24, 23, 22, 21, 20];
+const List<int> _meisei11gatsu = [
+  500, 250, 200, 90, 80, 70, 60, 50, 20, 20, 20, 20, 20, 20, 20, //
+];
+const List<int> _meiseiShougatsu = [
+  2000, 1000, 800, 360, 320, 280, 240, 200, 160, 120, //
+  50, 50, 50, 50, 50, 50, 50, 50, 50, 50, //
+];
+const List<int> _meiseiTaikousenSougou = [1000, 500, 400, 180, 160, 140, 120, 100];
+const List<int> _meiseiTaikousenKojin = [100, 50, 40, 18, 16, 14, 12, 10];
+
+List<String> _kakutokuMeiseiGyou(bool setsumeisho) {
+  final Ghensuu? gh = Hive.box<Ghensuu>('ghensuuBox').getAt(0);
+  final Map<int, UnivData> univ = {
+    for (final UnivData u in Hive.box<UnivData>('univBox').values) u.id: u,
+  };
+  // 「駅伝名声設定」の倍率(分子と分母は1〜10。範囲外は1。KirokuKousin.dart と同じ読み方)
+  int yomu(int id) {
+    final int? v = int.tryParse(univ[id]?.name_tanshuku ?? '');
+    return (v == null || v < 1 || v > 10) ? 1 : v;
+  }
+
+  double bairitu(int bunsiId, int bunboId) =>
+      yomu(bunsiId).toDouble() / yomu(bunboId).toDouble();
+  final double b10 = bairitu(1, 2);
+  final double b11 = bairitu(3, 4);
+  final double b01 = bairitu(5, 6);
+
+  // 目標順位1位のときの量(KirokuKousin.dart と同じく、小数を切り捨てて最低1)
+  int ryou(double r) => r.toInt() < 1 ? 1 : r.toInt();
+  List<int> kakeru(List<int> kihon, double b) => [
+    for (final int k in kihon) ryou(k.toDouble() * b),
+  ];
+
+  final List<String> gyou = [
+    '・${_konoData(setsumeisho)}、駅伝の総合順位で得られる名声は次のとおりです(目標順位1位のとき。実際は目標順位で割った量になります)。',
+    '　・10月駅伝: ${_juniRetsu(kakeru(_meisei10gatsu, b10))}',
+    '　・11月駅伝: ${_juniRetsu(kakeru(_meisei11gatsu, b11))}',
+    '　・正月駅伝: ${_juniRetsu(kakeru(_meiseiShougatsu, b01))}',
+  ];
+  final List<String> kukanshou = [
+    '10月駅伝${(500.toDouble() * 0.2 * b10).toInt()}',
+    '11月駅伝${(500.toDouble() * 0.2 * b11).toInt()}',
+    '正月駅伝${(2000.toDouble() * 0.2 * b01).toInt()}',
+  ];
+  // カスタム駅伝(開催する設定のときだけ。倍率は「カスタム駅伝設定」の獲得名声倍率)
+  if (gh != null &&
+      gh.spurtryokuseichousisuu1 == 1 &&
+      gh.spurtryokuseichousisuu5 >= 1) {
+    final double bc =
+        gh.spurtryokuseichousisuu4.toDouble() /
+        gh.spurtryokuseichousisuu5.toDouble();
+    final String mei = courseRaceTitle(5);
+    gyou.add(
+      '　・$mei: ${_juniRetsu([for (final int k in _meiseiShougatsu) ryou(b01 * k.toDouble() * bc)])}',
+    );
+    kukanshou.add('$mei${(0.2 * 2000.toDouble() * b01 * bc).toInt()}');
+  }
+  gyou.addAll([
+    '・区間賞は1区間につき、${kukanshou.join('、')}です(目標順位と関係ありません)。',
+    '・対校戦で得られる名声は次のとおりです(目標順位と関係ありません)。',
+    '　・総合: ${_juniRetsu(_meiseiTaikousenSougou)}',
+    '　・種目(5000m・10000m・ハーフ)ごとの個人: ${_juniRetsu(_meiseiTaikousenKojin)}',
+    '・駅伝予選の順位では、名声は得られません。',
+  ]);
+  return gyou;
+}
+
+// 順位ごとの量を「1位500、2位250、…、9〜15位20」の形にする(同じ量が続くところはまとめる)
+String _juniRetsu(List<int> ryou) {
+  final List<String> list = [];
+  int i = 0;
+  while (i < ryou.length) {
+    int j = i;
+    while (j + 1 < ryou.length && ryou[j + 1] == ryou[i]) {
+      j++;
+    }
+    list.add(i == j ? '${i + 1}位${ryou[i]}' : '${i + 1}〜${j + 1}位${ryou[i]}');
+    i = j + 1;
+  }
+  return list.join('、');
+}
 
 // 一次エントリーの人数(区間数が6以下なら8人、8以下なら13人、それより多いと16人。
 // 一次エントリーの画面(mode0150_content.dart)と同じ決まり)

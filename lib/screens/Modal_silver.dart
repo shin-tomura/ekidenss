@@ -276,9 +276,10 @@ class _ModalTokkunSilverState extends State<ModalTokkunSilver> {
                                       }
                                     : null, // 条件を満たさない場合はボタンを無効化
                                 style: ElevatedButton.styleFrom(
+                                  // カリスマは99まで押せる(100を超えて伸ばせるのは意図どおり)ので、色も押せる条件と揃える(1.8.6)
                                   backgroundColor:
                                       (currentGhensuu.silverballsuu >= 10 &&
-                                          targetSenshu.karisuma <= 89)
+                                          targetSenshu.karisuma <= 99)
                                       ? Colors.green
                                       : Colors.grey, // 無効時はグレー
                                   foregroundColor: Colors.black,

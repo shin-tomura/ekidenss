@@ -10,26 +10,15 @@ import 'package:ekiden/kansuu/time_date.dart';
 // 自分の大学のレース経過のテキスト(1.8.2)
 // レース画面の「自分の大学のレース経過をコピー」と、生成AIに渡すテキストのまとめボタンで使う。
 // 目標順位による悪化の文には根拠を付けない(1.8.3。根拠は走った時点で記録した補正の説明に出る)
+// 結果分析([分析])は出さない(1.8.4。その区間を走った選手の中だけの相対値で、選手全体の評価や
+// ほかの区間との比較と読み違えやすく、見抜く力がついていない能力の手がかりにもなるため。
+// 秒数での内訳は補正の説明にある)
 // ------------------------------------------------------------
 
 /// 自分の大学のレース経過のテキスト(生成AIに渡して実況や相談を楽しむためのコピー用)
 /// レース画面の「直近区間」「ここまでの全区間」と同じ内容(指示の内容と結果、補正の説明)に、
-/// 順位・タイム差・結果分析と、まだ走っていない区間の選手を加える
+/// 順位・タイム差と、まだ走っていない区間の選手を加える
 String jibunRaceKeikaText(Ghensuu currentGhensuu) {
-  const List<String> bunsekiKoumoku = [
-    '調子',
-    'メンタル',
-    '集団走(1区)',
-    '基本走力',
-    '登り',
-    '下り',
-    'アップダウン',
-    '経験',
-    'ロード適性',
-    'ペース変動',
-    '長距離粘り',
-    'スパート力',
-  ];
   const List<String> kekka = ["失敗", "成功"];
   final int race = currentGhensuu.hyojiracebangou;
   final List<UnivData> univs = Hive.box<UnivData>('univBox').values.toList()
@@ -91,7 +80,7 @@ String jibunRaceKeikaText(Ghensuu currentGhensuu) {
     '※※※陸上競技のタイム計算に関係することなので、【数値が小さいほど優秀】と捉えてください。(「プラス」は悪い数値、「マイナス」は良い数値。ただし、項目によっては仕様上「プラスの数値」しか出ないものもあります。その場合は「いかにプラスの数値を小さく（0に近く）抑えられたか」を高く評価してください。)※※※\n',
   );
   sb.write(
-    '※[分析]は、各項目が走破タイムに与えた影響度を相対値で示しています。マイナスの数値は平均よりタイムを短縮させた好影響、プラスの数値はタイムを悪化させた悪影響を表します。\n',
+    '※[補正の説明]の「○位」は、その${kumi ? '組' : '区間'}を走った選手の中での順位です(選手全体の中での順位ではありません)。\n',
   );
   sb.writeln('【$raceMei ${my.name}大学 レース経過】');
   sb.writeln('目標順位:${mokuhyou + 1}位');
@@ -147,7 +136,7 @@ String jibunRaceKeikaText(Ghensuu currentGhensuu) {
       saList.add('シード権(${seed + 1}位)との差:${saBun(tuuka - times[seed])}');
     }
     if (saList.isNotEmpty) sb.writeln('  (${saList.join('、')})');
-    // 走った選手ごとの指示の内容と結果、補正の説明、結果分析(画面と同じ決まり)
+    // 走った選手ごとの指示の内容と結果、補正の説明(画面と同じ決まり。結果分析は出さない。1.8.4)
     for (final SenshuData x in hashiru) {
       if (hashiru.length > 1 || kumi) sb.writeln('  ${x.name}(${x.gakunen}年)');
       if (kumi) {
@@ -185,14 +174,6 @@ String jibunRaceKeikaText(Ghensuu currentGhensuu) {
         )) {
           sb.writeln('   $gyou');
         }
-      }
-      if (x.racechuukakuseiflag != 0) {
-        final List<String> bunseki = [];
-        for (int i = 0; i < bunsekiKoumoku.length; i++) {
-          final int score = ((x.racechuukakuseiflag >> (i * 4)) & 0xF) - 7;
-          bunseki.add('${bunsekiKoumoku[i]}:${score > 0 ? '+' : ''}$score');
-        }
-        sb.writeln('  [分析] ${bunseki.join(' ')}');
       }
     }
     sb.writeln("-----------------------------------");

@@ -12,6 +12,9 @@ import 'package:ekiden/constants.dart'; // TEISUUクラスをインポート
 /// [sortedunivdata]: ID順にソートされた大学データのリスト。
 /// [sortedsenshudata]: ID順にソートされた選手データのリスト。
 /// [gakunen]: 育成対象の学年。
+/// [shozokuKetteiMae]: 新規ゲーム開始時に、所属先を決める前の2〜4年生を育成するときはtrue(1.8.4)。
+///   所属先が決まっていないので、大学の育成力は全員150(最大・初期値)とし、
+///   ondoflagによるほかの大学の選手の底上げもしない(新規ゲーム開始時はondoflagは0)。
 ///
 /// この関数は、渡されたリスト内のSenshuDataオブジェクトのプロパティを変更します。
 /// 変更を永続化するには、この関数を呼び出した後にHive Boxに保存し直す必要があります。
@@ -31,6 +34,7 @@ Future<void> Ikusei_Com({
   required List<UnivData> sortedunivdata,
   required List<SenshuData> sortedsenshudata,
   required int gakunen,
+  bool shozokuKetteiMae = false,
 }) async {
   final startTime = DateTime.now();
   print("Ikusei_Comに入った");
@@ -143,8 +147,14 @@ Future<void> Ikusei_Com({
         }
       }*/
 
+      // 大学の育成力(所属先を決める前の育成では、全員150。1.8.4)
+      final int ikuseiryoku = shozokuKetteiMae
+          ? 150
+          : sortedunivdata[sortedsenshudata[senshuid].univid].ikuseiryoku;
+
       //ここで、ondoflagを使った他の大学の選手の底上げ処理
-      if (sortedsenshudata[senshuid].univid != gh[0].MYunivid) {
+      if (!shozokuKetteiMae &&
+          sortedsenshudata[senshuid].univid != gh[0].MYunivid) {
         if (sortedsenshudata[senshuid].choukyorinebari < gh[0].ondoflag * 10) {
           sortedsenshudata[senshuid].choukyorinebari =
               gh[0].ondoflag * 10 + _random.nextInt(10);
@@ -200,17 +210,13 @@ Future<void> Ikusei_Com({
           // 大学の育成力と素質ボーナスに基づいた乱数生成
           // Swift: Int.random(in: 0...(sortedunivdata[sortedsenshudata[senshuid].univid].ikuseiryoku+sositu))
           // Dart: _random.nextInt(max_value + 1)
-          int ikusei_rand_max =
-              sortedunivdata[sortedsenshudata[senshuid].univid].ikuseiryoku +
-              sositu;
+          int ikusei_rand_max = ikuseiryoku + sositu;
           int randseisuu = _random.nextInt(
             ikusei_rand_max + 1,
           ); // 0からikusei_rand_maxまで
 
           int motomotoseisuu = 0;
-          motomotoseisuu =
-              sortedunivdata[sortedsenshudata[senshuid].univid].ikuseiryoku +
-              sositu;
+          motomotoseisuu = ikuseiryoku + sositu;
 
           temp_seichou = (chouseisisuu * randseisuu).toInt() + motomotoseisuu;
 
@@ -223,9 +229,7 @@ Future<void> Ikusei_Com({
 
           ///////ここで各大学の育成力による調整/////
           double ikuseiryokuchousei = 0.0;
-          ikuseiryokuchousei =
-              sortedunivdata[sortedsenshudata[senshuid].univid].ikuseiryoku /
-              150.0;
+          ikuseiryokuchousei = ikuseiryoku / 150.0;
           temp_seichou = (temp_seichou.toDouble() * ikuseiryokuchousei).toInt();
           ////////////////////////////////////
           ///

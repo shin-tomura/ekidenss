@@ -31,8 +31,8 @@ import 'package:ekiden/kansuu/ShoriGuard.dart';
 import 'package:ekiden/kansuu/NameListKoushin.dart';
 import 'package:ekiden/kansuu/SenshuShokiti.dart';
 import 'package:ekiden/kansuu/asset_loader.dart';
-import 'package:ekiden/kansuu/ShozokusakiKettei_By_Univmeisei.dart';
 import 'package:ekiden/kansuu/Ikusei_Com.dart';
+import 'package:ekiden/kansuu/shinki_shozoku.dart';
 import 'package:ekiden/kansuu/EntryCalc.dart';
 import 'package:ekiden/kansuu/Entry1Calc.dart';
 import 'package:ekiden/kansuu/RaceCalc.dart';
@@ -1357,75 +1357,14 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     List<UnivData> sortedUnivsById = _univBox.toMap().values.toList();
     sortedUnivsById.sort((a, b) => a.id.compareTo(b.id));
 
-    // --- 2. nyuugakuji5000SenshuData の準備 ---
-    List<SenshuData> allSenshus = _senshuBox.toMap().values.toList();
-    // 例として、入学時の学年である「1」を指定してフィルタリング・ソート
-    // この `1` は、ShozokusakiKettei_By_Univmeisei に渡す `gakunen` と一致させる必要があります。
+    // --- 2. 2〜4年生を育成してから、全選手の所属先を決める(1.8.4) ---
+    // 1.8.3までは、入学時5000mの記録の順に振り分けてから2〜4年生を育成していたため、
+    // 育成後の強さが名声の順とあまり揃わなかった。2〜4年生は先に育成し(育成力は全員150)、
+    // 育成後の強さの順に名声で振り分ける。1年生は今まで通り入学時5000mの記録の順
+    // (中身は lib/kansuu/shinki_shozoku.dart)
+    await shinkiGameShozokuKettei(ghensuu: ghensuu);
 
-    for (int gakunenToAssign = 1; gakunenToAssign <= 4; gakunenToAssign++) {
-      List<SenshuData> nyuugakujiSenshusSortedByRecord = allSenshus
-          .toList(); // .toList() をすることで、ソート時に元のリストが変更されないようにする
-      nyuugakujiSenshusSortedByRecord.sort(
-        (a, b) => a.kiroku_nyuugakuji_5000.compareTo(b.kiroku_nyuugakuji_5000),
-      );
-
-      //final List<Ghensuu> gh = [_ghensuuBox.getAt(0)!];
-      // --- 3. ShozokusakiKettei_By_Univmeisei の呼び出し ---
-      await ShozokusakiKettei_By_Univmeisei(
-        sortedunivdata: sortedUnivsById, // 引数名を明示
-        nyuugakuji5000_senshudata: nyuugakujiSenshusSortedByRecord, // 引数名を明示
-        gakunen: gakunenToAssign,
-        ghensuu: ghensuu,
-      );
-
-      // --- 4. 変更された選手データをHiveに保存し直す (重要！) ---
-      // ShozokusakiKettei_By_Univmeisei 関数は SenshuData の `univid` を変更するため、
-      // その変更を永続化するためにHive Boxに保存し直す必要があります。
-      for (final senshu in nyuugakujiSenshusSortedByRecord) {
-        await _senshuBox.put(senshu.id, senshu);
-      }
-    }
-    // --- gh (Ghensuu) の準備 ---
-    // ghensuu オブジェクトは引数として既に渡されていますが、
-    // Ikusei_Com が List<Ghensuu> を要求するため、リストに格納します。
-    List<Ghensuu> gh_list = [
-      ghensuu,
-    ]; // あるいは _ghensuuBox.get('global_ghensuu') を取得してリストにする
-
-    // --- sortedunivdata (UnivData) の準備 ---
-    List<UnivData> sortedunivdata_ready = _univBox.toMap().values.toList();
-    sortedunivdata_ready.sort((a, b) => a.id.compareTo(b.id));
-
-    // --- sortedsenshudata (SenshuData) の準備 ---
-    List<SenshuData> sortedsenshudata_ready = _senshuBox
-        .toMap()
-        .values
-        .toList();
-    sortedsenshudata_ready.sort((a, b) => a.id.compareTo(b.id));
-
-    // --- ここから Ikusei_Com の呼び出しループ ---
-    // 例として、(2年から4年) の選手を育成*2回(春と夏の分)
-    for (int i = 0; i < 2; i++) {
-      for (
-        int gakunen_to_process = 2;
-        gakunen_to_process <= 4;
-        gakunen_to_process++
-      ) {
-        print('学年 $gakunen_to_process の選手を育成中...');
-        await Ikusei_Com(
-          gh: gh_list,
-          sortedunivdata: sortedunivdata_ready,
-          sortedsenshudata: sortedsenshudata_ready,
-          gakunen: gakunen_to_process, // 現在処理する学年を渡す
-        );
-        // --- 変更された選手データをHiveに保存し直す (重要！) ---
-        // Ikusei_Com は sortedsenshudata の内容を変更するため、永続化が必要です。
-        // sortedunivdata は変更されないと仮定します。
-        for (final senshu in sortedsenshudata_ready) {
-          await _senshuBox.put(senshu.id, senshu);
-        }
-      }
-    }
+    // 初期の2〜4年生の成長タイプを付け直す(今まで通り)
     for (final entry in _senshuBox.toMap().entries) {
       //final int senshuId = entry.key;
       final SenshuData senshu = entry.value;
@@ -1609,75 +1548,14 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     List<UnivData> sortedUnivsById = _univBox.toMap().values.toList();
     sortedUnivsById.sort((a, b) => a.id.compareTo(b.id));
 
-    // --- 2. nyuugakuji5000SenshuData の準備 ---
-    List<SenshuData> allSenshus = _senshuBox.toMap().values.toList();
-    // 例として、入学時の学年である「1」を指定してフィルタリング・ソート
-    // この `1` は、ShozokusakiKettei_By_Univmeisei に渡す `gakunen` と一致させる必要があります。
+    // --- 2. 2〜4年生を育成してから、全選手の所属先を決める(1.8.4) ---
+    // 1.8.3までは、入学時5000mの記録の順に振り分けてから2〜4年生を育成していたため、
+    // 育成後の強さが名声の順とあまり揃わなかった。2〜4年生は先に育成し(育成力は全員150)、
+    // 育成後の強さの順に名声で振り分ける。1年生は今まで通り入学時5000mの記録の順
+    // (中身は lib/kansuu/shinki_shozoku.dart)
+    await shinkiGameShozokuKettei(ghensuu: ghensuu);
 
-    for (int gakunenToAssign = 1; gakunenToAssign <= 4; gakunenToAssign++) {
-      List<SenshuData> nyuugakujiSenshusSortedByRecord = allSenshus
-          .toList(); // .toList() をすることで、ソート時に元のリストが変更されないようにする
-      nyuugakujiSenshusSortedByRecord.sort(
-        (a, b) => a.kiroku_nyuugakuji_5000.compareTo(b.kiroku_nyuugakuji_5000),
-      );
-
-      final List<Ghensuu> gh = [ghensuu];
-      // --- 3. ShozokusakiKettei_By_Univmeisei の呼び出し ---
-      await ShozokusakiKettei_By_Univmeisei(
-        sortedunivdata: sortedUnivsById, // 引数名を明示
-        nyuugakuji5000_senshudata: nyuugakujiSenshusSortedByRecord, // 引数名を明示
-        gakunen: gakunenToAssign,
-        ghensuu: gh[0],
-      );
-
-      // --- 4. 変更された選手データをHiveに保存し直す (重要！) ---
-      // ShozokusakiKettei_By_Univmeisei 関数は SenshuData の `univid` を変更するため、
-      // その変更を永続化するためにHive Boxに保存し直す必要があります。
-      for (final senshu in nyuugakujiSenshusSortedByRecord) {
-        await _senshuBox.put(senshu.id, senshu);
-      }
-    }
-    // --- gh (Ghensuu) の準備 ---
-    // ghensuu オブジェクトは引数として既に渡されていますが、
-    // Ikusei_Com が List<Ghensuu> を要求するため、リストに格納します。
-    List<Ghensuu> gh_list = [
-      ghensuu,
-    ]; // あるいは _ghensuuBox.get('global_ghensuu') を取得してリストにする
-
-    // --- sortedunivdata (UnivData) の準備 ---
-    List<UnivData> sortedunivdata_ready = _univBox.toMap().values.toList();
-    sortedunivdata_ready.sort((a, b) => a.id.compareTo(b.id));
-
-    // --- sortedsenshudata (SenshuData) の準備 ---
-    List<SenshuData> sortedsenshudata_ready = _senshuBox
-        .toMap()
-        .values
-        .toList();
-    sortedsenshudata_ready.sort((a, b) => a.id.compareTo(b.id));
-
-    // --- ここから Ikusei_Com の呼び出しループ ---
-    // 例として、(2年から4年) の選手を育成*2回(春と夏の分)
-    for (int i = 0; i < 2; i++) {
-      for (
-        int gakunen_to_process = 2;
-        gakunen_to_process <= 4;
-        gakunen_to_process++
-      ) {
-        print('学年 $gakunen_to_process の選手を育成中...');
-        await Ikusei_Com(
-          gh: gh_list,
-          sortedunivdata: sortedunivdata_ready,
-          sortedsenshudata: sortedsenshudata_ready,
-          gakunen: gakunen_to_process, // 現在処理する学年を渡す
-        );
-        // --- 変更された選手データをHiveに保存し直す (重要！) ---
-        // Ikusei_Com は sortedsenshudata の内容を変更するため、永続化が必要です。
-        // sortedunivdata は変更されないと仮定します。
-        for (final senshu in sortedsenshudata_ready) {
-          await _senshuBox.put(senshu.id, senshu);
-        }
-      }
-    }
+    // 初期の2〜4年生の成長タイプを付け直す(今まで通り)
     for (final entry in _senshuBox.toMap().entries) {
       //final int senshuId = entry.key;
       final SenshuData senshu = entry.value;

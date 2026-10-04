@@ -3365,68 +3365,85 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             );
           }
           // アプリに出す4年生卒業直前データ(1.8.7で、入学時5000mの記録ごとと留学生も出すようにした。
-          // これまではコンソールにだけ出していた。1グループを人数と平均の1行・最速の1行にまとめる。
+          // これまではコンソールにだけ出していた。書き方はログと同じ1項目1行で、まとまりの間を1行空ける。
           // 文は toukei_text.dart。留学生は優秀度ごとに分けず、留学生のいる大学の優秀度の内訳を添える)
           sortedUnivsById[12].name_tanshuku += "==4年生卒業直前データ==\n";
           sortedUnivsById[12].name_tanshuku += toukeiGroupBun(
             "日本人",
+            "総数",
             skip.count_jap_all,
             skip.totaltime_jap_all,
             skip.besttime_jap_all,
           );
-          sortedUnivsById[12].name_tanshuku += "\n日本人(入学時5000mの記録別)\n";
-          sortedUnivsById[12].name_tanshuku +=
-              toukeiGroupBun(
-                "13分台入学",
-                skip.count_jap_13pundai,
-                skip.totaltime_jap_13pundai,
-                skip.besttime_jap_13pundai,
-              ) +
-              toukeiGroupBun(
-                "14分00秒台入学",
-                skip.count_jap_14pun00dai,
-                skip.totaltime_jap_14pun00dai,
-                skip.besttime_jap_14pun00dai,
-              ) +
-              toukeiGroupBun(
-                "14分10秒台入学",
-                skip.count_jap_14pun10dai,
-                skip.totaltime_jap_14pun10dai,
-                skip.besttime_jap_14pun10dai,
-              ) +
-              toukeiGroupBun(
-                "14分20秒台入学",
-                skip.count_jap_14pun20dai,
-                skip.totaltime_jap_14pun20dai,
-                skip.besttime_jap_14pun20dai,
-              ) +
-              toukeiGroupBun(
-                "14分30秒台入学",
-                skip.count_jap_14pun30dai,
-                skip.totaltime_jap_14pun30dai,
-                skip.besttime_jap_14pun30dai,
-              ) +
-              toukeiGroupBun(
-                "14分40秒台入学",
-                skip.count_jap_14pun40dai,
-                skip.totaltime_jap_14pun40dai,
-                skip.besttime_jap_14pun40dai,
-              ) +
-              toukeiGroupBun(
-                "14分50秒台入学",
-                skip.count_jap_14pun50dai,
-                skip.totaltime_jap_14pun50dai,
-                skip.besttime_jap_14pun50dai,
-              ) +
-              toukeiGroupBun(
-                "15分台入学",
-                skip.count_jap_15pundai,
-                skip.totaltime_jap_15pundai,
-                skip.besttime_jap_15pundai,
-              );
+          // 入学時5000mの記録の帯ごと(人数の行の名前はログと同じ「サンプル数」)
+          sortedUnivsById[12].name_tanshuku += "\n";
+          sortedUnivsById[12].name_tanshuku += toukeiGroupBun(
+            "13分台入学",
+            "サンプル数",
+            skip.count_jap_13pundai,
+            skip.totaltime_jap_13pundai,
+            skip.besttime_jap_13pundai,
+          );
+          sortedUnivsById[12].name_tanshuku += "\n";
+          sortedUnivsById[12].name_tanshuku += toukeiGroupBun(
+            "14分00秒台入学",
+            "サンプル数",
+            skip.count_jap_14pun00dai,
+            skip.totaltime_jap_14pun00dai,
+            skip.besttime_jap_14pun00dai,
+          );
+          sortedUnivsById[12].name_tanshuku += "\n";
+          sortedUnivsById[12].name_tanshuku += toukeiGroupBun(
+            "14分10秒台入学",
+            "サンプル数",
+            skip.count_jap_14pun10dai,
+            skip.totaltime_jap_14pun10dai,
+            skip.besttime_jap_14pun10dai,
+          );
+          sortedUnivsById[12].name_tanshuku += "\n";
+          sortedUnivsById[12].name_tanshuku += toukeiGroupBun(
+            "14分20秒台入学",
+            "サンプル数",
+            skip.count_jap_14pun20dai,
+            skip.totaltime_jap_14pun20dai,
+            skip.besttime_jap_14pun20dai,
+          );
+          sortedUnivsById[12].name_tanshuku += "\n";
+          sortedUnivsById[12].name_tanshuku += toukeiGroupBun(
+            "14分30秒台入学",
+            "サンプル数",
+            skip.count_jap_14pun30dai,
+            skip.totaltime_jap_14pun30dai,
+            skip.besttime_jap_14pun30dai,
+          );
+          sortedUnivsById[12].name_tanshuku += "\n";
+          sortedUnivsById[12].name_tanshuku += toukeiGroupBun(
+            "14分40秒台入学",
+            "サンプル数",
+            skip.count_jap_14pun40dai,
+            skip.totaltime_jap_14pun40dai,
+            skip.besttime_jap_14pun40dai,
+          );
+          sortedUnivsById[12].name_tanshuku += "\n";
+          sortedUnivsById[12].name_tanshuku += toukeiGroupBun(
+            "14分50秒台入学",
+            "サンプル数",
+            skip.count_jap_14pun50dai,
+            skip.totaltime_jap_14pun50dai,
+            skip.besttime_jap_14pun50dai,
+          );
+          sortedUnivsById[12].name_tanshuku += "\n";
+          sortedUnivsById[12].name_tanshuku += toukeiGroupBun(
+            "15分台入学",
+            "サンプル数",
+            skip.count_jap_15pundai,
+            skip.totaltime_jap_15pundai,
+            skip.besttime_jap_15pundai,
+          );
           sortedUnivsById[12].name_tanshuku += "\n";
           sortedUnivsById[12].name_tanshuku += toukeiGroupBun(
             "留学生",
+            "総数",
             skip.count_ryuugakusei,
             skip.totaltime_ryuugakusei,
             skip.besttime_ryuugakusei,

@@ -7,6 +7,8 @@ import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/constants.dart';
 import 'package:ekiden/kansuu/time_date.dart';
 import 'package:ekiden/kansuu/gakuren_text.dart';
+import 'package:ekiden/kansuu/gakuren_kantoku.dart';
+import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/senshu_gakuren_data.dart';
 import 'package:ekiden/screens/Modal_senshu.dart';
 import 'dart:io';
@@ -231,14 +233,29 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
         if (currentGhensuu == null)
           return const Scaffold(body: Center(child: Text("データエラー")));
 
-        if (_selectedUnivId == null) {
-          _selectedUnivId = widget.targetUnivid;
-        }
-
         final List<UnivData> allUnivs = univdataBox.values.toList()
           ..sort((a, b) => a.id.compareTo(b.id));
         // 学連選抜(OP)を選べるのは、今年の学連選抜がいる正月駅伝のときだけ(1.8.2)
         final bool gakurenAri = gakurenKonnenAri(currentGhensuu);
+
+        if (_selectedUnivId == null) {
+          _selectedUnivId = widget.targetUnivid;
+          // 自分の大学を渡されて開いたときに、学連選抜の監督をしていれば、
+          // 最初から学連選抜(OP)を選ぶ(自分の大学は正月駅伝に出ていないので。1.8.8)
+          // (ほかの大学を渡されたときは、その大学を見たい場面なのでそのまま)
+          if (gakurenAri &&
+              widget.targetUnivid == currentGhensuu.MYunivid &&
+              widget.targetUnivid >= 0 &&
+              widget.targetUnivid < allUnivs.length) {
+            final KantokuData? kantoku = Hive.box<KantokuData>(
+              'kantokuBox',
+            ).get('KantokuData');
+            if (kantoku != null &&
+                gakurenKantokuChuu(kantoku, allUnivs[widget.targetUnivid])) {
+              _selectedUnivId = _gakurenId;
+            }
+          }
+        }
         if (_selectedUnivId == _gakurenId && !gakurenAri) {
           _selectedUnivId = widget.targetUnivid;
         }

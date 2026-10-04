@@ -78,6 +78,57 @@ class _Mode1111ContentState extends State<Mode1111Content> {
     await senshu.save(); // Hiveに永続化
   }
 
+  /// 全員を同じメニューにする(1.8.8)
+  /// メニューの一覧から選ぶと、自分の大学の全選手をそのメニューにする
+  /// (一覧から選ぶことを確認とし、確認を重ねて出さない。一人ひとりのドロップダウンはそのまま使える)
+  Future<void> _zeninOnajiMenu(List<SenshuData> senshuList) async {
+    final int? erabu = await showDialog<int>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text(
+            '全員を同じメニューにする',
+            style: TextStyle(color: Colors.black),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '選んだメニューを全選手に設定します。それぞれの選手に選んでいたメニューは上書きされます。',
+                  style: TextStyle(color: Colors.black),
+                ),
+                const SizedBox(height: 8),
+                for (final entry in _trainingOptions.entries)
+                  TextButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(entry.key),
+                    child: Text(entry.value),
+                  ),
+              ],
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('キャンセル'),
+            ),
+          ],
+        );
+      },
+    );
+    if (erabu == null) return;
+    for (final SenshuData senshu in senshuList) {
+      if (senshu.kaifukuryoku != erabu) {
+        await _updateKaifukuryoku(senshu, erabu);
+      }
+    }
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('全員のメニューを「${_trainingOptions[erabu]}」にしました')),
+    );
+  }
+
   /// kaifukuryoku の初期値をチェックし、範囲外なら0に設定して保存する
   void _initializeKaifukuryoku(List<SenshuData> senshuList) async {
     bool needsSave = false;
@@ -213,6 +264,24 @@ class _Mode1111ContentState extends State<Mode1111Content> {
                           child: const Text("進む＞＞"),
                         ),
                       ],
+                    ),
+                  ),
+
+                  // 全員を同じメニューにする(1.8.8)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4.0, bottom: 4.0),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton(
+                        onPressed: () => _zeninOnajiMenu(myTeamSenshu),
+                        child: const Text(
+                          '全員を同じメニューにする',
+                          style: TextStyle(
+                            color: HENSUU.LinkColor,
+                            fontSize: HENSUU.fontsize_honbun,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
 

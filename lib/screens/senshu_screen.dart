@@ -2380,13 +2380,14 @@ class _SenshuScreenState extends State<SenshuScreen> {
                         ),*/
 
                         // 各種能力値
-                        // 成長回数(育成で基本走力が伸びた段階の数。1年で12増える。
-                        // 育成が二重にかかっていないかを確かめるためのもの。1.8.5で「動作検証用」から名前を変えた)
+                        // 限界突破回数(1.8.5。これまでの「動作検証用」の成長回数(seichoukaisuu)は、
+                        // 同じ学年・時期ならほぼ全員同じ値で役に立たないので、選手ごとに違う限界突破の回数に置き換えた。
+                        // 限界突破に成功するたびに上限が小さく(速く)なるので、上限の表示と合わせて読める)
                         if (kantoku.yobiint2[17] == 1)
                           _buildAbilityRow(
-                            '成長回数',
+                            '限界突破回数',
                             1,
-                            currentSenshu.seichoukaisuu,
+                            currentSenshu.genkaitoppakaisuu,
                           ),
                         if (kantoku.yobiint2[17] == 1)
                           _buildAbilityRow('基本走力', 1, aInt + 300),

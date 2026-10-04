@@ -2702,6 +2702,8 @@ Future<void> kirokuKousin({
   if (skip.skipflag >= 2 && (racebangou <= 2 || racebangou == 5)) {
     print("区間別統計データ記録ルーチン内通過");
     final statsContainer = EkidenStatistics.instance;
+    // 日本人だけ(留学生を除く)の区間別統計(1.8.7)
+    final statsContainerNihonjin = EkidenStatistics.instanceNihonjin;
     for (
       int i_kukan = 0;
       i_kukan < gh[0].kukansuu_taikaigoto[racebangou];
@@ -2712,6 +2714,10 @@ Future<void> kirokuKousin({
       double totaltime = 0.0;
       int count = 0;
       double averagetime = 0.0;
+      double mintimeNihonjin = TEISUU.DEFAULTTIME;
+      double maxtimeNihonjin = -99999.0;
+      double totaltimeNihonjin = 0.0;
+      int countNihonjin = 0;
       for (var senshu in sortedsenshudata) {
         if (senshu.entrykukan_race[racebangou][senshu.gakunen - 1] == i_kukan) {
           if (mintime > senshu.time_taikai_total) {
@@ -2722,6 +2728,18 @@ Future<void> kirokuKousin({
           }
           totaltime += senshu.time_taikai_total;
           count++;
+          if (senshu.hirou == 1) {
+            statsContainer.ryuugakuseiGaHashitta = true;
+          } else {
+            if (mintimeNihonjin > senshu.time_taikai_total) {
+              mintimeNihonjin = senshu.time_taikai_total;
+            }
+            if (maxtimeNihonjin < senshu.time_taikai_total) {
+              maxtimeNihonjin = senshu.time_taikai_total;
+            }
+            totaltimeNihonjin += senshu.time_taikai_total;
+            countNihonjin++;
+          }
         }
       }
       averagetime = totaltime / count.toDouble();
@@ -2732,6 +2750,15 @@ Future<void> kirokuKousin({
         worstTime: maxtime,
         averageTime: averagetime,
       );
+      if (countNihonjin > 0) {
+        statsContainerNihonjin.updateStats(
+          ekidenIndex: racebangou,
+          sectionIndex: i_kukan,
+          fastestTime: mintimeNihonjin,
+          worstTime: maxtimeNihonjin,
+          averageTime: totaltimeNihonjin / countNihonjin.toDouble(),
+        );
+      }
     }
   }
 

@@ -54,6 +54,7 @@ import 'package:ekiden/screens/record_screen.dart'; // 新しく作ったUnivScr
 import 'package:ekiden/screens/setting_screen.dart'; // 新しく作ったUnivScreenをインポート
 import 'package:ekiden/screens/error_screen.dart';
 import 'package:ekiden/toukei.dart';
+import 'package:ekiden/kansuu/toukei_text.dart';
 import 'dart:math'; // Randomクラスを使用するため
 import 'package:ekiden/screens/Toujituhenkou.dart';
 import 'package:ekiden/screens/ToujitsuAhenkou.dart';
@@ -1005,9 +1006,9 @@ Future<void> main() async {
     //save_load_screenの中の _importFromSlot の中にもあるので、そちらも変更すること！
     final versionValue = int.tryParse(sortedUnivData[7].name_tanshuku);
     if (versionValue == null ||
-        versionValue < 21860 ||
+        versionValue < 21870 ||
         versionValue > 999999999) {
-      sortedUnivData[7].name_tanshuku = "21860"; //バージョン番号
+      sortedUnivData[7].name_tanshuku = "21870"; //バージョン番号
       await sortedUnivData[7].save();
     }
 
@@ -3305,7 +3306,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             skip.skipday <= ghensuu.day) {
           print("⭐️⭐️統計⭐️⭐️");
 
-          print("留学生${sortedUnivsById[0].r}流の場合");
+          // 留学生は優秀度ごとに分けずに集計する。大学ごとの優秀度の内訳を出す(1.8.7)
+          print(ryuugakuseiUchiwakeBun(sortedUnivsById).trim());
           print("留学生総数 ${skip.count_ryuugakusei[0]}");
           if (skip.count_ryuugakusei[0] > 0) {
             print(
@@ -3336,51 +3338,102 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
           print("");
           print("日本人総数 ${skip.count_jap_all[0]}");
-          sortedUnivsById[12].name_tanshuku += "==4年生卒業直前データ==\n";
-          sortedUnivsById[12].name_tanshuku +=
-              "日本人総数 ${skip.count_jap_all[0]}\n";
           if (skip.count_jap_all[0] > 0) {
             print(
               "日本人5000m平均 ${TimeDate.timeToFunByouString(skip.totaltime_jap_all[0] / skip.count_jap_all[0])}",
             );
-            sortedUnivsById[12].name_tanshuku +=
-                "日本人5000m平均 ${TimeDate.timeToFunByouString(skip.totaltime_jap_all[0] / skip.count_jap_all[0])}\n";
             print(
               "日本人10000m平均 ${TimeDate.timeToFunByouString(skip.totaltime_jap_all[1] / skip.count_jap_all[1])}",
             );
-            sortedUnivsById[12].name_tanshuku +=
-                "日本人10000m平均 ${TimeDate.timeToFunByouString(skip.totaltime_jap_all[1] / skip.count_jap_all[1])}\n";
             print(
               "日本人ハーフ平均 ${TimeDate.timeToFunByouString(skip.totaltime_jap_all[2] / skip.count_jap_all[2])}",
             );
-            sortedUnivsById[12].name_tanshuku +=
-                "日本人ハーフ平均 ${TimeDate.timeToFunByouString(skip.totaltime_jap_all[2] / skip.count_jap_all[2])}\n";
             print(
               "日本人フル平均 ${TimeDate.timeToJikanFunByouString(skip.totaltime_jap_all[3] / skip.count_jap_all[3])}",
             );
-            sortedUnivsById[12].name_tanshuku +=
-                "日本人フル平均 ${TimeDate.timeToJikanFunByouString(skip.totaltime_jap_all[3] / skip.count_jap_all[3])}\n";
             print(
               "日本人5000m最速 ${TimeDate.timeToFunByouString(skip.besttime_jap_all[0])}",
             );
-            sortedUnivsById[12].name_tanshuku +=
-                "日本人5000m最速 ${TimeDate.timeToFunByouString(skip.besttime_jap_all[0])}\n";
             print(
               "日本人10000m最速 ${TimeDate.timeToFunByouString(skip.besttime_jap_all[1])}",
             );
-            sortedUnivsById[12].name_tanshuku +=
-                "日本人10000m最速 ${TimeDate.timeToFunByouString(skip.besttime_jap_all[1])}\n";
             print(
               "日本人ハーフ最速 ${TimeDate.timeToFunByouString(skip.besttime_jap_all[2])}",
             );
-            sortedUnivsById[12].name_tanshuku +=
-                "日本人ハーフ最速 ${TimeDate.timeToFunByouString(skip.besttime_jap_all[2])}\n";
             print(
               "日本人フル最速 ${TimeDate.timeToJikanFunByouString(skip.besttime_jap_all[3])}",
             );
-            sortedUnivsById[12].name_tanshuku +=
-                "日本人フル最速 ${TimeDate.timeToJikanFunByouString(skip.besttime_jap_all[3])}\n";
           }
+          // アプリに出す4年生卒業直前データ(1.8.7で、入学時5000mの記録ごとと留学生も出すようにした。
+          // これまではコンソールにだけ出していた。1グループを人数と平均の1行・最速の1行にまとめる。
+          // 文は toukei_text.dart。留学生は優秀度ごとに分けず、留学生のいる大学の優秀度の内訳を添える)
+          sortedUnivsById[12].name_tanshuku += "==4年生卒業直前データ==\n";
+          sortedUnivsById[12].name_tanshuku += toukeiGroupBun(
+            "日本人",
+            skip.count_jap_all,
+            skip.totaltime_jap_all,
+            skip.besttime_jap_all,
+          );
+          sortedUnivsById[12].name_tanshuku += "\n日本人(入学時5000mの記録別)\n";
+          sortedUnivsById[12].name_tanshuku +=
+              toukeiGroupBun(
+                "13分台入学",
+                skip.count_jap_13pundai,
+                skip.totaltime_jap_13pundai,
+                skip.besttime_jap_13pundai,
+              ) +
+              toukeiGroupBun(
+                "14分00秒台入学",
+                skip.count_jap_14pun00dai,
+                skip.totaltime_jap_14pun00dai,
+                skip.besttime_jap_14pun00dai,
+              ) +
+              toukeiGroupBun(
+                "14分10秒台入学",
+                skip.count_jap_14pun10dai,
+                skip.totaltime_jap_14pun10dai,
+                skip.besttime_jap_14pun10dai,
+              ) +
+              toukeiGroupBun(
+                "14分20秒台入学",
+                skip.count_jap_14pun20dai,
+                skip.totaltime_jap_14pun20dai,
+                skip.besttime_jap_14pun20dai,
+              ) +
+              toukeiGroupBun(
+                "14分30秒台入学",
+                skip.count_jap_14pun30dai,
+                skip.totaltime_jap_14pun30dai,
+                skip.besttime_jap_14pun30dai,
+              ) +
+              toukeiGroupBun(
+                "14分40秒台入学",
+                skip.count_jap_14pun40dai,
+                skip.totaltime_jap_14pun40dai,
+                skip.besttime_jap_14pun40dai,
+              ) +
+              toukeiGroupBun(
+                "14分50秒台入学",
+                skip.count_jap_14pun50dai,
+                skip.totaltime_jap_14pun50dai,
+                skip.besttime_jap_14pun50dai,
+              ) +
+              toukeiGroupBun(
+                "15分台入学",
+                skip.count_jap_15pundai,
+                skip.totaltime_jap_15pundai,
+                skip.besttime_jap_15pundai,
+              );
+          sortedUnivsById[12].name_tanshuku += "\n";
+          sortedUnivsById[12].name_tanshuku += toukeiGroupBun(
+            "留学生",
+            skip.count_ryuugakusei,
+            skip.totaltime_ryuugakusei,
+            skip.besttime_ryuugakusei,
+          );
+          sortedUnivsById[12].name_tanshuku += ryuugakuseiUchiwakeBun(
+            sortedUnivsById,
+          );
 
           print("");
           print("13分台入学サンプル数 ${skip.count_jap_13pundai[0]}");
@@ -3615,73 +3668,97 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           }
 
           //区間別統計データ
-          final statsContainer = EkidenStatistics.instance;
-          final toukeitest = statsContainer.stats[0][0];
-          print("");
-          print("");
-          print("⭐️区間別タイム差統計⭐️");
-          print("長距離タイム抑制補正あり、留学生は含まれません");
-          print("試行回数 ${toukeitest.runCount}回");
-          sortedUnivsById[12].name_tanshuku +=
-              "\n\n\n==区間別タイム統計==\n試行回数 ${toukeitest.runCount}回\n";
-          print("");
-          for (int i_racebangou = 0; i_racebangou <= 5; i_racebangou++) {
-            if (i_racebangou == 3 || i_racebangou == 4) {
-              continue;
-            }
-            if (i_racebangou == 0) {
-              print("10月駅伝");
-              sortedUnivsById[12].name_tanshuku += "\n10月駅伝\n";
-            }
-            if (i_racebangou == 1) {
-              print("11月駅伝");
-              sortedUnivsById[12].name_tanshuku += "\n11月駅伝\n";
-            }
-            if (i_racebangou == 2) {
-              print("正月駅伝");
-              sortedUnivsById[12].name_tanshuku += "\n正月駅伝\n";
-            }
-            if (i_racebangou == 5) {
-              print("カスタム駅伝");
-              sortedUnivsById[12].name_tanshuku +=
-                  "\n" + sortedUnivsById[0].name_tanshuku + "\n";
-            }
+          // 全体(留学生を含む全員)と、日本人だけ(留学生を除く)の2つ(日本人だけは1.8.7)
+          // 日本人だけは、統計をとっている間に留学生が駅伝を走ったときだけ書き出す
+          // (走っていなければ全体と同じなので)
+          void kukanToukeiKakidasu(
+            EkidenStatistics statsContainer,
+            String midashi,
+            String consoleSetsumei,
+          ) {
+            final toukeitest = statsContainer.stats[0][0];
             print("");
-            for (
-              int i_kukan = 0;
-              i_kukan < ghensuu.kukansuu_taikaigoto[i_racebangou];
-              i_kukan++
-            ) {
-              final toukei = statsContainer.stats[i_racebangou][i_kukan];
-              print(
-                "${i_kukan + 1}区平均平均タイム ${TimeDate.timeToFunByouString(toukei.averageAverageTime)}",
-              );
-              sortedUnivsById[12].name_tanshuku +=
-                  "${i_kukan + 1}区平均タイム ${TimeDate.timeToFunByouString(toukei.averageAverageTime)}\n";
-              print(
-                "${i_kukan + 1}区平均最速タイム ${TimeDate.timeToFunByouString(toukei.averageFastestTime)}",
-              );
-              sortedUnivsById[12].name_tanshuku +=
-                  "${i_kukan + 1}区平均最速タイム ${TimeDate.timeToFunByouString(toukei.averageFastestTime)}\n";
-              print(
-                "${i_kukan + 1}区平均ワーストタイム ${TimeDate.timeToFunByouString(toukei.averageWorstTime)}",
-              );
-              sortedUnivsById[12].name_tanshuku +=
-                  "${i_kukan + 1}区平均ワーストタイム ${TimeDate.timeToFunByouString(toukei.averageWorstTime)}\n";
-              print(
-                // 小数点以下第一位までの表示に修正
-                "${i_kukan + 1}区平均タイム差 ${(toukei.averageWorstTime - toukei.averageFastestTime).toStringAsFixed(1)}秒",
-              );
-              sortedUnivsById[12].name_tanshuku +=
-                  "${i_kukan + 1}区平均タイム差 ${(toukei.averageWorstTime - toukei.averageFastestTime).toStringAsFixed(1)}秒\n";
-              print(
-                // 小数点以下第一位までの表示に修正
-                "${i_kukan + 1}区平均タイム差/区間距離 ${((toukei.averageWorstTime - toukei.averageFastestTime) / ghensuu.kyori_taikai_kukangoto[i_racebangou][i_kukan] * 1000.0).toStringAsFixed(1)}s/km",
-              );
-              sortedUnivsById[12].name_tanshuku +=
-                  "${i_kukan + 1}区平均タイム差/区間距離 ${((toukei.averageWorstTime - toukei.averageFastestTime) / ghensuu.kyori_taikai_kukangoto[i_racebangou][i_kukan] * 1000.0).toStringAsFixed(1)}s/km\n";
+            print("");
+            print("⭐️区間別タイム差統計⭐️");
+            print("長距離タイム抑制補正あり、$consoleSetsumei");
+            print("試行回数 ${toukeitest.runCount}回");
+            sortedUnivsById[12].name_tanshuku +=
+                "\n\n\n==$midashi==\n試行回数 ${toukeitest.runCount}回\n";
+            print("");
+            for (int i_racebangou = 0; i_racebangou <= 5; i_racebangou++) {
+              if (i_racebangou == 3 || i_racebangou == 4) {
+                continue;
+              }
+              if (i_racebangou == 0) {
+                print("10月駅伝");
+                sortedUnivsById[12].name_tanshuku += "\n10月駅伝\n";
+              }
+              if (i_racebangou == 1) {
+                print("11月駅伝");
+                sortedUnivsById[12].name_tanshuku += "\n11月駅伝\n";
+              }
+              if (i_racebangou == 2) {
+                print("正月駅伝");
+                sortedUnivsById[12].name_tanshuku += "\n正月駅伝\n";
+              }
+              if (i_racebangou == 5) {
+                print("カスタム駅伝");
+                sortedUnivsById[12].name_tanshuku +=
+                    "\n" + sortedUnivsById[0].name_tanshuku + "\n";
+              }
               print("");
+              for (
+                int i_kukan = 0;
+                i_kukan < ghensuu.kukansuu_taikaigoto[i_racebangou];
+                i_kukan++
+              ) {
+                final toukei = statsContainer.stats[i_racebangou][i_kukan];
+                print(
+                  "${i_kukan + 1}区平均平均タイム ${TimeDate.timeToFunByouString(toukei.averageAverageTime)}",
+                );
+                sortedUnivsById[12].name_tanshuku +=
+                    "${i_kukan + 1}区平均タイム ${TimeDate.timeToFunByouString(toukei.averageAverageTime)}\n";
+                print(
+                  "${i_kukan + 1}区平均最速タイム ${TimeDate.timeToFunByouString(toukei.averageFastestTime)}",
+                );
+                sortedUnivsById[12].name_tanshuku +=
+                    "${i_kukan + 1}区平均最速タイム ${TimeDate.timeToFunByouString(toukei.averageFastestTime)}\n";
+                print(
+                  "${i_kukan + 1}区平均ワーストタイム ${TimeDate.timeToFunByouString(toukei.averageWorstTime)}",
+                );
+                sortedUnivsById[12].name_tanshuku +=
+                    "${i_kukan + 1}区平均ワーストタイム ${TimeDate.timeToFunByouString(toukei.averageWorstTime)}\n";
+                print(
+                  // 小数点以下第一位までの表示に修正
+                  "${i_kukan + 1}区平均タイム差 ${(toukei.averageWorstTime - toukei.averageFastestTime).toStringAsFixed(1)}秒",
+                );
+                sortedUnivsById[12].name_tanshuku +=
+                    "${i_kukan + 1}区平均タイム差 ${(toukei.averageWorstTime - toukei.averageFastestTime).toStringAsFixed(1)}秒\n";
+                print(
+                  // 小数点以下第一位までの表示に修正
+                  "${i_kukan + 1}区平均タイム差/区間距離 ${((toukei.averageWorstTime - toukei.averageFastestTime) / ghensuu.kyori_taikai_kukangoto[i_racebangou][i_kukan] * 1000.0).toStringAsFixed(1)}s/km",
+                );
+                sortedUnivsById[12].name_tanshuku +=
+                    "${i_kukan + 1}区平均タイム差/区間距離 ${((toukei.averageWorstTime - toukei.averageFastestTime) / ghensuu.kyori_taikai_kukangoto[i_racebangou][i_kukan] * 1000.0).toStringAsFixed(1)}s/km\n";
+                print("");
+              }
             }
+          }
+
+          kukanToukeiKakidasu(
+            EkidenStatistics.instance,
+            "区間別タイム統計(留学生を含む全員)",
+            "留学生を含む全員",
+          );
+          if (EkidenStatistics.instance.ryuugakuseiGaHashitta) {
+            kukanToukeiKakidasu(
+              EkidenStatistics.instanceNihonjin,
+              "区間別タイム統計(日本人だけ)",
+              "日本人だけ(留学生を除く)",
+            );
+          } else {
+            sortedUnivsById[12].name_tanshuku +=
+                "\n\n(統計をとっている間、駅伝を留学生が走らなかったので、日本人だけの区間別タイム統計は上と同じです)\n";
           }
           await sortedUnivsById[12].save();
           print("");

@@ -109,6 +109,7 @@ class _StatisticsSimulationScreenState
 
     try {
       EkidenStatistics.instance.resetAllStats();
+      EkidenStatistics.instanceNihonjin.resetAllStats(); // 日本人だけの区間別統計(1.8.7)
       await WakelockPlus.enable();
 
       final Ghensuu ghensuu = _ghensuuBox.get('global_ghensuu')!;

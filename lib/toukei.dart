@@ -6,6 +6,16 @@ class EkidenStatistics {
   // 2. staticなゲッターでどこからでもインスタンスにアクセスできるようにする
   static EkidenStatistics get instance => _instance;
 
+  // 日本人だけ(留学生を除く)の区間別タイム統計(1.8.7)
+  // instance は留学生を含む全員の統計。どちらもメモリだけに持ち、保存はしない
+  static final EkidenStatistics _instanceNihonjin =
+      EkidenStatistics._internal();
+  static EkidenStatistics get instanceNihonjin => _instanceNihonjin;
+
+  /// 統計をとっている間に、駅伝を留学生が走ったか(instance でだけ使う。1.8.7)
+  /// (走っていなければ日本人だけの統計は全員の統計と同じなので、書き出さない)
+  bool ryuugakuseiGaHashitta = false;
+
   // 駅伝の定数定義
   static const int EKIDEN_OCTOBER = 0; // 10月駅伝
   static const int EKIDEN_NOVEMBER = 1; // 11月駅伝
@@ -84,6 +94,7 @@ class EkidenStatistics {
 
   /// 全ての統計データをリセットし、初期状態に戻します。
   void resetAllStats() {
+    ryuugakuseiGaHashitta = false;
     for (int i = 0; i < _stats.length; i++) {
       final sectionCount = _sectionCounts[i];
       // 各駅伝のリストをクリアして、新しいSectionStatsで埋め直す

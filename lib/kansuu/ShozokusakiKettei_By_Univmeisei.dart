@@ -5,6 +5,7 @@ import 'package:ekiden/univ_data.dart'; // UnivDataクラスのインポート
 import 'package:ekiden/senshu_data.dart'; // SenshuDataクラスのインポート
 import 'package:ekiden/constants.dart'; // TEISUUクラスをインポート
 import 'package:ekiden/kansuu/ikusei_ryuugakusei.dart';
+import 'package:ekiden/kansuu/joukai.dart';
 import 'package:flutter/services.dart';
 // 必要に応じて他のモデルや定数ファイルのインポートを追加してください
 
@@ -230,6 +231,11 @@ Future<void> ShozokusakiKettei_By_Univmeisei({
           nyuugakuji5000_senshudata[ii].sositu_bonus =
               TEISUU.SOSITU_BONUS; //-100
           final int tempRand = random.nextInt(11) + 1550; // 1550から1600までの乱数
+          // 基本走力の上限は、入学時5000mではなく、大学の留学生の優秀度で決める(1.8.5。joukai.dart)
+          // (日本人の新入生の上限は入学時5000mで決まるので、この選手の元の上限は使わない。
+          // 下の a_min_int もこの上限で計算する)
+          nyuugakuji5000_senshudata[ii].magicnumber =
+              ryuugakuseiJoukaiMagicnumber(sortedunivdata[i].r);
           // a_min_intの計算 (temprand=1550の場合のa_min_int)
           final int aMinInt =
               (1550.0 * 1550.0 * 0.0333 -

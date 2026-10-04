@@ -10,6 +10,7 @@ import 'package:ekiden/qr_r_modal.dart';
 import 'package:ekiden/senshu_r_data.dart';
 import 'package:ekiden/album.dart';
 import 'package:ekiden/riji_data.dart';
+import 'package:ekiden/kansuu/joukai.dart';
 
 String _timeToMinuteSecondString(double time) {
   if (time == TEISUU.DEFAULTTIME) {
@@ -846,11 +847,12 @@ class _Senshu_R_ScreenState extends State<Senshu_R_Screen> {
                         // 各種能力値
                         if (kantoku.yobiint2[17] == 1)
                           _buildAbilityRowr('基本走力', 1, aInt + 300),
+                        // 素質の代わりに基本走力の上限を出す(卒業したときの上限。基本走力と同じ目盛り。1.8.5)
                         if (kantoku.yobiint2[17] == 1)
                           _buildAbilityRowr(
-                            '素質',
+                            '上限',
                             1,
-                            currentSenshu.sositu - 1500,
+                            joukaiHyouji(currentSenshu.magicnumber),
                           ),
                         // 卒業選手は全ての能力値が見えるものとして、flagは全て1を使用します
                         _buildAbilityRowr('安定感', 1, currentSenshu.anteikan),

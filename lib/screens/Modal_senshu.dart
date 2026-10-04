@@ -14,6 +14,7 @@ import 'package:ekiden/qr_camera_scanner_screen.dart';
 import 'package:ekiden/qr_gallery_scanner_screen.dart';
 import 'package:ekiden/kansuu/ChartPanelSenshu.dart';
 import 'package:ekiden/screens/Modal_ChartHyojiHijyojiKirikae.dart';
+import 'package:ekiden/kansuu/joukai.dart';
 
 // タイムを「分秒」形式の文字列に変換するヘルパー関数
 String _timeToMinuteSecondString(double time) {
@@ -689,11 +690,12 @@ class _ModalSenshuDetailViewState extends State<ModalSenshuDetailView> {
                             ),
                           if (kantoku.yobiint2[17] == 1)
                             _buildAbilityRow('基本走力', 1, aInt + 300),
+                          // 素質の代わりに基本走力の上限を出す(基本走力と同じ目盛り。1.8.5)
                           if (kantoku.yobiint2[17] == 1)
                             _buildAbilityRow(
-                              '素質',
+                              '上限',
                               1,
-                              currentSenshu.sositu - 1500,
+                              joukaiHyouji(currentSenshu.magicnumber),
                             ),
                           if (((ghensuu.month == 10 && ghensuu.day == 5) ||
                                   (ghensuu.month == 11 && ghensuu.day == 5) ||

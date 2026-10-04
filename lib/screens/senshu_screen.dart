@@ -16,6 +16,7 @@ import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/screens/Modal_editSenshu.dart';
 import 'package:ekiden/kansuu/ChartPanelSenshu.dart';
 import 'package:ekiden/screens/Modal_ChartHyojiHijyojiKirikae.dart';
+import 'package:ekiden/kansuu/joukai.dart';
 
 String _getCombinedDifficultyText(KantokuData kantoku, Ghensuu currentGhensuu) {
   // 難易度モードを取得 (0:通常, 1:極, 2:天)
@@ -2387,11 +2388,12 @@ class _SenshuScreenState extends State<SenshuScreen> {
                           ),
                         if (kantoku.yobiint2[17] == 1)
                           _buildAbilityRow('基本走力', 1, aInt + 300),
+                        // 素質の代わりに基本走力の上限を出す(基本走力と同じ目盛り。1.8.5)
                         if (kantoku.yobiint2[17] == 1)
                           _buildAbilityRow(
-                            '素質',
+                            '上限',
                             1,
-                            currentSenshu.sositu - 1500,
+                            joukaiHyouji(currentSenshu.magicnumber),
                           ),
 
                         if (((ghensuu.month == 10 && ghensuu.day == 5) ||

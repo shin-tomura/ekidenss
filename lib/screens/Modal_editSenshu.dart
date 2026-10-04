@@ -4,6 +4,9 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ekiden/constants.dart';
 import 'package:ekiden/senshu_data.dart';
 import 'package:ekiden/univ_data.dart';
+import 'package:ekiden/kantoku_data.dart';
+import 'package:ekiden/kansuu/joukai.dart';
+import 'package:ekiden/kansuu/riron_kirokukai_time.dart';
 
 class SenshuEditView extends StatefulWidget {
   final int senshuId;
@@ -38,13 +41,55 @@ class _SenshuEditViewState extends State<SenshuEditView> {
   final TextEditingController _paceagesagetaiouryokuController =
       TextEditingController();
   final TextEditingController _baseAbilityAController = TextEditingController();
-  final TextEditingController _sosituController = TextEditingController();
+  // 基本走力の上限(1.8.5で素質の代わりに編集できるようにした。基本走力と同じ目盛り)
+  final TextEditingController _joukaiController = TextEditingController();
+  // 開いたときの基本走力と上限の値(欄を変えたかどうかを見るため。1.8.5)
+  int? _kihonShokiti;
+  int? _joukaiShokiti;
 
   @override
   void initState() {
     super.initState();
     _senshuBox = Hive.box<SenshuData>('senshuBox');
     _loadSenshuData();
+    // 理論値の欄を、入力に合わせてその場で計算し直す(1.8.5)
+    for (final TextEditingController c in [
+      _baseAbilityAController,
+      _joukaiController,
+      _choukyorinebariController,
+      _spurtryokuController,
+      _tandokusouController,
+      _paceagesagetaiouryokuController,
+    ]) {
+      c.addListener(_rironchiKoushin);
+    }
+  }
+
+  void _rironchiKoushin() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    for (final TextEditingController c in [
+      _chousiController,
+      _anteikanController,
+      _konjouController,
+      _heijousinController,
+      _choukyorinebariController,
+      _spurtryokuController,
+      _karisumaController,
+      _noboritekiseiController,
+      _kudaritekiseiController,
+      _noborikudarikirikaenouryokuController,
+      _tandokusouController,
+      _paceagesagetaiouryokuController,
+      _baseAbilityAController,
+      _joukaiController,
+    ]) {
+      c.dispose();
+    }
+    super.dispose();
   }
 
   void _loadSenshuData() {
@@ -81,8 +126,151 @@ class _SenshuEditViewState extends State<SenshuEditView> {
 
       int aInt = new_a_min_int + sa;
       _baseAbilityAController.text = (aInt + 300).toString();
-      _sosituController.text = (senshu.sositu - 1500).toString();
+      _kihonShokiti = aInt + 300;
+      _joukaiShokiti = joukaiHyouji(senshu.magicnumber);
+      _joukaiController.text = _joukaiShokiti.toString();
     }
+  }
+
+  /// 保存したときの基本走力の上限(magicnumber)(1.8.5)
+  /// [kihon]・[joukai]は、基本走力と上限の欄の値(どちらも小さいほど速い目盛り)
+  /// ・上限の欄を変えたとき: 入力した上限。ただし、基本走力と同じかそれより遅い(大きい)ときは、
+  ///   基本走力−25にする(上限を基本走力より遅くすると、次の育成で基本走力が上限まで引き戻されて
+  ///   選手が遅くなってしまうため)
+  /// ・基本走力の欄だけを変えたとき: 今の上限。ただし、基本走力を上限より速くしたときは、
+  ///   基本走力−25にする(1.8.4までと同じ)
+  /// ・どちらの欄も変えていないとき: 今の上限のまま(目盛りの値に直すときの端数で、保存のたびにずれないように)
+  double _hozonJoukaiMagicnumber(int kihon, int joukai) {
+    final double oldMagicNumber = _editingSenshu!.magicnumber;
+    final bool kihonHenkou = kihon != _kihonShokiti;
+    final bool joukaiHenkou = joukai != _joukaiShokiti;
+    if (!kihonHenkou && !joukaiHenkou) return oldMagicNumber;
+    // 基本走力の値がちょうど上限になるmagicnumber
+    final double kihonMagicNumber = magicnumberFromJoukaiHyouji(kihon);
+    if (joukaiHenkou) {
+      final double joukaiMagicNumber = magicnumberFromJoukaiHyouji(joukai);
+      return joukaiMagicNumber >= kihonMagicNumber
+          ? kihonMagicNumber - 25.0
+          : joukaiMagicNumber;
+    }
+    return oldMagicNumber > kihonMagicNumber
+        ? kihonMagicNumber - 25.0
+        : oldMagicNumber;
+  }
+
+  /// 説明書きの行(1.8.5)
+  Widget _buildSetsumei(List<String> gyou) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final String g in gyou)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4.0),
+            child: Text(
+              g,
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: HENSUU.fontsize_honbun - 2,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// 理論値の時間の書き方(選手画面の持ちタイムと同じ「分秒」)(1.8.5)
+  String _rironTimeString(double time) {
+    final int minutes = time ~/ 60;
+    final int seconds = (time % 60).toInt();
+    return '${minutes.toString().padLeft(2, '0')}分${seconds.toString().padLeft(2, '0')}秒';
+  }
+
+  /// 理論値の欄(1.8.5)
+  /// 入力中の値から、今の基本走力と上限に届いたときの、平地の記録会の理論値を出す
+  /// (計算は riron_kirokukai_time.dart。入力が数値でない欄があるときは「−」)
+  Widget _buildRironchi(List<UnivData> sortedUnivData) {
+    final int? kihon = int.tryParse(_baseAbilityAController.text.trim());
+    final int? joukai = int.tryParse(_joukaiController.text.trim());
+    final int? nebari = int.tryParse(_choukyorinebariController.text.trim());
+    final int? spurt = int.tryParse(_spurtryokuController.text.trim());
+    final int? road = int.tryParse(_tandokusouController.text.trim());
+    final int? pace = int.tryParse(
+      _paceagesagetaiouryokuController.text.trim(),
+    );
+    final KantokuData? kantoku = Hive.box<KantokuData>(
+      'kantokuBox',
+    ).get('KantokuData');
+    final SenshuData senshu = _editingSenshu!;
+    // 上限に届いたときの基本走力(保存したときの上限)
+    final int? joukaiKihon = (kihon == null || joukai == null)
+        ? null
+        : joukaiHyouji(_hozonJoukaiMagicnumber(kihon, joukai));
+
+    String timeMojiretsu(int? kihonHyouji, double kyori) {
+      if (kihonHyouji == null ||
+          nebari == null ||
+          spurt == null ||
+          road == null ||
+          pace == null ||
+          kantoku == null) {
+        return '−';
+      }
+      final double time = rironKirokukaiTime(
+        kyori: kyori,
+        kihonSouryokuHyouji: kihonHyouji,
+        choukyorinebari: nebari,
+        spurtryoku: spurt,
+        tandokusou: road,
+        paceagesagetaiouryoku: pace,
+        univid: senshu.univid,
+        ryuugakusei: senshu.hirou == 1,
+        trainingNum: _selectedMenu ?? senshu.kaifukuryoku,
+        kantoku: kantoku,
+        choukyoriTimeHosei: sortedUnivData[9].name_tanshuku == "1",
+      );
+      return _rironTimeString(time);
+    }
+
+    const TextStyle midasiStyle = TextStyle(
+      color: Colors.white70,
+      fontSize: HENSUU.fontsize_honbun - 2,
+    );
+    // スマホの幅でも「62分40秒」が1行に収まるように、少し小さい字にする
+    const TextStyle atai = TextStyle(
+      color: Colors.white,
+      fontSize: HENSUU.fontsize_honbun - 2,
+    );
+    TableRow gyou(String label, int? kihonHyouji) {
+      return TableRow(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4.0),
+            child: Text(label, style: midasiStyle),
+          ),
+          for (final double kyori in rironKirokukaiKyori)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4.0),
+              child: Text(timeMojiretsu(kihonHyouji, kyori), style: atai),
+            ),
+        ],
+      );
+    }
+
+    return Table(
+      columnWidths: const {0: FlexColumnWidth(1.6)},
+      children: [
+        const TableRow(
+          children: [
+            Text('', style: midasiStyle),
+            Text('5000m', style: midasiStyle),
+            Text('1万m', style: midasiStyle),
+            Text('ハーフ', style: midasiStyle),
+          ],
+        ),
+        gyou('今の基本走力', kihon),
+        gyou('上限に届いたとき', joukaiKihon),
+      ],
+    );
   }
 
   /// 数値入力専用のフィールド（キーボードを数字に限定）
@@ -151,7 +339,7 @@ class _SenshuEditViewState extends State<SenshuEditView> {
         'max': 99,
       },
       {'label': '基本走力', 'ctrl': _baseAbilityAController, 'min': 0, 'max': 6000},
-      {'label': '素質', 'ctrl': _sosituController, 'min': 0, 'max': 180},
+      {'label': '上限', 'ctrl': _joukaiController, 'min': 0, 'max': 6000},
     ];
 
     for (var field in fields) {
@@ -203,21 +391,14 @@ class _SenshuEditViewState extends State<SenshuEditView> {
     int aIntInput = int.parse(_baseAbilityAController.text) - 300;
     int b_int = 1550;
 
-    double term1 = b_int * b_int * 0.0333;
-    double term2 = b_int * 114.25;
-
-    double oldMagicNumber = _editingSenshu!.magicnumber;
-    double newMagicNumber = aIntInput - (term1 - term2);
-    if (oldMagicNumber > newMagicNumber) {
-      newMagicNumber -= 25.0;
-    } else {
-      newMagicNumber = oldMagicNumber;
-    }
+    // 基本走力の上限(1.8.5で、素質の代わりに上限を編集できるようにした)
+    double newMagicNumber = _hozonJoukaiMagicnumber(
+      int.parse(_baseAbilityAController.text),
+      int.parse(_joukaiController.text),
+    );
 
     double originalA = aIntInput * 0.000000001;
     double originalB = b_int / 10000;
-
-    int newSositu = int.parse(_sosituController.text) + 1500;
 
     final updatedSenshu = _editingSenshu!
       ..kaifukuryoku = _selectedMenu!
@@ -237,8 +418,7 @@ class _SenshuEditViewState extends State<SenshuEditView> {
       ..paceagesagetaiouryoku = int.parse(_paceagesagetaiouryokuController.text)
       ..a = originalA
       ..b = originalB
-      ..magicnumber = newMagicNumber
-      ..sositu = newSositu;
+      ..magicnumber = newMagicNumber;
 
     try {
       await _senshuBox.put(widget.senshuId, updatedSenshu);
@@ -356,8 +536,30 @@ class _SenshuEditViewState extends State<SenshuEditView> {
                 ),
               ),
               _buildNumberInputField('基本走力', _baseAbilityAController, 0, 6000),
-              _buildNumberInputField('素質', _sosituController, 0, 180),
-              Text("※素質は基本走力の成長を促進させる能力"),
+              _buildNumberInputField('上限', _joukaiController, 0, 6000),
+              _buildSetsumei(const [
+                '・上限: 基本走力が伸びていく先の値です(小さいほど速い)。',
+                '・基本走力が上限に届くと、育成のたびに限界突破の判定があり、成功すると上限が少し小さくなります。',
+                '・保存するとき、上限は基本走力より少し小さい値までにそろえます(上限の編集で選手が遅くならないように)。',
+                '・選手を遅くしたいときは、基本走力と上限の両方を大きくしてください。',
+              ]),
+              const Divider(color: Colors.white24, height: 32),
+              const Text(
+                "理論値",
+                style: TextStyle(
+                  color: Colors.orangeAccent,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              _buildRironchi(sortedUnivData),
+              const SizedBox(height: 8),
+              _buildSetsumei(const [
+                '・理論値: 平地の記録会で、運に左右されずに走ったときのタイムです。',
+                '・大学の個性・年間強化練習・タイム調整など、記録会のタイムにかかる設定を含めて計算しています。',
+                '・調子と、能力のタイムへの影響度(駅伝と駅伝予選だけにかかる設定)は含みません。',
+                '・「上限に届いたとき」は、今の能力値のまま上限まで伸びたときのタイムです。',
+              ]),
               const SizedBox(height: 40),
               SizedBox(
                 width: double.infinity,

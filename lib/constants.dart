@@ -19,7 +19,9 @@ class TEISUU {
   static const int SUU_MAXKYORI = 50; //km単位
   static const double MAGICNUMBER = 98470.0;
   //static const int KAKURITU13PUNDAINYUUGAKU = 7;
-  static const int KAKURITU13PUNDAINYUUGAKU = 4;
+  //static const int KAKURITU13PUNDAINYUUGAKU = 4;
+  // 13分台の新入生の割合(%)。最近の高校生の記録の水準に合わせて4から12にした(1.8.5)
+  static const int KAKURITU13PUNDAINYUUGAKU = 12;
   static const int GENKAICHOKUMENSISUU = 100;
   static const int MOKUHYO_B_5000 = 1500;
   static const int MOKUHYO_B_10000 = 1565;

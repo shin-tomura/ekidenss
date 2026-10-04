@@ -275,6 +275,9 @@ Future<void> Ikusei_Com({
               if (sortedsenshudata[senshuid].genkaitoppakaisuu < 3) {
                 if (_random.nextInt(100) < 33) {
                   // 0から99までの乱数が33未満 (33%の確率)
+                  // 突破する前の上限(1.8.5。下の a_min_int の計算で使う)
+                  final double maeMagicnumber =
+                      sortedsenshudata[senshuid].magicnumber;
                   sortedsenshudata[senshuid].magicnumber -=
                       (25 + _random.nextInt(76)).toDouble(); // 0から75までの乱数
                   sortedsenshudata[senshuid].genkaitoppakaisuu +=
@@ -283,10 +286,16 @@ Future<void> Ikusei_Com({
                   a_int = (sortedsenshudata[senshuid].a * 1000000000.0).toInt();
                   b_int = (sortedsenshudata[senshuid].b * 10000.0).toInt();
                   // TEISUU.MAGICNUMBERは、sortedsenshudata[senshuid].magicnumberとは異なる定数として扱う
+                  // (1.8.5: 上限が人ごとになったので、突破する前の上限がTEISUU.MAGICNUMBERより遅い選手
+                  // (入学時5000mが遅い新入生・留学生)は、突破する前の自分の上限の少し下に戻す。
+                  // TEISUU.MAGICNUMBERのままだと、新しい上限より速いところまで戻ってしまうため。
+                  // それ以外の選手は今まで通り)
                   a_min_int =
                       (b_int.toDouble() * b_int.toDouble() * 0.0333 -
                               b_int.toDouble() * 114.25 +
-                              TEISUU.MAGICNUMBER)
+                              (maeMagicnumber > TEISUU.MAGICNUMBER
+                                  ? maeMagicnumber
+                                  : TEISUU.MAGICNUMBER))
                           .toInt();
 
                   if (a_int - a_min_int >= 0) {
@@ -304,16 +313,22 @@ Future<void> Ikusei_Com({
                 // 限界突破回数が3回以上の場合のロジック
                 if (_random.nextInt(100) < 10) {
                   // 0から99までの乱数が10未満 (10%の確率)
+                  // 突破する前の上限(1.8.5。下の a_min_int の計算で使う)
+                  final double maeMagicnumber =
+                      sortedsenshudata[senshuid].magicnumber;
                   sortedsenshudata[senshuid].magicnumber -=
                       (25 + _random.nextInt(76)).toDouble();
                   sortedsenshudata[senshuid].genkaitoppakaisuu += 1;
 
                   a_int = (sortedsenshudata[senshuid].a * 1000000000.0).toInt();
                   b_int = (sortedsenshudata[senshuid].b * 10000.0).toInt();
+                  // (1.8.5: 突破する前の上限がTEISUU.MAGICNUMBERより遅い選手は、その上限の少し下に戻す。上と同じ)
                   a_min_int =
                       (b_int.toDouble() * b_int.toDouble() * 0.0333 -
                               b_int.toDouble() * 114.25 +
-                              TEISUU.MAGICNUMBER)
+                              (maeMagicnumber > TEISUU.MAGICNUMBER
+                                  ? maeMagicnumber
+                                  : TEISUU.MAGICNUMBER))
                           .toInt();
 
                   if (a_int - a_min_int >= 0) {

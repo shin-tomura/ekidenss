@@ -6,6 +6,7 @@ import 'dart:math'; // ★この行を追加★
 import 'package:ekiden/kansuu/RironTime.dart';
 import 'package:ekiden/kansuu/RironTime_Nyuugakuji.dart';
 import 'package:ekiden/kantoku_data.dart';
+import 'package:ekiden/kansuu/joukai.dart';
 
 /// SenshuData Box 内の選手をループし、指定した学年の選手に特定の処理を適用する関数。
 ///
@@ -140,6 +141,7 @@ Future<void> SenshuShokitiSetteiByGakunen(
 
       bool tokubetuflag = false;
       int tokubetusisuu = 0;
+      bool juusanpundaiflag = false; // 13分台の新入生(1.8.5)
       senshu.hirou = 0;
       {
         //選手ごとの成長力とか成長のスタート地点とか
@@ -171,6 +173,7 @@ Future<void> SenshuShokitiSetteiByGakunen(
           senshu.sositu = tempRand;
         } else if (random.nextInt(100) < TEISUU.KAKURITU13PUNDAINYUUGAKU) {
           // 13分台大学入学の条件分岐
+          juusanpundaiflag = true;
           senshu.sositu_bonus = TEISUU.SOSITU_BONUS; //-100
           tempRand = random.nextInt(51) + 1550; // 1550から1600までの乱数
 
@@ -248,6 +251,19 @@ Future<void> SenshuShokitiSetteiByGakunen(
         tokubetusisuu,
         5000.0,
         senshu,
+      );
+      // 13分台の新入生の入学時5000mは、13分35秒〜13分59秒に広げる(遅いほど多い。1.8.5)
+      // (RironTime_Nyuugakuji は a・b を書き換えるので、今まで通り呼んでから記録だけ置き換える)
+      if (juusanpundaiflag) {
+        senshu.kiroku_nyuugakuji_5000 = nyuugakuji5000Juusanpundai(
+          senshu.sositu,
+          random,
+        );
+      }
+      // 基本走力の上限を、入学時5000mの記録で決める(1.8.5。詳しくは joukai.dart)
+      // (入学時の基本走力はどの選手も上限より遅いので、今まで通り育成で上限に向かって伸びる)
+      senshu.magicnumber = joukaiMagicnumberFromNyuugakuji5000(
+        senshu.kiroku_nyuugakuji_5000,
       );
       senshu.rirontime5000 = RironTime(5000.0, senshu);
       senshu.rirontime10000 = RironTime(10000.0, senshu);

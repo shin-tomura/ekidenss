@@ -147,6 +147,9 @@ void ryuugakusei_ikusei({required int senshuid}) {
                   (5 - sortedunivdata[sortedsenshudata[senshuid].univid].r) *
                       10 +
                   21;
+              // 突破する前の上限(1.8.5。下の a_min_int の計算で使う)
+              final double maeMagicnumber =
+                  sortedsenshudata[senshuid].magicnumber;
               sortedsenshudata[senshuid].magicnumber -=
                   (suu_min + _random.nextInt(suu_rand))
                       .toDouble(); // 0から75までの乱数
@@ -155,10 +158,14 @@ void ryuugakusei_ikusei({required int senshuid}) {
               a_int = (sortedsenshudata[senshuid].a * 1000000000.0).toInt();
               b_int = (sortedsenshudata[senshuid].b * 10000.0).toInt();
               // TEISUU.MAGICNUMBERは、sortedsenshudata[senshuid].magicnumberとは異なる定数として扱う
+              // (1.8.5: 留学生の上限は優秀度ごとにTEISUU.MAGICNUMBERより遅くしたので、
+              // 突破する前の上限がそれより遅いときは、その上限の少し下に戻す。Ikusei_Comと同じ)
               a_min_int =
                   (b_int.toDouble() * b_int.toDouble() * 0.0333 -
                           b_int.toDouble() * 114.25 +
-                          TEISUU.MAGICNUMBER)
+                          (maeMagicnumber > TEISUU.MAGICNUMBER
+                              ? maeMagicnumber
+                              : TEISUU.MAGICNUMBER))
                       .toInt();
 
               if (a_int - a_min_int >= 0) {
@@ -182,6 +189,9 @@ void ryuugakusei_ikusei({required int senshuid}) {
                   (5 - sortedunivdata[sortedsenshudata[senshuid].univid].r) *
                       10 +
                   21;
+              // 突破する前の上限(1.8.5。下の a_min_int の計算で使う)
+              final double maeMagicnumber =
+                  sortedsenshudata[senshuid].magicnumber;
               sortedsenshudata[senshuid].magicnumber -=
                   (suu_min + _random.nextInt(suu_rand))
                       .toDouble(); // 0から75までの乱数
@@ -192,7 +202,9 @@ void ryuugakusei_ikusei({required int senshuid}) {
               a_min_int =
                   (b_int.toDouble() * b_int.toDouble() * 0.0333 -
                           b_int.toDouble() * 114.25 +
-                          TEISUU.MAGICNUMBER)
+                          (maeMagicnumber > TEISUU.MAGICNUMBER
+                              ? maeMagicnumber
+                              : TEISUU.MAGICNUMBER))
                       .toInt();
 
               if (a_int - a_min_int >= 0) {

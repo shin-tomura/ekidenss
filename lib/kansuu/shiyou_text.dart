@@ -337,6 +337,8 @@ ShiyouSetsu shiyouIkusei({bool setsumeisho = false}) {
   final int mode = _nanidoMode(kantoku);
   final List<String> gyou = [
     '・基本走力は、春と夏の2回、自動で成長します。総監督が直接上げる方法はありません。',
+    // 1.8.5で、入学時5000mの記録で基本走力の上限が決まるようにした(joukai.dart)
+    '・入学時の5000mの記録が良い選手ほど、基本走力が最終的に高くなりやすい傾向があります。',
   ];
   // 年間強化練習(効果が0のときは、効果がないことを書く)
   if (_kyoukaKyoudo(kantoku) == 0) {

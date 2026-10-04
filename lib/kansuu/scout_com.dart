@@ -37,7 +37,7 @@ import 'package:ekiden/kansuu/ShozokusakiKettei_By_Univmeisei.dart'; // 振り�
 //     タイム順位による上限 = 新入生(留学生を除く)全体の中での5000m持ちタイムの順位で、
 //       1位10%〜87位以下75%
 //     成功率 = タイム順位による上限 × 名声の比 ÷ 75% (名声の比が75%以上なら上限のまま。
-//       1%単位に丸め、1%未満は0.1%)
+//       1%以上は1%単位、1%未満は0.1%単位に丸める(下限0.1%)。1.8.7までは1%未満は一律0.1%だった)
 //     (トップ級の大学と、タイム87位以下の選手は「小さいほう」と同じ値になる。名声の高くない
 //     大学ほど、持ちタイムの良い選手の成功率が下がる。どの大学も同じ10%で大物に挑めると、
 //     成功率の低い大物を後回しにするコンピュータより、粘って大物を狙う人間が有利になるため)
@@ -506,7 +506,43 @@ double _heikinMeisei(List<UnivData> sortedUnivData) {
 /// 成功率の計算で、タイム順位による上限のまま使える名声の比(これより低いと比に応じて下がる)
 const double _meiseiHiKijun = 0.75;
 
-/// 交渉の成功率(ONのとき。1%単位に丸め、1%未満は0.1%)
+/// 交渉の成功率を丸める(ON・OFF共通。1.8.8)
+/// 1%以上は1%単位、1%未満は0.1%単位(下限0.1%)。画面の表示と抽選は、どちらもこの値を使う
+/// (1.8.7までは、1%未満は一律0.1%で、画面には「1%未満」と出していた。
+///  1%未満でも選手ごとの差が分かるように、0.1%単位にした。1%以上は今まで通り)
+double scoutSeikouritsuMarume(double p) {
+  if (p < 0.01) {
+    final int permil = (p * 1000).round().clamp(1, 10).toInt();
+    return permil / 1000.0;
+  }
+  return (p * 100).round() / 100.0;
+}
+
+/// 成功率をスカウト画面の選手のkegaflagに入れる値(0.1%単位の整数。1〜900。1.8.8)
+/// (kegaflagの負の値は「決定」「断られた」などの印。1.8.7までは1%単位で、1%未満は-1だった)
+int scoutSeikouritsuKegaflag(double seikouritsu) {
+  return (seikouritsu * 1000).round().clamp(1, 1000).toInt();
+}
+
+/// スカウト画面の選手のkegaflagから成功率を出す(印のときは0。1.8.8)
+/// (-1は1.8.7までの「1%未満」で、0.1%として扱う)
+double scoutSeikouritsuFromKegaflag(int kegaflag) {
+  if (kegaflag == -1) return 0.001;
+  if (kegaflag <= 0) return 0.0;
+  return kegaflag / 1000.0;
+}
+
+/// スカウト画面に出す成功率の文(1.8.8。1%以上は「12%」、1%未満は「0.3%」)
+/// 留学生など交渉できない選手(-2)は「0%」。「決定」「断られた」は画面の側で出す
+String scoutSeikouritsuBun(int kegaflag) {
+  if (kegaflag == -2) return '0%';
+  if (kegaflag == -1) return '0.1%';
+  if (kegaflag <= 0) return '0%';
+  if (kegaflag % 10 == 0) return '${kegaflag ~/ 10}%';
+  return '${kegaflag ~/ 10}.${kegaflag % 10}%';
+}
+
+/// 交渉の成功率(ONのとき。丸め方は scoutSeikouritsuMarume)
 /// 名声の比は全大学の平均の名声と比べる(仮の振り分けの大学によらないように)
 /// 成功率 = タイム順位による上限 × 名声の比 ÷ 75%(名声の比が75%以上なら上限のまま)
 double _seikouritsu({
@@ -525,8 +561,7 @@ double _seikouritsu({
   final double jougen = (0.10 + (timeJuni - 1) * (0.75 - 0.10) / (87.0 - 1.0))
       .clamp(0.10, 0.75);
   final double p = jougen * min(1.0, meiseiHi / _meiseiHiKijun);
-  if (p < 0.01) return 0.001;
-  return (p * 100).round() / 100.0;
+  return scoutSeikouritsuMarume(p);
 }
 
 /// 性格ごとの要件(まだ進路未定の新入生の中で、自校の方針での点数が上位何%以内か)

@@ -161,7 +161,7 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
       if (freshman.hirou == 1) {
         freshman.kegaflag = -2; //0%
       } else {
-        freshman.kegaflag = -1; //0.1%
+        freshman.kegaflag = -1; //0.1%(1.8.7までの「1%未満」の値。scoutSeikouritsuFromKegaflagで0.1%)
       }
 
       await freshman.save();
@@ -209,7 +209,8 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
       if (comScoutKettei(s)) continue;
       if (comScoutKotowarareta(s)) continue;
       final double r = seikouritsu[s.id] ?? 0.001;
-      s.kegaflag = r < 0.01 ? -1 : (r * 100).round();
+      // 0.1%単位で入れる(1%未満も0.1%単位。1.8.8。scout_com.dart)
+      s.kegaflag = scoutSeikouritsuKegaflag(r);
       await s.save();
     }
 
@@ -388,8 +389,9 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
       // ★交渉成功確率でのソートを追加
       case SortCriterion.successRate:
         compareFunction = (a, b) {
-          // kegaflag はパーセント値なので、そのまま比較すると降順になる
+          // kegaflag は成功率(0.1%単位。1.8.8)なので、そのまま比較すると降順になる
           // 成功確率が高いほど値が大きいので、b.kegaflag.compareTo(a.kegaflag) で降順ソート
+          // (「決定」「断られた」などの印は負の値なので、一番下になる)
           final successRateComparison = b.kegaflag.compareTo(a.kegaflag);
           if (successRateComparison != 0) {
             return successRateComparison;
@@ -477,14 +479,15 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
     if (finalSuccessRate > maxSuccessRateBasedOnTime) {
       finalSuccessRate = maxSuccessRateBasedOnTime;
     }
-    // kegaflag に確率を整数（パーセント）で格納する
-    // 1%未満の場合は -1 で表現
+    // kegaflag に確率を0.1%単位の整数で格納する
+    // (1%以上は1%単位、1%未満は0.1%単位(下限0.1%)に丸める。1.8.8。scout_com.dart。
+    //  1.8.7までは1%単位で、1%未満は-1(一律0.1%)だった)
     if (freshman.hirou == 1) {
       freshman.kegaflag = -2;
-    } else if (finalSuccessRate < 0.01) {
-      freshman.kegaflag = -1;
     } else {
-      freshman.kegaflag = (finalSuccessRate * 100).round();
+      freshman.kegaflag = scoutSeikouritsuKegaflag(
+        scoutSeikouritsuMarume(finalSuccessRate),
+      );
     }
   }
 
@@ -503,15 +506,8 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
       return;
     }
 
-    // 成功確率を取得
-    double successRate;
-    if (freshman.kegaflag == -1) {
-      // 1%未満の場合、0.1%の確率で成功とみなす
-      successRate = 0.001;
-    } else {
-      // 格納されているパーセント値を確率に変換
-      successRate = freshman.kegaflag / 100.0;
-    }
+    // 成功確率を取得(画面に出している値と同じ。1.8.8)
+    final double successRate = scoutSeikouritsuFromKegaflag(freshman.kegaflag);
 
     final random = Random();
     final isSuccess = random.nextDouble() < successRate;
@@ -544,15 +540,8 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
 
   /// コンピュータスカウトONのときの交渉(プレイヤーとコンピュータの大学が同じラウンドで交渉する)
   Future<void> _negotiateRound(SenshuData freshman) async {
-    // 成功率(画面に出している値と同じ。1%未満は0.1%)
-    double successRate;
-    if (freshman.kegaflag == -1) {
-      successRate = 0.001;
-    } else if (freshman.kegaflag < 0) {
-      successRate = 0.0;
-    } else {
-      successRate = freshman.kegaflag / 100.0;
-    }
+    // 成功率(画面に出している値と同じ。1.8.8)
+    final double successRate = scoutSeikouritsuFromKegaflag(freshman.kegaflag);
     final int roundBangou = _roundBangou();
     setState(() {
       _isLoading = true;
@@ -859,12 +848,13 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
 
     // 2. ★追加: 成功率フィルターチェック
     if (_successRateFilter > 0) {
-      // freshman.kegaflag が格納している成功率（-2, -1, 1-100）
-      final int successRate = freshman.kegaflag;
+      // freshman.kegaflag が格納している成功率(0.1%単位。1.8.8)を%にする(印は0%)
+      final double successRate =
+          scoutSeikouritsuFromKegaflag(freshman.kegaflag) * 100.0;
 
       // 設定された最低成功率（_successRateFilter）を下回る場合は false
-      // 例: フィルターが60%の場合、kegaflagが59以下（-2, -1含む）は除外
-      if (successRate < _successRateFilter) {
+      // 例: フィルターが60%の場合、59%以下(1%未満や印も含む)は除外
+      if (successRate < _successRateFilter - 0.0001) {
         return false;
       }
     }
@@ -1056,9 +1046,8 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
     }
 
     // 成功率テキスト
-    String rateStr = freshman.kegaflag == -2
-        ? '0%'
-        : (freshman.kegaflag == -1 ? '1%未満' : '${freshman.kegaflag}%');
+    // (1%未満も0.1%単位で出す。1.8.8。scout_com.dart)
+    String rateStr = scoutSeikouritsuBun(freshman.kegaflag);
     // コンピュータスカウトONで進学先が決まった選手は、成功率の代わりに「決定」
     final bool kettei = _comScoutOn && comScoutKettei(freshman);
     if (kettei) rateStr = '決定';

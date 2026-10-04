@@ -1360,7 +1360,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     // --- 2. 2〜4年生を育成してから、全選手の所属先を決める(1.8.4) ---
     // 1.8.3までは、入学時5000mの記録の順に振り分けてから2〜4年生を育成していたため、
     // 育成後の強さが名声の順とあまり揃わなかった。2〜4年生は先に育成し(育成力は全員150)、
-    // 育成後の強さの順に名声で振り分ける。1年生は今まで通り入学時5000mの記録の順
+    // 育成後の強さの順に名声で振り分ける。育成力が150でない大学に入った選手は、
+    // その大学の育成力で育成し直す。1年生は今まで通り入学時5000mの記録の順
     // (中身は lib/kansuu/shinki_shozoku.dart)
     await shinkiGameShozokuKettei(ghensuu: ghensuu);
 
@@ -1551,7 +1552,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     // --- 2. 2〜4年生を育成してから、全選手の所属先を決める(1.8.4) ---
     // 1.8.3までは、入学時5000mの記録の順に振り分けてから2〜4年生を育成していたため、
     // 育成後の強さが名声の順とあまり揃わなかった。2〜4年生は先に育成し(育成力は全員150)、
-    // 育成後の強さの順に名声で振り分ける。1年生は今まで通り入学時5000mの記録の順
+    // 育成後の強さの順に名声で振り分ける。育成力が150でない大学に入った選手は、
+    // その大学の育成力で育成し直す。1年生は今まで通り入学時5000mの記録の順
     // (中身は lib/kansuu/shinki_shozoku.dart)
     await shinkiGameShozokuKettei(ghensuu: ghensuu);
 

@@ -15,6 +15,8 @@ import 'package:ekiden/constants.dart'; // TEISUUクラスをインポート
 /// [shozokuKetteiMae]: 新規ゲーム開始時に、所属先を決める前の2〜4年生を育成するときはtrue(1.8.4)。
 ///   所属先が決まっていないので、大学の育成力は全員150(最大・初期値)とし、
 ///   ondoflagによるほかの大学の選手の底上げもしない(新規ゲーム開始時はondoflagは0)。
+/// [taishouSenshuIds]: 指定したときは、この中のidの選手だけを育成する(1.8.4。新規ゲーム開始時に、
+///   育成力が150でない大学の選手だけ、その大学の育成力で成長をやり直すときに使う)。
 ///
 /// この関数は、渡されたリスト内のSenshuDataオブジェクトのプロパティを変更します。
 /// 変更を永続化するには、この関数を呼び出した後にHive Boxに保存し直す必要があります。
@@ -35,6 +37,7 @@ Future<void> Ikusei_Com({
   required List<SenshuData> sortedsenshudata,
   required int gakunen,
   bool shozokuKetteiMae = false,
+  Set<int>? taishouSenshuIds,
 }) async {
   final startTime = DateTime.now();
   print("Ikusei_Comに入った");
@@ -64,8 +67,10 @@ Future<void> Ikusei_Com({
 
   // 全選手をループ
   for (int senshuid = 0; senshuid < TEISUU.SENSHUSUU_TOTAL; senshuid++) {
-    // 対象学年の選手のみを処理
-    if (sortedsenshudata[senshuid].gakunen == gakunen) {
+    // 対象学年の選手のみを処理(taishouSenshuIdsを指定したときは、その中の選手だけ)
+    if (sortedsenshudata[senshuid].gakunen == gakunen &&
+        (taishouSenshuIds == null ||
+            taishouSenshuIds.contains(sortedsenshudata[senshuid].id))) {
       //二重育成防止
       /*if ((gh[0].month == 4 && gh[0].day == 25) ||
           (gh[0].month == 7 && gh[0].day == 15)) {

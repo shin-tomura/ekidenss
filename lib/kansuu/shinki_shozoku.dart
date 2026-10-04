@@ -15,6 +15,9 @@ import 'package:ekiden/kansuu/SpurtRyokuHoseitime.dart';
 // 名声の低い大学でも1年目から駅伝予選を突破することがあった。
 // そこで、2〜4年生は先に育成してから(所属先が決まっていないので、育成力は全員150)、
 // 育成後の強さの順に、今まで通り名声で振り分ける。
+// 名声と育成力を維持したリセットでは、育成力が150でない大学に入った2〜4年生だけ、
+// 育成前の状態に戻して、その大学の育成力で育成し直す(育成力の差をつけて始められるように)。
+// 振り分けの順は「育成力150で育ったときの強さ」(素材の良さ)になる。
 // 1年生は今まで通り入学時5000mの記録の順に振り分ける。
 // 毎年4月の新入生の振り分け(RetireNew.dart)は変えていない。
 // ------------------------------------------------------------
@@ -50,6 +53,28 @@ double shokiTsuyosaTime(SenshuData senshu) {
   return time;
 }
 
+// 育成で変わる値(育成し直すときに、育成前に戻すため)
+class _IkuseiMae {
+  final double a;
+  final double magicnumber;
+  final int seichoukaisuu;
+  final int genkaichokumenkaisuu;
+  final int genkaitoppakaisuu;
+  _IkuseiMae(SenshuData s)
+    : a = s.a,
+      magicnumber = s.magicnumber,
+      seichoukaisuu = s.seichoukaisuu,
+      genkaichokumenkaisuu = s.genkaichokumenkaisuu,
+      genkaitoppakaisuu = s.genkaitoppakaisuu;
+  void modosu(SenshuData s) {
+    s.a = a;
+    s.magicnumber = magicnumber;
+    s.seichoukaisuu = seichoukaisuu;
+    s.genkaichokumenkaisuu = genkaichokumenkaisuu;
+    s.genkaitoppakaisuu = genkaitoppakaisuu;
+  }
+}
+
 /// 新規ゲーム開始時(リセットを含む)に、2〜4年生を育成してから、全選手の所属先を決める
 /// (SenshuShokitiSetteiByGakunen(0)で全選手を作り直し、大学の名声を決めたあとに呼ぶ。
 ///  2〜4年生の成長タイプの付け直しは、呼び出し側で今まで通り行う)
@@ -60,6 +85,12 @@ Future<void> shinkiGameShozokuKettei({required Ghensuu ghensuu}) async {
     ..sort((a, b) => a.id.compareTo(b.id));
   final List<SenshuData> sortedSenshuById = senshuBox.values.toList()
     ..sort((a, b) => a.id.compareTo(b.id));
+
+  // 0. 育成前の状態を覚えておく(育成力が150でない大学の選手を、あとで育成し直すため)
+  final Map<int, _IkuseiMae> ikuseiMae = {
+    for (final SenshuData s in sortedSenshuById)
+      if (s.gakunen >= 2 && s.gakunen <= 4) s.id: _IkuseiMae(s),
+  };
 
   // 1. 2〜4年生を先に育成する(春と夏の分で2回。所属先が決まる前なので、育成力は全員150)
   for (int i = 0; i < 2; i++) {
@@ -104,7 +135,33 @@ Future<void> shinkiGameShozokuKettei({required Ghensuu ghensuu}) async {
     );
   }
 
-  // 4. 変更した選手データをHiveに保存し直す
+  // 4. 育成力が150でない大学に入った2〜4年生は、育成前に戻して、その大学の育成力で育成し直す
+  //    (名声と育成力を維持したリセットのとき。普通の新規ゲームは全大学150なので、誰も育成し直さない)
+  final Set<int> yarinaoshi = {
+    for (final SenshuData s in sortedSenshuById)
+      if (ikuseiMae.containsKey(s.id) &&
+          sortedUnivsById[s.univid].ikuseiryoku != 150)
+        s.id,
+  };
+  if (yarinaoshi.isNotEmpty) {
+    for (final int id in yarinaoshi) {
+      ikuseiMae[id]!.modosu(sortedSenshuById[id]);
+    }
+    for (int i = 0; i < 2; i++) {
+      for (int gakunen = 2; gakunen <= 4; gakunen++) {
+        print('学年 $gakunen の選手を、大学の育成力で育成し直し中...');
+        await Ikusei_Com(
+          gh: [ghensuu],
+          sortedunivdata: sortedUnivsById,
+          sortedsenshudata: sortedSenshuById,
+          gakunen: gakunen,
+          taishouSenshuIds: yarinaoshi,
+        );
+      }
+    }
+  }
+
+  // 5. 変更した選手データをHiveに保存し直す
   for (final SenshuData s in sortedSenshuById) {
     await senshuBox.put(s.id, s);
   }

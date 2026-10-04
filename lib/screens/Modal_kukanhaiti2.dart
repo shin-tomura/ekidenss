@@ -7,6 +7,7 @@ import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/constants.dart';
 import 'package:ekiden/kansuu/time_date.dart';
 import 'package:ekiden/kansuu/gakuren_text.dart';
+import 'package:ekiden/kansuu/kukannai_juni.dart'; // 持ちタイムの区間内順位(1.8.8)
 import 'package:ekiden/kansuu/gakuren_kantoku.dart';
 import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/senshu_gakuren_data.dart';
@@ -887,8 +888,8 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
                 spacing: 4,
                 runSpacing: 4,
                 children: [
-                  if (showRank && kukanJuni > 0)
-                    _rankTagBun("区", "$kukanJuni相当"),
+                  // タイムトライアルの4種目も、区間を走る大学の選手全員に記録があれば出す(1.8.8)
+                  if (kukanJuni > 0) _rankTagBun("区", "$kukanJuni相当"),
                   _rankTag("学", g.gakunaijuni_bestkiroku[idx] + 1),
                   if (showRank)
                     _rankTag("全", g.zentaijuni_bestkiroku[idx] + 1),
@@ -1120,13 +1121,26 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
     ];
     return Column(
       children: records
-          .map((r) => _buildRecordRow(s, r['label'], r['idx'], r['showRank']))
+          .map(
+            (r) => _buildRecordRow(gh, s, r['label'], r['idx'], r['showRank']),
+          )
           .toList(),
     );
   }
 
-  Widget _buildRecordRow(SenshuData s, String label, int idx, bool showRank) {
+  Widget _buildRecordRow(
+    Ghensuu gh,
+    SenshuData s,
+    String label,
+    int idx,
+    bool showRank,
+  ) {
     final bool hasRecord = s.time_bestkiroku[idx] != TEISUU.DEFAULTTIME;
+    // 夏の学内タイムトライアルの4種目は、その区間を走る選手全員に記録があるときだけ
+    // 区間内順位も出す(0なら出さない。1.8.8)
+    final int ttKukanJuni = (hasRecord && !showRank)
+        ? kukannaiJuni(s, idx, gh.hyojiracebangou)
+        : 0;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
@@ -1174,6 +1188,7 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
                     _rankTag("学", s.gakunaijuni_bestkiroku[idx] + 1),
                     _rankTag("全", s.zentaijuni_bestkiroku[idx] + 1),
                   ] else ...[
+                    if (ttKukanJuni > 0) _rankTag("区", ttKukanJuni),
                     _rankTag("学", s.gakunaijuni_bestkiroku[idx] + 1),
                   ],
                 ],
@@ -1323,11 +1338,16 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
             String base = TimeDate.timeToFunByouString(s.time_bestkiroku[idx]);
             if (mode == 2) {
               // 詳細版は順位を全て盛り込む
+              // (生成AIが読み違えないように、順位は言葉で書く。1.8.8)
               if (showRank) {
                 base +=
-                    " [区:${s.kukannaijuni[idx] + 1}位 学:${s.gakunaijuni_bestkiroku[idx] + 1}位 全:${s.zentaijuni_bestkiroku[idx] + 1}位]";
+                    " [区間内${s.kukannaijuni[idx] + 1}位 学内${s.gakunaijuni_bestkiroku[idx] + 1}位 全体${s.zentaijuni_bestkiroku[idx] + 1}位]";
               } else {
-                base += " [学:${s.gakunaijuni_bestkiroku[idx] + 1}位]";
+                // 夏の学内タイムトライアルの4種目は、区間を走る選手全員に記録があるときだけ区間内順位も書く
+                final int ttKukanJuni = kukannaiJuni(s, idx, raceIdx);
+                base += ttKukanJuni > 0
+                    ? " [区間内$ttKukanJuni位 学内${s.gakunaijuni_bestkiroku[idx] + 1}位]"
+                    : " [学内${s.gakunaijuni_bestkiroku[idx] + 1}位]";
               }
             }
             return base;
@@ -1349,9 +1369,8 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
       }
     }
     if (mode == 2) {
-      sb.writeln(
-        "\n※「区」はその区間にエントリーされている選手の中でのその種目の持ちタイムの順位、「学」はその種目の所属大学学内での持ちタイムの順位、「全」はその種目の学生全体での持ちタイムの順位",
-      );
+      sb.writeln("\n$mochiTimeJuniChuui");
+      sb.writeln(ttKirokuChuui);
     }
 
     return sb.toString();
@@ -1396,6 +1415,12 @@ String kukanZenDaigakuText(int targetKukanIdx) {
   final entryUnivs =
       uBox.values.where((u) => u.taikaientryflag[raceIdx] == 1).toList()
         ..sort((a, b) => a.id.compareTo(b.id)); // 大学ID順
+
+  // この区間を走る大学の選手(夏の学内タイムトライアルの4種目の区間内順位に使う。1.8.8)
+  final List<SenshuData> kukanSenshu = kukanHashiruSenshu(
+    raceIdx,
+    targetKukanIdx,
+  );
 
   StringBuffer sb = StringBuffer();
   String kyoristring =
@@ -1459,13 +1484,22 @@ String kukanZenDaigakuText(int targetKukanIdx) {
           String base = TimeDate.timeToFunByouString(s.time_bestkiroku[idx]);
 
           // 詳細版なので順位情報を付与
+          // (生成AIが読み違えないように、順位は言葉で書く。1.8.8)
           if (showRank) {
             // 区間順位・学内順位・全体順位
             base +=
-                " [区:${s.kukannaijuni[idx] + 1}位 学:${s.gakunaijuni_bestkiroku[idx] + 1}位 全:${s.zentaijuni_bestkiroku[idx] + 1}位]";
+                " [区間内${s.kukannaijuni[idx] + 1}位 学内${s.gakunaijuni_bestkiroku[idx] + 1}位 全体${s.zentaijuni_bestkiroku[idx] + 1}位]";
           } else {
-            // 学内順位のみ
-            base += " [学:${s.gakunaijuni_bestkiroku[idx] + 1}位]";
+            // 夏の学内タイムトライアルの4種目は、区間を走る選手全員に記録があるときだけ区間内順位も書く
+            // (なければ学内順位のみ。1.8.8)
+            final int ttKukanJuni = ttKukannaiJuni(
+              s.time_bestkiroku[idx],
+              idx,
+              kukanSenshu,
+            );
+            base += ttKukanJuni > 0
+                ? " [区間内$ttKukanJuni位 学内${s.gakunaijuni_bestkiroku[idx] + 1}位]"
+                : " [学内${s.gakunaijuni_bestkiroku[idx] + 1}位]";
           }
           return base;
         }
@@ -1498,9 +1532,8 @@ String kukanZenDaigakuText(int targetKukanIdx) {
     }
   }
 
-  sb.writeln(
-    "\n※「区」はその区間にエントリーされている選手の中でのその種目の持ちタイムの順位、「学」はその種目の所属大学学内での持ちタイムの順位、「全」はその種目の学生全体での持ちタイムの順位",
-  );
+  sb.writeln("\n$mochiTimeJuniChuui");
+  sb.writeln(ttKirokuChuui);
   if (gakurenAri) {
     sb.write(gakurenOpChuui);
     sb.writeln(gakurenKukanJuniChuui);

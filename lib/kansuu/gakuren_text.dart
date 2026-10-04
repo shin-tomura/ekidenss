@@ -8,6 +8,7 @@ import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/senshu_gakuren_data.dart';
 import 'package:ekiden/univ_gakuren_data.dart';
 import 'package:ekiden/kansuu/time_date.dart';
+import 'package:ekiden/kansuu/kukannai_juni.dart'; // 持ちタイムの区間内順位(1.8.8)
 import 'package:ekiden/kansuu/gakuren_kantoku.dart';
 
 // ------------------------------------------------------------
@@ -217,9 +218,10 @@ void gakurenSenshuShousaiKaku(
     }
     final double time = s.time_bestkiroku[idx];
     String base = TimeDate.timeToFunByouString(time);
-    final String gaku = '学:${s.gakunaijuni_bestkiroku[idx] + 1}位';
+    // 生成AIが読み違えないように、順位は言葉で書く(1.8.8)
+    final String gaku = '学内${s.gakunaijuni_bestkiroku[idx] + 1}位';
     if (showRank) {
-      final String zen = '全:${s.zentaijuni_bestkiroku[idx] + 1}位';
+      final String zen = '全体${s.zentaijuni_bestkiroku[idx] + 1}位';
       if (hashiru) {
         int juni = 1;
         for (final d in daigaku) {
@@ -227,12 +229,15 @@ void gakurenSenshuShousaiKaku(
             juni++;
           }
         }
-        base += " [区:$juni位相当 $gaku $zen]";
+        base += " [区間内$juni位相当 $gaku $zen]";
       } else {
         base += " [$gaku $zen]";
       }
     } else {
-      base += " [$gaku]";
+      // 夏の学内タイムトライアルの4種目は、区間を走る大学の選手全員に記録があるときだけ
+      // 区間内の順位相当も書く(1.8.8)
+      final int ttJuni = hashiru ? ttKukannaiJuni(time, idx, daigaku) : 0;
+      base += ttJuni > 0 ? " [区間内$ttJuni位相当 $gaku]" : " [$gaku]";
     }
     return base;
   }
@@ -249,6 +254,7 @@ void gakurenSenshuShousaiKaku(
 
 /// 学連選抜の選手[s]の種目[idx]の持ちタイムを、走る区間の大学の選手と比べた順位相当(1が1位相当)。
 /// 区間を走らない(補欠)ときや記録がないときは0(区間配置確認の画面の「区」で使う。1.8.2)
+/// 夏の学内タイムトライアルの4種目は、区間を走る大学の選手全員に記録があるときだけ出す(1.8.8)
 int gakurenKukanJuniSoutou(Senshu_Gakuren_Data s, int idx, Ghensuu gh) {
   final int kukan = gakurenEntry(s);
   if (kukan < 0 || kukan >= gh.kukansuu_taikaigoto[_raceIndex]) return 0;
@@ -257,6 +263,9 @@ int gakurenKukanJuniSoutou(Senshu_Gakuren_Data s, int idx, Ghensuu gh) {
     return 0;
   }
   final double time = s.time_bestkiroku[idx];
+  if (ttShumoku(idx)) {
+    return ttKukannaiJuni(time, idx, _kukanDaigakuSenshu(kukan));
+  }
   int juni = 1;
   for (final d in _kukanDaigakuSenshu(kukan)) {
     if (d.time_bestkiroku.length > idx && d.time_bestkiroku[idx] < time) {
@@ -269,9 +278,9 @@ int gakurenKukanJuniSoutou(Senshu_Gakuren_Data s, int idx, Ghensuu gh) {
 /// 学連選抜の選手の所属大学の名前(大学の画面で使う。1.8.2)
 String gakurenShozoku(Senshu_Gakuren_Data s) => _univMei()[s.univid] ?? '---';
 
-/// 区間配置確認の「区」「学」「全」の説明(学連選抜の「区」は○位相当)
+/// 生成AIに渡すテキストの「区間内」の説明(学連選抜の「区間内」は○位相当。1.8.8で言葉の書き方にした)
 const String gakurenKukanJuniChuui =
-    '※学連選抜(OP)の選手の「区」は、その区間にエントリーされている大学の選手と比べた場合の、その種目の持ちタイムの順位(○位相当)です。';
+    '※学連選抜(OP)の選手の「区間内」は、その区間にエントリーされている大学の選手と比べた場合の、その種目の持ちタイムの順位(○位相当)です。';
 
 /// 学連選抜の区間配置のテキスト(学連選抜の区間配置の画面からコピーする)
 String gakurenKukanHaitiText(Ghensuu gh) {
@@ -318,7 +327,8 @@ String gakurenKukanHaitiText(Ghensuu gh) {
   }
   sb.writeln('');
   sb.writeln(gakurenKukanJuniChuui);
-  sb.writeln('※「学」はその種目の所属大学学内での持ちタイムの順位、「全」はその種目の学生全体での持ちタイムの順位です。');
+  sb.writeln('※「学内」はその種目の所属大学学内での持ちタイムの順位、「全体」はその種目の学生全体での持ちタイムの順位です。');
+  sb.writeln(ttKirokuChuui);
   sb.writeln('#箱庭小駅伝SS');
   return sb.toString();
 }

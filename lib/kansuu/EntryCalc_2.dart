@@ -239,16 +239,11 @@ Future<List<int>> EntryCalc_2({
     return [];
   } else if (racebangou >= 13 && racebangou <= 16) {
     for (int i = 0; i < TEISUU.SENSHUSUU_TOTAL; i++) {
-      if (kantoku.yobiint2[19] == 1 ||
-          sortedSenshuData[i].univid == gh[0].MYunivid) {
-        sortedSenshuData[i]
-                .entrykukan_race[racebangou][sortedSenshuData[i].gakunen - 1] =
-            0;
-      } else {
-        sortedSenshuData[i]
-                .entrykukan_race[racebangou][sortedSenshuData[i].gakunen - 1] =
-            -1;
-      }
+      // 夏の学内タイムトライアルは、いつも全大学で行う(1.8.8。それまでは設定で
+      // 自分の大学だけにもできた(KantokuData.yobiint2[19])が、設定をなくした)
+      sortedSenshuData[i]
+              .entrykukan_race[racebangou][sortedSenshuData[i].gakunen - 1] =
+          0;
       sortedSenshuData[i].string_racesetumei = "";
       await sortedSenshuData[i].save();
     }

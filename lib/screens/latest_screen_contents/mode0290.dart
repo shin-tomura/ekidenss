@@ -21,9 +21,73 @@ class Mode0290Content extends StatefulWidget {
 }
 
 class _Mode0290ContentState extends State<Mode0290Content> {
+  // 学連選抜の区間配置の画面を開いた年(アプリを起動している間だけ覚えておく。1.8.8)
+  // (区間配置を決められることに気づかずに進んでしまわないように、開いていなければ進むときに確認を出す)
+  static int _kukanHaitiHiraitaNen = -1;
+
+  // 学連選抜の監督をしているか(自分の大学が正月駅伝に出場できず、監督をする設定のとき)
+  bool _gakurenKantokuChuu() {
+    final KantokuData? kantoku = Hive.box<KantokuData>(
+      'kantokuBox',
+    ).get('KantokuData');
+    UnivData? myUniv;
+    for (final UnivData u in Hive.box<UnivData>('univBox').values) {
+      if (u.id == widget.ghensuu.MYunivid) myUniv = u;
+    }
+    if (kantoku == null || myUniv == null) return false;
+    return gakurenKantokuChuu(kantoku, myUniv);
+  }
+
+  // 学連選抜の区間配置を決める画面を開く
+  void _kukanHaitiHiraku() {
+    _kukanHaitiHiraitaNen = widget.ghensuu.year;
+    showGeneralDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.8),
+      barrierDismissible: true,
+      barrierLabel: '学連選抜の区間配置',
+      transitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (context, _, __) => const ModalGakurenKukanHenshuu(),
+    );
+  }
+
   // 進むボタンのアクション
-  void _handleAdvanceButton() {
-    // 後の処理をここに記述
+  // 学連選抜の監督をしていて、この年に区間配置の画面をまだ開いていなければ、確認を出す(1.8.8)
+  Future<void> _handleAdvanceButton() async {
+    if (_gakurenKantokuChuu() &&
+        _kukanHaitiHiraitaNen != widget.ghensuu.year) {
+      final String? erabi = await showDialog<String>(
+        context: context,
+        builder: (BuildContext dialogContext) {
+          return AlertDialog(
+            title: const Text(
+              '学連選抜の区間配置',
+              style: TextStyle(color: Colors.black),
+            ),
+            content: const Text(
+              '学連選抜の区間配置をまだ確かめていません。このまま進むと、コンピュータが決めた区間配置で走ります。',
+              style: TextStyle(color: Colors.black),
+            ),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop('kimeru'),
+                child: const Text('区間配置を決める'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop('susumu'),
+                child: const Text('このまま進む'),
+              ),
+            ],
+          );
+        },
+      );
+      if (!mounted) return;
+      if (erabi == 'kimeru') {
+        _kukanHaitiHiraku();
+        return;
+      }
+      if (erabi != 'susumu') return; // 確認を閉じたときは進まない
+    }
     widget.onAdvanceMode?.call();
   }
 
@@ -86,6 +150,28 @@ class _Mode0290ContentState extends State<Mode0290Content> {
         onChanged: (bool v) => _gakurenKantokuHozon(kantoku, v),
         activeColor: Colors.blue,
       ),
+      // 区間配置を決めるボタンは、見落とさないように切り替えのすぐ下に横幅いっぱいで出す(1.8.8)
+      if (suru) ...[
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: _kukanHaitiHiraku,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange.shade700,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+            ),
+            child: const Text(
+              "学連選抜の区間配置を決める",
+              style: TextStyle(
+                fontSize: HENSUU.fontsize_honbun,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+      ],
       if (suru && shutsujouSuu > 0) ...[
         Row(
           children: [
@@ -127,25 +213,6 @@ class _Mode0290ContentState extends State<Mode0290Content> {
         ),
         const SizedBox(height: 8),
       ],
-      if (suru)
-        ElevatedButton(
-          onPressed: () {
-            showGeneralDialog(
-              context: context,
-              barrierColor: Colors.black.withOpacity(0.8),
-              barrierDismissible: true,
-              barrierLabel: '学連選抜の区間配置',
-              transitionDuration: const Duration(milliseconds: 300),
-              pageBuilder: (context, _, __) =>
-                  const ModalGakurenKukanHenshuu(),
-            );
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.orange.shade700,
-            foregroundColor: Colors.white,
-          ),
-          child: const Text("学連選抜の区間配置を決める"),
-        ),
       const SizedBox(height: 20),
     ];
   }
@@ -169,10 +236,11 @@ class _Mode0290ContentState extends State<Mode0290Content> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Expanded(
+                      // 学連選抜の監督をする年は、区間配置も決められる画面だと分かるようにする(1.8.8)
+                      Expanded(
                         child: Text(
-                          "学連選抜編成",
-                          style: TextStyle(
+                          _gakurenKantokuChuu() ? "学連選抜編成・区間配置" : "学連選抜編成",
+                          style: const TextStyle(
                             fontSize: HENSUU.fontsize_honbun,
                             color: HENSUU.textcolor,
                           ),

@@ -1,3 +1,4 @@
+import 'dart:async'; // FutureOr(損得予測の文は計算を待ってから作る。1.8.8)
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -17,6 +18,7 @@ import 'package:ekiden/screens/Modal_kukanresult.dart' as kekka;
 import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/kansuu/shiyou_text.dart'; // ゲームの仕様(1.8.3)
 import 'package:ekiden/kansuu/mokuhyou_kingin.dart'; // 目標達成時の金銀(1.8.3)
+import 'package:ekiden/kansuu/siji_sontoku_text.dart'; // 指示ごとの損得予測(1.8.8)
 
 // ------------------------------------------------------------
 // 生成AIに渡すテキストのまとめボタン(1.8.2)
@@ -28,6 +30,9 @@ import 'package:ekiden/kansuu/mokuhyou_kingin.dart'; // 目標達成時の金銀
 //    最後の区間の分は結果画面の一番上に出す。1.8.3)
 // ・次区間予想セット: 直近の通過順位速報+次の区間のコース情報+次の区間の全大学詳細リスト
 //   (次の区間の展開予想や指示の相談に。1区のスタート前は通過順位速報なし。1.8.3)
+//   レース画面で、指示ごとの損得予測の画面を開ける場面(駅伝の2区以降)では、最後に
+//   自分の大学の選手(学連選抜の監督をしているときは学連選抜の選手)の損得予測も入れる。
+//   損得予測は単体でもコピーできる(画面と同じ内容。期待値と今選んでいる指示は入れない。1.8.8)
 // ・直近区間結果セットと次区間予想セットの先頭には、レースの名前と何区か(最終区間か)の見出しを付ける(1.8.3)
 // ・振り返りセット: 総合成績+自分の大学のレース経過(結果画面で、レース後の振り返りに)
 // ・学連選抜の振り返りセット: 総合成績+学連選抜のレース経過+学連選抜の区間配置(結果画面で)
@@ -49,7 +54,8 @@ class _AiCopyKoumoku {
   final String title;
   final String setsumei;
   final IconData icon;
-  final String Function()? tsukuru; // コピーする文を作る
+  // コピーする文を作る(損得予測のように計算を待つものは、Futureを返す。1.8.8)
+  final FutureOr<String> Function()? tsukuru;
   // 区間を選んでコピーするもの(区間の番号(0が1区)から文を作る)
   final String Function(int)? kukanTsukuru;
   final int kukanKazu; // 選べる区間の数
@@ -437,23 +443,47 @@ class AiCopyMatomeButton extends StatelessWidget {
       );
     }
     // 次の区間の展開予想用(直近区間結果セットのすぐ下に出す。1.8.3)
+    // レース画面で、指示ごとの損得予測の画面を開ける場面では、損得予測も入れる(1.8.8)
+    // (目標順位・当日変更の画面では、区間配置や目標順位が決まる前なので入れない)
+    final bool sontokuAri =
+        jikaiAri && !mokuhyouGamen && !toujitsuGamen && sijiSontokuAiAri(gh);
     if (jikaiAri) {
       list.add(
         _AiCopyKoumoku(
           '次区間予想セット($jikaiMei)',
-          chokkin >= 0
-              ? '${kukanMei}の通過順位速報と、これから走る${jikaiMei}のコース情報・全大学詳細リストをまとめてコピー。次の区間の展開予想や指示の相談に'
-              : 'これから走る${jikaiMei}のコース情報と全大学詳細リストをまとめてコピー。${jikaiMei}の展開予想や指示の相談に',
+          (chokkin >= 0
+                  ? '${kukanMei}の通過順位速報と、これから走る${jikaiMei}のコース情報・全大学詳細リストをまとめてコピー。次の区間の展開予想や指示の相談に'
+                  : 'これから走る${jikaiMei}のコース情報と全大学詳細リストをまとめてコピー。${jikaiMei}の展開予想や指示の相談に') +
+              (sontokuAri ? '。指示ごとの損得予測も入る' : ''),
           Icons.insights,
           // 先頭の見出し(レースの名前と何区か)のあと、
-          // 今の状況(通過順位と差)→次の区間のコース→次の区間を走る選手の順
-          () =>
-              '${_setMidashi(gh, race, jikai, '次区間予想')}\n\n' +
-              [
-                if (chokkin >= 0) tuukaJuniSokuhouText(gh, chokkin),
-                courseKukanText(gh, race, jikai),
-                kukanZenDaigakuText(jikai),
-              ].where((t) => t.isNotEmpty).join(_setKugiri),
+          // 今の状況(通過順位と差)→次の区間のコース→次の区間を走る選手→指示ごとの損得予測の順
+          () async {
+            final String sontoku = sontokuAri
+                ? await sijiSontokuAiText(gh)
+                : '';
+            return '${_setMidashi(gh, race, jikai, '次区間予想')}\n\n' +
+                [
+                  if (chokkin >= 0) tuukaJuniSokuhouText(gh, chokkin),
+                  courseKukanText(gh, race, jikai),
+                  kukanZenDaigakuText(jikai),
+                  sontoku,
+                ].where((t) => t.isNotEmpty).join(_setKugiri);
+          },
+        ),
+      );
+    }
+    // 指示ごとの損得予測だけをコピー(次区間予想セットのすぐ下。1.8.8)
+    if (sontokuAri) {
+      list.add(
+        _AiCopyKoumoku(
+          '指示ごとの損得予測($jikaiMei)',
+          'これから走る選手の、指示ごとに成功・失敗したときの損得の見込み(指示ごとの損得予測の画面と同じ内容)',
+          Icons.compare_arrows,
+          () async {
+            final String t = await sijiSontokuAiText(gh);
+            return t.isEmpty ? '指示ごとの損得予測を計算できませんでした。' : t;
+          },
         ),
       );
     }
@@ -759,11 +789,11 @@ class AiCopyMatomeButton extends StatelessWidget {
                         fontSize: 12,
                       ),
                     ),
-                    onTap: () => _copy(
+                    onTap: () async => _copy(
                       sheetContext,
                       messenger,
                       k.title,
-                      k.tsukuru!(),
+                      await k.tsukuru!(),
                     ),
                   ),
             ],

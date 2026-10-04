@@ -4,7 +4,7 @@ import 'package:ekiden/ghensuu.dart';
 import 'package:ekiden/senshu_data.dart';
 import 'package:ekiden/constants.dart'; // HENSUU
 import 'package:ekiden/kansuu/siji_sontoku.dart';
-import 'package:ekiden/album.dart';
+import 'package:ekiden/kansuu/siji_sontoku_text.dart'; // 画面と生成AI向けで同じ文(1.8.8)
 
 /// 「指示ごとの損得予測」の画面(1.8.1)
 /// 駅伝の2区以降で、走り出す直前の選手の、指示なし・前半突っ込み・前半抑えそれぞれの
@@ -111,7 +111,7 @@ class _ModalSijiSontokuViewState extends State<ModalSijiSontokuView> {
                   ),
                 const SizedBox(height: 4),
                 Text(
-                  _joukyouBun(sontoku),
+                  sijiSontokuJoukyouBun(sontoku, gakuren: widget.gakuren),
                   style: TextStyle(
                     color: Colors.amber,
                     fontSize: HENSUU.fontsize_honbun,
@@ -143,9 +143,9 @@ class _ModalSijiSontokuViewState extends State<ModalSijiSontokuView> {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  '・秒数は、この選手のこの区間の見込みタイムから計算したものです。実際の補正とは1秒ほどずれることがあります。\n'
-                  '・成功率は、前半突っ込みは駅伝男、前半抑えは平常心の値と同じです。\n'
-                  '・前半突っ込みか前半抑えの指示を出すと、目標順位による補正(下回ったときの前半の突っ込み、上回ったときのほっと一息)はかからず、代わりに指示の成否による補正がかかります。',
+                  '$sijiSontokuChuuiByousuu\n'
+                  '$sijiSontokuChuuiSeikouritsu\n'
+                  '$sijiSontokuChuuiHosei',
                   style: TextStyle(
                     color: HENSUU.textcolor.withOpacity(0.8),
                     fontSize: HENSUU.fontsize_honbun - 2,
@@ -164,11 +164,11 @@ class _ModalSijiSontokuViewState extends State<ModalSijiSontokuView> {
                     ),
                   ),
                 // 学連選抜の選手には、指示の補正のあとにモチベーション低下補正がかかる(1.8.2)
-                if (widget.gakuren && _motivationHoseiAri())
+                if (widget.gakuren && sijiSontokuMotivationHoseiAri())
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
                     child: Text(
-                      '・学連選抜の選手には、2区以降で「学連選抜モチベーション設定」のモチベーション低下補正もかかります。この補正は指示の補正のあとにかかるので、ここの秒数には入っていません。走ったあとの補正の説明では、指示の補正の秒数とは別に「モチベーション低下補正」として出ます(区間タイムはその分さらに遅くなります)。',
+                      sijiSontokuChuuiMotivation,
                       style: TextStyle(
                         color: Colors.amber,
                         fontSize: HENSUU.fontsize_honbun - 2,
@@ -180,7 +180,7 @@ class _ModalSijiSontokuViewState extends State<ModalSijiSontokuView> {
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
                     child: Text(
-                      '・補正の強さを設定で変更しています(説明画面の設定タブの「目標順位・指示の補正設定」)。',
+                      sijiSontokuChuuiTsuyosa,
                       style: TextStyle(
                         color: Colors.amber,
                         fontSize: HENSUU.fontsize_honbun - 2,
@@ -195,58 +195,9 @@ class _ModalSijiSontokuViewState extends State<ModalSijiSontokuView> {
     );
   }
 
-  /// 学連選抜のモチベーション低下補正をかける設定か(Album.yobiint4が1以上)
-  bool _motivationHoseiAri() {
-    final Album? album = Hive.box<Album>('albumBox').get('AlbumData');
-    return album != null && album.yobiint4 > 0;
-  }
-
-  /// 襷を受けた時点の状況の文
-  String _joukyouBun(SijiSontoku s) {
-    final int juni = s.juni + 1;
-    final int mokuhyou = s.mokuhyou + 1;
-    if (s.joukyou == SijiSontokuJoukyou.gakurenMokuhyouNai) {
-      return '襷を受けた時点で$juni位相当(学連選抜の目標の$mokuhyou位以内。学連選抜にはほっと一息はありません)';
-    }
-    if (widget.gakuren && s.joukyou == SijiSontokuJoukyou.shitamawari) {
-      final double? sa = s.timeSa;
-      final String saBun = sa == null
-          ? ''
-          : '・$mokuhyou位と${sa.toStringAsFixed(1)}秒差';
-      return '襷を受けた時点で$juni位相当(学連選抜の目標の$mokuhyou位を下回っています$saBun)';
-    }
-    if (widget.gakuren && s.joukyou == SijiSontokuJoukyou.uwamawari) {
-      return '襷を受けた時点で$juni位相当(学連選抜の目標の$mokuhyou位を${mokuhyou - juni}つ上回っています)';
-    }
-    if (widget.gakuren && s.joukyou == SijiSontokuJoukyou.choudo) {
-      return '襷を受けた時点で$juni位相当(学連選抜の目標順位ちょうど)';
-    }
-    if (s.joukyou == SijiSontokuJoukyou.fukuroStart) {
-      return '6区は復路のスタートなので、往路の順位による目標順位の補正はありません';
-    }
-    if (s.joukyou == SijiSontokuJoukyou.shitamawari) {
-      final double? sa = s.timeSa;
-      final String saBun = sa == null
-          ? ''
-          : '・$mokuhyou位と${sa.toStringAsFixed(1)}秒差';
-      return '襷を受けた時点で$juni位(目標$mokuhyou位を下回っています$saBun)';
-    }
-    if (s.joukyou == SijiSontokuJoukyou.uwamawari) {
-      return '襷を受けた時点で$juni位(目標$mokuhyou位を${mokuhyou - juni}つ上回っています)';
-    }
-    return '襷を受けた時点で$juni位(目標順位ちょうど)';
-  }
-
   /// 指示なしの行(理由も付ける。補正の強さが0%で損得がないときは理由を出さない)
   Widget _nashiGyou(SijiSontoku s) {
-    String riyuu = '';
-    if (s.nashi == 0.0) {
-      riyuu = '';
-    } else if (s.joukyou == SijiSontokuJoukyou.shitamawari) {
-      riyuu = '目標順位を下回ったため、前半無理に突っ込んでしまう分';
-    } else if (s.joukyou == SijiSontokuJoukyou.uwamawari) {
-      riyuu = '目標順位を上回ったため、ほっと一息ついてしまう分';
-    }
+    final String riyuu = sijiSontokuNashiRiyuu(s);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -265,16 +216,9 @@ class _ModalSijiSontokuViewState extends State<ModalSijiSontokuView> {
 
   /// 「成功:約38秒の得」のような1行
   Widget _sontokuGyou(String label, double byou) {
-    final String atai;
+    final String atai = sijiSontokuAtai(byou);
     Color iro = HENSUU.textcolor;
-    if (byou == 0.0) {
-      atai = '損得なし';
-    } else if (byou.abs() < 0.5) {
-      atai = byou > 0 ? '1秒未満の損' : '1秒未満の得';
-      iro = byou > 0 ? _sonColor : _tokuColor;
-    } else {
-      final int maru = byou.abs().round();
-      atai = byou > 0 ? '約$maru秒の損' : '約$maru秒の得';
+    if (byou != 0.0) {
       iro = byou > 0 ? _sonColor : _tokuColor;
     }
     return Text.rich(

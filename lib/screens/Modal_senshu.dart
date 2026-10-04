@@ -682,9 +682,11 @@ class _ModalSenshuDetailViewState extends State<ModalSenshuDetailView> {
                           const SizedBox(height: 8),
 
                           // 各種能力値
+                          // 成長回数(育成で基本走力が伸びた段階の数。1年で12増える。
+                          // 育成が二重にかかっていないかを確かめるためのもの。1.8.5で「動作検証用」から名前を変えた)
                           if (kantoku.yobiint2[17] == 1)
                             _buildAbilityRow(
-                              '動作検証用',
+                              '成長回数',
                               1,
                               currentSenshu.seichoukaisuu,
                             ),

@@ -383,6 +383,9 @@ Future<void> RaceCalc({
       );
 
       // Theoretical time calculation
+      // ※記録会(レース番号10・11・12)で通るタイムの計算(この下の理論タイム・タイム調整・出過ぎ補正・
+      // ロード適性・ペース変動対応力・長距離粘り・スパート力)や、能力の値の求め方を変えたら、
+      // 箱庭モードの選手の編集画面の理論値(riron_kirokukai_time.dart)も直すこと(1.8.5)
       final kyori = tempkyori;
       double returntime = 0.0;
 

@@ -325,6 +325,11 @@ ShiyouSetsu shiyouSiji({bool setsumeisho = false}) {
   }
   gyou.addAll([
     ..._shougatsuYosenSijiGyou,
+    // 「おまかせで組む」(説明書だけ。1.8.8。組み方は yosen_omakase.dart)
+    if (setsumeisho) ...[
+      '・正月駅伝予選のレース画面の「おまかせで組む」で、指示と設定タイムをまとめて入れられます(入れたあとに直してから確定できます)。',
+      '　・試走タイムの近い選手どうしで集団を作り、駅伝男が90以上の選手は前半突っ込みにします。',
+    ],
     '・コンピュータの大学も、駅伝男や平常心の高い選手には指示を出すことがあります。',
   ]);
   return ShiyouSetsu('レース中の指示', gyou);

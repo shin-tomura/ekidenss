@@ -32,6 +32,7 @@ import 'package:ekiden/screens/gakuren_copy_button.dart';
 import 'package:ekiden/kansuu/jibun_keika_text.dart';
 import 'package:ekiden/kansuu/gakuren_text.dart'; // 学連選抜の指示の内容と結果の文(1.8.3)
 import 'package:ekiden/screens/ai_copy_matome.dart';
+import 'package:ekiden/kansuu/yosen_omakase.dart'; // 正月駅伝予選の「おまかせで組む」(1.8.8)
 
 String _getCombinedDifficultyText(KantokuData kantoku, Ghensuu currentGhensuu) {
   // 難易度モードを取得 (0:通常, 1:極, 2:天)
@@ -199,6 +200,125 @@ class _Mode0350ContentState extends State<Mode0350Content> {
           fontSize: HENSUU.fontsize_honbun,
         ),
       ),
+    );
+  }
+
+  // 正月駅伝予選の「おまかせで組む」ボタン(1.8.8。組み方は yosen_omakase.dart)
+  // 押すと確認を出してから、自分の大学の選手の指示と集団ごとの設定タイムを上書きする
+  // (そのあとプレイヤーが直してから、今まで通り確定する)
+  Widget _buildYosenOmakaseButton(
+    Ghensuu currentGhensuu,
+    List<SenshuData> gakunenjununivfilteredsenshudata,
+  ) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: TextButton.icon(
+        onPressed: () =>
+            _yosenOmakase(currentGhensuu, gakunenjununivfilteredsenshudata),
+        icon: const Icon(
+          Icons.auto_fix_high,
+          size: 18,
+          color: HENSUU.LinkColor,
+        ),
+        label: const Text(
+          'おまかせで組む',
+          style: TextStyle(
+            color: HENSUU.LinkColor,
+            fontSize: HENSUU.fontsize_honbun,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // 「おまかせで組む」を押したとき(1.8.8)
+  // [senshuList] は指示の欄と同じ並びの自分の大学の選手(SijiSelectedOptionの番号と同じ)
+  Future<void> _yosenOmakase(
+    Ghensuu currentGhensuu,
+    List<SenshuData> senshuList,
+  ) async {
+    final Shuudansou? sd = shuudansou;
+    if (sd == null) return;
+    final bool? kumu = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('おまかせで組む', style: TextStyle(color: Colors.black)),
+          content: const SingleChildScrollView(
+            child: Text(
+              '今の指示と集団の設定タイムを、次の組み方で上書きします。\n'
+              '・駅伝男が90以上の選手は、フリー走の前半突っ込み\n'
+              '・残りは、試走タイムの近い選手どうしで集団走(最大6集団)\n'
+              '・平常心の高い選手を、できるだけ別々の集団に入れる\n'
+              '・設定タイムは、集団で一番速い選手の試走タイムに合わせる\n'
+              '・集団に入れない選手はフリー走(平常心が90以上なら前半抑え)\n'
+              '組んだあとに確かめて、必要なら直してから確定してください。',
+              style: TextStyle(color: Colors.black),
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('キャンセル'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('組む'),
+            ),
+          ],
+        );
+      },
+    );
+    if (kumu != true) return;
+
+    // 正月駅伝予選を走る選手(試走タイムと駅伝男・平常心)
+    final int race = currentGhensuu.hyojiracebangou;
+    final List<YosenOmakaseSenshu> taishou = [];
+    for (int i = 0; i < senshuList.length; i++) {
+      final SenshuData s = senshuList[i];
+      if (s.entrykukan_race[race][s.gakunen - 1] !=
+          currentGhensuu.nowracecalckukan) {
+        continue;
+      }
+      if (s.id < 0 || s.id >= sd.sisoutime.length) continue;
+      taishou.add(
+        YosenOmakaseSenshu(
+          bangou: i,
+          sisou: sd.sisoutime[s.id],
+          konjou: s.konjou,
+          heijousin: s.heijousin,
+        ),
+      );
+    }
+    if (taishou.isEmpty) return;
+    final YosenOmakaseKekka kekka = yosenOmakase(taishou);
+
+    // 指示(走らない選手はフリー走にしておく。確定のときは全員の指示を見るため)
+    for (
+      int i = 0;
+      i < senshuList.length && i < currentGhensuu.SijiSelectedOption.length;
+      i++
+    ) {
+      currentGhensuu.SijiSelectedOption[i] = kekka.sentaku[i] ?? 0;
+    }
+    await currentGhensuu.save();
+    // 集団ごとの設定タイム(使わない集団はそのまま)
+    for (
+      int g = 0;
+      g < kekka.setteiByou.length &&
+          g < sd.sijioption_fun.length &&
+          g < sd.sijioption_byou.length;
+      g++
+    ) {
+      final int? t = kekka.setteiByou[g];
+      if (t == null) continue;
+      sd.sijioption_fun[g] = t ~/ 60;
+      sd.sijioption_byou[g] = t % 60;
+    }
+    await sd.save();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('おまかせで組みました。確かめてから確定してください')),
     );
   }
 
@@ -430,6 +550,16 @@ class _Mode0350ContentState extends State<Mode0350Content> {
                                       fontSize: HENSUU.fontsize_honbun - 2,
                                     ),
                                   ),
+                                ),
+                              // 正月駅伝予選の「おまかせで組む」(自分の大学が走るとき。1.8.8)
+                              if (currentGhensuu.hyojiracebangou == 4 &&
+                                  nowracekukanfilteredsenshudata.any(
+                                    (s) =>
+                                        s.univid == currentGhensuu.MYunivid,
+                                  ))
+                                _buildYosenOmakaseButton(
+                                  currentGhensuu,
+                                  gakunenjununivfilteredsenshudata,
                                 ),
                               // 選手への指示と区間成績表示
                               SenshuSijiSection(

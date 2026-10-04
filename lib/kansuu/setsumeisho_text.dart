@@ -50,8 +50,10 @@ List<SetsumeishoGroup> setsumeishoGroupList() {
     SetsumeishoGroup('選手と能力', [
       SetsumeishoKoumoku(
         shiyouNouryoku(setsumeisho: true),
+        // △は、駅伝の2区と3区・正月駅伝予選(ロード適性とペース変動対応力)と、
+        // クロカン1万(坂の能力とペース変動対応力)。「少し効く」から直した(1.8.6)
         zuSetsumei:
-            '参考資料: ロード適性・ペース変動対応力と各競技との関係性(○はよく効く、△は少し効く)',
+            '参考資料: ロード適性・ペース変動対応力と各競技との関係性(○はよく効く、△はほかの能力と一緒に効く)',
         zu: const ['lib/assets/gazou/nouryoku.png'],
       ),
       SetsumeishoKoumoku(shiyouMochiTime(setsumeisho: true)),

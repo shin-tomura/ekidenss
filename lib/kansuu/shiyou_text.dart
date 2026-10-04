@@ -166,13 +166,14 @@ ShiyouSetsu shiyouNouryoku({bool setsumeisho = false}) {
     ]),
     '・登り適性・下り適性・アップダウン対応力は、互いに無関係に値を決めています(クロカンが強くても、登りが強いとは限りません)。',
     ..._nouryokuGyou(kantoku, setsumeisho, nouryokuEikyodoRoadIndex, 'ロード適性', [
-      '・ロード適性: 駅伝の4区以降でよく効き、2区と3区では少し効きます。1区では効きません。',
-      '・ロード適性は、正月駅伝予選でも少し効きます。ハーフ・ロード1万の持ちタイムにも関係します。',
+      '・ロード適性: 駅伝の4区以降でよく効きます。1区では効きません。',
+      '・ロード適性は、ハーフ・ロード1万の持ちタイムにも関係します。',
     ]),
     ..._nouryokuGyou(kantoku, setsumeisho, nouryokuEikyodoPaceIndex, 'ペース変動対応力', [
-      '・ペース変動対応力: 駅伝の1区と11月駅伝予選でよく効きます。駅伝の2区と3区、正月駅伝予選では少し効き、駅伝の4区以降では効きません。',
+      '・ペース変動対応力: 駅伝の1区と11月駅伝予選でよく効きます。駅伝の4区以降では効きません。',
       '・ペース変動対応力は、5千・1万(トラック)の持ちタイムに関係し、クロカン1万にも少し関係します。',
     ]),
+    ..._roadPaceRyouhouGyou(kantoku),
     // 「金銀を使えない」「能力値は不動」と読み違えないように書く(1.8.4)
     _nanidoMode(kantoku) == 2
         ? '・駅伝男からペース変動対応力までの能力は自然には変わりません。${_konoData(setsumeisho)}、金銀が支給されないので、入学から卒業まで変わりません。'
@@ -673,4 +674,34 @@ List<String> _nouryokuGyou(
     ];
   }
   return setsumei;
+}
+
+// 駅伝の2区と3区、正月駅伝予選のロード適性とペース変動対応力(1.8.6)
+// どちらも、よく効く区間の半分ずつ効き、合わせると能力1つがよく効く区間と同じ重みになる。
+// 「少し効く」だと区間として能力の影響が小さいと読めるので、両方が効くと書く。
+// 能力のタイムへの影響度でどちらかを0%にしているときは、残ったほうだけを書く
+// (そのときはその区間の能力の影響が実際に小さいので、よく効く区間ほどではないと添える)。
+List<String> _roadPaceRyouhouGyou(KantokuData? kantoku) {
+  final bool road =
+      kantoku == null ||
+      nouryokuEikyodoPercent(kantoku, nouryokuEikyodoRoadIndex) != 0;
+  final bool pace =
+      kantoku == null ||
+      nouryokuEikyodoPercent(kantoku, nouryokuEikyodoPaceIndex) != 0;
+  if (road && pace) {
+    return [
+      '・駅伝の2区と3区、正月駅伝予選では、ロード適性とペース変動対応力の両方が効きます(両方が高い選手ほど有利です)。',
+    ];
+  }
+  if (road) {
+    return [
+      '・ロード適性は、駅伝の2区と3区、正月駅伝予選でも効きます(4区以降ほどではありません)。',
+    ];
+  }
+  if (pace) {
+    return [
+      '・ペース変動対応力は、駅伝の2区と3区、正月駅伝予選でも効きます(1区ほどではありません)。',
+    ];
+  }
+  return [];
 }

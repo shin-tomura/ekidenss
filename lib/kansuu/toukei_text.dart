@@ -7,23 +7,37 @@ import 'package:ekiden/univ_data.dart';
 // KirokuKousin.dart(区間別タイム統計。toukei.dart。メモリだけ)で行う
 
 /// 4年生卒業直前データの1グループ分の文
-/// 1行目に人数と持ちタイムの平均、2行目に最速を書く
+/// 1項目1行で、人数、持ちタイムの平均(4種目)、最速(4種目)の順に書く
+/// (書き方はコンソールのログと同じ。日本人全体は1.8.6までのアプリの出力と同じになる。
+/// 人数が0人のときは人数の行だけ)
+/// [ninzuuMei]は人数の行の名前(日本人と留学生は「総数」、入学時5000mの帯は「サンプル数」)
 /// (配列はSkipの集計と同じ並びで、0→5000m、1→10000m、2→ハーフ、3→フル)
 String toukeiGroupBun(
   String namae,
+  String ninzuuMei,
   List<int> count,
   List<double> totaltime,
   List<double> besttime,
 ) {
-  if (count.isEmpty || count[0] <= 0) {
-    return "$namae 0人\n";
+  final int ninzuu = count.isEmpty ? 0 : count[0];
+  String bun = "$namae$ninzuuMei $ninzuu\n";
+  if (ninzuu <= 0) {
+    return bun;
   }
-  String heikin(int i) =>
-      count[i] > 0 ? _toukeiTimeString(i, totaltime[i] / count[i]) : "-";
-  String saisoku(int i) => _toukeiTimeString(i, besttime[i]);
-  return "$namae ${count[0]}人 平均 5千${heikin(0)}・1万${heikin(1)}・ハーフ${heikin(2)}・フル${heikin(3)}\n"
-      "　最速 5千${saisoku(0)}・1万${saisoku(1)}・ハーフ${saisoku(2)}・フル${saisoku(3)}\n";
+  for (int i = 0; i < 4; i++) {
+    if (count[i] > 0) {
+      bun +=
+          "$namae${_shumokuMei[i]}平均 ${_toukeiTimeString(i, totaltime[i] / count[i])}\n";
+    }
+  }
+  for (int i = 0; i < 4; i++) {
+    bun +=
+        "$namae${_shumokuMei[i]}最速 ${_toukeiTimeString(i, besttime[i])}\n";
+  }
+  return bun;
 }
+
+const List<String> _shumokuMei = ['5000m', '10000m', 'ハーフ', 'フル'];
 
 String _toukeiTimeString(int shumoku, double time) {
   return shumoku == 3

@@ -16,6 +16,8 @@ import 'package:ekiden/toukei.dart';
 import 'package:ekiden/kansuu/ChartPanelSenshu.dart';
 import 'package:ekiden/kansuu/ChartPanelUniv.dart';
 import 'package:ekiden/kansuu/goldsilver_com.dart';
+import 'package:ekiden/kansuu/gakuren_kantoku.dart'; // 学連選抜の監督・目標順位(1.8.4)
+import 'package:ekiden/kansuu/gakuren_text.dart'; // 学連選抜の結果(順位相当。1.8.4)
 
 String _timeToMinuteSecondString(double time) {
   if (time == TEISUU.DEFAULTTIME) {
@@ -876,6 +878,14 @@ Future<void> kirokuKousin({
           await gh[0].save(); // gh[0] の変更を保存
         }
       }
+    } else if (racebangou == 2) {
+      // 自分の大学が正月駅伝に不出場で、学連選抜の監督をした年の目標達成の報酬(1.8.4)
+      await _gakurenMokuhyouHoushuu(
+        gh: gh[0],
+        kantoku: kantoku,
+        myUniv: sortedunivdata[gh[0].MYunivid],
+        random: random,
+      );
     }
   }
 
@@ -2745,6 +2755,50 @@ Future<void> kirokuKousin({
   final endTime = DateTime.now();
   final timeInterval = endTime.difference(startTime).inMicroseconds / 1000000.0;
   print("KirokuKousin処理時間: ${_timeToMinuteSecondString(timeInterval)}経過");
+}
+
+/// 学連選抜の監督として目標順位を達成したときの報酬(1.8.4)
+/// ・自分の大学が正月駅伝に不出場で、学連選抜の監督をしていて(スキップ中でない)、
+///   学連選抜の最終の順位相当が、最後に決めた目標順位以内のとき
+/// ・目標順位が10位以内のときだけ(10位より下の目標で確実にもらうことはできない)
+/// ・見抜く力は、大学の目標達成と同じ印(KantokuData.yobiint2[1])を付ける
+/// ・金銀は、予選突破の目標達成と同じ最低量(10×金銀支給量の倍率。1割で金、9割で銀)。
+///   学連選抜には各校のエースが集まり、目標を達成しやすいので、目標順位を上げても量は増やさない。
+///   難易度モードの「極」「天」では金銀はなし(大学の目標達成と同じ)
+Future<void> _gakurenMokuhyouHoushuu({
+  required Ghensuu gh,
+  required KantokuData kantoku,
+  required UnivData myUniv,
+  required Random random,
+}) async {
+  if (!gakurenKantokuRule(kantoku, myUniv)) return;
+  if (gh.kukansuu_taikaigoto.length <= 2) return;
+  final GakurenKukanKekka? saigo = gakurenKukanKekka(
+    gh,
+    gh.kukansuu_taikaigoto[2] - 1,
+  );
+  if (saigo == null) return;
+  final int mokuhyou = gakurenMokuhyouSettei(kantoku); // 0が1位
+  if (mokuhyou > gakurenHoushuuMokuhyouSaikai) return;
+  if (saigo.tuukaJuni > mokuhyou) return;
+
+  // 見抜く力(このあと金銀の画面と、見抜く能力を選ぶ画面に進む)
+  kantoku.yobiint2[1] = 1;
+  await kantoku.save();
+
+  // 金銀(難易度モードが通常のときだけ)
+  if (kantoku.yobiint2[0] != 0) return;
+  final int ryou = 10 * kantoku.yobiint2[12];
+  if (random.nextInt(100) < 10) {
+    gh.last_goldenballkakutokusuu = ryou;
+    gh.goldenballsuu += ryou;
+  } else {
+    gh.last_silverballkakutokusuu = ryou;
+    gh.silverballsuu += ryou;
+  }
+  if (gh.goldenballsuu > 9999) gh.goldenballsuu = 9999;
+  if (gh.silverballsuu > 9999) gh.silverballsuu = 9999;
+  await gh.save();
 }
 
 // SenshuDataのリストをtime_taikai_totalでソートするための拡張メソッド

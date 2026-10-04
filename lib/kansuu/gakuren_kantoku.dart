@@ -118,6 +118,10 @@ bool gakurenKantokuChuu(KantokuData kantoku, UnivData myUniv) {
 
 const int gakurenMokuhyouIndex = 76;
 
+/// 学連選抜の監督として目標順位を達成したときに報酬(金銀・見抜く力)がもらえる、一番下の目標順位
+/// (0が1位。9は10位。これより下の目標では、達成しても報酬はない。1.8.4)
+const int gakurenHoushuuMokuhyouSaikai = 9;
+
 /// プレイヤーが決めた学連選抜の目標順位(0が1位。yobiint2[76]が0なら10位(初期値)、1〜ならその順位)
 int gakurenMokuhyouSettei(KantokuData kantoku) {
   if (kantoku.yobiint2.length <= gakurenMokuhyouIndex) return 9;

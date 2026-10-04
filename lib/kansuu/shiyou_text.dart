@@ -4,6 +4,7 @@ import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/album.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/screens/Modal_courseshoukai.dart'; // カスタム駅伝の名前(courseRaceTitle)
+import 'package:ekiden/kansuu/gakuren_kantoku.dart'; // 学連選抜の報酬がもらえる目標順位(1.8.4)
 import 'package:ekiden/kansuu/nouryoku_eikyodo.dart';
 import 'package:ekiden/kansuu/mokuhyou_hosei.dart';
 
@@ -362,6 +363,11 @@ ShiyouSetsu shiyouIkusei({bool setsumeisho = false}) {
           ? '・$kd、金銀は春の定期支給だけです(目標順位を達成してももらえません)。'
           : '・金銀は、春の定期支給と、チームの目標順位を達成したときにもらえます。',
     );
+    if (mode == 0) {
+      gyou.add(
+        '　・学連選抜の監督として、目標を${gakurenHoushuuMokuhyouSaikai + 1}位以内にして達成したときも、予選突破と同じ量をもらえます。',
+      );
+    }
     gyou.addAll([
       '・春の定期支給の額は、次の成績で決まります(上ほど多い)。',
       '　・三冠',
@@ -414,6 +420,10 @@ ShiyouSetsu shiyouMeisei({bool setsumeisho = false}) {
 /// 学連選抜(正月駅伝)
 ShiyouSetsu shiyouGakuren({bool setsumeisho = false}) {
   final String anata = _anata(setsumeisho);
+  final KantokuData? kantoku = _kantoku();
+  final bool kinginAri = _nanidoMode(kantoku) == 0;
+  // 学連選抜の監督として目標を達成したときに報酬がもらえる、一番下の目標順位(1が1位。1.8.4)
+  final int saikai = gakurenHoushuuMokuhyouSaikai + 1;
   final List<String> gyou = [
     '・正月駅伝に出られなかった大学から1人ずつ選ばれた、10人のチームです(補欠なし)。',
     '・オープン参加なので、順位は大学の中に入れた場合の「○位相当」(OP)で表します。',
@@ -423,8 +433,16 @@ ShiyouSetsu shiyouGakuren({bool setsumeisho = false}) {
     '・監督をするかどうかは、学連選抜編成の画面の「学連選抜の監督をする」で切り替えられます(初期値はオン)。',
     '・学連選抜の目標順位は毎年10位から始まります。学連選抜編成の画面と、正月駅伝の6区のスタート前に決め直せます。',
     '・目標順位を下回ったときの悪化とほっと一息は、大学と同じです。',
-    '・学連選抜には金銀や名声はないので、実力に見合った目標を選ぶのがおすすめです。',
-    '・コンピュータが監督のときの学連選抜は、目標がいつも10位で、ほっと一息はありません。',
+    // 目標を10位以内にして達成したときの報酬(1.8.4)
+    kinginAri
+        ? '・目標を$saikai位以内にして達成すると、予選突破と同じ量の金銀がもらえ、選手の能力を見抜く力がつくことがあります。'
+        : '・目標を$saikai位以内にして達成すると、選手の能力を見抜く力がつくことがあります(${_konoData(setsumeisho)}、金銀はもらえません)。',
+    '　・1〜${saikai - 1}位にしても${kinginAri ? '金銀' : '報酬'}は増えません。実力に近い目標にすると、ほっと一息のタイム悪化は防げます。',
+    // 開き直りの一文は説明書だけ(生成AIが隠れた数値があると思い込まないように)
+    if (setsumeisho) '　・1〜${saikai - 1}位を目標にするのは、選手たちの幸福度が上がるという脳内補完でお願いします。',
+    '・判定は最後に決めた目標順位で行います。6区のスタート前に$saikai位より下にすると、達成しても報酬はもらえません。',
+    '・学連選抜には名声はありません。',
+    '・コンピュータが監督のときの学連選抜は、目標がいつも10位で、ほっと一息も報酬もありません。',
     '・コンピュータが監督の学連選抜の選手には、指示は出ません(1区で飛び出すことはあります)。',
   ];
   final Album? album = Hive.box<Album>('albumBox').get('AlbumData');

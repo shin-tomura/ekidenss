@@ -1174,6 +1174,14 @@ class _Mode0350ContentState extends State<Mode0350Content> {
                         fontSize: HENSUU.fontsize_honbun - 2,
                       ),
                     ),
+                    // 報酬(金銀・見抜く力)は、最後に決めた目標順位が10位以内のときだけ(1.8.4)
+                    Text(
+                      "${gakurenHoushuuMokuhyouSaikai + 1}位より下にすると、目標を達成しても${kantoku.yobiint2[0] == 0 ? '金銀や見抜く力' : '見抜く力'}はもらえません",
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                      ),
+                    ),
                     // 文字が大きい設定でもはみ出さないよう、横幅いっぱいにして長いときは「...」にする
                     DropdownButton<int>(
                       value: mokuhyou.clamp(0, shutsujouSuu - 1).toInt(),

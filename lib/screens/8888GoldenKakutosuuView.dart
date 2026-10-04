@@ -3,6 +3,7 @@ import 'package:hive_flutter/hive_flutter.dart'; // HiveFlutterを使う場合�
 import 'package:ekiden/ghensuu.dart'; // Ghensuuクラスのパスを適宜修正
 import 'package:ekiden/constants.dart'; // HENSUUクラスのパスを適宜修正
 import 'package:ekiden/kantoku_data.dart';
+import 'package:ekiden/univ_data.dart'; // 学連選抜の監督をした年か(1.8.4)
 // GhensuuBoxが開いていることを前提とします。
 // アプリケーションの起動時にHive.openBox<Ghensuu>('ghensuuBox'); のように開いてください。
 
@@ -108,9 +109,24 @@ class _GoldenAcquisitionViewState extends State<GoldenAcquisitionView> {
       return "大学理事会からの今年度の支援金銀です。";
     } else if (ghensuu.last_goldenballkakutokusuu == 9) {
       return "大学当局が危機を感じて、支援をしてくれました！";
+    } else if (_gakurenKantokuNen(ghensuu)) {
+      // 学連選抜の監督として目標順位を達成した(1.8.4)
+      return "学連選抜の目標順位クリア！！";
     } else {
       return "チーム目標順位クリア！！";
     }
+  }
+
+  // 正月駅伝のあとで、自分の大学が不出場(学連選抜の監督をした年)か(1.8.4)
+  // この画面に来るのは目標順位を達成したときなので、不出場なら学連選抜の目標達成
+  bool _gakurenKantokuNen(Ghensuu ghensuu) {
+    if (ghensuu.hyojiracebangou != 2) return false;
+    for (final UnivData u in Hive.box<UnivData>('univBox').values) {
+      if (u.id == ghensuu.MYunivid) {
+        return u.taikaientryflag.length > 2 && u.taikaientryflag[2] == 0;
+      }
+    }
+    return false;
   }
 
   Widget _getAwardText(Ghensuu ghensuu) {

@@ -43,7 +43,7 @@ List<SetsumeishoGroup> setsumeishoGroupList() {
       SetsumeishoKoumoku(shiyouTaikai(setsumeisho: true)),
       SetsumeishoKoumoku(shiyouMokuhyou(setsumeisho: true)),
       SetsumeishoKoumoku(shiyouSiji(setsumeisho: true)),
-      SetsumeishoKoumoku(shiyouIchiku(setsumeisho: true)),
+      SetsumeishoKoumoku(shiyouShuudansou(setsumeisho: true)),
       SetsumeishoKoumoku(shiyouKeiken(setsumeisho: true)),
       SetsumeishoKoumoku(shiyouGakuren(setsumeisho: true)),
     ]),

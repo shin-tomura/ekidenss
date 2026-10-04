@@ -47,7 +47,7 @@ String gameShiyouText() {
     shiyouNouryoku(),
     shiyouMochiTime(),
     shiyouKeiken(),
-    shiyouIchiku(),
+    shiyouShuudansou(),
     shiyouMokuhyou(),
     shiyouSiji(),
     shiyouKinGin(),
@@ -114,8 +114,8 @@ ShiyouSetsu shiyouTaikai({bool setsumeisho = false}) {
     }
   }
   gyou.addAll([
-    '・11月駅伝予選: 組ごとに1万mを走り、全組の合計タイムで争います。',
-    '・正月駅伝予選: 完全にフラットなコースのハーフマラソンを全員で走り、各大学の上位10人のタイムの合計で争います(エントリー12人)。',
+    ..._yosen11Gyou,
+    ..._yosenShougatsuGyou,
     '・一次エントリーで選んだ選手の中から、区間エントリーで各区間に1人ずつ配置します。残りは補欠になります。',
     '・当日変更: スタート前に、区間を走る予定の選手を補欠と入れ替えられます。',
     '・当日変更の最大人数は、全6区以下の駅伝は2人、全8区以下は3人、それより多い駅伝は6人です。',
@@ -192,15 +192,20 @@ ShiyouSetsu shiyouKeiken({bool setsumeisho = false}) {
   return const ShiyouSetsu('経験補正', [
     '・同じ駅伝の同じ区間を過去に走ったことがあると、経験からタイムが少し良くなります。',
     '・走った回数が多いほど良くなります。',
+    _keikenYosenGyou,
   ]);
 }
 
-/// 駅伝の1区(集団走)
-ShiyouSetsu shiyouIchiku({bool setsumeisho = false}) {
-  return const ShiyouSetsu('駅伝の1区(集団走)', [
-    '・駅伝の1区は集団で走り、集団のペースはカリスマが一番高い選手が作ります。',
+/// 集団走(駅伝の1区と11月駅伝予選。1.8.4で11月駅伝予選のことを書き足した)
+ShiyouSetsu shiyouShuudansou({bool setsumeisho = false}) {
+  return const ShiyouSetsu('集団走(駅伝の1区と11月駅伝予選)', [
+    '・駅伝の1区と、11月駅伝予選の各組は、全大学の選手が1つの集団で走ります。',
+    '・集団のペースは、その区間(組)を走る選手の中で、カリスマが一番高い選手が作ります。',
     '・集団のペースが自分の本来のペースより遅いとタイム損、少し速いとタイム得になります。',
     '・速すぎると無理して付いていき、後半に大失速して大きくタイム損をすることがあります。',
+    '・コンピュータの大学は、11月駅伝予選で、1万mの持ちタイムが速い順に2人ずつ、4組・3組・1組・2組に配置します。',
+    '　・速い選手が集まる4組は集団のペースが速くなりやすく、遅い選手を入れると大失速するおそれがあります。',
+    '　・逆に、速い選手を遅い選手の多い組に入れると、ペースが遅くてタイム損をすることがあります。',
   ]);
 }
 
@@ -297,9 +302,7 @@ ShiyouSetsu shiyouSiji({bool setsumeisho = false}) {
     ]);
   }
   gyou.addAll([
-    '・正月駅伝予選では、選手ごとにフリー走か集団走を選べます。',
-    '・フリー走では、前半突っ込みか前半抑えも指示できます。',
-    '・集団走では最大6つの集団を作れ、集団ごとに設定タイムを指示します。',
+    ..._shougatsuYosenSijiGyou,
     '・コンピュータの大学も、駅伝男や平常心の高い選手には指示を出すことがあります。',
   ]);
   return ShiyouSetsu('レース中の指示', gyou);
@@ -368,6 +371,58 @@ ShiyouSetsu shiyouGakuren({bool setsumeisho = false}) {
   }
   return ShiyouSetsu('学連選抜(正月駅伝)', gyou);
 }
+
+/// 駅伝予選の相談セットの先頭に入れる「この大会の決まり」(1.8.4)
+/// メンバーを選ぶ相談で、生成AIが駅伝と同じ決まり(経験補正など)だと思い込まないように入れる。
+/// 文は仕様の文と同じもの(11月駅伝予選・正月駅伝予選以外では空)
+String yosenKimariText(int race) {
+  final List<String> gyou;
+  if (race == 3) {
+    gyou = [..._yosen11Gyou, ...shiyouShuudansou().gyou, _keikenYosenGyou];
+  } else if (race == 4) {
+    gyou = [
+      ..._yosenShougatsuGyou,
+      ..._shougatsuYosenSijiGyou,
+      _keikenYosenGyou,
+    ];
+  } else {
+    return '';
+  }
+  final StringBuffer sb = StringBuffer();
+  sb.writeln('【${race == 3 ? '11月駅伝予選' : '正月駅伝予選'} この大会の決まり】');
+  for (final String g in gyou) {
+    sb.writeln(g);
+  }
+  return sb.toString();
+}
+
+// 11月駅伝予選の決まり(大会と人数と、駅伝予選の決まりで使う)
+const List<String> _yosen11Gyou = [
+  '・11月駅伝予選: 4組に分かれて1万mを走り、全組の合計タイムで争います。',
+  '・11月駅伝予選は、各大学が1組に2人ずつ、合わせて8人が走ります。',
+  '・11月駅伝予選では、一次エントリーの8人が全員走るので、補欠はありません。',
+];
+
+// 正月駅伝予選の決まり(大会と人数と、駅伝予選の決まりで使う)
+const List<String> _yosenShougatsuGyou = [
+  '・正月駅伝予選: 完全にフラットなコースのハーフマラソンを全員で走り、各大学の上位10人のタイムの合計で争います(エントリー12人)。',
+];
+
+// 正月駅伝予選のフリー走と集団走(レース中の指示と、駅伝予選の決まりで使う。
+// 設定タイムの注意は、レース画面の説明と同じ内容)
+const List<String> _shougatsuYosenSijiGyou = [
+  '・正月駅伝予選では、選手ごとにフリー走か集団走を選べます。',
+  '・フリー走では、前半突っ込みか前半抑えも指示できます。',
+  '・集団走では最大6つの集団を作れ、集団ごとに設定タイムを指示します。',
+  '・設定タイムは、その集団で一番速い選手の試走タイムより速くはできません。',
+  '・設定タイムが速すぎると、集団の中で実力が足りない選手が大失速するおそれがあります。',
+  '・設定タイムが遅すぎると、実力よりタイムが出ない選手が出ます。',
+  '　・実力が飛び抜けた選手や大きく足りない選手は、別の集団にするかフリー走にすると良いかもしれません。',
+];
+
+// 駅伝予選には経験補正と調子がないこと(経験補正と、駅伝予選の決まりで使う)
+const String _keikenYosenGyou =
+    '・駅伝予選(11月駅伝予選・正月駅伝予選)には、経験補正はありません。調子も関係しません。';
 
 // 一次エントリーの人数(区間数が6以下なら8人、8以下なら13人、それより多いと16人。
 // 一次エントリーの画面(mode0150_content.dart)と同じ決まり)

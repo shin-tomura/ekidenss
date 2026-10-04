@@ -238,6 +238,11 @@ String entryJoukyouText(
     if (race == 4) {
       sb.writeln('※エントリーは$maxEntry人です。');
       sb.writeln('エントリーに選んでいる選手(${erabi.length}/$maxEntry人):${meibo(erabi)}');
+    } else if (race == 3) {
+      // 11月駅伝予選は1組に2人ずつで、一次エントリーの全員が走る(1.8.4)
+      sb.writeln(
+        '※一次エントリーは$maxEntry人です。このあとのエントリーで、一次エントリーの$maxEntry人を$kukansuu組に2人ずつ配置します(補欠はありません)。',
+      );
     } else {
       sb.writeln(
         '※一次エントリーは$maxEntry人です。このあとの区間エントリーで、一次エントリーの選手の中から$kukansuu$kukanMeiに配置し、残りは補欠になります。',
@@ -251,7 +256,9 @@ String entryJoukyouText(
   } else {
     // 学連選抜編成・区間エントリーの画面
     sb.writeln(
-      '一次エントリーの選手(${erabi.length}人。この中から$kukansuu$kukanMeiに配置し、残りは補欠):${meibo(erabi)}',
+      race == 3
+          ? '一次エントリーの選手(${erabi.length}人。全員を$kukansuu組に2人ずつ配置し、補欠はなし):${meibo(erabi)}'
+          : '一次エントリーの選手(${erabi.length}人。この中から$kukansuu$kukanMeiに配置し、残りは補欠):${meibo(erabi)}',
     );
     sb.writeln('今の区間配置(自分の大学):');
     for (int k = 0; k < kukansuu; k++) {
@@ -270,14 +277,19 @@ String entryJoukyouText(
       final int e = entryAtai(s);
       return (e < 0 && e > -100) || e >= kukansuu;
     }).toList();
-    sb.writeln('補欠:${meibo(hoketsu)}');
+    if (race != 3) {
+      sb.writeln('補欠:${meibo(hoketsu)}');
+    } else if (hoketsu.isNotEmpty) {
+      // 11月駅伝予選には補欠がないので、組に配置していない選手があるときだけ出す(1.8.4)
+      sb.writeln('まだ組に配置していない選手:${meibo(hoketsu)}');
+    }
     final List<SenshuData> hazureta = erabi
         .where((s) => entryAtai(s) <= -100)
         .toList();
     if (hazureta.isNotEmpty) {
       sb.writeln('当日変更で外れた選手(この大会ではもう走れない):${meibo(hazureta)}');
     }
-    sb.writeln('一次エントリーに入っていない選手(区間に配置できない):${meibo(erabanai)}');
+    sb.writeln('一次エントリーに入っていない選手($kukanMeiに配置できない):${meibo(erabanai)}');
   }
   return sb.toString();
 }

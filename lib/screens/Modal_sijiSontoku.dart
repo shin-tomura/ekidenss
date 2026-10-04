@@ -9,6 +9,7 @@ import 'package:ekiden/album.dart';
 /// 「指示ごとの損得予測」の画面(1.8.1)
 /// 駅伝の2区以降で、走り出す直前の選手の、指示なし・前半突っ込み・前半抑えそれぞれの
 /// タイムの損得(成功時・失敗時)を「約○秒」で出す。計算は siji_sontoku.dart
+/// 各指示の枠の「この指示にする」で、この画面から指示を選べる(1.8.8)
 class ModalSijiSontokuView extends StatefulWidget {
   final int senshuId;
 
@@ -18,11 +19,17 @@ class ModalSijiSontokuView extends StatefulWidget {
   /// 学連選抜の選手か(学連選抜の監督をしているとき。1.8.2)
   final bool gakuren;
 
+  /// 「この指示にする」を押したときに呼ぶ処理(0指示なし、1前半突っ込み、2前半抑え。1.8.8)
+  /// 保存先が大学(Ghensuu.SijiSelectedOption)と学連選抜(選手のsijiflag)で違うので、
+  /// 開く側(レース画面)がドロップダウンと同じ保存の処理を渡す。渡さないときは見るだけの画面
+  final Future<void> Function(int bangou)? onSijiSentaku;
+
   const ModalSijiSontokuView({
     super.key,
     required this.senshuId,
     this.sentakuchuu = -1,
     this.gakuren = false,
+    this.onSijiSentaku,
   });
 
   @override
@@ -32,12 +39,19 @@ class ModalSijiSontokuView extends StatefulWidget {
 class _ModalSijiSontokuViewState extends State<ModalSijiSontokuView> {
   late final Future<SijiSontoku?> _keisan;
 
+  /// 今選んでいる指示(この画面で選び直すと変わる。1.8.8)
+  late int _sentakuchuu;
+
+  /// 指示を保存している間(ボタンを続けて押せないようにする)
+  bool _hozonChuu = false;
+
   static const Color _sonColor = Colors.redAccent;
   static const Color _tokuColor = Colors.lightBlueAccent;
 
   @override
   void initState() {
     super.initState();
+    _sentakuchuu = widget.sentakuchuu;
     // 乱数を使わない計算なので、開いたときに1回だけ計算する
     _keisan = widget.gakuren
         ? sijiSontokuKeisanGakuren(widget.senshuId)
@@ -137,6 +151,18 @@ class _ModalSijiSontokuViewState extends State<ModalSijiSontokuView> {
                     fontSize: HENSUU.fontsize_honbun - 2,
                   ),
                 ),
+                // この画面から指示を選べるとき(1.8.8)
+                if (widget.onSijiSentaku != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      '・「この指示にする」を押すと、レース画面の指示の欄も同じ指示に変わります。',
+                      style: TextStyle(
+                        color: HENSUU.textcolor.withOpacity(0.8),
+                        fontSize: HENSUU.fontsize_honbun - 2,
+                      ),
+                    ),
+                  ),
                 // 学連選抜の選手には、指示の補正のあとにモチベーション低下補正がかかる(1.8.2)
                 if (widget.gakuren && _motivationHoseiAri())
                   Padding(
@@ -269,14 +295,15 @@ class _ModalSijiSontokuViewState extends State<ModalSijiSontokuView> {
     );
   }
 
-  /// 指示1つ分の枠(レース画面で選んでいる指示は枠の色を変えて「選択中」と出す)
+  /// 指示1つ分の枠(選んでいる指示は枠の色を変えて「選択中」と出す)
+  /// この画面から指示を選べるときは、選んでいない枠に「この指示にする」ボタンを出す(1.8.8)
   Widget _sijiCard({
     required int bangou,
     required String midashi,
     String seikouritsu = '',
     required List<Widget> gyou,
   }) {
-    final bool sentakuchuu = widget.sentakuchuu == bangou;
+    final bool sentakuchuu = _sentakuchuu == bangou;
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 10),
@@ -321,8 +348,36 @@ class _ModalSijiSontokuViewState extends State<ModalSijiSontokuView> {
           ),
           const SizedBox(height: 6),
           ...gyou,
+          if (widget.onSijiSentaku != null && !sentakuchuu)
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: _hozonChuu ? null : () => _sijiSentaku(bangou),
+                child: Text(
+                  'この指示にする',
+                  style: TextStyle(
+                    color: HENSUU.LinkColor,
+                    fontSize: HENSUU.fontsize_honbun,
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
+  }
+
+  /// 「この指示にする」を押したとき(1.8.8)
+  /// 開く側から渡された処理で保存し、画面は開いたまま「選択中」の印を移す
+  Future<void> _sijiSentaku(int bangou) async {
+    final Future<void> Function(int)? hozon = widget.onSijiSentaku;
+    if (hozon == null) return;
+    setState(() => _hozonChuu = true);
+    try {
+      await hozon(bangou);
+      if (mounted) setState(() => _sentakuchuu = bangou);
+    } finally {
+      if (mounted) setState(() => _hozonChuu = false);
+    }
   }
 }

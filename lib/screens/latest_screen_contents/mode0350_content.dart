@@ -160,7 +160,12 @@ class _Mode0350ContentState extends State<Mode0350Content> {
 
   // 指示ごとの損得予測の画面を呼び出すボタン(駅伝の2区以降。1.8.1)
   // [sentakuchuu] 今選んでいる指示(画面で印を付ける)
-  Widget _buildSijiSontokuButton(SenshuData senshu, int sentakuchuu) {
+  // [onSijiSentaku] その画面の「この指示にする」で指示を選んだときの保存の処理(ドロップダウンと共通。1.8.8)
+  Widget _buildSijiSontokuButton(
+    SenshuData senshu,
+    int sentakuchuu,
+    Future<void> Function(int) onSijiSentaku,
+  ) {
     return TextButton(
       onPressed: () {
         showGeneralDialog(
@@ -173,6 +178,7 @@ class _Mode0350ContentState extends State<Mode0350Content> {
             return ModalSijiSontokuView(
               senshuId: senshu.id,
               sentakuchuu: sentakuchuu,
+              onSijiSentaku: onSijiSentaku,
             );
           },
           transitionBuilder: (context, animation, secondaryAnimation, child) {
@@ -1071,6 +1077,18 @@ class _Mode0350ContentState extends State<Mode0350Content> {
     }
     final Senshu_Gakuren_Data? sonoSenshu = runner;
 
+    // 学連選抜の選手への指示を変えたときの保存(ドロップダウンと、指示ごとの損得予測の画面の
+    // 「この指示にする」で共通。1.8.8)
+    Future<void> gakurenSijiHenkou(int v) async {
+      final Senshu_Gakuren_Data? s = sonoSenshu;
+      if (s == null) return;
+      s.sijiflag = v;
+      // 1区は飛び出しの印も付ける(指示なしは計算のときに自動の飛び出しの抽選をする)
+      s.startchokugotobidasiflag = (kukan == 0 && v == 1) ? 1 : 0;
+      await s.save();
+      if (mounted) setState(() {});
+    }
+
     // 学連選抜の目標順位(0が1位。学連選抜編成の画面で決め、6区のスタート前に決め直せる。1.8.2)
     final KantokuData kantoku = Hive.box<KantokuData>(
       'kantokuBox',
@@ -1291,12 +1309,7 @@ class _Mode0350ContentState extends State<Mode0350Content> {
                           isExpanded: true,
                           onChanged: (int? v) async {
                             if (v == null) return;
-                            sonoSenshu.sijiflag = v;
-                            // 1区は飛び出しの印も付ける(指示なしは計算のときに自動の飛び出しの抽選をする)
-                            sonoSenshu.startchokugotobidasiflag =
-                                (kukan == 0 && v == 1) ? 1 : 0;
-                            await sonoSenshu.save();
-                            if (mounted) setState(() {});
+                            await gakurenSijiHenkou(v);
                           },
                           items: [
                             for (int i = 0; i < options.length; i++)
@@ -1334,6 +1347,7 @@ class _Mode0350ContentState extends State<Mode0350Content> {
                                         senshuId: sonoSenshu.id,
                                         sentakuchuu: sonoSenshu.sijiflag,
                                         gakuren: true,
+                                        onSijiSentaku: gakurenSijiHenkou,
                                       );
                                     },
                                 transitionBuilder: fadeTransition,
@@ -2182,6 +2196,15 @@ class _Mode0350ContentState extends State<Mode0350Content> {
             //currentGhensuu.save();ここには来ないはずなのでコメントアウトした
           }
 
+          // 指示を変えたときの保存(ドロップダウンと、指示ごとの損得予測の画面の
+          // 「この指示にする」で共通。1.8.8)
+          Future<void> sijiHenkou(int newValue) async {
+            currentGhensuu.SijiSelectedOption[gakunenjununivfilteredsenshudata
+                    .indexOf(senshu)] =
+                newValue;
+            await currentGhensuu.save();
+          }
+
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -2206,16 +2229,7 @@ class _Mode0350ContentState extends State<Mode0350Content> {
                 onChanged: (int? newValue) async {
                   print('onChanged is called!'); // これが実行されるか確認
                   if (newValue != null) {
-                    currentGhensuu
-                            .SijiSelectedOption[gakunenjununivfilteredsenshudata
-                            .indexOf(senshu)] =
-                        newValue;
-
-                    /*print(
-                      'indexOf(senshu)=${gakunenjununivfilteredsenshudata.indexOf(senshu)}  SijiSelectedOption=${currentGhensuu.SijiSelectedOption[gakunenjununivfilteredsenshudata.indexOf(senshu)]}',
-                    );*/
-
-                    await currentGhensuu.save();
+                    await sijiHenkou(newValue);
                   }
                 },
                 items: options.asMap().entries.map((entry) {
@@ -2242,7 +2256,11 @@ class _Mode0350ContentState extends State<Mode0350Content> {
                 currentGhensuu.nowracecalckukan,
               )) ...[
                 const SizedBox(height: 16),
-                _buildSijiSontokuButton(senshu, currentSijiOption),
+                _buildSijiSontokuButton(
+                  senshu,
+                  currentSijiOption,
+                  sijiHenkou,
+                ),
               ],
               const SizedBox(height: 10),
             ],

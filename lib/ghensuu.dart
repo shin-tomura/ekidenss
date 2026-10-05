@@ -107,6 +107,8 @@ class Ghensuu extends HiveObject {
     (_) => List.filled(TEISUU.SUU_MAXKUKANSUU, 0),
   );
   //[大会(レース)種類番号][区間、0→1区、9→10区]
+  // 大会記録は、1.8.8から記録画面に出す大会の分を歴代10位まで伸ばして使う
+  // (2つめの次元が順位で、長さは1〜10。lib/kansuu/rekidai_kiroku.dart)
   @HiveField(36)
   List<List<double>> time_zentaitaikaikiroku = List.generate(
     TEISUU.SUU_MAXRACESUU_1YEAR,

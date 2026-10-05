@@ -2,6 +2,7 @@ import 'package:ekiden/constants.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ekiden/ghensuu.dart';
 import 'package:ekiden/kiroku.dart';
+import 'package:ekiden/kansuu/rekidai_kiroku.dart'; // 歴代10位までの記録(1.8.8)
 
 Future<void> GhensuuShokika(Box<Ghensuu> ghensuuBox) async {
   //ここでKirokuも初期化しちゃう
@@ -281,6 +282,8 @@ Future<void> GhensuuShokika(Box<Ghensuu> ghensuuBox) async {
         ghensuu.gakunen_zentaikukankiroku[i][ii][iii] = 0;
       }
     }
+    // 大会記録は歴代10位まで残すので、2位以下も消す(1.8.8)
+    rekidaiZentaiTaikai(ghensuu, i).kaku([]);
   }
   for (int i = 0; i < TEISUU.SUU_KOJINBESTKIROKUSHURUISUU; i++) {
     for (int ii = 0; ii < TEISUU.SUU_BESTKIROKUHOZONJUNISUU; ii++) {

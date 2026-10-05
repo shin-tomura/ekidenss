@@ -12,6 +12,8 @@ class Kiroku extends HiveObject {
   //10→5000記録会、11→10000記録会、12→市民ハーフ、13→登り1万、14→下り1万、15→ロード1万、16→クロカン1万
   //
   //[大会(レース)種類番号][区間、0→1区、9→10区][保存順位数、0→1位、9→10位]
+  // 1.8.8から、記録画面に出す記録(全体と、総監督をしている大学の学内)は、保存順位数の配列を
+  // 歴代10位まで伸ばして使う(長さは1〜10。lib/kansuu/rekidai_kiroku.dart)
   @HiveField(0)
   List<List<List<double>>> time_zentai_ryuugakusei_kukankiroku = List.generate(
     TEISUU.SUU_MAXRACESUU_1YEAR,

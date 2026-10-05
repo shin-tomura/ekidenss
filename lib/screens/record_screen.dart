@@ -9,6 +9,7 @@ import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/kiroku.dart';
 import 'package:ekiden/constants.dart';
 import 'package:ekiden/kantoku_data.dart';
+import 'package:ekiden/kansuu/rekidai_kiroku.dart'; // 歴代10位までの記録(1.8.8)
 
 String _getCombinedDifficultyText(KantokuData kantoku, Ghensuu currentGhensuu) {
   // 難易度モードを取得 (0:通常, 1:極, 2:天)
@@ -116,6 +117,8 @@ class _RecordScreenState extends State<RecordScreen>
   // sortedUnivData のデータが Hive から取得されることを前提
   late final UnivData tempUnivData;
   late final String _customEkidenName;
+  // 2位以下を開いている記録の行(1.8.8。画面を閉じると、また閉じた状態に戻る)
+  final Set<String> _hiraitaKiroku = <String>{};
 
   @override
   void initState() {
@@ -200,210 +203,154 @@ class _RecordScreenState extends State<RecordScreen>
   }
 
   // MARK: - リセット処理を管理するヘルパー関数
-  Future<void> _resetUnivRecord_kiroku({
-    required bool ryuugakuseiflag, //0日本人、1留学生
-    required int myUnivId,
-    required int recordType, // 0:個人, 1:大会記録, 2:区間
-    required int index1,
-    required int index2,
-  }) async {
-    final Kiroku? kiroku = _kirokuBox.get('KirokuData');
-    if (kiroku == null) return;
-    if (ryuugakuseiflag == true) {
-      if (recordType == 0) {
-        // 個人記録
-        kiroku.time_univ_ryuugakusei_kojinkiroku[myUnivId][index1][index2] =
-            TEISUU.DEFAULTTIME;
-        kiroku.year_univ_ryuugakusei_kojinkiroku[myUnivId][index1][index2] = 0;
-        kiroku.month_univ_ryuugakusei_kojinkiroku[myUnivId][index1][index2] = 0;
-        kiroku.name_univ_ryuugakusei_kojinkiroku[myUnivId][index1][index2] =
-            "記録なし";
-        kiroku.gakunen_univ_ryuugakusei_kojinkiroku[myUnivId][index1][index2] =
-            0;
-      } else if (recordType == 1) {
-        // 大会総合記録
-      } else if (recordType == 2) {
-        // 区間記録
-        kiroku.time_univ_ryuugakusei_kukankiroku[myUnivId][index1][index2][0] =
-            TEISUU.DEFAULTTIME;
-        kiroku.year_univ_ryuugakusei_kukankiroku[myUnivId][index1][index2][0] =
-            0;
-        kiroku.month_univ_ryuugakusei_kukankiroku[myUnivId][index1][index2][0] =
-            0;
-        kiroku.name_univ_ryuugakusei_kukankiroku[myUnivId][index1][index2][0] =
-            "記録なし";
-        kiroku.gakunen_univ_ryuugakusei_kukankiroku[myUnivId][index1][index2][0] =
-            0;
-      }
-    } else {
-      if (recordType == 0) {
-        // 個人記録
-        kiroku.time_univ_jap_kojinkiroku[myUnivId][index1][index2] =
-            TEISUU.DEFAULTTIME;
-        kiroku.year_univ_jap_kojinkiroku[myUnivId][index1][index2] = 0;
-        kiroku.month_univ_jap_kojinkiroku[myUnivId][index1][index2] = 0;
-        kiroku.name_univ_jap_kojinkiroku[myUnivId][index1][index2] = "記録なし";
-        kiroku.gakunen_univ_jap_kojinkiroku[myUnivId][index1][index2] = 0;
-      } else if (recordType == 1) {
-        // 大会総合記録
-      } else if (recordType == 2) {
-        // 区間記録
-        kiroku.time_univ_jap_kukankiroku[myUnivId][index1][index2][0] =
-            TEISUU.DEFAULTTIME;
-        kiroku.year_univ_jap_kukankiroku[myUnivId][index1][index2][0] = 0;
-        kiroku.month_univ_jap_kukankiroku[myUnivId][index1][index2][0] = 0;
-        kiroku.name_univ_jap_kukankiroku[myUnivId][index1][index2][0] = "記録なし";
-        kiroku.gakunen_univ_jap_kukankiroku[myUnivId][index1][index2][0] = 0;
-      }
+  // 記録は歴代10位まで残すので(1.8.8)、リセットはその行の歴代をまとめて消す。
+  // 日本人と留学生を分けない行の2位以下は、日本人・留学生の行の記録を合わせて作るため、次のようにそろえる。
+  // ・日本人と留学生を分けない行: その行と、日本人・留学生の行の記録を、まとめて消す
+  // ・日本人(留学生)の行: その行の記録を消し、分けない行の1位を、留学生(日本人)の行の1位で作り直す
+  // [shurui] 0:日本人と留学生を分けない行、1:日本人、2:留学生
+
+  /// 分けない行([ichii])と、日本人・留学生の行の記録を、[shurui]に応じて消す
+  void _resetAwase({
+    required RekidaiOkiba ichii,
+    required RekidaiOkiba nihonjin,
+    required RekidaiOkiba ryuugakusei,
+    required int shurui,
+  }) {
+    if (shurui == 0) {
+      ichii.kaku([]);
+      nihonjin.kaku([]);
+      ryuugakusei.kaku([]);
+      return;
     }
-    await kiroku.save();
-    // setState を呼び出してUIを更新
-    setState(() {});
+    final RekidaiOkiba kesu = shurui == 1 ? nihonjin : ryuugakusei;
+    final RekidaiOkiba nokosu = shurui == 1 ? ryuugakusei : nihonjin;
+    kesu.kaku([]);
+    final List<RekidaiKiroku> l = nokosu.yomu();
+    ichii.kaku(l.isEmpty ? [] : [l.first]);
   }
 
-  Future<void> _resetOverallRecord_kiroku({
-    required bool ryuugakuseiflag, //0日本人、1留学生
-    required int recordType, // 0:個人, 1:大会記録, 2:区間
-    required int index1,
-    required int index2,
-  }) async {
-    final Kiroku? kiroku = _kirokuBox.get('KirokuData');
-    if (kiroku == null) return;
-    if (ryuugakuseiflag == true) {
-      if (recordType == 0) {
-        // 全体個人記録
-        kiroku.time_zentai_ryuugakusei_kojinkiroku[index1][index2] =
-            TEISUU.DEFAULTTIME;
-        kiroku.year_zentai_ryuugakusei_kojinkiroku[index1][index2] = 0;
-        kiroku.month_zentai_ryuugakusei_kojinkiroku[index1][index2] = 0;
-        kiroku.name_zentai_ryuugakusei_kojinkiroku[index1][index2] = "記録なし";
-        kiroku.gakunen_zentai_ryuugakusei_kojinkiroku[index1][index2] = 0;
-        kiroku.univname_zentai_ryuugakusei_kojinkiroku[index1][index2] = "記録なし";
-      } else if (recordType == 1) {
-      } else if (recordType == 2) {
-        // 全体区間記録
-        kiroku.time_zentai_ryuugakusei_kukankiroku[index1][index2][0] =
-            TEISUU.DEFAULTTIME;
-        kiroku.year_zentai_ryuugakusei_kukankiroku[index1][index2][0] = 0;
-        kiroku.month_zentai_ryuugakusei_kukankiroku[index1][index2][0] = 0;
-        kiroku.name_zentai_ryuugakusei_kukankiroku[index1][index2][0] = "記録なし";
-        kiroku.gakunen_zentai_ryuugakusei_kukankiroku[index1][index2][0] = 0;
-        kiroku.univname_zentai_ryuugakusei_kukankiroku[index1][index2][0] =
-            "記録なし";
-      }
-    } else {
-      if (recordType == 0) {
-        // 全体個人記録
-        kiroku.time_zentai_jap_kojinkiroku[index1][index2] = TEISUU.DEFAULTTIME;
-        kiroku.year_zentai_jap_kojinkiroku[index1][index2] = 0;
-        kiroku.month_zentai_jap_kojinkiroku[index1][index2] = 0;
-        kiroku.name_zentai_jap_kojinkiroku[index1][index2] = "記録なし";
-        kiroku.gakunen_zentai_jap_kojinkiroku[index1][index2] = 0;
-        kiroku.univname_zentai_jap_kojinkiroku[index1][index2] = "記録なし";
-      } else if (recordType == 1) {
-      } else if (recordType == 2) {
-        // 全体区間記録
-        kiroku.time_zentai_jap_kukankiroku[index1][index2][0] =
-            TEISUU.DEFAULTTIME;
-        kiroku.year_zentai_jap_kukankiroku[index1][index2][0] = 0;
-        kiroku.month_zentai_jap_kukankiroku[index1][index2][0] = 0;
-        kiroku.name_zentai_jap_kukankiroku[index1][index2][0] = "記録なし";
-        kiroku.gakunen_zentai_jap_kukankiroku[index1][index2][0] = 0;
-        kiroku.univname_zentai_jap_kukankiroku[index1][index2][0] = "記録なし";
-      }
-    }
-    await kiroku.save();
-    // setState を呼び出してUIを更新
-    setState(() {});
-  }
-
-  Future<void> _resetUnivRecord({
-    required int myUnivId,
-    required int recordType, // 0:個人, 1:大会記録, 2:区間
-    required int index1,
-    required int index2,
-  }) async {
-    final univData = _univBox.get(myUnivId);
-    if (univData == null) return;
-
-    if (recordType == 0) {
-      // 個人記録
-      univData.time_univkojinkiroku[index1][index2] = TEISUU.DEFAULTTIME;
-      univData.year_univkojinkiroku[index1][index2] = 0;
-      univData.month_univkojinkiroku[index1][index2] = 0;
-      univData.name_univkojinkiroku[index1][index2] = "記録なし";
-      univData.gakunen_univkojinkiroku[index1][index2] = 0;
-    } else if (recordType == 1) {
-      // 大会総合記録
-      univData.time_univtaikaikiroku[index1][index2] = TEISUU.DEFAULTTIME;
-      univData.year_univtaikaikiroku[index1][index2] = 0;
-      univData.month_univtaikaikiroku[index1][index2] = 0;
-    } else if (recordType == 2) {
-      // 区間記録
-      univData.time_univkukankiroku[index1][index2][0] = TEISUU.DEFAULTTIME;
-      univData.year_univkukankiroku[index1][index2][0] = 0;
-      univData.month_univkukankiroku[index1][index2][0] = 0;
-      univData.name_univkukankiroku[index1][index2][0] = "記録なし";
-      univData.gakunen_univkukankiroku[index1][index2][0] = 0;
-    }
-
-    await univData.save();
-    // setState を呼び出してUIを更新
-    setState(() {});
-  }
-
-  Future<void> _resetOverallRecord({
+  /// 学内記録のリセット
+  /// [recordType] 0:個人, 1:大会記録, 2:区間
+  Future<void> _resetUnivRekidai({
     required int recordType,
+    required int shurui,
     required int index1,
     required int index2,
   }) async {
     final ghensuu = _ghensuuBox.get('global_ghensuu');
-    if (ghensuu == null) return;
+    final Kiroku? kiroku = _kirokuBox.get('KirokuData');
+    if (ghensuu == null || kiroku == null) return;
+    final int myUnivId = ghensuu.MYunivid;
+    final UnivData? univData = _univBox.get(myUnivId);
+    if (univData == null) return;
 
-    if (recordType == 0) {
-      // 全体個人記録
-      ghensuu.time_zentaikojinkiroku[index1][index2] = TEISUU.DEFAULTTIME;
-      ghensuu.year_zentaikojinkiroku[index1][index2] = 0;
-      ghensuu.month_zentaikojinkiroku[index1][index2] = 0;
-      ghensuu.name_zentaikojinkiroku[index1][index2] = "記録なし";
-      ghensuu.gakunen_zentaikojinkiroku[index1][index2] = 0;
-      ghensuu.univname_zentaikojinkiroku[index1][index2] = "記録なし";
-    } else if (recordType == 1) {
-      // 全体大会総合記録
-      ghensuu.time_zentaitaikaikiroku[index1][index2] = TEISUU.DEFAULTTIME;
-      ghensuu.year_zentaitaikaikiroku[index1][index2] = 0;
-      ghensuu.month_zentaitaikaikiroku[index1][index2] = 0;
-      ghensuu.univname_zentaitaikaikiroku[index1][index2] = "記録なし";
+    if (recordType == 1) {
+      // 大会総合記録
+      rekidaiUnivTaikai(univData, index1).kaku([]);
+      await univData.save();
+    } else if (recordType == 0) {
+      // 個人記録
+      _resetAwase(
+        ichii: ichiiUnivKojin(univData, index1),
+        nihonjin: rekidaiUnivKojin(kiroku, false, myUnivId, index1),
+        ryuugakusei: rekidaiUnivKojin(kiroku, true, myUnivId, index1),
+        shurui: shurui,
+      );
+      await univData.save();
+      await kiroku.save();
     } else if (recordType == 2) {
-      // 全体区間記録
-      ghensuu.time_zentaikukankiroku[index1][index2][0] = TEISUU.DEFAULTTIME;
-      ghensuu.year_zentaikukankiroku[index1][index2][0] = 0;
-      ghensuu.month_zentaikukankiroku[index1][index2][0] = 0;
-      ghensuu.name_zentaikukankiroku[index1][index2][0] = "記録なし";
-      ghensuu.gakunen_zentaikukankiroku[index1][index2][0] = 0;
-      ghensuu.univname_zentaikukankiroku[index1][index2][0] = "記録なし";
+      // 区間記録
+      _resetAwase(
+        ichii: ichiiUnivKukan(univData, index1, index2),
+        nihonjin: rekidaiUnivKukan(kiroku, false, myUnivId, index1, index2),
+        ryuugakusei: rekidaiUnivKukan(kiroku, true, myUnivId, index1, index2),
+        shurui: shurui,
+      );
+      await univData.save();
+      await kiroku.save();
     }
-    await ghensuu.save();
     // setState を呼び出してUIを更新
     setState(() {});
   }
 
+  /// 全体記録のリセット
+  /// [recordType] 0:個人, 1:大会記録, 2:区間
+  Future<void> _resetOverallRekidai({
+    required int recordType,
+    required int shurui,
+    required int index1,
+    required int index2,
+  }) async {
+    final ghensuu = _ghensuuBox.get('global_ghensuu');
+    final Kiroku? kiroku = _kirokuBox.get('KirokuData');
+    if (ghensuu == null || kiroku == null) return;
+
+    if (recordType == 1) {
+      // 全体大会総合記録
+      rekidaiZentaiTaikai(ghensuu, index1).kaku([]);
+      await ghensuu.save();
+    } else if (recordType == 0) {
+      // 全体個人記録
+      _resetAwase(
+        ichii: ichiiZentaiKojin(ghensuu, index1),
+        nihonjin: rekidaiZentaiKojin(kiroku, false, index1),
+        ryuugakusei: rekidaiZentaiKojin(kiroku, true, index1),
+        shurui: shurui,
+      );
+      await ghensuu.save();
+      await kiroku.save();
+    } else if (recordType == 2) {
+      // 全体区間記録
+      _resetAwase(
+        ichii: ichiiZentaiKukan(ghensuu, index1, index2),
+        nihonjin: rekidaiZentaiKukan(kiroku, false, index1, index2),
+        ryuugakusei: rekidaiZentaiKukan(kiroku, true, index1, index2),
+        shurui: shurui,
+      );
+      await ghensuu.save();
+      await kiroku.save();
+    }
+    // setState を呼び出してUIを更新
+    setState(() {});
+  }
+
+  /// リセットの確認ダイアログに出す補足([shurui]は上と同じ。大会記録はnull)
+  String _resetHosoku(int? shurui) {
+    switch (shurui) {
+      case 0:
+        return '歴代10位までの記録が、日本人・留学生の行の記録もあわせて、まとめて消えます。';
+      case 1:
+        return '歴代10位までの記録がまとめて消えます。日本人と留学生を分けない行の記録は、留学生の記録だけで作り直します。';
+      case 2:
+        return '歴代10位までの記録がまとめて消えます。日本人と留学生を分けない行の記録は、日本人の記録だけで作り直します。';
+      default:
+        return '歴代10位までの記録がまとめて消えます。';
+    }
+  }
+
   // MARK: - 確認ダイアログを表示するヘルパー関数
+  // [hosoku] 何が消えるかの補足(1.8.8)
   Future<void> _showResetConfirmationDialog(
     String title,
-    VoidCallback onConfirm,
-  ) async {
+    VoidCallback onConfirm, {
+    String? hosoku,
+  }) async {
     return showDialog<void>(
       context: context,
       barrierDismissible: false, // ユーザーがダイアログの外をタップして閉じないようにする
       builder: (BuildContext context) {
         return AlertDialog(
           title: Text('この$titleの記録をリセットしますか？'),
-          content: const SingleChildScrollView(
+          content: SingleChildScrollView(
             child: ListBody(
               children: <Widget>[
-                Text('この操作は元に戻せません。', style: TextStyle(color: Colors.black)),
-                Text(
+                if (hosoku != null)
+                  Text(hosoku, style: const TextStyle(color: Colors.black)),
+                const Text(
+                  'この操作は元に戻せません。',
+                  style: TextStyle(color: Colors.black),
+                ),
+                const Text(
                   '本当にリセットしてもよろしいですか？',
                   style: TextStyle(color: Colors.black),
                 ),
@@ -2073,39 +2020,69 @@ class _RecordScreenState extends State<RecordScreen>
     }
   }
 
-  // 個人記録セクションのヘルパーウィジェット (学内記録用)
-  // リセットボタンを追加
-  Widget _buildKojinKirokuSection({
+  // 記録の行のヘルパーウィジェット(歴代10位まで。1.8.8で、学内・全体の個人記録・区間記録・総合記録の4つをまとめた)
+  // ・ふだんは1位だけを出し、2位以下があるときは、押すと歴代10位までを開いたり閉じたりする
+  // ・[senshu] 選手名と学年を出すか(総合記録は出さない)
+  // ・[daigaku] 大学名を出すか(学内記録は出さない)
+  Widget _buildRekidaiSection({
+    required String kagi,
     required String title,
-    required double time,
-    required int year,
-    required int month,
-    required String name,
-    required int gakunen,
+    required List<RekidaiKiroku> rekidai,
     required bool isOverallTime,
+    required bool senshu,
+    required bool daigaku,
     required VoidCallback onReset,
   }) {
-    final timeString = isOverallTime
-        ? _timeToHourMinuteSecondString(time)
-        : _timeToMinuteSecondString(time);
-    final isDefault = (time == TEISUU.DEFAULTTIME);
+    const TextStyle moji = TextStyle(
+      color: Colors.white,
+      fontSize: HENSUU.fontsize_honbun,
+    );
+    final bool aru = rekidai.isNotEmpty;
+    final bool hirakeru = rekidai.length >= 2;
+    final bool hiraiteru = hirakeru && _hiraitaKiroku.contains(kagi);
+
+    // r位の記録(0が1位)
+    Widget ikken(int r) {
+      final RekidaiKiroku k = rekidai[r];
+      final String timeString = isOverallTime
+          ? _timeToHourMinuteSecondString(k.time)
+          : _timeToMinuteSecondString(k.time);
+      final String juni = hiraiteru ? '${r + 1}位 ' : '';
+      return Padding(
+        padding: EdgeInsets.only(top: r == 0 ? 0 : 6),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Wrap(
+              children: [
+                Text('$juni$timeString', style: moji),
+                Text(' (${k.year}年${k.month}月記録)', style: moji),
+                // 総合記録は、大学名を同じ行に出す
+                if (!senshu && daigaku) Text(' ${k.univname}', style: moji),
+              ],
+            ),
+            if (senshu)
+              Wrap(
+                children: [
+                  Text(k.name, style: moji),
+                  Text(' ${k.gakunen}年', style: moji),
+                  if (daigaku) Text(' ${k.univname}', style: moji),
+                ],
+              ),
+          ],
+        ),
+      );
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
-          //mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              title,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: HENSUU.fontsize_honbun,
-              ),
-            ),
-            Text("  "),
+            Text(title, style: moji),
+            const Text("  "),
             // 記録がある場合のみリセットボタンを表示
-            if (!isDefault)
+            if (aru)
               ElevatedButton(
                 onPressed: onReset,
                 style: ElevatedButton.styleFrom(
@@ -2125,54 +2102,36 @@ class _RecordScreenState extends State<RecordScreen>
               ),
           ],
         ),
-        if (!isDefault)
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Wrap(
-                children: [
-                  Text(
-                    timeString,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: HENSUU.fontsize_honbun,
-                    ),
-                  ),
-                  Text(
-                    ' ($year年$month月記録)',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: HENSUU.fontsize_honbun,
-                    ),
-                  ),
-                ],
-              ),
-              Wrap(
-                children: [
-                  Text(
-                    name,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: HENSUU.fontsize_honbun,
-                    ),
-                  ),
-                  Text(
-                    ' $gakunen年',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: HENSUU.fontsize_honbun,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          )
+        if (!aru)
+          const Text('記録なし', style: moji)
         else
-          const Text(
-            '記録なし',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: HENSUU.fontsize_honbun,
+          InkWell(
+            onTap: hirakeru
+                ? () {
+                    setState(() {
+                      if (!_hiraitaKiroku.remove(kagi)) {
+                        _hiraitaKiroku.add(kagi);
+                      }
+                    });
+                  }
+                : null,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (int r = 0; r < (hiraiteru ? rekidai.length : 1); r++)
+                  ikken(r),
+                if (hirakeru)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2),
+                    child: Text(
+                      hiraiteru ? '▲ 閉じる' : '▼ 2位以下を見る',
+                      style: const TextStyle(
+                        color: HENSUU.LinkColor,
+                        fontSize: HENSUU.fontsize_honbun,
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
         const SizedBox(height: 5),
@@ -2180,291 +2139,39 @@ class _RecordScreenState extends State<RecordScreen>
     );
   }
 
-  // 総合記録セクションのヘルパーウィジェット (選手名・学年なし、学内記録用)
-  // リセットボタンを追加
-  Widget _buildOverallRecordSection({
-    required String title,
-    required double time,
-    required int year,
-    required int month,
+  // 日本人と留学生を分けない行・日本人・留学生の3行(個人記録・区間記録。1.8.8)
+  // [titles] 3行の見出し(分けない行、日本人、留学生の順)
+  // [ichii] 分けない行の1位の置き場所(区間新などの判定に使う記録)
+  // [onReset] 押したリセットボタンの行(_resetAwase の shurui)と見出しを受け取る
+  List<Widget> _buildAwaseSections({
+    required String kagi,
+    required List<String> titles,
+    required RekidaiOkiba ichii,
+    required RekidaiOkiba nihonjin,
+    required RekidaiOkiba ryuugakusei,
     required bool isOverallTime,
-    required VoidCallback onReset,
+    required bool daigaku,
+    required void Function(int shurui, String title) onReset,
   }) {
-    final timeString = isOverallTime
-        ? _timeToHourMinuteSecondString(time)
-        : _timeToMinuteSecondString(time);
-    final isDefault = (time == TEISUU.DEFAULTTIME);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          //mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: HENSUU.fontsize_honbun,
-              ),
-            ),
-            Text("  "),
-            // 記録がある場合のみリセットボタンを表示
-            if (!isDefault)
-              ElevatedButton(
-                onPressed: onReset,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.grey, // 目立たない色に変更
-                  foregroundColor: Colors.black,
-                  minimumSize: Size.zero,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: const Text(
-                  'リセット',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                ),
-              ),
-          ],
+    final List<RekidaiKiroku> j = nihonjin.yomu();
+    final List<RekidaiKiroku> r = ryuugakusei.yomu();
+    final List<List<RekidaiKiroku>> gyou = [
+      rekidaiAwaseru(ichii: ichii.yomu(), nihonjin: j, ryuugakusei: r),
+      j,
+      r,
+    ];
+    return [
+      for (int shurui = 0; shurui < 3; shurui++)
+        _buildRekidaiSection(
+          kagi: '${kagi}_$shurui',
+          title: titles[shurui],
+          rekidai: gyou[shurui],
+          isOverallTime: isOverallTime,
+          senshu: true,
+          daigaku: daigaku,
+          onReset: () => onReset(shurui, titles[shurui]),
         ),
-        if (!isDefault)
-          Wrap(
-            children: [
-              Text(
-                timeString,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: HENSUU.fontsize_honbun,
-                ),
-              ),
-              Text(
-                ' ($year年$month月記録)',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: HENSUU.fontsize_honbun,
-                ),
-              ),
-            ],
-          )
-        else
-          const Text(
-            '記録なし',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: HENSUU.fontsize_honbun,
-            ),
-          ),
-        const SizedBox(height: 5),
-      ],
-    );
-  }
-
-  // 新しく追加: 全体個人記録セクションのヘルパーウィジェット
-  // リセットボタンを追加
-  Widget _buildOverallKojinKirokuSection({
-    required String title,
-    required double time,
-    required int year,
-    required int month,
-    required String name,
-    required int gakunen,
-    required String univName,
-    required bool isOverallTime,
-    required VoidCallback onReset,
-  }) {
-    final timeString = isOverallTime
-        ? _timeToHourMinuteSecondString(time)
-        : _timeToMinuteSecondString(time);
-    final isDefault = (time == TEISUU.DEFAULTTIME);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          //mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: HENSUU.fontsize_honbun,
-              ),
-            ),
-            Text("  "),
-            // 記録がある場合のみリセットボタンを表示
-            if (!isDefault)
-              ElevatedButton(
-                onPressed: onReset,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.grey, // 目立たない色に変更
-                  foregroundColor: Colors.black,
-                  minimumSize: Size.zero,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: const Text(
-                  'リセット',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                ),
-              ),
-          ],
-        ),
-        if (!isDefault)
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Wrap(
-                children: [
-                  Text(
-                    timeString,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: HENSUU.fontsize_honbun,
-                    ),
-                  ),
-                  Text(
-                    ' ($year年$month月記録)',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: HENSUU.fontsize_honbun,
-                    ),
-                  ),
-                ],
-              ),
-              Wrap(
-                children: [
-                  Text(
-                    name,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: HENSUU.fontsize_honbun,
-                    ),
-                  ),
-                  Text(
-                    ' $gakunen年',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: HENSUU.fontsize_honbun,
-                    ),
-                  ),
-                  Text(
-                    ' $univName',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: HENSUU.fontsize_honbun,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          )
-        else
-          const Text(
-            '記録なし',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: HENSUU.fontsize_honbun,
-            ),
-          ),
-        const SizedBox(height: 5),
-      ],
-    );
-  }
-
-  // 新しく追加: 全体駅伝総合記録セクションのヘルパーウィジェット
-  // リセットボタンを追加
-  Widget _buildOverallEkidenKirokuSection({
-    required String title,
-    required double time,
-    required int year,
-    required int month,
-    required String univName,
-    required bool isOverallTime,
-    required VoidCallback onReset,
-  }) {
-    final timeString = isOverallTime
-        ? _timeToHourMinuteSecondString(time)
-        : _timeToMinuteSecondString(time);
-    final isDefault = (time == TEISUU.DEFAULTTIME);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          //mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: HENSUU.fontsize_honbun,
-              ),
-            ),
-            Text("  "),
-            // 記録がある場合のみリセットボタンを表示
-            if (!isDefault)
-              ElevatedButton(
-                onPressed: onReset,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.grey, // 目立たない色に変更
-                  foregroundColor: Colors.black,
-                  minimumSize: Size.zero,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: const Text(
-                  'リセット',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                ),
-              ),
-          ],
-        ),
-        if (!isDefault)
-          Wrap(
-            children: [
-              Text(
-                timeString,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: HENSUU.fontsize_honbun,
-                ),
-              ),
-              Text(
-                ' ($year年$month月記録)',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: HENSUU.fontsize_honbun,
-                ),
-              ),
-              Text(
-                ' $univName',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: HENSUU.fontsize_honbun,
-                ),
-              ),
-            ],
-          )
-        else
-          const Text(
-            '記録なし',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: HENSUU.fontsize_honbun,
-            ),
-          ),
-        const SizedBox(height: 5),
-      ],
-    );
+    ];
   }
 
   // MARK: - 大学記録タブのコンテンツ
@@ -2608,6 +2315,34 @@ class _RecordScreenState extends State<RecordScreen>
     );
   }
 
+  // 記録画面に出す個人記録の種目(番号は個人記録の番号。1.8.8でまとめた)
+  static const List<String> _kojinShumoku = [
+    '5000m',
+    '10000m',
+    'ハーフマラソン',
+    'フルマラソン',
+  ];
+  static const List<String> _kojinShumokuRyaku = [
+    '5000m',
+    '10000m',
+    'ハーフ',
+    'フル',
+  ];
+
+  // 駅伝の記録の選択肢(_recordTypes の1〜4)の大会番号
+  static const List<int> _ekidenRacebangou = [0, 1, 2, 5];
+
+  // 駅伝の記録の見出しと区間数
+  String _ekidenMidashi(int sentaku, List<UnivData> sortedUnivData) {
+    if (sentaku == 4) return sortedUnivData[0].name_tanshuku; // カスタム駅伝
+    return const ['10月駅伝', '11月駅伝', '正月駅伝'][sentaku - 1];
+  }
+
+  int _ekidenKukansuu(int sentaku, Ghensuu ghensuu) {
+    if (sentaku == 4) return ghensuu.kukansuu_taikaigoto[5]; // カスタム駅伝
+    return const [6, 8, 10][sentaku - 1];
+  }
+
   // MARK: - 大学記録のコンテンツ切り替えヘルパー関数
   Widget _buildUnivRecordContent(String recordType) {
     final ghensuu = _ghensuuBox.get(
@@ -2620,680 +2355,122 @@ class _RecordScreenState extends State<RecordScreen>
     sortedUnivData.sort((a, b) => a.id.compareTo(b.id));
     final Kiroku kiroku = _kirokuBox.get('KirokuData')!;
     final UnivData myUnivData = _univBox.get(myUnivId)!;
-    if (recordType == _recordTypes[0]) {
+    const TextStyle moji = TextStyle(
+      color: Colors.white,
+      fontSize: HENSUU.fontsize_honbun,
+    );
+    final int sentaku = _recordTypes.indexOf(recordType);
+
+    if (sentaku == 0) {
+      // 個人記録
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start, // 左寄せを維持
         children: [
-          Text(
-            '${myUnivData.name}大学学内記録',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: HENSUU.fontsize_honbun,
-              //fontWeight: FontWeight.bold,
-            ),
-          ),
+          Text('${myUnivData.name}大学学内記録', style: moji),
           const SizedBox(height: 10),
-          // 5000m
-          _buildKojinKirokuSection(
-            title: '5000m',
-            time: myUnivData.time_univkojinkiroku[0][0],
-            year: myUnivData.year_univkojinkiroku[0][0],
-            month: myUnivData.month_univkojinkiroku[0][0],
-            name: myUnivData.name_univkojinkiroku[0][0],
-            gakunen: myUnivData.gakunen_univkojinkiroku[0][0],
-            isOverallTime: false,
-            onReset: () => _showResetConfirmationDialog(
-              '5000m',
-              () => _resetUnivRecord(
-                myUnivId: myUnivId,
-                recordType: 0,
-                index1: 0,
-                index2: 0,
+          for (int k = 0; k < _kojinShumoku.length; k++) ...[
+            if (k > 0) const SizedBox(height: 10),
+            ..._buildAwaseSections(
+              kagi: 'univ_kojin_$k',
+              titles: [
+                _kojinShumoku[k],
+                '${_kojinShumokuRyaku[k]}日本人',
+                '${_kojinShumokuRyaku[k]}留学生',
+              ],
+              ichii: ichiiUnivKojin(myUnivData, k),
+              nihonjin: rekidaiUnivKojin(kiroku, false, myUnivId, k),
+              ryuugakusei: rekidaiUnivKojin(kiroku, true, myUnivId, k),
+              isOverallTime: k == 3, // フルマラソンは時間で表示
+              daigaku: false,
+              onReset: (shurui, title) => _showResetConfirmationDialog(
+                title,
+                () => _resetUnivRekidai(
+                  recordType: 0,
+                  shurui: shurui,
+                  index1: k,
+                  index2: 0,
+                ),
+                hosoku: _resetHosoku(shurui),
               ),
             ),
-          ),
-          _buildKojinKirokuSection(
-            title: '5000m日本人',
-            time: kiroku.time_univ_jap_kojinkiroku[myUnivId][0][0],
-            year: kiroku.year_univ_jap_kojinkiroku[myUnivId][0][0],
-            month: kiroku.month_univ_jap_kojinkiroku[myUnivId][0][0],
-            name: kiroku.name_univ_jap_kojinkiroku[myUnivId][0][0],
-            gakunen: kiroku.gakunen_univ_jap_kojinkiroku[myUnivId][0][0],
-            isOverallTime: false,
-            onReset: () => _showResetConfirmationDialog(
-              '5000m日本人',
-              () => _resetUnivRecord_kiroku(
-                ryuugakuseiflag: false,
-                myUnivId: myUnivId,
-                recordType: 0,
-                index1: 0,
-                index2: 0,
-              ),
-            ),
-          ),
-          _buildKojinKirokuSection(
-            title: '5000m留学生',
-            time: kiroku.time_univ_ryuugakusei_kojinkiroku[myUnivId][0][0],
-            year: kiroku.year_univ_ryuugakusei_kojinkiroku[myUnivId][0][0],
-            month: kiroku.month_univ_ryuugakusei_kojinkiroku[myUnivId][0][0],
-            name: kiroku.name_univ_ryuugakusei_kojinkiroku[myUnivId][0][0],
-            gakunen:
-                kiroku.gakunen_univ_ryuugakusei_kojinkiroku[myUnivId][0][0],
-            isOverallTime: false,
-            onReset: () => _showResetConfirmationDialog(
-              '5000m留学生',
-              () => _resetUnivRecord_kiroku(
-                ryuugakuseiflag: true,
-                myUnivId: myUnivId,
-                recordType: 0,
-                index1: 0,
-                index2: 0,
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          // 10000m
-          _buildKojinKirokuSection(
-            title: '10000m',
-            time: myUnivData.time_univkojinkiroku[1][0],
-            year: myUnivData.year_univkojinkiroku[1][0],
-            month: myUnivData.month_univkojinkiroku[1][0],
-            name: myUnivData.name_univkojinkiroku[1][0],
-            gakunen: myUnivData.gakunen_univkojinkiroku[1][0],
-            isOverallTime: false,
-            onReset: () => _showResetConfirmationDialog(
-              '10000m',
-              () => _resetUnivRecord(
-                myUnivId: myUnivId,
-                recordType: 0,
-                index1: 1,
-                index2: 0,
-              ),
-            ),
-          ),
-          _buildKojinKirokuSection(
-            title: '10000m日本人',
-            time: kiroku.time_univ_jap_kojinkiroku[myUnivId][1][0],
-            year: kiroku.year_univ_jap_kojinkiroku[myUnivId][1][0],
-            month: kiroku.month_univ_jap_kojinkiroku[myUnivId][1][0],
-            name: kiroku.name_univ_jap_kojinkiroku[myUnivId][1][0],
-            gakunen: kiroku.gakunen_univ_jap_kojinkiroku[myUnivId][1][0],
-            isOverallTime: false,
-            onReset: () => _showResetConfirmationDialog(
-              '10000m日本人',
-              () => _resetUnivRecord_kiroku(
-                ryuugakuseiflag: false,
-                myUnivId: myUnivId,
-                recordType: 0,
-                index1: 1,
-                index2: 0,
-              ),
-            ),
-          ),
-          _buildKojinKirokuSection(
-            title: '10000m留学生',
-            time: kiroku.time_univ_ryuugakusei_kojinkiroku[myUnivId][1][0],
-            year: kiroku.year_univ_ryuugakusei_kojinkiroku[myUnivId][1][0],
-            month: kiroku.month_univ_ryuugakusei_kojinkiroku[myUnivId][1][0],
-            name: kiroku.name_univ_ryuugakusei_kojinkiroku[myUnivId][1][0],
-            gakunen:
-                kiroku.gakunen_univ_ryuugakusei_kojinkiroku[myUnivId][1][0],
-            isOverallTime: false,
-            onReset: () => _showResetConfirmationDialog(
-              '10000m留学生',
-              () => _resetUnivRecord_kiroku(
-                ryuugakuseiflag: true,
-                myUnivId: myUnivId,
-                recordType: 0,
-                index1: 1,
-                index2: 0,
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          // ハーフマラソン
-          _buildKojinKirokuSection(
-            title: 'ハーフマラソン',
-            time: myUnivData.time_univkojinkiroku[2][0],
-            year: myUnivData.year_univkojinkiroku[2][0],
-            month: myUnivData.month_univkojinkiroku[2][0],
-            name: myUnivData.name_univkojinkiroku[2][0],
-            gakunen: myUnivData.gakunen_univkojinkiroku[2][0],
-            isOverallTime: false,
-            onReset: () => _showResetConfirmationDialog(
-              'ハーフマラソン',
-              () => _resetUnivRecord(
-                myUnivId: myUnivId,
-                recordType: 0,
-                index1: 2,
-                index2: 0,
-              ),
-            ),
-          ),
-          _buildKojinKirokuSection(
-            title: 'ハーフ日本人',
-            time: kiroku.time_univ_jap_kojinkiroku[myUnivId][2][0],
-            year: kiroku.year_univ_jap_kojinkiroku[myUnivId][2][0],
-            month: kiroku.month_univ_jap_kojinkiroku[myUnivId][2][0],
-            name: kiroku.name_univ_jap_kojinkiroku[myUnivId][2][0],
-            gakunen: kiroku.gakunen_univ_jap_kojinkiroku[myUnivId][2][0],
-            isOverallTime: false,
-            onReset: () => _showResetConfirmationDialog(
-              'ハーフ日本人',
-              () => _resetUnivRecord_kiroku(
-                ryuugakuseiflag: false,
-                myUnivId: myUnivId,
-                recordType: 0,
-                index1: 2,
-                index2: 0,
-              ),
-            ),
-          ),
-          _buildKojinKirokuSection(
-            title: 'ハーフ留学生',
-            time: kiroku.time_univ_ryuugakusei_kojinkiroku[myUnivId][2][0],
-            year: kiroku.year_univ_ryuugakusei_kojinkiroku[myUnivId][2][0],
-            month: kiroku.month_univ_ryuugakusei_kojinkiroku[myUnivId][2][0],
-            name: kiroku.name_univ_ryuugakusei_kojinkiroku[myUnivId][2][0],
-            gakunen:
-                kiroku.gakunen_univ_ryuugakusei_kojinkiroku[myUnivId][2][0],
-            isOverallTime: false,
-            onReset: () => _showResetConfirmationDialog(
-              'ハーフ留学生',
-              () => _resetUnivRecord_kiroku(
-                ryuugakuseiflag: true,
-                myUnivId: myUnivId,
-                recordType: 0,
-                index1: 2,
-                index2: 0,
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          // フルマラソン
-          _buildKojinKirokuSection(
-            title: 'フルマラソン',
-            time: myUnivData.time_univkojinkiroku[3][0],
-            year: myUnivData.year_univkojinkiroku[3][0],
-            month: myUnivData.month_univkojinkiroku[3][0],
-            name: myUnivData.name_univkojinkiroku[3][0],
-            gakunen: myUnivData.gakunen_univkojinkiroku[3][0],
-            isOverallTime: true,
-            onReset: () => _showResetConfirmationDialog(
-              'フルマラソン',
-              () => _resetUnivRecord(
-                myUnivId: myUnivId,
-                recordType: 0,
-                index1: 3,
-                index2: 0,
-              ),
-            ),
-          ),
-          _buildKojinKirokuSection(
-            title: 'フル日本人',
-            time: kiroku.time_univ_jap_kojinkiroku[myUnivId][3][0],
-            year: kiroku.year_univ_jap_kojinkiroku[myUnivId][3][0],
-            month: kiroku.month_univ_jap_kojinkiroku[myUnivId][3][0],
-            name: kiroku.name_univ_jap_kojinkiroku[myUnivId][3][0],
-            gakunen: kiroku.gakunen_univ_jap_kojinkiroku[myUnivId][3][0],
-            isOverallTime: true,
-            onReset: () => _showResetConfirmationDialog(
-              'フル日本人',
-              () => _resetUnivRecord_kiroku(
-                ryuugakuseiflag: false,
-                myUnivId: myUnivId,
-                recordType: 0,
-                index1: 3,
-                index2: 0,
-              ),
-            ),
-          ),
-          _buildKojinKirokuSection(
-            title: 'フル留学生',
-            time: kiroku.time_univ_ryuugakusei_kojinkiroku[myUnivId][3][0],
-            year: kiroku.year_univ_ryuugakusei_kojinkiroku[myUnivId][3][0],
-            month: kiroku.month_univ_ryuugakusei_kojinkiroku[myUnivId][3][0],
-            name: kiroku.name_univ_ryuugakusei_kojinkiroku[myUnivId][3][0],
-            gakunen:
-                kiroku.gakunen_univ_ryuugakusei_kojinkiroku[myUnivId][3][0],
-            isOverallTime: true,
-            onReset: () => _showResetConfirmationDialog(
-              'フル留学生',
-              () => _resetUnivRecord_kiroku(
-                ryuugakuseiflag: true,
-                myUnivId: myUnivId,
-                recordType: 0,
-                index1: 3,
-                index2: 0,
-              ),
-            ),
-          ),
+          ],
         ],
       );
-    } else if (recordType == _recordTypes[1]) {
+    } else if (sentaku >= 1 && sentaku <= 4) {
+      // 駅伝の記録
+      final int race = _ekidenRacebangou[sentaku - 1];
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start, // 左寄せを維持
         children: [
-          Text(
-            '10月駅伝',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: HENSUU.fontsize_honbun,
-              //fontWeight: FontWeight.bold,
-            ),
-          ),
+          Text(_ekidenMidashi(sentaku, sortedUnivData), style: moji),
           const SizedBox(height: 5),
-
-          // 10月駅伝 総合記録
-          _buildOverallRecordSection(
+          // 総合記録
+          _buildRekidaiSection(
+            kagi: 'univ_taikai_$race',
             title: '総合記録',
-            time: myUnivData.time_univtaikaikiroku[0][0],
-            year: myUnivData.year_univtaikaikiroku[0][0],
-            month: myUnivData.month_univtaikaikiroku[0][0],
+            rekidai: rekidaiUnivTaikai(myUnivData, race).yomu(),
             isOverallTime: true,
+            senshu: false,
+            daigaku: false,
             onReset: () => _showResetConfirmationDialog(
               '総合記録',
-              () => _resetUnivRecord(
-                myUnivId: myUnivId,
+              () => _resetUnivRekidai(
                 recordType: 1,
-                index1: 0,
+                shurui: 0,
+                index1: race,
                 index2: 0,
               ),
+              hosoku: _resetHosoku(null),
             ),
           ),
           const SizedBox(height: 5),
-
-          // 10月駅伝 区間記録 (1区〜6区)
-          ...List.generate(6, (index) {
-            return Column(
+          // 区間記録
+          for (
+            int index = 0;
+            index < _ekidenKukansuu(sentaku, ghensuu);
+            index++
+          )
+            Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildKojinKirokuSection(
-                  title: '${index + 1}区',
-                  time: myUnivData.time_univkukankiroku[0][index][0],
-                  year: myUnivData.year_univkukankiroku[0][index][0],
-                  month: myUnivData.month_univkukankiroku[0][index][0],
-                  name: myUnivData.name_univkukankiroku[0][index][0],
-                  gakunen: myUnivData.gakunen_univkukankiroku[0][index][0],
-                  isOverallTime: false,
-                  onReset: () => _showResetConfirmationDialog(
+                ..._buildAwaseSections(
+                  kagi: 'univ_kukan_${race}_$index',
+                  titles: [
                     '${index + 1}区',
-                    () => _resetUnivRecord(
-                      myUnivId: myUnivId,
-                      recordType: 2,
-                      index1: 0,
-                      index2: index,
-                    ),
-                  ),
-                ),
-                _buildKojinKirokuSection(
-                  title: '${index + 1}区日本人',
-                  time: kiroku.time_univ_jap_kukankiroku[myUnivId][0][index][0],
-                  year: kiroku.year_univ_jap_kukankiroku[myUnivId][0][index][0],
-                  month:
-                      kiroku.month_univ_jap_kukankiroku[myUnivId][0][index][0],
-                  name: kiroku.name_univ_jap_kukankiroku[myUnivId][0][index][0],
-                  gakunen: kiroku
-                      .gakunen_univ_jap_kukankiroku[myUnivId][0][index][0],
-                  isOverallTime: false,
-                  onReset: () => _showResetConfirmationDialog(
                     '${index + 1}区日本人',
-                    () => _resetUnivRecord_kiroku(
-                      ryuugakuseiflag: false,
-                      myUnivId: myUnivId,
-                      recordType: 2,
-                      index1: 0,
-                      index2: index,
-                    ),
-                  ),
-                ),
-                _buildKojinKirokuSection(
-                  title: '${index + 1}区留学生',
-                  time: kiroku
-                      .time_univ_ryuugakusei_kukankiroku[myUnivId][0][index][0],
-                  year: kiroku
-                      .year_univ_ryuugakusei_kukankiroku[myUnivId][0][index][0],
-                  month: kiroku
-                      .month_univ_ryuugakusei_kukankiroku[myUnivId][0][index][0],
-                  name: kiroku
-                      .name_univ_ryuugakusei_kukankiroku[myUnivId][0][index][0],
-                  gakunen: kiroku
-                      .gakunen_univ_ryuugakusei_kukankiroku[myUnivId][0][index][0],
-                  isOverallTime: false,
-                  onReset: () => _showResetConfirmationDialog(
                     '${index + 1}区留学生',
-                    () => _resetUnivRecord_kiroku(
-                      ryuugakuseiflag: true,
-                      myUnivId: myUnivId,
+                  ],
+                  ichii: ichiiUnivKukan(myUnivData, race, index),
+                  nihonjin: rekidaiUnivKukan(
+                    kiroku,
+                    false,
+                    myUnivId,
+                    race,
+                    index,
+                  ),
+                  ryuugakusei: rekidaiUnivKukan(
+                    kiroku,
+                    true,
+                    myUnivId,
+                    race,
+                    index,
+                  ),
+                  isOverallTime: false,
+                  daigaku: false,
+                  onReset: (shurui, title) => _showResetConfirmationDialog(
+                    title,
+                    () => _resetUnivRekidai(
                       recordType: 2,
-                      index1: 0,
+                      shurui: shurui,
+                      index1: race,
                       index2: index,
                     ),
+                    hosoku: _resetHosoku(shurui),
                   ),
                 ),
                 const SizedBox(height: 10),
               ],
-            );
-          }),
-        ],
-      );
-    } else if (recordType == _recordTypes[2]) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start, // 左寄せを維持
-        children: [
-          Text(
-            '11月駅伝',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: HENSUU.fontsize_honbun,
-              //fontWeight: FontWeight.bold,
             ),
-          ),
-          const SizedBox(height: 5),
-          // 11月駅伝 総合記録
-          _buildOverallRecordSection(
-            title: '総合記録',
-            time: myUnivData.time_univtaikaikiroku[1][0],
-            year: myUnivData.year_univtaikaikiroku[1][0],
-            month: myUnivData.month_univtaikaikiroku[1][0],
-            isOverallTime: true,
-            onReset: () => _showResetConfirmationDialog(
-              '総合記録',
-              () => _resetUnivRecord(
-                myUnivId: myUnivId,
-                recordType: 1,
-                index1: 1,
-                index2: 0,
-              ),
-            ),
-          ),
-          const SizedBox(height: 5),
-
-          // 11月駅伝 区間記録 (1区〜8区)
-          ...List.generate(8, (index) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildKojinKirokuSection(
-                  title: '${index + 1}区',
-                  time: myUnivData.time_univkukankiroku[1][index][0],
-                  year: myUnivData.year_univkukankiroku[1][index][0],
-                  month: myUnivData.month_univkukankiroku[1][index][0],
-                  name: myUnivData.name_univkukankiroku[1][index][0],
-                  gakunen: myUnivData.gakunen_univkukankiroku[1][index][0],
-                  isOverallTime: false,
-                  onReset: () => _showResetConfirmationDialog(
-                    '${index + 1}区',
-                    () => _resetUnivRecord(
-                      myUnivId: myUnivId,
-                      recordType: 2,
-                      index1: 1,
-                      index2: index,
-                    ),
-                  ),
-                ),
-                _buildKojinKirokuSection(
-                  title: '${index + 1}区日本人',
-                  time: kiroku.time_univ_jap_kukankiroku[myUnivId][1][index][0],
-                  year: kiroku.year_univ_jap_kukankiroku[myUnivId][1][index][0],
-                  month:
-                      kiroku.month_univ_jap_kukankiroku[myUnivId][1][index][0],
-                  name: kiroku.name_univ_jap_kukankiroku[myUnivId][1][index][0],
-                  gakunen: kiroku
-                      .gakunen_univ_jap_kukankiroku[myUnivId][1][index][0],
-                  isOverallTime: false,
-                  onReset: () => _showResetConfirmationDialog(
-                    '${index + 1}区日本人',
-                    () => _resetUnivRecord_kiroku(
-                      ryuugakuseiflag: false,
-                      myUnivId: myUnivId,
-                      recordType: 2,
-                      index1: 1,
-                      index2: index,
-                    ),
-                  ),
-                ),
-                _buildKojinKirokuSection(
-                  title: '${index + 1}区留学生',
-                  time: kiroku
-                      .time_univ_ryuugakusei_kukankiroku[myUnivId][1][index][0],
-                  year: kiroku
-                      .year_univ_ryuugakusei_kukankiroku[myUnivId][1][index][0],
-                  month: kiroku
-                      .month_univ_ryuugakusei_kukankiroku[myUnivId][1][index][0],
-                  name: kiroku
-                      .name_univ_ryuugakusei_kukankiroku[myUnivId][1][index][0],
-                  gakunen: kiroku
-                      .gakunen_univ_ryuugakusei_kukankiroku[myUnivId][1][index][0],
-                  isOverallTime: false,
-                  onReset: () => _showResetConfirmationDialog(
-                    '${index + 1}区留学生',
-                    () => _resetUnivRecord_kiroku(
-                      ryuugakuseiflag: true,
-                      myUnivId: myUnivId,
-                      recordType: 2,
-                      index1: 1,
-                      index2: index,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-              ],
-            );
-          }),
-        ],
-      );
-    } else if (recordType == _recordTypes[3]) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start, // 左寄せを維持
-        children: [
-          Text(
-            '正月駅伝',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: HENSUU.fontsize_honbun,
-              //fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 5),
-          // 正月駅伝 総合記録
-          _buildOverallRecordSection(
-            title: '総合記録',
-            time: myUnivData.time_univtaikaikiroku[2][0],
-            year: myUnivData.year_univtaikaikiroku[2][0],
-            month: myUnivData.month_univtaikaikiroku[2][0],
-            isOverallTime: true,
-            onReset: () => _showResetConfirmationDialog(
-              '総合記録',
-              () => _resetUnivRecord(
-                myUnivId: myUnivId,
-                recordType: 1,
-                index1: 2,
-                index2: 0,
-              ),
-            ),
-          ),
-          const SizedBox(height: 5),
-
-          // 正月駅伝 区間記録 (1区〜10区)
-          ...List.generate(10, (index) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildKojinKirokuSection(
-                  title: '${index + 1}区',
-                  time: myUnivData.time_univkukankiroku[2][index][0],
-                  year: myUnivData.year_univkukankiroku[2][index][0],
-                  month: myUnivData.month_univkukankiroku[2][index][0],
-                  name: myUnivData.name_univkukankiroku[2][index][0],
-                  gakunen: myUnivData.gakunen_univkukankiroku[2][index][0],
-                  isOverallTime: false,
-                  onReset: () => _showResetConfirmationDialog(
-                    '${index + 1}区',
-                    () => _resetUnivRecord(
-                      myUnivId: myUnivId,
-                      recordType: 2,
-                      index1: 2,
-                      index2: index,
-                    ),
-                  ),
-                ),
-                _buildKojinKirokuSection(
-                  title: '${index + 1}区日本人',
-                  time: kiroku.time_univ_jap_kukankiroku[myUnivId][2][index][0],
-                  year: kiroku.year_univ_jap_kukankiroku[myUnivId][2][index][0],
-                  month:
-                      kiroku.month_univ_jap_kukankiroku[myUnivId][2][index][0],
-                  name: kiroku.name_univ_jap_kukankiroku[myUnivId][2][index][0],
-                  gakunen: kiroku
-                      .gakunen_univ_jap_kukankiroku[myUnivId][2][index][0],
-                  isOverallTime: false,
-                  onReset: () => _showResetConfirmationDialog(
-                    '${index + 1}区日本人',
-                    () => _resetUnivRecord_kiroku(
-                      ryuugakuseiflag: false,
-                      myUnivId: myUnivId,
-                      recordType: 2,
-                      index1: 2,
-                      index2: index,
-                    ),
-                  ),
-                ),
-                _buildKojinKirokuSection(
-                  title: '${index + 1}区留学生',
-                  time: kiroku
-                      .time_univ_ryuugakusei_kukankiroku[myUnivId][2][index][0],
-                  year: kiroku
-                      .year_univ_ryuugakusei_kukankiroku[myUnivId][2][index][0],
-                  month: kiroku
-                      .month_univ_ryuugakusei_kukankiroku[myUnivId][2][index][0],
-                  name: kiroku
-                      .name_univ_ryuugakusei_kukankiroku[myUnivId][2][index][0],
-                  gakunen: kiroku
-                      .gakunen_univ_ryuugakusei_kukankiroku[myUnivId][2][index][0],
-                  isOverallTime: false,
-                  onReset: () => _showResetConfirmationDialog(
-                    '${index + 1}区留学生',
-                    () => _resetUnivRecord_kiroku(
-                      ryuugakuseiflag: true,
-                      myUnivId: myUnivId,
-                      recordType: 2,
-                      index1: 2,
-                      index2: index,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-              ],
-            );
-          }),
-        ],
-      );
-    } else if (recordType == _recordTypes[4]) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start, // 左寄せを維持
-        children: [
-          //カスタム駅伝
-          Text(
-            sortedUnivData[0].name_tanshuku,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: HENSUU.fontsize_honbun,
-              //fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 5),
-          // カスタム駅伝 総合記録
-          _buildOverallRecordSection(
-            title: '総合記録',
-            time: myUnivData.time_univtaikaikiroku[5][0],
-            year: myUnivData.year_univtaikaikiroku[5][0],
-            month: myUnivData.month_univtaikaikiroku[5][0],
-            isOverallTime: true,
-            onReset: () => _showResetConfirmationDialog(
-              '総合記録',
-              () => _resetUnivRecord(
-                myUnivId: myUnivId,
-                recordType: 1,
-                index1: 5,
-                index2: 0,
-              ),
-            ),
-          ),
-          const SizedBox(height: 5),
-
-          // カスタム駅伝 区間記録 (1区〜10区)
-          ...List.generate(ghensuu.kukansuu_taikaigoto[5], (index) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildKojinKirokuSection(
-                  title: '${index + 1}区',
-                  time: myUnivData.time_univkukankiroku[5][index][0],
-                  year: myUnivData.year_univkukankiroku[5][index][0],
-                  month: myUnivData.month_univkukankiroku[5][index][0],
-                  name: myUnivData.name_univkukankiroku[5][index][0],
-                  gakunen: myUnivData.gakunen_univkukankiroku[5][index][0],
-                  isOverallTime: false,
-                  onReset: () => _showResetConfirmationDialog(
-                    '${index + 1}区',
-                    () => _resetUnivRecord(
-                      myUnivId: myUnivId,
-                      recordType: 2,
-                      index1: 5,
-                      index2: index,
-                    ),
-                  ),
-                ),
-                _buildKojinKirokuSection(
-                  title: '${index + 1}区日本人',
-                  time: kiroku.time_univ_jap_kukankiroku[myUnivId][5][index][0],
-                  year: kiroku.year_univ_jap_kukankiroku[myUnivId][5][index][0],
-                  month:
-                      kiroku.month_univ_jap_kukankiroku[myUnivId][5][index][0],
-                  name: kiroku.name_univ_jap_kukankiroku[myUnivId][5][index][0],
-                  gakunen: kiroku
-                      .gakunen_univ_jap_kukankiroku[myUnivId][5][index][0],
-                  isOverallTime: false,
-                  onReset: () => _showResetConfirmationDialog(
-                    '${index + 1}区日本人',
-                    () => _resetUnivRecord_kiroku(
-                      ryuugakuseiflag: false,
-                      myUnivId: myUnivId,
-                      recordType: 2,
-                      index1: 5,
-                      index2: index,
-                    ),
-                  ),
-                ),
-                _buildKojinKirokuSection(
-                  title: '${index + 1}区留学生',
-                  time: kiroku
-                      .time_univ_ryuugakusei_kukankiroku[myUnivId][5][index][0],
-                  year: kiroku
-                      .year_univ_ryuugakusei_kukankiroku[myUnivId][5][index][0],
-                  month: kiroku
-                      .month_univ_ryuugakusei_kukankiroku[myUnivId][5][index][0],
-                  name: kiroku
-                      .name_univ_ryuugakusei_kukankiroku[myUnivId][5][index][0],
-                  gakunen: kiroku
-                      .gakunen_univ_ryuugakusei_kukankiroku[myUnivId][5][index][0],
-                  isOverallTime: false,
-                  onReset: () => _showResetConfirmationDialog(
-                    '${index + 1}区留学生',
-                    () => _resetUnivRecord_kiroku(
-                      ryuugakuseiflag: true,
-                      myUnivId: myUnivId,
-                      recordType: 2,
-                      index1: 5,
-                      index2: index,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-              ],
-            );
-          }),
         ],
       );
     } else {
@@ -3306,638 +2483,114 @@ class _RecordScreenState extends State<RecordScreen>
       'global_ghensuu',
       defaultValue: Ghensuu.initial(),
     )!;
-    //final myUnivId = ghensuu.MYunivid;
     final univDataBox = Hive.box<UnivData>('univBox');
     List<UnivData> sortedUnivData = univDataBox.values.toList();
     sortedUnivData.sort((a, b) => a.id.compareTo(b.id));
     final Kiroku kiroku = _kirokuBox.get('KirokuData')!;
-    //final UnivData myUnivData = _univBox.get(myUnivId)!;
+    const TextStyle moji = TextStyle(
+      color: Colors.white,
+      fontSize: HENSUU.fontsize_honbun,
+    );
+    final int sentaku = _recordTypes.indexOf(recordType);
 
-    if (recordType == _recordTypes[0]) {
+    if (sentaku == 0) {
+      // 個人記録
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start, // 左寄せを維持
         children: [
-          Text(
-            '全体歴代記録',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: HENSUU.fontsize_honbun,
-              //fontWeight: FontWeight.bold,
-            ),
-          ),
+          const Text('全体歴代記録', style: moji),
           const SizedBox(height: 15),
-
-          // 5000m
-          _buildOverallKojinKirokuSection(
-            title: '5000m',
-            time: ghensuu.time_zentaikojinkiroku[0][0],
-            year: ghensuu.year_zentaikojinkiroku[0][0],
-            month: ghensuu.month_zentaikojinkiroku[0][0],
-            name: ghensuu.name_zentaikojinkiroku[0][0],
-            gakunen: ghensuu.gakunen_zentaikojinkiroku[0][0],
-            univName: ghensuu.univname_zentaikojinkiroku[0][0],
-            isOverallTime: false,
-            onReset: () => _showResetConfirmationDialog(
-              '5000m',
-              () => _resetOverallRecord(recordType: 0, index1: 0, index2: 0),
-            ),
-          ),
-          _buildOverallKojinKirokuSection(
-            title: '5000m日本人',
-            time: kiroku.time_zentai_jap_kojinkiroku[0][0],
-            year: kiroku.year_zentai_jap_kojinkiroku[0][0],
-            month: kiroku.month_zentai_jap_kojinkiroku[0][0],
-            name: kiroku.name_zentai_jap_kojinkiroku[0][0],
-            gakunen: kiroku.gakunen_zentai_jap_kojinkiroku[0][0],
-            univName: kiroku.univname_zentai_jap_kojinkiroku[0][0],
-            isOverallTime: false,
-            onReset: () => _showResetConfirmationDialog(
-              '5000m日本人',
-              () => _resetOverallRecord_kiroku(
-                ryuugakuseiflag: false,
-                recordType: 0,
-                index1: 0,
-                index2: 0,
+          for (int k = 0; k < _kojinShumoku.length; k++) ...[
+            if (k > 0) const SizedBox(height: 10),
+            ..._buildAwaseSections(
+              kagi: 'zentai_kojin_$k',
+              titles: [
+                _kojinShumoku[k],
+                '${_kojinShumokuRyaku[k]}日本人',
+                '${_kojinShumokuRyaku[k]}留学生',
+              ],
+              ichii: ichiiZentaiKojin(ghensuu, k),
+              nihonjin: rekidaiZentaiKojin(kiroku, false, k),
+              ryuugakusei: rekidaiZentaiKojin(kiroku, true, k),
+              isOverallTime: k == 3, // フルマラソンは時間で表示
+              daigaku: true,
+              onReset: (shurui, title) => _showResetConfirmationDialog(
+                title,
+                () => _resetOverallRekidai(
+                  recordType: 0,
+                  shurui: shurui,
+                  index1: k,
+                  index2: 0,
+                ),
+                hosoku: _resetHosoku(shurui),
               ),
             ),
-          ),
-          _buildOverallKojinKirokuSection(
-            title: '5000m留学生',
-            time: kiroku.time_zentai_ryuugakusei_kojinkiroku[0][0],
-            year: kiroku.year_zentai_ryuugakusei_kojinkiroku[0][0],
-            month: kiroku.month_zentai_ryuugakusei_kojinkiroku[0][0],
-            name: kiroku.name_zentai_ryuugakusei_kojinkiroku[0][0],
-            gakunen: kiroku.gakunen_zentai_ryuugakusei_kojinkiroku[0][0],
-            univName: kiroku.univname_zentai_ryuugakusei_kojinkiroku[0][0],
-            isOverallTime: false,
-            onReset: () => _showResetConfirmationDialog(
-              '5000m留学生',
-              () => _resetOverallRecord_kiroku(
-                ryuugakuseiflag: true,
-                recordType: 0,
-                index1: 0,
-                index2: 0,
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          // 10000m
-          _buildOverallKojinKirokuSection(
-            title: '10000m',
-            time: ghensuu.time_zentaikojinkiroku[1][0],
-            year: ghensuu.year_zentaikojinkiroku[1][0],
-            month: ghensuu.month_zentaikojinkiroku[1][0],
-            name: ghensuu.name_zentaikojinkiroku[1][0],
-            gakunen: ghensuu.gakunen_zentaikojinkiroku[1][0],
-            univName: ghensuu.univname_zentaikojinkiroku[1][0],
-            isOverallTime: false,
-            onReset: () => _showResetConfirmationDialog(
-              '10000m',
-              () => _resetOverallRecord(recordType: 0, index1: 1, index2: 0),
-            ),
-          ),
-          _buildOverallKojinKirokuSection(
-            title: '10000m日本人',
-            time: kiroku.time_zentai_jap_kojinkiroku[1][0],
-            year: kiroku.year_zentai_jap_kojinkiroku[1][0],
-            month: kiroku.month_zentai_jap_kojinkiroku[1][0],
-            name: kiroku.name_zentai_jap_kojinkiroku[1][0],
-            gakunen: kiroku.gakunen_zentai_jap_kojinkiroku[1][0],
-            univName: kiroku.univname_zentai_jap_kojinkiroku[1][0],
-            isOverallTime: false,
-            onReset: () => _showResetConfirmationDialog(
-              '10000m日本人',
-              () => _resetOverallRecord_kiroku(
-                ryuugakuseiflag: false,
-                recordType: 0,
-                index1: 1,
-                index2: 0,
-              ),
-            ),
-          ),
-          _buildOverallKojinKirokuSection(
-            title: '10000m留学生',
-            time: kiroku.time_zentai_ryuugakusei_kojinkiroku[1][0],
-            year: kiroku.year_zentai_ryuugakusei_kojinkiroku[1][0],
-            month: kiroku.month_zentai_ryuugakusei_kojinkiroku[1][0],
-            name: kiroku.name_zentai_ryuugakusei_kojinkiroku[1][0],
-            gakunen: kiroku.gakunen_zentai_ryuugakusei_kojinkiroku[1][0],
-            univName: kiroku.univname_zentai_ryuugakusei_kojinkiroku[1][0],
-            isOverallTime: false,
-            onReset: () => _showResetConfirmationDialog(
-              '10000m留学生',
-              () => _resetOverallRecord_kiroku(
-                ryuugakuseiflag: true,
-                recordType: 0,
-                index1: 1,
-                index2: 0,
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          // ハーフマラソン
-          _buildOverallKojinKirokuSection(
-            title: 'ハーフマラソン',
-            time: ghensuu.time_zentaikojinkiroku[2][0],
-            year: ghensuu.year_zentaikojinkiroku[2][0],
-            month: ghensuu.month_zentaikojinkiroku[2][0],
-            name: ghensuu.name_zentaikojinkiroku[2][0],
-            gakunen: ghensuu.gakunen_zentaikojinkiroku[2][0],
-            univName: ghensuu.univname_zentaikojinkiroku[2][0],
-            isOverallTime: false,
-            onReset: () => _showResetConfirmationDialog(
-              'ハーフマラソン',
-              () => _resetOverallRecord(recordType: 0, index1: 2, index2: 0),
-            ),
-          ),
-          _buildOverallKojinKirokuSection(
-            title: 'ハーフ日本人',
-            time: kiroku.time_zentai_jap_kojinkiroku[2][0],
-            year: kiroku.year_zentai_jap_kojinkiroku[2][0],
-            month: kiroku.month_zentai_jap_kojinkiroku[2][0],
-            name: kiroku.name_zentai_jap_kojinkiroku[2][0],
-            gakunen: kiroku.gakunen_zentai_jap_kojinkiroku[2][0],
-            univName: kiroku.univname_zentai_jap_kojinkiroku[2][0],
-            isOverallTime: false,
-            onReset: () => _showResetConfirmationDialog(
-              'ハーフ日本人',
-              () => _resetOverallRecord_kiroku(
-                ryuugakuseiflag: false,
-                recordType: 0,
-                index1: 2,
-                index2: 0,
-              ),
-            ),
-          ),
-          _buildOverallKojinKirokuSection(
-            title: 'ハーフ留学生',
-            time: kiroku.time_zentai_ryuugakusei_kojinkiroku[2][0],
-            year: kiroku.year_zentai_ryuugakusei_kojinkiroku[2][0],
-            month: kiroku.month_zentai_ryuugakusei_kojinkiroku[2][0],
-            name: kiroku.name_zentai_ryuugakusei_kojinkiroku[2][0],
-            gakunen: kiroku.gakunen_zentai_ryuugakusei_kojinkiroku[2][0],
-            univName: kiroku.univname_zentai_ryuugakusei_kojinkiroku[2][0],
-            isOverallTime: false,
-            onReset: () => _showResetConfirmationDialog(
-              'ハーフ留学生',
-              () => _resetOverallRecord_kiroku(
-                ryuugakuseiflag: true,
-                recordType: 0,
-                index1: 2,
-                index2: 0,
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          // フルマラソン
-          _buildOverallKojinKirokuSection(
-            title: 'フルマラソン',
-            time: ghensuu.time_zentaikojinkiroku[3][0],
-            year: ghensuu.year_zentaikojinkiroku[3][0],
-            month: ghensuu.month_zentaikojinkiroku[3][0],
-            name: ghensuu.name_zentaikojinkiroku[3][0],
-            gakunen: ghensuu.gakunen_zentaikojinkiroku[3][0],
-            univName: ghensuu.univname_zentaikojinkiroku[3][0],
-            isOverallTime: true,
-            onReset: () => _showResetConfirmationDialog(
-              'フルマラソン',
-              () => _resetOverallRecord(recordType: 0, index1: 3, index2: 0),
-            ),
-          ),
-          _buildOverallKojinKirokuSection(
-            title: 'フル日本人',
-            time: kiroku.time_zentai_jap_kojinkiroku[3][0],
-            year: kiroku.year_zentai_jap_kojinkiroku[3][0],
-            month: kiroku.month_zentai_jap_kojinkiroku[3][0],
-            name: kiroku.name_zentai_jap_kojinkiroku[3][0],
-            gakunen: kiroku.gakunen_zentai_jap_kojinkiroku[3][0],
-            univName: kiroku.univname_zentai_jap_kojinkiroku[3][0],
-            isOverallTime: true,
-            onReset: () => _showResetConfirmationDialog(
-              'フル日本人',
-              () => _resetOverallRecord_kiroku(
-                ryuugakuseiflag: false,
-                recordType: 0,
-                index1: 3,
-                index2: 0,
-              ),
-            ),
-          ),
-          _buildOverallKojinKirokuSection(
-            title: 'フル留学生',
-            time: kiroku.time_zentai_ryuugakusei_kojinkiroku[3][0],
-            year: kiroku.year_zentai_ryuugakusei_kojinkiroku[3][0],
-            month: kiroku.month_zentai_ryuugakusei_kojinkiroku[3][0],
-            name: kiroku.name_zentai_ryuugakusei_kojinkiroku[3][0],
-            gakunen: kiroku.gakunen_zentai_ryuugakusei_kojinkiroku[3][0],
-            univName: kiroku.univname_zentai_ryuugakusei_kojinkiroku[3][0],
-            isOverallTime: true,
-            onReset: () => _showResetConfirmationDialog(
-              'フル留学生',
-              () => _resetOverallRecord_kiroku(
-                ryuugakuseiflag: true,
-                recordType: 0,
-                index1: 3,
-                index2: 0,
-              ),
-            ),
-          ),
+          ],
         ],
       );
-    } else if (recordType == _recordTypes[1]) {
+    } else if (sentaku >= 1 && sentaku <= 4) {
+      // 駅伝の記録
+      final int race = _ekidenRacebangou[sentaku - 1];
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start, // 左寄せを維持
         children: [
-          Text(
-            '10月駅伝',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: HENSUU.fontsize_honbun,
-              //fontWeight: FontWeight.bold,
-            ),
-          ),
+          Text(_ekidenMidashi(sentaku, sortedUnivData), style: moji),
           const SizedBox(height: 5),
-          // 10月駅伝 総合記録
-          _buildOverallEkidenKirokuSection(
+          // 総合記録
+          _buildRekidaiSection(
+            kagi: 'zentai_taikai_$race',
             title: '総合記録',
-            time: ghensuu.time_zentaitaikaikiroku[0][0],
-            year: ghensuu.year_zentaitaikaikiroku[0][0],
-            month: ghensuu.month_zentaitaikaikiroku[0][0],
-            univName: ghensuu.univname_zentaitaikaikiroku[0][0],
+            rekidai: rekidaiZentaiTaikai(ghensuu, race).yomu(),
             isOverallTime: true,
+            senshu: false,
+            daigaku: true,
             onReset: () => _showResetConfirmationDialog(
               '総合記録',
-              () => _resetOverallRecord(recordType: 1, index1: 0, index2: 0),
+              () => _resetOverallRekidai(
+                recordType: 1,
+                shurui: 0,
+                index1: race,
+                index2: 0,
+              ),
+              hosoku: _resetHosoku(null),
             ),
           ),
           const SizedBox(height: 5),
-
-          // 10月駅伝 区間記録 (1区〜6区)
-          ...List.generate(6, (index) {
-            return Column(
+          // 区間記録
+          for (
+            int index = 0;
+            index < _ekidenKukansuu(sentaku, ghensuu);
+            index++
+          )
+            Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildOverallKojinKirokuSection(
-                  title: '${index + 1}区',
-                  time: ghensuu.time_zentaikukankiroku[0][index][0],
-                  year: ghensuu.year_zentaikukankiroku[0][index][0],
-                  month: ghensuu.month_zentaikukankiroku[0][index][0],
-                  name: ghensuu.name_zentaikukankiroku[0][index][0],
-                  gakunen: ghensuu.gakunen_zentaikukankiroku[0][index][0],
-                  univName: ghensuu.univname_zentaikukankiroku[0][index][0],
-                  isOverallTime: false,
-                  onReset: () => _showResetConfirmationDialog(
+                ..._buildAwaseSections(
+                  kagi: 'zentai_kukan_${race}_$index',
+                  titles: [
                     '${index + 1}区',
-                    () => _resetOverallRecord(
-                      recordType: 2,
-                      index1: 0,
-                      index2: index,
-                    ),
-                  ),
-                ),
-                _buildOverallKojinKirokuSection(
-                  title: '${index + 1}区日本人',
-                  time: kiroku.time_zentai_jap_kukankiroku[0][index][0],
-                  year: kiroku.year_zentai_jap_kukankiroku[0][index][0],
-                  month: kiroku.month_zentai_jap_kukankiroku[0][index][0],
-                  name: kiroku.name_zentai_jap_kukankiroku[0][index][0],
-                  gakunen: kiroku.gakunen_zentai_jap_kukankiroku[0][index][0],
-                  univName: kiroku.univname_zentai_jap_kukankiroku[0][index][0],
-                  isOverallTime: false,
-                  onReset: () => _showResetConfirmationDialog(
                     '${index + 1}区日本人',
-                    () => _resetOverallRecord_kiroku(
-                      ryuugakuseiflag: false,
-                      recordType: 2,
-                      index1: 0,
-                      index2: index,
-                    ),
-                  ),
-                ),
-                _buildOverallKojinKirokuSection(
-                  title: '${index + 1}区留学生',
-                  time: kiroku.time_zentai_ryuugakusei_kukankiroku[0][index][0],
-                  year: kiroku.year_zentai_ryuugakusei_kukankiroku[0][index][0],
-                  month:
-                      kiroku.month_zentai_ryuugakusei_kukankiroku[0][index][0],
-                  name: kiroku.name_zentai_ryuugakusei_kukankiroku[0][index][0],
-                  gakunen: kiroku
-                      .gakunen_zentai_ryuugakusei_kukankiroku[0][index][0],
-                  univName: kiroku
-                      .univname_zentai_ryuugakusei_kukankiroku[0][index][0],
-                  isOverallTime: false,
-                  onReset: () => _showResetConfirmationDialog(
                     '${index + 1}区留学生',
-                    () => _resetOverallRecord_kiroku(
-                      ryuugakuseiflag: true,
+                  ],
+                  ichii: ichiiZentaiKukan(ghensuu, race, index),
+                  nihonjin: rekidaiZentaiKukan(kiroku, false, race, index),
+                  ryuugakusei: rekidaiZentaiKukan(kiroku, true, race, index),
+                  isOverallTime: false,
+                  daigaku: true,
+                  onReset: (shurui, title) => _showResetConfirmationDialog(
+                    title,
+                    () => _resetOverallRekidai(
                       recordType: 2,
-                      index1: 0,
+                      shurui: shurui,
+                      index1: race,
                       index2: index,
                     ),
+                    hosoku: _resetHosoku(shurui),
                   ),
                 ),
-
                 const SizedBox(height: 10),
               ],
-            );
-          }),
-        ],
-      );
-    } else if (recordType == _recordTypes[2]) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start, // 左寄せを維持
-        children: [
-          Text(
-            '11月駅伝',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: HENSUU.fontsize_honbun,
-              //fontWeight: FontWeight.bold,
             ),
-          ),
-          const SizedBox(height: 5),
-          // 11月駅伝 総合記録
-          _buildOverallEkidenKirokuSection(
-            title: '総合記録',
-            time: ghensuu.time_zentaitaikaikiroku[1][0],
-            year: ghensuu.year_zentaitaikaikiroku[1][0],
-            month: ghensuu.month_zentaitaikaikiroku[1][0],
-            univName: ghensuu.univname_zentaitaikaikiroku[1][0],
-            isOverallTime: true,
-            onReset: () => _showResetConfirmationDialog(
-              '総合記録',
-              () => _resetOverallRecord(recordType: 1, index1: 1, index2: 0),
-            ),
-          ),
-          const SizedBox(height: 5),
-
-          // 11月駅伝 区間記録 (1区〜8区)
-          ...List.generate(8, (index) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildOverallKojinKirokuSection(
-                  title: '${index + 1}区',
-                  time: ghensuu.time_zentaikukankiroku[1][index][0],
-                  year: ghensuu.year_zentaikukankiroku[1][index][0],
-                  month: ghensuu.month_zentaikukankiroku[1][index][0],
-                  name: ghensuu.name_zentaikukankiroku[1][index][0],
-                  gakunen: ghensuu.gakunen_zentaikukankiroku[1][index][0],
-                  univName: ghensuu.univname_zentaikukankiroku[1][index][0],
-                  isOverallTime: false,
-                  onReset: () => _showResetConfirmationDialog(
-                    '${index + 1}区',
-                    () => _resetOverallRecord(
-                      recordType: 2,
-                      index1: 1,
-                      index2: index,
-                    ),
-                  ),
-                ),
-                _buildOverallKojinKirokuSection(
-                  title: '${index + 1}区日本人',
-                  time: kiroku.time_zentai_jap_kukankiroku[1][index][0],
-                  year: kiroku.year_zentai_jap_kukankiroku[1][index][0],
-                  month: kiroku.month_zentai_jap_kukankiroku[1][index][0],
-                  name: kiroku.name_zentai_jap_kukankiroku[1][index][0],
-                  gakunen: kiroku.gakunen_zentai_jap_kukankiroku[1][index][0],
-                  univName: kiroku.univname_zentai_jap_kukankiroku[1][index][0],
-                  isOverallTime: false,
-                  onReset: () => _showResetConfirmationDialog(
-                    '${index + 1}区日本人',
-                    () => _resetOverallRecord_kiroku(
-                      ryuugakuseiflag: false,
-                      recordType: 2,
-                      index1: 1,
-                      index2: index,
-                    ),
-                  ),
-                ),
-                _buildOverallKojinKirokuSection(
-                  title: '${index + 1}区留学生',
-                  time: kiroku.time_zentai_ryuugakusei_kukankiroku[1][index][0],
-                  year: kiroku.year_zentai_ryuugakusei_kukankiroku[1][index][0],
-                  month:
-                      kiroku.month_zentai_ryuugakusei_kukankiroku[1][index][0],
-                  name: kiroku.name_zentai_ryuugakusei_kukankiroku[1][index][0],
-                  gakunen: kiroku
-                      .gakunen_zentai_ryuugakusei_kukankiroku[1][index][0],
-                  univName: kiroku
-                      .univname_zentai_ryuugakusei_kukankiroku[1][index][0],
-                  isOverallTime: false,
-                  onReset: () => _showResetConfirmationDialog(
-                    '${index + 1}区留学生',
-                    () => _resetOverallRecord_kiroku(
-                      ryuugakuseiflag: true,
-                      recordType: 2,
-                      index1: 1,
-                      index2: index,
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 10),
-              ],
-            );
-          }),
-        ],
-      );
-    } else if (recordType == _recordTypes[3]) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start, // 左寄せを維持
-        children: [
-          Text(
-            '正月駅伝',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: HENSUU.fontsize_honbun,
-              //fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 5),
-          // 正月駅伝 総合記録
-          _buildOverallEkidenKirokuSection(
-            title: '総合記録',
-            time: ghensuu.time_zentaitaikaikiroku[2][0],
-            year: ghensuu.year_zentaitaikaikiroku[2][0],
-            month: ghensuu.month_zentaitaikaikiroku[2][0],
-            univName: ghensuu.univname_zentaitaikaikiroku[2][0],
-            isOverallTime: true,
-            onReset: () => _showResetConfirmationDialog(
-              '総合記録',
-              () => _resetOverallRecord(recordType: 1, index1: 2, index2: 0),
-            ),
-          ),
-          const SizedBox(height: 5),
-
-          // 正月駅伝 区間記録 (1区〜10区)
-          ...List.generate(10, (index) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildOverallKojinKirokuSection(
-                  title: '${index + 1}区',
-                  time: ghensuu.time_zentaikukankiroku[2][index][0],
-                  year: ghensuu.year_zentaikukankiroku[2][index][0],
-                  month: ghensuu.month_zentaikukankiroku[2][index][0],
-                  name: ghensuu.name_zentaikukankiroku[2][index][0],
-                  gakunen: ghensuu.gakunen_zentaikukankiroku[2][index][0],
-                  univName: ghensuu.univname_zentaikukankiroku[2][index][0],
-                  isOverallTime: false,
-                  onReset: () => _showResetConfirmationDialog(
-                    '${index + 1}区',
-                    () => _resetOverallRecord(
-                      recordType: 2,
-                      index1: 2,
-                      index2: index,
-                    ),
-                  ),
-                ),
-                _buildOverallKojinKirokuSection(
-                  title: '${index + 1}区日本人',
-                  time: kiroku.time_zentai_jap_kukankiroku[2][index][0],
-                  year: kiroku.year_zentai_jap_kukankiroku[2][index][0],
-                  month: kiroku.month_zentai_jap_kukankiroku[2][index][0],
-                  name: kiroku.name_zentai_jap_kukankiroku[2][index][0],
-                  gakunen: kiroku.gakunen_zentai_jap_kukankiroku[2][index][0],
-                  univName: kiroku.univname_zentai_jap_kukankiroku[2][index][0],
-                  isOverallTime: false,
-                  onReset: () => _showResetConfirmationDialog(
-                    '${index + 1}区日本人',
-                    () => _resetOverallRecord_kiroku(
-                      ryuugakuseiflag: false,
-                      recordType: 2,
-                      index1: 2,
-                      index2: index,
-                    ),
-                  ),
-                ),
-                _buildOverallKojinKirokuSection(
-                  title: '${index + 1}区留学生',
-                  time: kiroku.time_zentai_ryuugakusei_kukankiroku[2][index][0],
-                  year: kiroku.year_zentai_ryuugakusei_kukankiroku[2][index][0],
-                  month:
-                      kiroku.month_zentai_ryuugakusei_kukankiroku[2][index][0],
-                  name: kiroku.name_zentai_ryuugakusei_kukankiroku[2][index][0],
-                  gakunen: kiroku
-                      .gakunen_zentai_ryuugakusei_kukankiroku[2][index][0],
-                  univName: kiroku
-                      .univname_zentai_ryuugakusei_kukankiroku[2][index][0],
-                  isOverallTime: false,
-                  onReset: () => _showResetConfirmationDialog(
-                    '${index + 1}区留学生',
-                    () => _resetOverallRecord_kiroku(
-                      ryuugakuseiflag: true,
-                      recordType: 2,
-                      index1: 2,
-                      index2: index,
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 10),
-              ],
-            );
-          }),
-        ],
-      );
-    } else if (recordType == _recordTypes[4]) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start, // 左寄せを維持
-        children: [
-          Text(
-            sortedUnivData[0].name_tanshuku,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: HENSUU.fontsize_honbun,
-              //fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 5),
-          // カスタム駅伝 総合記録
-          _buildOverallEkidenKirokuSection(
-            title: '総合記録',
-            time: ghensuu.time_zentaitaikaikiroku[5][0],
-            year: ghensuu.year_zentaitaikaikiroku[5][0],
-            month: ghensuu.month_zentaitaikaikiroku[5][0],
-            univName: ghensuu.univname_zentaitaikaikiroku[5][0],
-            isOverallTime: true,
-            onReset: () => _showResetConfirmationDialog(
-              '総合記録',
-              () => _resetOverallRecord(recordType: 1, index1: 5, index2: 0),
-            ),
-          ),
-          const SizedBox(height: 5),
-
-          // カスタム駅伝 区間記録 (1区〜10区)
-          ...List.generate(ghensuu.kukansuu_taikaigoto[5], (index) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildOverallKojinKirokuSection(
-                  title: '${index + 1}区',
-                  time: ghensuu.time_zentaikukankiroku[5][index][0],
-                  year: ghensuu.year_zentaikukankiroku[5][index][0],
-                  month: ghensuu.month_zentaikukankiroku[5][index][0],
-                  name: ghensuu.name_zentaikukankiroku[5][index][0],
-                  gakunen: ghensuu.gakunen_zentaikukankiroku[5][index][0],
-                  univName: ghensuu.univname_zentaikukankiroku[5][index][0],
-                  isOverallTime: false,
-                  onReset: () => _showResetConfirmationDialog(
-                    '${index + 1}区',
-                    () => _resetOverallRecord(
-                      recordType: 2,
-                      index1: 5,
-                      index2: index,
-                    ),
-                  ),
-                ),
-                _buildOverallKojinKirokuSection(
-                  title: '${index + 1}区日本人',
-                  time: kiroku.time_zentai_jap_kukankiroku[5][index][0],
-                  year: kiroku.year_zentai_jap_kukankiroku[5][index][0],
-                  month: kiroku.month_zentai_jap_kukankiroku[5][index][0],
-                  name: kiroku.name_zentai_jap_kukankiroku[5][index][0],
-                  gakunen: kiroku.gakunen_zentai_jap_kukankiroku[5][index][0],
-                  univName: kiroku.univname_zentai_jap_kukankiroku[5][index][0],
-                  isOverallTime: false,
-                  onReset: () => _showResetConfirmationDialog(
-                    '${index + 1}区日本人',
-                    () => _resetOverallRecord_kiroku(
-                      ryuugakuseiflag: false,
-                      recordType: 2,
-                      index1: 5,
-                      index2: index,
-                    ),
-                  ),
-                ),
-                _buildOverallKojinKirokuSection(
-                  title: '${index + 1}区留学生',
-                  time: kiroku.time_zentai_ryuugakusei_kukankiroku[5][index][0],
-                  year: kiroku.year_zentai_ryuugakusei_kukankiroku[5][index][0],
-                  month:
-                      kiroku.month_zentai_ryuugakusei_kukankiroku[5][index][0],
-                  name: kiroku.name_zentai_ryuugakusei_kukankiroku[5][index][0],
-                  gakunen: kiroku
-                      .gakunen_zentai_ryuugakusei_kukankiroku[5][index][0],
-                  univName: kiroku
-                      .univname_zentai_ryuugakusei_kukankiroku[5][index][0],
-                  isOverallTime: false,
-                  onReset: () => _showResetConfirmationDialog(
-                    '${index + 1}区留学生',
-                    () => _resetOverallRecord_kiroku(
-                      ryuugakuseiflag: true,
-                      recordType: 2,
-                      index1: 5,
-                      index2: index,
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 10),
-              ],
-            );
-          }),
         ],
       );
     } else {

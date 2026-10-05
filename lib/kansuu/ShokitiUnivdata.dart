@@ -2,6 +2,7 @@ import 'package:ekiden/constants.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/kansuu/meisei_rireki.dart'; // 名声の履歴(1.8.8)
+import 'package:ekiden/kansuu/rekidai_kiroku.dart'; // 歴代10位までの記録(1.8.8)
 
 Future<void> ShokitiUnivdata(
   bool ikuseiryoku_meisei_ijiflag,
@@ -163,6 +164,8 @@ Future<void> ShokitiUnivdata(
           // 1nensei_univkukankiroku はコメントアウトされているため移植しない
         }
       }
+      // 学内大会記録は歴代10位まで残すので、2位以下も消す(1.8.8)
+      rekidaiUnivTaikai(univ, ii).kaku([]);
     }
 
     for (int ii = 0; ii < TEISUU.SUU_KOJINBESTKIROKUSHURUISUU; ii++) {

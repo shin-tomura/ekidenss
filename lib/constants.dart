@@ -33,6 +33,8 @@ class TEISUU {
   //0→5000、1→10000、2→half、3→full、4→登り10000、5→下り10000、6→ロード10000、7〜9→予備
   static const int SUU_BESTKIROKUHOZONJUNISUU = 1;
   //static const int SUU_BESTKIROKUHOZONJUNISUU = 5;
+  // 記録画面の歴代記録として残す順位の数(1.8.8。lib/kansuu/rekidai_kiroku.dart)
+  static const int SUU_REKIDAIKIROKUJUNISUU = 10;
   static const double CHOUSEI_NOBORI = 0.65; //登りのタイムの調整用
   static const double CHOUSEI_KUDARI = 0.58;
   //static const double CHOUSEI_KIRIKAE = 0.00001;

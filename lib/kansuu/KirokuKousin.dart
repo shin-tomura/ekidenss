@@ -19,6 +19,7 @@ import 'package:ekiden/kansuu/goldsilver_com.dart';
 import 'package:ekiden/kansuu/gakuren_kantoku.dart'; // 学連選抜の監督・目標順位(1.8.4)
 import 'package:ekiden/kansuu/gakuren_text.dart'; // 学連選抜の結果(順位相当。1.8.4)
 import 'package:ekiden/kansuu/meisei_rireki.dart'; // 名声の履歴(1.8.8)
+import 'package:ekiden/kansuu/rekidai_kiroku.dart'; // 歴代10位までの記録(1.8.8)
 
 String _timeToMinuteSecondString(double time) {
   if (time == TEISUU.DEFAULTTIME) {
@@ -225,6 +226,11 @@ Future<void> kirokuKousin({
       }
     }
     // 個人区間記録
+    // 日本人・留学生の区間記録を残す順位の数(記録画面に出す大会は歴代10位まで。1.8.8)
+    final int rekidaiSaidai = rekidaiTaishouRace(racebangou)
+        ? TEISUU.SUU_REKIDAIKIROKUJUNISUU
+        : TEISUU.SUU_BESTKIROKUHOZONJUNISUU;
+    bool kirokuHenkou = false; // Kirokuを書き換えたか(保存はまとめて1回にする)
     for (
       var iKukan = 0;
       iKukan < gh[0].kukansuu_taikaigoto[racebangou];
@@ -333,107 +339,21 @@ Future<void> kirokuKousin({
           break;
         }
       } // 全体区間記録ループ終端
-      //留学生
-      for (
-        var iTimeJuni = 0;
-        iTimeJuni < timeJunSortedKukanFilteredSenshuData.length;
-        iTimeJuni++
-      ) {
-        if (timeJunSortedKukanFilteredSenshuData[iTimeJuni].hirou == 1) {
-          if (kiroku!
-                  .time_zentai_ryuugakusei_kukankiroku[racebangou][iKukan][TEISUU
-                      .SUU_BESTKIROKUHOZONJUNISUU -
-                  1] >
-              timeJunSortedKukanFilteredSenshuData[iTimeJuni]
-                  .time_taikai_total) {
-            for (
-              var iHozonJuni = 0;
-              iHozonJuni < temp_kirokuhozonjunisuu;
-              iHozonJuni++
-            ) {
-              if (kiroku
-                      .time_zentai_ryuugakusei_kukankiroku[racebangou][iKukan][iHozonJuni] >
-                  timeJunSortedKukanFilteredSenshuData[iTimeJuni]
-                      .time_taikai_total) {
-                for (
-                  var iZurasijuni = temp_kirokuhozonjunisuu - 1;
-                  iZurasijuni > iHozonJuni;
-                  iZurasijuni--
-                ) {}
-                kiroku.time_zentai_ryuugakusei_kukankiroku[racebangou][iKukan][iHozonJuni] =
-                    timeJunSortedKukanFilteredSenshuData[iTimeJuni]
-                        .time_taikai_total;
-                kiroku.year_zentai_ryuugakusei_kukankiroku[racebangou][iKukan][iHozonJuni] =
-                    gh[0].year;
-                kiroku.month_zentai_ryuugakusei_kukankiroku[racebangou][iKukan][iHozonJuni] =
-                    gh[0].month;
-                kiroku.univname_zentai_ryuugakusei_kukankiroku[racebangou][iKukan][iHozonJuni] =
-                    sortedunivdata[timeJunSortedKukanFilteredSenshuData[iTimeJuni]
-                            .univid]
-                        .name;
-                kiroku.name_zentai_ryuugakusei_kukankiroku[racebangou][iKukan][iHozonJuni] =
-                    timeJunSortedKukanFilteredSenshuData[iTimeJuni].name;
-                kiroku.gakunen_zentai_ryuugakusei_kukankiroku[racebangou][iKukan][iHozonJuni] =
-                    timeJunSortedKukanFilteredSenshuData[iTimeJuni].gakunen;
-                break;
-              }
-            }
-            await kiroku.save(); // gh[0] の変更を保存
-          } else {
-            break;
+      // 全体の留学生・日本人(歴代10位まで。保存は区間のループのあとにまとめて行う。1.8.8)
+      if (kiroku != null) {
+        for (final bool ryuugakusei in [true, false]) {
+          if (rekidaiKousin(
+            okiba: rekidaiZentaiKukan(kiroku, ryuugakusei, racebangou, iKukan),
+            junban: timeJunSortedKukanFilteredSenshuData,
+            ryuugakusei: ryuugakusei,
+            saidai: rekidaiSaidai,
+            gh: gh[0],
+            sortedunivdata: sortedunivdata,
+          )) {
+            kirokuHenkou = true;
           }
         }
-      } // 全体区間記録ループ終端
-      //日本人
-      for (
-        var iTimeJuni = 0;
-        iTimeJuni < timeJunSortedKukanFilteredSenshuData.length;
-        iTimeJuni++
-      ) {
-        if (timeJunSortedKukanFilteredSenshuData[iTimeJuni].hirou != 1) {
-          if (kiroku!.time_zentai_jap_kukankiroku[racebangou][iKukan][TEISUU
-                      .SUU_BESTKIROKUHOZONJUNISUU -
-                  1] >
-              timeJunSortedKukanFilteredSenshuData[iTimeJuni]
-                  .time_taikai_total) {
-            for (
-              var iHozonJuni = 0;
-              iHozonJuni < temp_kirokuhozonjunisuu;
-              iHozonJuni++
-            ) {
-              if (kiroku
-                      .time_zentai_jap_kukankiroku[racebangou][iKukan][iHozonJuni] >
-                  timeJunSortedKukanFilteredSenshuData[iTimeJuni]
-                      .time_taikai_total) {
-                for (
-                  var iZurasijuni = temp_kirokuhozonjunisuu - 1;
-                  iZurasijuni > iHozonJuni;
-                  iZurasijuni--
-                ) {}
-                kiroku.time_zentai_jap_kukankiroku[racebangou][iKukan][iHozonJuni] =
-                    timeJunSortedKukanFilteredSenshuData[iTimeJuni]
-                        .time_taikai_total;
-                kiroku.year_zentai_jap_kukankiroku[racebangou][iKukan][iHozonJuni] =
-                    gh[0].year;
-                kiroku.month_zentai_jap_kukankiroku[racebangou][iKukan][iHozonJuni] =
-                    gh[0].month;
-                kiroku.univname_zentai_jap_kukankiroku[racebangou][iKukan][iHozonJuni] =
-                    sortedunivdata[timeJunSortedKukanFilteredSenshuData[iTimeJuni]
-                            .univid]
-                        .name;
-                kiroku.name_zentai_jap_kukankiroku[racebangou][iKukan][iHozonJuni] =
-                    timeJunSortedKukanFilteredSenshuData[iTimeJuni].name;
-                kiroku.gakunen_zentai_jap_kukankiroku[racebangou][iKukan][iHozonJuni] =
-                    timeJunSortedKukanFilteredSenshuData[iTimeJuni].gakunen;
-                break;
-              }
-            }
-            await kiroku.save(); // gh[0] の変更を保存
-          } else {
-            break;
-          }
-        }
-      } // 全体区間記録ループ終端
+      }
       // 学内区間記録
       var univKukanFilteredSenshuData = kukanFilteredSenshuData
           .where((s) => s.univid == gh[0].MYunivid)
@@ -511,224 +431,111 @@ Future<void> kirokuKousin({
           break;
         }
       } // 学内区間記録ループ終端
-      //留学生
-      for (
-        var iTimeJuni = 0;
-        iTimeJuni < univKukanFilteredSenshuData.length;
-        iTimeJuni++
-      ) {
-        if (univKukanFilteredSenshuData[iTimeJuni].hirou == 1) {
-          if (kiroku!.time_univ_ryuugakusei_kukankiroku[gh[0]
-                  .MYunivid][racebangou][iKukan][TEISUU
-                      .SUU_BESTKIROKUHOZONJUNISUU -
-                  1] >
-              univKukanFilteredSenshuData[iTimeJuni].time_taikai_total) {
-            for (
-              var iHozonJuni = 0;
-              iHozonJuni < temp_kirokuhozonjunisuu;
-              iHozonJuni++
-            ) {
-              if (kiroku.time_univ_ryuugakusei_kukankiroku[gh[0]
-                      .MYunivid][racebangou][iKukan][iHozonJuni] >
-                  univKukanFilteredSenshuData[iTimeJuni].time_taikai_total) {
-                for (
-                  var iZurasijuni = temp_kirokuhozonjunisuu - 1;
-                  iZurasijuni > iHozonJuni;
-                  iZurasijuni--
-                ) {}
-                kiroku.time_univ_ryuugakusei_kukankiroku[gh[0]
-                        .MYunivid][racebangou][iKukan][iHozonJuni] =
-                    univKukanFilteredSenshuData[iTimeJuni].time_taikai_total;
-                kiroku.year_univ_ryuugakusei_kukankiroku[gh[0]
-                        .MYunivid][racebangou][iKukan][iHozonJuni] =
-                    gh[0].year;
-                kiroku.month_univ_ryuugakusei_kukankiroku[gh[0]
-                        .MYunivid][racebangou][iKukan][iHozonJuni] =
-                    gh[0].month;
-                kiroku.name_univ_ryuugakusei_kukankiroku[gh[0]
-                        .MYunivid][racebangou][iKukan][iHozonJuni] =
-                    univKukanFilteredSenshuData[iTimeJuni].name;
-                kiroku.gakunen_univ_ryuugakusei_kukankiroku[gh[0]
-                        .MYunivid][racebangou][iKukan][iHozonJuni] =
-                    univKukanFilteredSenshuData[iTimeJuni].gakunen;
-                break;
-              }
-            }
-            await kiroku.save(); // UnivData の変更を保存
-          } else {
-            break;
+      // 学内の留学生・日本人(歴代10位まで。保存は区間のループのあとにまとめて行う。1.8.8)
+      if (kiroku != null) {
+        for (final bool ryuugakusei in [true, false]) {
+          if (rekidaiKousin(
+            okiba: rekidaiUnivKukan(
+              kiroku,
+              ryuugakusei,
+              gh[0].MYunivid,
+              racebangou,
+              iKukan,
+            ),
+            junban: univKukanFilteredSenshuData,
+            ryuugakusei: ryuugakusei,
+            saidai: rekidaiSaidai,
+            gh: gh[0],
+            sortedunivdata: sortedunivdata,
+          )) {
+            kirokuHenkou = true;
           }
-        }
-      } // 学内区間記録ループ終端
-      //日本人
-      for (
-        var iTimeJuni = 0;
-        iTimeJuni < univKukanFilteredSenshuData.length;
-        iTimeJuni++
-      ) {
-        if (univKukanFilteredSenshuData[iTimeJuni].hirou != 1) {
-          if (kiroku!.time_univ_jap_kukankiroku[gh[0]
-                  .MYunivid][racebangou][iKukan][TEISUU
-                      .SUU_BESTKIROKUHOZONJUNISUU -
-                  1] >
-              univKukanFilteredSenshuData[iTimeJuni].time_taikai_total) {
-            for (
-              var iHozonJuni = 0;
-              iHozonJuni < temp_kirokuhozonjunisuu;
-              iHozonJuni++
-            ) {
-              if (kiroku.time_univ_jap_kukankiroku[gh[0]
-                      .MYunivid][racebangou][iKukan][iHozonJuni] >
-                  univKukanFilteredSenshuData[iTimeJuni].time_taikai_total) {
-                for (
-                  var iZurasijuni = temp_kirokuhozonjunisuu - 1;
-                  iZurasijuni > iHozonJuni;
-                  iZurasijuni--
-                ) {}
-                kiroku.time_univ_jap_kukankiroku[gh[0]
-                        .MYunivid][racebangou][iKukan][iHozonJuni] =
-                    univKukanFilteredSenshuData[iTimeJuni].time_taikai_total;
-                kiroku.year_univ_jap_kukankiroku[gh[0]
-                        .MYunivid][racebangou][iKukan][iHozonJuni] =
-                    gh[0].year;
-                kiroku.month_univ_jap_kukankiroku[gh[0]
-                        .MYunivid][racebangou][iKukan][iHozonJuni] =
-                    gh[0].month;
-                kiroku.name_univ_jap_kukankiroku[gh[0]
-                        .MYunivid][racebangou][iKukan][iHozonJuni] =
-                    univKukanFilteredSenshuData[iTimeJuni].name;
-                kiroku.gakunen_univ_jap_kukankiroku[gh[0]
-                        .MYunivid][racebangou][iKukan][iHozonJuni] =
-                    univKukanFilteredSenshuData[iTimeJuni].gakunen;
-                break;
-              }
-            }
-            await kiroku.save(); // UnivData の変更を保存
-          } else {
-            break;
-          }
-        }
-      } // 学内区間記録ループ終端
-    } // 個人区間記録i_kukanループ終端
-
-    // 大会記録
-    for (var iTimeJuni = 0; iTimeJuni < timeJunUnivData.length; iTimeJuni++) {
-      // 現在時刻と前回の休憩時刻を比較
-      {
-        final now = DateTime.now();
-        if (now.difference(Chousa.lastGapTime).inSeconds >= 1) {
-          // 3秒以上経過してたら
-          await Future.delayed(const Duration(milliseconds: 50)); // 休憩を入れる
-          Chousa.lastGapTime = DateTime.now();
         }
       }
-      if (gh[0].time_zentaitaikaikiroku[racebangou][TEISUU
-                  .SUU_BESTKIROKUHOZONJUNISUU -
-              1] >
-          timeJunUnivData[iTimeJuni]
-              .time_taikai_total[gh[0].kukansuu_taikaigoto[racebangou] - 1]) {
-        if (iTimeJuni == 0 && (racebangou <= 2 || racebangou == 5)) {
+    } // 個人区間記録i_kukanループ終端
+    if (kirokuHenkou && kiroku != null) {
+      await kiroku.save(); // 日本人・留学生の区間記録をまとめて保存
+    }
+
+    // 大会記録(記録画面に出す大会は歴代10位まで。1.8.8)
+    {
+      final int saigoKukan = gh[0].kukansuu_taikaigoto[racebangou] - 1;
+      final RekidaiOkiba okiba = rekidaiZentaiTaikai(gh[0], racebangou);
+      final List<RekidaiKiroku> rekidai = okiba.yomu();
+      bool kawatta = false;
+      for (
+        var iTimeJuni = 0;
+        iTimeJuni < timeJunUnivData.length;
+        iTimeJuni++
+      ) {
+        // 現在時刻と前回の休憩時刻を比較
+        {
+          final now = DateTime.now();
+          if (now.difference(Chousa.lastGapTime).inSeconds >= 1) {
+            // 3秒以上経過してたら
+            await Future.delayed(const Duration(milliseconds: 50)); // 休憩を入れる
+            Chousa.lastGapTime = DateTime.now();
+          }
+        }
+        final UnivData univ = timeJunUnivData[iTimeJuni];
+        if (univ.taikaientryflag[racebangou] != 1) continue;
+        final double time = univ.time_taikai_total[saigoKukan];
+        if (iTimeJuni == 0 &&
+            (racebangou <= 2 || racebangou == 5) &&
+            gh[0].time_zentaitaikaikiroku[racebangou][0] > time) {
           //大会記録樹立時の途中区間での大会記録比用に保存
           for (
             int i_kukan = 0;
             i_kukan < gh[0].kukansuu_taikaigoto[racebangou];
             i_kukan++
           ) {
-            kantoku.yobiint4[racebangou * 10 + 30 + i_kukan] =
-                timeJunUnivData[iTimeJuni].time_taikai_total[i_kukan].toInt();
+            kantoku.yobiint4[racebangou * 10 + 30 + i_kukan] = univ
+                .time_taikai_total[i_kukan]
+                .toInt();
           }
           await kantoku.save();
         }
-
-        for (
-          var iHozonJuni = 0;
-          iHozonJuni < temp_kirokuhozonjunisuu;
-          iHozonJuni++
-        ) {
-          if (gh[0].time_zentaitaikaikiroku[racebangou][iHozonJuni] >
-              timeJunUnivData[iTimeJuni].time_taikai_total[gh[0]
-                      .kukansuu_taikaigoto[racebangou] -
-                  1]) {
-            for (
-              var iZurasijuni = temp_kirokuhozonjunisuu - 1;
-              iZurasijuni > iHozonJuni;
-              iZurasijuni--
-            ) {
-              gh[0].time_zentaitaikaikiroku[racebangou][iZurasijuni] =
-                  gh[0].time_zentaitaikaikiroku[racebangou][iZurasijuni - 1];
-              gh[0].year_zentaitaikaikiroku[racebangou][iZurasijuni] =
-                  gh[0].year_zentaitaikaikiroku[racebangou][iZurasijuni - 1];
-              gh[0].month_zentaitaikaikiroku[racebangou][iZurasijuni] =
-                  gh[0].month_zentaitaikaikiroku[racebangou][iZurasijuni - 1];
-              gh[0].univname_zentaitaikaikiroku[racebangou][iZurasijuni] = gh[0]
-                  .univname_zentaitaikaikiroku[racebangou][iZurasijuni - 1];
-            }
-            gh[0].time_zentaitaikaikiroku[racebangou][iHozonJuni] =
-                timeJunUnivData[iTimeJuni].time_taikai_total[gh[0]
-                        .kukansuu_taikaigoto[racebangou] -
-                    1];
-            gh[0].year_zentaitaikaikiroku[racebangou][iHozonJuni] = gh[0].year;
-            gh[0].month_zentaitaikaikiroku[racebangou][iHozonJuni] =
-                gh[0].month;
-            gh[0].univname_zentaitaikaikiroku[racebangou][iHozonJuni] =
-                timeJunUnivData[iTimeJuni].name;
-            break;
-          }
-        }
-        await gh[0].save(); // gh[0] の変更を保存
-      } else {
-        break;
-      }
-    } // 大会記録ループ終端
-
-    // 学内大会記録
-    if (sortedunivdata[gh[0].MYunivid].time_univtaikaikiroku[racebangou][TEISUU
-                .SUU_BESTKIROKUHOZONJUNISUU -
-            1] >
-        sortedunivdata[gh[0].MYunivid]
-            .time_taikai_total[gh[0].kukansuu_taikaigoto[racebangou] - 1]) {
-      for (
-        var iHozonJuni = 0;
-        iHozonJuni < temp_kirokuhozonjunisuu;
-        iHozonJuni++
-      ) {
-        if (sortedunivdata[gh[0].MYunivid]
-                .time_univtaikaikiroku[racebangou][iHozonJuni] >
-            sortedunivdata[gh[0].MYunivid]
-                .time_taikai_total[gh[0].kukansuu_taikaigoto[racebangou] - 1]) {
-          for (
-            var iZurasijuni = temp_kirokuhozonjunisuu - 1;
-            iZurasijuni > iHozonJuni;
-            iZurasijuni--
-          ) {
-            sortedunivdata[gh[0].MYunivid]
-                    .time_univtaikaikiroku[racebangou][iZurasijuni] =
-                sortedunivdata[gh[0].MYunivid]
-                    .time_univtaikaikiroku[racebangou][iZurasijuni - 1];
-            sortedunivdata[gh[0].MYunivid]
-                    .year_univtaikaikiroku[racebangou][iZurasijuni] =
-                sortedunivdata[gh[0].MYunivid]
-                    .year_univtaikaikiroku[racebangou][iZurasijuni - 1];
-            sortedunivdata[gh[0].MYunivid]
-                    .month_univtaikaikiroku[racebangou][iZurasijuni] =
-                sortedunivdata[gh[0].MYunivid]
-                    .month_univtaikaikiroku[racebangou][iZurasijuni - 1];
-          }
-          sortedunivdata[gh[0].MYunivid]
-                  .time_univtaikaikiroku[racebangou][iHozonJuni] =
-              sortedunivdata[gh[0].MYunivid]
-                  .time_taikai_total[gh[0].kukansuu_taikaigoto[racebangou] - 1];
-          sortedunivdata[gh[0].MYunivid]
-                  .year_univtaikaikiroku[racebangou][iHozonJuni] =
-              gh[0].year;
-          sortedunivdata[gh[0].MYunivid]
-                  .month_univtaikaikiroku[racebangou][iHozonJuni] =
-              gh[0].month;
+        if (rekidaiIreru(
+          rekidai,
+          RekidaiKiroku(
+            time: time,
+            year: gh[0].year,
+            month: gh[0].month,
+            univname: univ.name,
+          ),
+          rekidaiSaidai,
+        )) {
+          kawatta = true;
+        } else {
+          // タイム順なので、入らなかったら、これより後ろの大学も入らない
           break;
         }
       }
-      await sortedunivdata[gh[0].MYunivid].save(); // UnivData の変更を保存
-    } // 学内大会記録ループ終端
+      if (kawatta) {
+        okiba.kaku(rekidai);
+        await gh[0].save(); // gh[0] の変更を保存
+      }
+    } // 大会記録終端
+
+    // 学内大会記録(記録画面に出す大会は歴代10位まで。1.8.8)
+    {
+      final UnivData myUniv = sortedunivdata[gh[0].MYunivid];
+      final RekidaiOkiba okiba = rekidaiUnivTaikai(myUniv, racebangou);
+      final List<RekidaiKiroku> rekidai = okiba.yomu();
+      if (rekidaiIreru(
+        rekidai,
+        RekidaiKiroku(
+          time: myUniv
+              .time_taikai_total[gh[0].kukansuu_taikaigoto[racebangou] - 1],
+          year: gh[0].year,
+          month: gh[0].month,
+        ),
+        rekidaiSaidai,
+      )) {
+        okiba.kaku(rekidai);
+        await myUniv.save(); // UnivData の変更を保存
+      }
+    } // 学内大会記録終端
   }
 
   // コンピュータ大学の目標順位達成時の金銀獲得(夏合宿まで保有する)
@@ -1849,6 +1656,10 @@ Future<void> kirokuKousin({
     if (racebangou == 17) {
       kirokubangou = 3;
     }
+    // 日本人・留学生の個人記録を残す順位の数(記録画面に出す種目は歴代10位まで。1.8.8)
+    final int kojinRekidaiSaidai = rekidaiTaishouKojin(kirokubangou)
+        ? TEISUU.SUU_REKIDAIKIROKUJUNISUU
+        : TEISUU.SUU_BESTKIROKUHOZONJUNISUU;
     // 個人ベスト記録更新
     if (racebangou != 3 && racebangou != 4) {
       for (int i = 0; i < TEISUU.SENSHUSUU_TOTAL; i++) {
@@ -1952,102 +1763,22 @@ Future<void> kirokuKousin({
           Chousa.lastGapTime = DateTime.now();
         }
       }
-      //留学生
-      for (
-        int i_kirokujun = 0;
-        i_kirokujun < kirokujunEntryFilteredSenshuData.length;
-        i_kirokujun++
-      ) {
-        if (kirokujunEntryFilteredSenshuData[i_kirokujun].hirou == 1) {
-          if (kiroku!.time_zentai_ryuugakusei_kojinkiroku[kirokubangou][TEISUU
-                      .SUU_BESTKIROKUHOZONJUNISUU -
-                  1] >
-              kirokujunEntryFilteredSenshuData[i_kirokujun].time_taikai_total) {
-            for (int i = 0; i < temp_kirokuhozonjunisuu; i++) {
-              if (kiroku.time_zentai_ryuugakusei_kojinkiroku[kirokubangou][i] >
-                  kirokujunEntryFilteredSenshuData[i_kirokujun]
-                      .time_taikai_total) {
-                // ずらす
-                if (i < temp_kirokuhozonjunisuu - 1) {
-                  for (int ii = temp_kirokuhozonjunisuu - 1; ii > i; ii--) {}
-                }
-                // 代入
-                kiroku.time_zentai_ryuugakusei_kojinkiroku[kirokubangou][i] =
-                    kirokujunEntryFilteredSenshuData[i_kirokujun]
-                        .time_taikai_total;
-                kiroku.year_zentai_ryuugakusei_kojinkiroku[kirokubangou][i] =
-                    gh[0].year;
-                kiroku.month_zentai_ryuugakusei_kojinkiroku[kirokubangou][i] =
-                    gh[0].month;
-                kiroku.univname_zentai_ryuugakusei_kojinkiroku[kirokubangou][i] =
-                    sortedunivdata[kirokujunEntryFilteredSenshuData[i_kirokujun]
-                            .univid]
-                        .name;
-                kiroku.name_zentai_ryuugakusei_kojinkiroku[kirokubangou][i] =
-                    kirokujunEntryFilteredSenshuData[i_kirokujun].name;
-                kiroku.gakunen_zentai_ryuugakusei_kojinkiroku[kirokubangou][i] =
-                    kirokujunEntryFilteredSenshuData[i_kirokujun].gakunen;
-                await kiroku.save(); // Hiveに保存
-                break;
-              }
-            }
-          } else {
-            break;
+      // 全体の留学生・日本人(5000m・10000m・ハーフ・フルは歴代10位まで。保存はまとめて1回。1.8.8)
+      if (kiroku != null) {
+        bool kawatta = false;
+        for (final bool ryuugakusei in [true, false]) {
+          if (rekidaiKousin(
+            okiba: rekidaiZentaiKojin(kiroku, ryuugakusei, kirokubangou),
+            junban: kirokujunEntryFilteredSenshuData,
+            ryuugakusei: ryuugakusei,
+            saidai: kojinRekidaiSaidai,
+            gh: gh[0],
+            sortedunivdata: sortedunivdata,
+          )) {
+            kawatta = true;
           }
         }
-      }
-      // 現在時刻と前回の休憩時刻を比較
-      {
-        final now = DateTime.now();
-        if (now.difference(Chousa.lastGapTime).inSeconds >= 1) {
-          // 3秒以上経過してたら
-          await Future.delayed(const Duration(milliseconds: 50)); // 休憩を入れる
-          Chousa.lastGapTime = DateTime.now();
-        }
-      }
-      //日本人
-      for (
-        int i_kirokujun = 0;
-        i_kirokujun < kirokujunEntryFilteredSenshuData.length;
-        i_kirokujun++
-      ) {
-        if (kirokujunEntryFilteredSenshuData[i_kirokujun].hirou != 1) {
-          if (kiroku!.time_zentai_jap_kojinkiroku[kirokubangou][TEISUU
-                      .SUU_BESTKIROKUHOZONJUNISUU -
-                  1] >
-              kirokujunEntryFilteredSenshuData[i_kirokujun].time_taikai_total) {
-            for (int i = 0; i < temp_kirokuhozonjunisuu; i++) {
-              if (kiroku.time_zentai_jap_kojinkiroku[kirokubangou][i] >
-                  kirokujunEntryFilteredSenshuData[i_kirokujun]
-                      .time_taikai_total) {
-                // ずらす
-                if (i < temp_kirokuhozonjunisuu - 1) {
-                  for (int ii = temp_kirokuhozonjunisuu - 1; ii > i; ii--) {}
-                }
-                // 代入
-                kiroku.time_zentai_jap_kojinkiroku[kirokubangou][i] =
-                    kirokujunEntryFilteredSenshuData[i_kirokujun]
-                        .time_taikai_total;
-                kiroku.year_zentai_jap_kojinkiroku[kirokubangou][i] =
-                    gh[0].year;
-                kiroku.month_zentai_jap_kojinkiroku[kirokubangou][i] =
-                    gh[0].month;
-                kiroku.univname_zentai_jap_kojinkiroku[kirokubangou][i] =
-                    sortedunivdata[kirokujunEntryFilteredSenshuData[i_kirokujun]
-                            .univid]
-                        .name;
-                kiroku.name_zentai_jap_kojinkiroku[kirokubangou][i] =
-                    kirokujunEntryFilteredSenshuData[i_kirokujun].name;
-                kiroku.gakunen_zentai_jap_kojinkiroku[kirokubangou][i] =
-                    kirokujunEntryFilteredSenshuData[i_kirokujun].gakunen;
-                await kiroku.save(); // Hiveに保存
-                break;
-              }
-            }
-          } else {
-            break;
-          }
-        }
+        if (kawatta) await kiroku.save(); // Hiveに保存
       }
     }
     // 現在時刻と前回の休憩時刻を比較
@@ -2155,116 +1886,27 @@ Future<void> kirokuKousin({
           Chousa.lastGapTime = DateTime.now();
         }
       }
-      //留学生のみ
-      for (
-        int i_kirokujun = 0;
-        i_kirokujun < kirokujunUnivEntryFilteredSenshuData.length;
-        i_kirokujun++
-      ) {
-        final currentUnivId =
-            kirokujunUnivEntryFilteredSenshuData[i_kirokujun].univid;
-        if (currentUnivId >= sortedunivdata.length) {
-          print(
-            'Error: currentUnivId $currentUnivId out of bounds for sortedUnivData. Length: ${sortedunivdata.length}',
-          );
-          continue;
-        }
-        if (kirokujunUnivEntryFilteredSenshuData[i_kirokujun].hirou == 1) {
-          if (kiroku!
-                  .time_univ_ryuugakusei_kojinkiroku[currentUnivId][kirokubangou][TEISUU
-                      .SUU_BESTKIROKUHOZONJUNISUU -
-                  1] >
-              kirokujunUnivEntryFilteredSenshuData[i_kirokujun]
-                  .time_taikai_total) {
-            for (int i = 0; i < temp_kirokuhozonjunisuu; i++) {
-              if (kiroku
-                      .time_univ_ryuugakusei_kojinkiroku[currentUnivId][kirokubangou][i] >
-                  kirokujunUnivEntryFilteredSenshuData[i_kirokujun]
-                      .time_taikai_total) {
-                // ずらす
-                if (i < temp_kirokuhozonjunisuu - 1) {
-                  for (int ii = temp_kirokuhozonjunisuu - 1; ii > i; ii--) {}
-                }
-                // 代入
-                kiroku.time_univ_ryuugakusei_kojinkiroku[currentUnivId][kirokubangou][i] =
-                    kirokujunUnivEntryFilteredSenshuData[i_kirokujun]
-                        .time_taikai_total;
-                kiroku.year_univ_ryuugakusei_kojinkiroku[currentUnivId][kirokubangou][i] =
-                    gh[0].year;
-                kiroku.month_univ_ryuugakusei_kojinkiroku[currentUnivId][kirokubangou][i] =
-                    gh[0].month;
-                kiroku.name_univ_ryuugakusei_kojinkiroku[currentUnivId][kirokubangou][i] =
-                    kirokujunUnivEntryFilteredSenshuData[i_kirokujun].name;
-                kiroku.gakunen_univ_ryuugakusei_kojinkiroku[currentUnivId][kirokubangou][i] =
-                    kirokujunUnivEntryFilteredSenshuData[i_kirokujun].gakunen;
-                await kiroku.save(); // Hiveに保存
-                break;
-              }
-            }
-          } else {
-            break;
+      // 学内の留学生・日本人(5000m・10000m・ハーフ・フルは歴代10位まで。保存はまとめて1回。1.8.8)
+      if (kiroku != null) {
+        bool kawatta = false;
+        for (final bool ryuugakusei in [true, false]) {
+          if (rekidaiKousin(
+            okiba: rekidaiUnivKojin(
+              kiroku,
+              ryuugakusei,
+              gh[0].MYunivid,
+              kirokubangou,
+            ),
+            junban: kirokujunUnivEntryFilteredSenshuData,
+            ryuugakusei: ryuugakusei,
+            saidai: kojinRekidaiSaidai,
+            gh: gh[0],
+            sortedunivdata: sortedunivdata,
+          )) {
+            kawatta = true;
           }
         }
-      }
-      // 現在時刻と前回の休憩時刻を比較
-      {
-        final now = DateTime.now();
-        if (now.difference(Chousa.lastGapTime).inSeconds >= 1) {
-          // 3秒以上経過してたら
-          await Future.delayed(const Duration(milliseconds: 50)); // 休憩を入れる
-          Chousa.lastGapTime = DateTime.now();
-        }
-      }
-      //日本人のみ
-      for (
-        int i_kirokujun = 0;
-        i_kirokujun < kirokujunUnivEntryFilteredSenshuData.length;
-        i_kirokujun++
-      ) {
-        final currentUnivId =
-            kirokujunUnivEntryFilteredSenshuData[i_kirokujun].univid;
-        if (currentUnivId >= sortedunivdata.length) {
-          print(
-            'Error: currentUnivId $currentUnivId out of bounds for sortedUnivData. Length: ${sortedunivdata.length}',
-          );
-          continue;
-        }
-        if (kirokujunUnivEntryFilteredSenshuData[i_kirokujun].hirou != 1) {
-          if (kiroku!
-                  .time_univ_jap_kojinkiroku[currentUnivId][kirokubangou][TEISUU
-                      .SUU_BESTKIROKUHOZONJUNISUU -
-                  1] >
-              kirokujunUnivEntryFilteredSenshuData[i_kirokujun]
-                  .time_taikai_total) {
-            for (int i = 0; i < temp_kirokuhozonjunisuu; i++) {
-              if (kiroku
-                      .time_univ_jap_kojinkiroku[currentUnivId][kirokubangou][i] >
-                  kirokujunUnivEntryFilteredSenshuData[i_kirokujun]
-                      .time_taikai_total) {
-                // ずらす
-                if (i < temp_kirokuhozonjunisuu - 1) {
-                  for (int ii = temp_kirokuhozonjunisuu - 1; ii > i; ii--) {}
-                }
-                // 代入
-                kiroku.time_univ_jap_kojinkiroku[currentUnivId][kirokubangou][i] =
-                    kirokujunUnivEntryFilteredSenshuData[i_kirokujun]
-                        .time_taikai_total;
-                kiroku.year_univ_jap_kojinkiroku[currentUnivId][kirokubangou][i] =
-                    gh[0].year;
-                kiroku.month_univ_jap_kojinkiroku[currentUnivId][kirokubangou][i] =
-                    gh[0].month;
-                kiroku.name_univ_jap_kojinkiroku[currentUnivId][kirokubangou][i] =
-                    kirokujunUnivEntryFilteredSenshuData[i_kirokujun].name;
-                kiroku.gakunen_univ_jap_kojinkiroku[currentUnivId][kirokubangou][i] =
-                    kirokujunUnivEntryFilteredSenshuData[i_kirokujun].gakunen;
-                await kiroku.save(); // Hiveに保存
-                break;
-              }
-            }
-          } else {
-            break;
-          }
-        }
+        if (kawatta) await kiroku.save(); // Hiveに保存
       }
     }
 

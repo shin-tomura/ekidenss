@@ -510,60 +510,70 @@ class _SenshuEditViewState extends State<SenshuEditView> {
       );
     }
 
+    // 選んだ区間のコースの特徴(コース詳細と同じ指標。登り指数=登り距離割合×平均勾配(絶対値)×10000)
+    final int noboriSisuu =
+        (gh.kyoriwariainobori_taikai_kukangoto[race][kukan] *
+                gh.heikinkoubainobori_taikai_kukangoto[race][kukan].abs() *
+                10000)
+            .round();
+    final int kudariSisuu =
+        (gh.kyoriwariaikudari_taikai_kukangoto[race][kukan] *
+                gh.heikinkoubaikudari_taikai_kukangoto[race][kukan].abs() *
+                10000)
+            .round();
+    final String courseBun =
+        '距離${gh.kyori_taikai_kukangoto[race][kukan].round()}m '
+        '登り指数$noboriSisuu 下り指数$kudariSisuu '
+        'アップダウン${gh.noborikudarikirikaekaisuu_taikai_kukangoto[race][kukan]}回';
+
+    // 大会と区間のドロップダウンは、文字を大きくしていても距離まで入るように、縦に並べて横幅いっぱいにする
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Expanded(
-              flex: 3,
-              child: DropdownButton<int>(
-                value: race,
-                isExpanded: true,
-                dropdownColor: HENSUU.backgroundcolor,
-                style: dropStyle,
-                items: [
-                  for (final int r in raceList)
-                    DropdownMenuItem<int>(
-                      value: r,
-                      child: Text(_mikomiRaceMei(r, sortedUnivData)),
-                    ),
-                ],
-                onChanged: (val) {
-                  if (val == null) return;
-                  setState(() {
-                    _mikomiRace = val;
-                    if (_mikomiKukan >= gh.kukansuu_taikaigoto[val]) {
-                      _mikomiKukan = 0;
-                    }
-                  });
-                },
+        DropdownButton<int>(
+          value: race,
+          isExpanded: true,
+          dropdownColor: HENSUU.backgroundcolor,
+          style: dropStyle,
+          items: [
+            for (final int r in raceList)
+              DropdownMenuItem<int>(
+                value: r,
+                child: Text(_mikomiRaceMei(r, sortedUnivData)),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              flex: 2,
-              child: DropdownButton<int>(
-                value: kukan,
-                isExpanded: true,
-                dropdownColor: HENSUU.backgroundcolor,
-                style: dropStyle,
-                items: [
-                  for (int k = 0; k < kukansuu; k++)
-                    DropdownMenuItem<int>(
-                      value: k,
-                      child: Text(
-                        '${k + 1}$kuMei(${gh.kyori_taikai_kukangoto[race][k].round()}m)',
-                      ),
-                    ),
-                ],
-                onChanged: (val) {
-                  if (val == null) return;
-                  setState(() => _mikomiKukan = val);
-                },
-              ),
-            ),
           ],
+          onChanged: (val) {
+            if (val == null) return;
+            setState(() {
+              _mikomiRace = val;
+              if (_mikomiKukan >= gh.kukansuu_taikaigoto[val]) {
+                _mikomiKukan = 0;
+              }
+            });
+          },
+        ),
+        DropdownButton<int>(
+          value: kukan,
+          isExpanded: true,
+          dropdownColor: HENSUU.backgroundcolor,
+          style: dropStyle,
+          items: [
+            for (int k = 0; k < kukansuu; k++)
+              DropdownMenuItem<int>(
+                value: k,
+                child: Text(
+                  '${k + 1}$kuMei(${gh.kyori_taikai_kukangoto[race][k].round()}m)',
+                ),
+              ),
+          ],
+          onChanged: (val) {
+            if (val == null) return;
+            setState(() => _mikomiKukan = val);
+          },
+        ),
+        Padding(
+          padding: const EdgeInsets.only(top: 4.0, bottom: 4.0),
+          child: Text(courseBun, style: midasiStyle),
         ),
         gyou('今の基本走力', imaTime),
         gyou('上限に届いたとき', joukaiTime),

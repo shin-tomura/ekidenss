@@ -129,6 +129,14 @@ int gakurenKukanIchiiMeisei(double bairitu) {
   return (2000.0 * 0.2 * 0.25 * bairitu).toInt();
 }
 
+/// 学連選抜の監督として、目標1位で総合1位相当に導いたときに、監督の大学に入る名声(1.8.8)
+/// 正月駅伝の区間賞と同じ量(2000×0.2×倍率)。[bairitu]は正月駅伝の「駅伝名声設定」の倍率。
+/// 学連選抜にはスポンサーはいないので金銀は増やさないが、監督の手腕は評価される、という扱い。
+/// サプライズなので、説明書・生成AI向けの仕様・変更履歴には書かない(CLAUDE.md)
+int gakurenYuushouKantokuMeisei(double bairitu) {
+  return (2000.0 * 0.2 * bairitu).toInt();
+}
+
 /// プレイヤーが決めた学連選抜の目標順位(0が1位。yobiint2[76]が0なら10位(初期値)、1〜ならその順位)
 int gakurenMokuhyouSettei(KantokuData kantoku) {
   if (kantoku.yobiint2.length <= gakurenMokuhyouIndex) return 9;

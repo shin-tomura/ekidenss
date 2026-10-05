@@ -3360,6 +3360,16 @@ class _Mode0700ContentState extends State<Mode0700Content> {
         idJunUnivData.length > currentGhensuu.MYunivid &&
         gakurenKantokuChuu(kantoku, idJunUnivData[currentGhensuu.MYunivid]) &&
         gakurenunivdata.isNotEmpty;
+    // 学連選抜を目標1位で総合1位相当に導いたときのお祝い(1.8.8。名声は KirokuKousin.dart で入れる。
+    // その場で条件を見て出すので、画面を開き直しても文が出るだけ。サプライズなので説明書には書かない)
+    final bool gakurenYuushou =
+        kantoku != null &&
+        gakurenKantoku &&
+        gakurenYuushouKantoku(
+          currentGhensuu,
+          kantoku,
+          idJunUnivData[currentGhensuu.MYunivid],
+        );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -3370,6 +3380,18 @@ class _Mode0700ContentState extends State<Mode0700Content> {
             //fontWeight: FontWeight.bold,
           ),
         ),
+        if (gakurenYuushou)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Text(
+              "学連選抜を総合1位相当に導きました！\n監督としての手腕が高く評価され、${idJunUnivData[currentGhensuu.MYunivid].name}大学の名声が高まりました。",
+              style: const TextStyle(
+                color: Colors.orangeAccent,
+                fontWeight: FontWeight.bold,
+                fontSize: HENSUU.fontsize_honbun + 2,
+              ),
+            ),
+          ),
 
         TextButton(
           onPressed: () {

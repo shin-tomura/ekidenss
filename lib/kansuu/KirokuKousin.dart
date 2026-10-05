@@ -2878,6 +2878,21 @@ Future<void> kirokuKousin({
   print("KirokuKousin処理時間: ${_timeToMinuteSecondString(timeInterval)}経過");
 }
 
+/// 正月駅伝の「駅伝名声設定」の倍率(大学id 5・6 の name_tanshuku。正月駅伝の名声の加算と同じ読み方)
+double _shougatsuMeiseiBairitu() {
+  int yomu(int id) {
+    for (final UnivData u in Hive.box<UnivData>('univBox').values) {
+      if (u.id == id) {
+        final int? v = int.tryParse(u.name_tanshuku);
+        return (v == null || v < 1 || v > 10) ? 1 : v;
+      }
+    }
+    return 1;
+  }
+
+  return yomu(5).toDouble() / yomu(6).toDouble();
+}
+
 /// 学連選抜の監督として目標順位を達成したときの報酬(1.8.4)
 /// ・自分の大学が正月駅伝に不出場で、学連選抜の監督をしていて(スキップ中でない)、
 ///   学連選抜の最終の順位相当が、最後に決めた目標順位以内のとき
@@ -2902,6 +2917,20 @@ Future<void> _gakurenMokuhyouHoushuu({
   final int mokuhyou = gakurenMokuhyouSettei(kantoku); // 0が1位
   if (mokuhyou > gakurenHoushuuMokuhyouSaikai) return;
   if (saigo.tuukaJuni > mokuhyou) return;
+
+  // 目標1位で総合1位相当に導いたときは、監督の手腕が評価されて、監督の大学に名声(1.8.8)
+  // (学連選抜にはスポンサーはいないので金銀は増やさない。結果画面にお祝いの文を出す(mode0700_content.dart)。
+  //  サプライズなので、説明書・生成AI向けの仕様・変更履歴には書かない)
+  if (gakurenYuushouKantoku(gh, kantoku, myUniv)) {
+    final int ryou = gakurenYuushouKantokuMeisei(_shougatsuMeiseiBairitu());
+    myUniv.meisei_yeargoto[0] += ryou;
+    await myUniv.save();
+    await meiseiRirekiTsuika(
+      myUniv.id,
+      '学連選抜 総合1位相当(監督として。目標1位)',
+      ryou,
+    );
+  }
 
   // 見抜く力(このあと金銀の画面と、見抜く能力を選ぶ画面に進む)
   kantoku.yobiint2[1] = 1;

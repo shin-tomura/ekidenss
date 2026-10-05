@@ -119,6 +119,20 @@ GakurenKukanKekka? gakurenKukanKekka(Ghensuu gh, int kukan) {
   );
 }
 
+/// 学連選抜の監督として、目標1位で総合1位相当に導いたか(1.8.8)
+/// 結果画面のお祝いの文と、KirokuKousin.dart の名声で、同じ条件を使う
+/// (監督をしていて(スキップ中でない)、最後に決めた目標順位が1位で、最終区間の通過順位相当が1位)
+bool gakurenYuushouKantoku(Ghensuu gh, KantokuData kantoku, UnivData myUniv) {
+  if (!gakurenKantokuRule(kantoku, myUniv)) return false;
+  if (gakurenMokuhyouSettei(kantoku) != 0) return false;
+  if (gh.kukansuu_taikaigoto.length <= 2) return false;
+  final GakurenKukanKekka? saigo = gakurenKukanKekka(
+    gh,
+    gh.kukansuu_taikaigoto[2] - 1,
+  );
+  return saigo != null && saigo.tuukaJuni == 0;
+}
+
 /// 順位の良い順に並んだ大学の順位(0が1位)[juniList]の中で、学連選抜(順位相当[gakurenJuni])を
 /// 差し込む位置(順位の数字が学連選抜と同じか大きい、最初の大学の前。なければ最後)
 /// 個人順位速報・通過順位速報などの画面の表で使う(コピーの文と同じ位置になる)

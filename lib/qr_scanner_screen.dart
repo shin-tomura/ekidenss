@@ -8,6 +8,7 @@ import 'senshu_data.dart';
 import 'shareable_senshu_data.dart';
 import 'ghensuu.dart';
 import 'package:ekiden/kansuu/kojinBestKirokuJuniKettei.dart';
+import 'package:ekiden/kansuu/gakuren_utsushi.dart'; // 学連選抜用の写しへの反映(1.8.8)
 import 'package:ekiden/kansuu/ChartPanelSenshu.dart';
 import 'package:ekiden/kansuu/ChartPanelUniv.dart';
 
@@ -140,6 +141,8 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
             newShareableData.paceagesagetaiouryoku;
 
         await targetSenshu.save();
+        // 学連選抜の選手なら、学連選抜用の写しにも書く(写しで走るため。1.8.8)
+        await gakurenUtsushiNiHanei(targetSenshu);
 
         final Box<Ghensuu> ghensuuBox = Hive.box<Ghensuu>('ghensuuBox');
         final List<Ghensuu> gh = [ghensuuBox.getAt(0)!];

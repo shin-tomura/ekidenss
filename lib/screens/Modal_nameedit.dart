@@ -12,6 +12,7 @@ import 'package:ekiden/qr_gallery_scanner_screen.dart';
 import 'package:ekiden/senshu_r_data.dart';
 import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/screens/Modal_editSenshu.dart';
+import 'package:ekiden/kansuu/gakuren_utsushi.dart'; // 学連選抜用の写しへの反映(1.8.8)
 
 class ModalSenshuNameHenkou_modalsenshugamen extends StatefulWidget {
   final int senshuId;
@@ -244,6 +245,8 @@ class _ModalSenshuNameHenkou_modalsenshugamen_State
                                     targetSenshu!.name =
                                         "${_firstNameController.text} ${_lastNameController.text}";
                                     await targetSenshu.save();
+                                    // 学連選抜の選手なら、学連選抜用の写しの名前も変える(1.8.8)
+                                    await gakurenUtsushiNiHanei(targetSenshu);
                                     if (mounted) Navigator.pop(context);
                                   },
                                   style: ElevatedButton.styleFrom(

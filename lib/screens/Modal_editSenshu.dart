@@ -7,6 +7,7 @@ import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/kansuu/joukai.dart';
 import 'package:ekiden/kansuu/riron_kirokukai_time.dart';
+import 'package:ekiden/kansuu/gakuren_utsushi.dart'; // 学連選抜用の写しへの反映(1.8.8)
 
 class SenshuEditView extends StatefulWidget {
   final int senshuId;
@@ -446,6 +447,8 @@ class _SenshuEditViewState extends State<SenshuEditView> {
 
     try {
       await _senshuBox.put(widget.senshuId, updatedSenshu);
+      // 学連選抜の選手なら、学連選抜用の写しにも書く(写しで走るため。1.8.8)
+      await gakurenUtsushiNiHanei(updatedSenshu);
       if (!mounted) return;
       // 1. 念のため現在出ているスナックバーをすべてクリア
       ScaffoldMessenger.of(context).clearSnackBars();

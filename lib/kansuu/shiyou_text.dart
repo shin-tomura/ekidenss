@@ -62,6 +62,7 @@ String gameShiyouText() {
     shiyouSiji(),
     shiyouIkusei(),
     shiyouMeisei(),
+    shiyouRyuugakusei(),
     shiyouGakuren(),
   ]) {
     _kakuSetsu(sb, setsu);
@@ -436,6 +437,60 @@ ShiyouSetsu shiyouMeisei({bool setsumeisho = false}) {
     ]);
   }
   return ShiyouSetsu('名声', gyou);
+}
+
+// 留学生の入学の決まり(1.8.9。ShozokusakiKettei_By_Univmeisei.dartの留学生処理)
+// ・年度替わりで、受け入れ中(UnivData.r >= 1)で在籍中の留学生が0人の大学にだけ、1年生を1人留学生にする。
+// ・新規ゲームでは1年生から振り分けるので、受け入れ中の大学の留学生はみな1年生になり、
+//   途中でオンにしたときも次の4月にまとめて入るため、入学する年がそろいやすい
+//   (留学生が入らない年が3年続くことについて、プレイヤーから質問があった)。
+// ・スカウトがOFFのときの放出で、自分の大学の留学生を他大学へ出すと2人在籍する大学ができうるので、
+//   「1大学1人まで」とは言い切らず、「在籍中の留学生がいない大学に入学する」と書く。
+const List<String> _ryuugakuseiKimariGyou = [
+  '・留学生は、受け入れ中の大学のうち、在籍中の留学生がいない大学に、4月に1人入学します。',
+  '・在籍中の留学生がいる大学には、その留学生が卒業するまで、次の留学生は入学しません。',
+  '・そのため、同じ大学に留学生が入学するのは4年に1度です。',
+  '・受け入れ中の大学の留学生がみな同じ年に入学していると、ほかの3年はどの大学にも入学しません。',
+  '・留学生は、新入生スカウトの対象外です。',
+  '・留学生が入学する大学の、日本人の新入生は4人です。',
+];
+
+// 留学生受け入れ設定の決まり(説明書と、大学画面の「留学生受け入れ設定」の画面に出す)
+// 優秀度は入学するときだけ使う(ryuugakuseiJoukaiMagicnumber と ryuugakusei_ikusei)
+const List<String> _ryuugakuseiSetteiGyou = [
+  '・受け入れをオンにすると、在籍中の留学生がいなければ、次の4月に入学します。',
+  '・オフにしても、在籍中の留学生は卒業まで在籍します。',
+  '・優秀度が高いほど、力のある留学生が入学します。',
+  '・優秀度を変えると、次に入学する留学生から反映されます。',
+];
+
+/// 大学画面の「留学生受け入れ設定」の画面に出す説明(説明書の「留学生」と同じ文)
+String ryuugakuseiSetteiSetsumeiText() =>
+    [..._ryuugakuseiKimariGyou, ..._ryuugakuseiSetteiGyou].join('\n');
+
+/// 留学生
+ShiyouSetsu shiyouRyuugakusei({bool setsumeisho = false}) {
+  final bool ukeireAri = Hive.box<UnivData>(
+    'univBox',
+  ).values.any((u) => u.r >= 1);
+  // 受け入れている大学がないときは、そのことを先に書く
+  // (生成AI向けには、仕組みがないのでその1行だけにする)
+  if (!ukeireAri && !setsumeisho) {
+    return ShiyouSetsu('留学生', [
+      '・${_konoData(setsumeisho)}、留学生を受け入れている大学はありません。',
+    ]);
+  }
+  final List<String> gyou = [
+    if (!ukeireAri) '・${_konoData(setsumeisho)}、留学生を受け入れている大学はありません。',
+    ..._ryuugakuseiKimariGyou,
+  ];
+  if (setsumeisho) {
+    gyou.addAll([
+      ..._ryuugakuseiSetteiGyou,
+      '・留学生の受け入れと優秀度は、大学画面の「留学生受け入れ設定」で変えられます。',
+    ]);
+  }
+  return ShiyouSetsu('留学生', gyou);
 }
 
 /// 学連選抜(正月駅伝)

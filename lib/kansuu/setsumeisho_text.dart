@@ -58,6 +58,8 @@ List<SetsumeishoGroup> setsumeishoGroupList() {
       ),
       SetsumeishoKoumoku(shiyouMochiTime(setsumeisho: true)),
       SetsumeishoKoumoku(shiyouSuuchi(setsumeisho: true)),
+      // 留学生の入学の決まり(1.8.9)
+      SetsumeishoKoumoku(shiyouRyuugakusei(setsumeisho: true)),
     ]),
     SetsumeishoGroup('育成と名声', [
       SetsumeishoKoumoku(shiyouIkusei(setsumeisho: true)),

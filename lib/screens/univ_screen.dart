@@ -32,6 +32,7 @@ import 'package:ekiden/screens/Modal_comGoldSilver.dart';
 import 'package:ekiden/screens/Modal_comScout.dart';
 import 'package:ekiden/screens/Modal_shinnyuuseiShingakusaki.dart';
 import 'package:ekiden/kansuu/meisei_rireki.dart'; // 名声の履歴(1.8.8)
+import 'package:ekiden/kansuu/shiyou_text.dart'; // 留学生の入学の決まり(1.8.9)
 //import 'package:ekiden/kansuu/kojinBestKirokuJuniKettei.dart';
 // Modal views (placeholders for now, you'll need to create these files)
 //import 'package:ekiden/modals/modal_univ_name_henshuu_view.dart';
@@ -644,9 +645,30 @@ class _ModalRyugakuseiNinzuState extends State<ModalRyugakuseiNinzu> {
                 const SizedBox(height: 16),
                 Expanded(
                   child: ListView.builder(
-                    itemCount: allUnivs.length,
+                    // 先頭に留学生の入学の決まりの説明を出す(説明書の「留学生」と同じ文。1.8.9)
+                    // (一覧と一緒にスクロールするように、一覧の1行目にする)
+                    itemCount: allUnivs.length + 1,
                     itemBuilder: (context, index) {
-                      final UnivData univ = allUnivs[index];
+                      if (index == 0) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Text(
+                                ryuugakuseiSetteiSetsumeiText(),
+                                style: TextStyle(
+                                  color: HENSUU.textcolor,
+                                  fontSize: HENSUU.fontsize_honbun,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              const Divider(color: Colors.grey),
+                            ],
+                          ),
+                        );
+                      }
+                      final UnivData univ = allUnivs[index - 1];
                       // r > 0 なら留学生受け入れ中と判断
                       final bool isRyugakuseiAccepted = univ.r > 0;
 

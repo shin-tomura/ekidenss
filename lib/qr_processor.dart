@@ -13,6 +13,7 @@ import 'kansuu/scout_com.dart'; // コンピュータスカウト設定の確認
 import 'kansuu/mokuhyou_hosei.dart'; // 目標順位・指示の補正設定の確認
 import 'kansuu/nouryoku_eikyodo.dart'; // 能力のタイムへの影響度設定の確認
 import 'kansuu/gakuren_kantoku.dart'; // 学連選抜の監督の設定の確認
+import 'kansuu/meisei_rireki.dart'; // 名声の履歴(1.8.8)
 
 // 読み込み時に複数枚のデータを一時的に保持する状態管理クラス
 class QrReceiveState {
@@ -591,6 +592,12 @@ class SettingsQrProcessor {
               sortedUnivData[i].meisei_yeargoto[ii] = yeargoto;
             }
             sortedUnivData[i].meisei_yeargoto[9] = amari;
+            // 名声の履歴に、名声を読み込んだことを書く(年ごとの名声を作り直すので、内訳と合わなくなるため。1.8.8)
+            await meiseiRirekiTsuika(
+              sortedUnivData[i].id,
+              '名声をQRコードで読み込み(10年分の合計を${sortedUnivData[i].meisei_total}にした)',
+              0,
+            );
           }
           if (i < rList.length) {
             sortedUnivData[i].r = rList[i] as int;

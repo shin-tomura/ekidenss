@@ -31,6 +31,7 @@ import 'package:ekiden/screens/tradeScreen.dart';
 import 'package:ekiden/screens/Modal_comGoldSilver.dart';
 import 'package:ekiden/screens/Modal_comScout.dart';
 import 'package:ekiden/screens/Modal_shinnyuuseiShingakusaki.dart';
+import 'package:ekiden/kansuu/meisei_rireki.dart'; // 名声の履歴(1.8.8)
 //import 'package:ekiden/kansuu/kojinBestKirokuJuniKettei.dart';
 // Modal views (placeholders for now, you'll need to create these files)
 //import 'package:ekiden/modals/modal_univ_name_henshuu_view.dart';
@@ -2969,6 +2970,12 @@ class _ModalMeiseiHenkouState extends State<ModalMeiseiHenkou> {
           _updateMeiseiValues(univ, newValue);
         });
         await univ.save();
+        // 名声の履歴に、名声を編集したことを書く(年ごとの名声を作り直すので、内訳と合わなくなるため。1.8.8)
+        await meiseiRirekiTsuika(
+          univ.id,
+          '名声を編集(10年分の合計を$newValueにした)',
+          0,
+        );
       }
     }
   }

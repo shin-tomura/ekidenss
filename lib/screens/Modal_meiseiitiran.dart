@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ekiden/constants.dart'; // TEISUU, HENSUUクラスをインポート
 import 'package:ekiden/univ_data.dart'; // UnivDataクラスをインポート
+import 'package:ekiden/screens/Modal_meiseiRireki.dart'; // 名声の履歴(1.8.8)
 
 // ソート状態を管理するための列挙型
 enum UnivSortType {
@@ -114,6 +115,14 @@ class _ModalMeiseiIchiranState extends State<ModalMeiseiIchiran> {
           ),
           body: Column(
             children: [
+              // 名声の履歴の案内(1.8.8)
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 8, 16, 4),
+                child: Text(
+                  '大学をタップすると、その大学の名声の履歴(過去10年の内訳)を見られます。',
+                  style: TextStyle(color: Colors.grey, fontSize: 13),
+                ),
+              ),
               // ヘッダーラベル
               Container(
                 padding: const EdgeInsets.symmetric(
@@ -169,6 +178,19 @@ class _ModalMeiseiIchiranState extends State<ModalMeiseiIchiran> {
                         : '${univ.id}'; // 大学ID
 
                     return ListTile(
+                      // タップで名声の履歴を開く(1.8.8)
+                      onTap: () {
+                        showGeneralDialog(
+                          context: context,
+                          barrierColor: Colors.black.withOpacity(0.8),
+                          barrierDismissible: true,
+                          barrierLabel: '名声の履歴',
+                          transitionDuration: const Duration(milliseconds: 300),
+                          pageBuilder: (context, animation, secondaryAnimation) {
+                            return ModalMeiseiRireki(univId: univ.id);
+                          },
+                        );
+                      },
                       leading: SizedBox(
                         width: 30,
                         child: Text(

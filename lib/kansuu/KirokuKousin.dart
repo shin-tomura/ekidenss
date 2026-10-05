@@ -18,6 +18,7 @@ import 'package:ekiden/kansuu/ChartPanelUniv.dart';
 import 'package:ekiden/kansuu/goldsilver_com.dart';
 import 'package:ekiden/kansuu/gakuren_kantoku.dart'; // 学連選抜の監督・目標順位(1.8.4)
 import 'package:ekiden/kansuu/gakuren_text.dart'; // 学連選抜の結果(順位相当。1.8.4)
+import 'package:ekiden/kansuu/meisei_rireki.dart'; // 名声の履歴(1.8.8)
 
 String _timeToMinuteSecondString(double time) {
   if (time == TEISUU.DEFAULTTIME) {
@@ -902,6 +903,8 @@ Future<void> kirokuKousin({
     }
     double bairitu = bunsi.toDouble() / bunbo.toDouble();
     for (var iUniv = 0; iUniv < sortedunivdata.length; iUniv++) {
+      // 総合順位の名声を足す前の今年度の名声(名声の履歴用。1.8.8)
+      final int meiseiMae = sortedunivdata[iUniv].meisei_yeargoto[0];
       if (sortedunivdata[iUniv].juni_race[racebangou][0] == 0) {
         int zoukaryou =
             (bairitu *
@@ -1046,6 +1049,8 @@ Future<void> kirokuKousin({
         }
         sortedunivdata[iUniv].meisei_yeargoto[0] += zoukaryou;
       }
+      // 名声の履歴に、総合順位で得た名声を足す(1.8.8)
+      await meiseiRirekiSougou(sortedunivdata[iUniv], racebangou, meiseiMae);
       //区間賞名声加算
       for (
         int i_kukan = 0;
@@ -1053,13 +1058,22 @@ Future<void> kirokuKousin({
         i_kukan++
       ) {
         if (sortedunivdata[iUniv].kukanjuni_taikai[i_kukan] == 0) {
-          sortedunivdata[iUniv].meisei_yeargoto[0] +=
+          final int kukanshouMeisei =
               (0.2 *
                       2000.toDouble() *
                       bairitu *
                       (gh[0].spurtryokuseichousisuu4.toDouble() /
                           gh[0].spurtryokuseichousisuu5.toDouble()))
                   .toInt();
+          sortedunivdata[iUniv].meisei_yeargoto[0] += kukanshouMeisei;
+          // 名声の履歴に足す(1.8.8)
+          await meiseiRirekiKukanshou(
+            sortedunivdata[iUniv],
+            sortedsenshudata,
+            racebangou,
+            i_kukan,
+            kukanshouMeisei,
+          );
         }
       }
       await sortedunivdata[iUniv].save(); // UnivData の変更を保存
@@ -1078,6 +1092,8 @@ Future<void> kirokuKousin({
     }
     double bairitu = bunsi.toDouble() / bunbo.toDouble();
     for (var iUniv = 0; iUniv < sortedunivdata.length; iUniv++) {
+      // 総合順位の名声を足す前の今年度の名声(名声の履歴用。1.8.8)
+      final int meiseiMae = sortedunivdata[iUniv].meisei_yeargoto[0];
       if (sortedunivdata[iUniv].juni_race[racebangou][0] == 0) {
         int zoukaryou =
             (500.toDouble() *
@@ -1188,6 +1204,8 @@ Future<void> kirokuKousin({
         }
         sortedunivdata[iUniv].meisei_yeargoto[0] += zoukaryou;
       }
+      // 名声の履歴に、総合順位で得た名声を足す(1.8.8)
+      await meiseiRirekiSougou(sortedunivdata[iUniv], racebangou, meiseiMae);
       //区間賞名声加算
       for (
         int i_kukan = 0;
@@ -1195,8 +1213,17 @@ Future<void> kirokuKousin({
         i_kukan++
       ) {
         if (sortedunivdata[iUniv].kukanjuni_taikai[i_kukan] == 0) {
-          sortedunivdata[iUniv].meisei_yeargoto[0] +=
+          final int kukanshouMeisei =
               (500.toDouble() * 0.2 * bairitu).toInt();
+          sortedunivdata[iUniv].meisei_yeargoto[0] += kukanshouMeisei;
+          // 名声の履歴に足す(1.8.8)
+          await meiseiRirekiKukanshou(
+            sortedunivdata[iUniv],
+            sortedsenshudata,
+            racebangou,
+            i_kukan,
+            kukanshouMeisei,
+          );
         }
       }
       await sortedunivdata[iUniv].save(); // UnivData の変更を保存
@@ -1216,6 +1243,8 @@ Future<void> kirokuKousin({
     }
     double bairitu = bunsi.toDouble() / bunbo.toDouble();
     for (var iUniv = 0; iUniv < sortedunivdata.length; iUniv++) {
+      // 総合順位の名声を足す前の今年度の名声(名声の履歴用。1.8.8)
+      final int meiseiMae = sortedunivdata[iUniv].meisei_yeargoto[0];
       if (sortedunivdata[iUniv].juni_race[racebangou][0] == 0) {
         int zoukaryou =
             (500.toDouble() *
@@ -1316,6 +1345,8 @@ Future<void> kirokuKousin({
         }
         sortedunivdata[iUniv].meisei_yeargoto[0] += zoukaryou;
       }
+      // 名声の履歴に、総合順位で得た名声を足す(1.8.8)
+      await meiseiRirekiSougou(sortedunivdata[iUniv], racebangou, meiseiMae);
       //区間賞名声加算
       for (
         int i_kukan = 0;
@@ -1323,8 +1354,17 @@ Future<void> kirokuKousin({
         i_kukan++
       ) {
         if (sortedunivdata[iUniv].kukanjuni_taikai[i_kukan] == 0) {
-          sortedunivdata[iUniv].meisei_yeargoto[0] +=
+          final int kukanshouMeisei =
               (500.toDouble() * 0.2 * bairitu).toInt();
+          sortedunivdata[iUniv].meisei_yeargoto[0] += kukanshouMeisei;
+          // 名声の履歴に足す(1.8.8)
+          await meiseiRirekiKukanshou(
+            sortedunivdata[iUniv],
+            sortedsenshudata,
+            racebangou,
+            i_kukan,
+            kukanshouMeisei,
+          );
         }
       }
       await sortedunivdata[iUniv].save(); // UnivData の変更を保存
@@ -1361,6 +1401,8 @@ Future<void> kirokuKousin({
     }
     double bairitu = bunsi.toDouble() / bunbo.toDouble();
     for (var iUniv = 0; iUniv < sortedunivdata.length; iUniv++) {
+      // 総合順位の名声を足す前の今年度の名声(名声の履歴用。1.8.8)
+      final int meiseiMae = sortedunivdata[iUniv].meisei_yeargoto[0];
       if (sortedunivdata[iUniv].juni_race[0][0] == 0 &&
           sortedunivdata[iUniv].juni_race[1][0] == 0 &&
           sortedunivdata[iUniv].juni_race[2][0] == 0) {
@@ -1488,6 +1530,8 @@ Future<void> kirokuKousin({
         }
         sortedunivdata[iUniv].meisei_yeargoto[0] += zoukaryou;
       }
+      // 名声の履歴に、総合順位で得た名声を足す(1.8.8)
+      await meiseiRirekiSougou(sortedunivdata[iUniv], racebangou, meiseiMae);
       //区間賞名声加算
       for (
         int i_kukan = 0;
@@ -1495,8 +1539,17 @@ Future<void> kirokuKousin({
         i_kukan++
       ) {
         if (sortedunivdata[iUniv].kukanjuni_taikai[i_kukan] == 0) {
-          sortedunivdata[iUniv].meisei_yeargoto[0] +=
+          final int kukanshouMeisei =
               (2000.toDouble() * 0.2 * bairitu).toInt();
+          sortedunivdata[iUniv].meisei_yeargoto[0] += kukanshouMeisei;
+          // 名声の履歴に足す(1.8.8)
+          await meiseiRirekiKukanshou(
+            sortedunivdata[iUniv],
+            sortedsenshudata,
+            racebangou,
+            i_kukan,
+            kukanshouMeisei,
+          );
         }
       }
       await sortedunivdata[iUniv].save(); // UnivData の変更を保存
@@ -1516,6 +1569,12 @@ Future<void> kirokuKousin({
       final int ryou = gakurenKukanIchiiMeisei(bairitu);
       sortedunivdata[univid].meisei_yeargoto[0] += ryou;
       await sortedunivdata[univid].save(); // UnivData の変更を保存
+      // 名声の履歴に足す(1.8.8)
+      await meiseiRirekiTsuika(
+        univid,
+        '正月駅伝 学連選抜 ${i_kukan + 1}区 区間1位相当(${gakuren.senshu.name})',
+        ryou,
+      );
       // 確認用(どれくらい起きるかを、統計をとるときに数えられるように)
       print(
         '学連選抜 ${i_kukan + 1}区 区間1位相当: ${gakuren.senshu.name}(${gakuren.shozoku}大学) 名声+$ryou',
@@ -2251,6 +2310,15 @@ Future<void> kirokuKousin({
           if (univId >= 0 && univId < sortedunivdata.length) {
             sortedunivdata[univId].meisei_yeargoto[0] += meiseiPoints[i];
             await sortedunivdata[univId].save();
+            // 名声の履歴に足す(1.8.8)
+            final String shumoku = racebangou == 6
+                ? '5000m'
+                : (racebangou == 7 ? '10000m' : 'ハーフ');
+            await meiseiRirekiTsuika(
+              univId,
+              '対校戦 $shumoku ${i + 1}位(${kirokujunEntryFilteredSenshuData[i].name})',
+              meiseiPoints[i],
+            );
           }
         }
       }
@@ -2356,6 +2424,12 @@ Future<void> kirokuKousin({
             inkarepointTotalJunUnivData[i].meisei_yeargoto[0] +=
                 meiseiPointsOverall[i];
             await inkarepointTotalJunUnivData[i].save();
+            // 名声の履歴に足す(1.8.8)
+            await meiseiRirekiTsuika(
+              inkarepointTotalJunUnivData[i].id,
+              '対校戦 総合${i + 1}位',
+              meiseiPointsOverall[i],
+            );
           }
         }
 

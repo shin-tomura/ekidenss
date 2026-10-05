@@ -1,12 +1,17 @@
 import 'package:ekiden/constants.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ekiden/univ_data.dart';
+import 'package:ekiden/kansuu/meisei_rireki.dart'; // 名声の履歴(1.8.8)
 
 Future<void> ShokitiUnivdata(
   bool ikuseiryoku_meisei_ijiflag,
   Box<UnivData> univBox,
 ) async {
   int temptotal = 0;
+  // 名声の履歴は、名声を作り直すときに消す(名声と育成力を維持するときは、名声と一緒に残す。1.8.8)
+  if (ikuseiryoku_meisei_ijiflag == false) {
+    await meiseiRirekiZenbuKesu();
+  }
   for (final entry in univBox.toMap().entries) {
     final int univId = entry.key;
     final UnivData univ = entry.value;

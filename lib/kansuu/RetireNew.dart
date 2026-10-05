@@ -11,6 +11,7 @@ import 'package:ekiden/kansuu/GakunenZurasi.dart';
 //import 'package:ekiden/kansuu/kojinBestKirokuJuniKettei.dart';
 import 'package:ekiden/kansuu/ShozokusakiKettei_By_Univmeisei.dart';
 import 'package:ekiden/kansuu/SenshuShokiti.dart';
+import 'package:ekiden/kansuu/meisei_rireki.dart'; // 名声の履歴(1.8.8)
 
 /// 年度替わりの選手引退、新入生入学、データ更新処理をまとめて実行します。
 ///
@@ -723,6 +724,8 @@ Future<void> RetireNew({
     // UnivDataオブジェクトの変更をHiveに保存
     await sortedUnivData[i].save();
   }
+  // 名声の履歴も、年ごとの名声と同じように1年ずつずらす(1.8.8)
+  await meiseiRirekiNenKawari();
 
   // --- 名声順位更新 ---
   // sortedByは新しいリストを返すため、元のリストを直接変更する前にコピーを作成

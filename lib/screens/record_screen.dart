@@ -2021,7 +2021,7 @@ class _RecordScreenState extends State<RecordScreen>
   }
 
   // 記録の行のヘルパーウィジェット(歴代10位まで。1.8.8で、学内・全体の個人記録・区間記録・総合記録の4つをまとめた)
-  // ・ふだんは1位だけを出し、2位以下があるときは、押すと歴代10位までを開いたり閉じたりする
+  // ・ふだんは1位だけを出し、2位以下があるときは、記録の下の「2位以下を見る」「閉じる」で開いたり閉じたりする
   // ・[senshu] 選手名と学年を出すか(総合記録は出さない)
   // ・[daigaku] 大学名を出すか(学内記録は出さない)
   Widget _buildRekidaiSection({
@@ -2104,36 +2104,31 @@ class _RecordScreenState extends State<RecordScreen>
         ),
         if (!aru)
           const Text('記録なし', style: moji)
-        else
-          InkWell(
-            onTap: hirakeru
-                ? () {
-                    setState(() {
-                      if (!_hiraitaKiroku.remove(kagi)) {
-                        _hiraitaKiroku.add(kagi);
-                      }
-                    });
+        else ...[
+          for (int r = 0; r < (hiraiteru ? rekidai.length : 1); r++) ikken(r),
+          // 開いたり閉じたりするのは、この文字を押したときだけ
+          // (記録の部分は押しても反応しない。スクロールのつもりで触れたときに開閉しないように)
+          if (hirakeru)
+            InkWell(
+              onTap: () {
+                setState(() {
+                  if (!_hiraitaKiroku.remove(kagi)) {
+                    _hiraitaKiroku.add(kagi);
                   }
-                : null,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                for (int r = 0; r < (hiraiteru ? rekidai.length : 1); r++)
-                  ikken(r),
-                if (hirakeru)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: Text(
-                      hiraiteru ? '▲ 閉じる' : '▼ 2位以下を見る',
-                      style: const TextStyle(
-                        color: HENSUU.LinkColor,
-                        fontSize: HENSUU.fontsize_honbun,
-                      ),
-                    ),
+                });
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Text(
+                  hiraiteru ? '▲ 閉じる' : '▼ 2位以下を見る',
+                  style: const TextStyle(
+                    color: HENSUU.LinkColor,
+                    fontSize: HENSUU.fontsize_honbun,
                   ),
-              ],
+                ),
+              ),
             ),
-          ),
+        ],
         const SizedBox(height: 5),
       ],
     );

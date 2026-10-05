@@ -10,6 +10,7 @@ import 'package:ekiden/univ_gakuren_data.dart';
 import 'package:ekiden/kansuu/time_date.dart';
 import 'package:ekiden/kansuu/kukannai_juni.dart'; // 持ちタイムの区間内順位(1.8.8)
 import 'package:ekiden/kansuu/gakuren_kantoku.dart';
+import 'package:ekiden/kansuu/setsumei_sontoku.dart'; // 補正の損得と指示の成否の書き足し(1.8.8)
 
 // ------------------------------------------------------------
 // 学連選抜のテキスト(1.8.2)
@@ -393,6 +394,7 @@ String gakurenRaceKeikaText(Ghensuu gh) {
     '※学連選抜は、正月駅伝に出場できなかった大学の選手で作るオープン参加のチームです。順位には数えず、「○位相当」は大学の中に入れた場合の順位を表します。\n',
   );
   sb.write(_suutiChuui);
+  sb.write(setsumeiSontokuChuui);
   sb.writeln('【正月駅伝 学連選抜(オープン参加) レース経過】');
   sb.write(_kantokuGyou());
   sb.writeln('学連選抜の目標:${mokuhyou + 1}位相当');
@@ -451,7 +453,10 @@ String gakurenRaceKeikaText(Ghensuu gh) {
     }
     if (s.string_racesetumei.trim().isNotEmpty) {
       sb.writeln('  [補正の説明]');
-      for (final String gyou in s.string_racesetumei.trimRight().split('\n')) {
+      // 補正の秒数に損得(指示は成否も)を書き足す(1.8.8)
+      for (final String gyou in setsumeiSontokuTsuki(
+        s.string_racesetumei.trimRight(),
+      ).split('\n')) {
         sb.writeln('   $gyou');
       }
     }

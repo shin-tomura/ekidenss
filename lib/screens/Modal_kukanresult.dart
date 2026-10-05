@@ -29,6 +29,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import 'package:flutter/services.dart';
+import 'package:ekiden/kansuu/setsumei_sontoku.dart'; // 説明文に損得と指示の成否を書き足す(1.8.8)
 
 // --------------------------------------------------
 
@@ -1494,8 +1495,9 @@ String _formatTimeDifference_copy(double diffTime) {
 String _gakurenGyou(GakurenKukanKekka gakuren, ViewMode viewMode) {
   String gyou = gakurenKojinSokuhouGyou(gakuren);
   if (viewMode == ViewMode.description) {
+    // 生成AIが補正の符号を読み違えないように、損得と指示の成否を書き足す(1.8.8)
     final String setumei = gakuren.senshu.string_racesetumei.isNotEmpty
-        ? gakuren.senshu.string_racesetumei
+        ? setsumeiSontokuTsuki(gakuren.senshu.string_racesetumei)
         : '(説明文なし)';
     gyou += '\n $setumei\n';
   } else if (viewMode == ViewMode.analysis) {
@@ -1534,6 +1536,7 @@ String kojinSeisekiHonbun({
   } else if (viewMode == ViewMode.description) {
     shareText +=
         '※説明文の「○位」は、その区間(組)を走った選手の中での順位です(選手全体の中での順位ではありません)。\n';
+    shareText += setsumeiSontokuChuui; // 損得と指示の成否の書き足しの説明(1.8.8)
   }
   shareText +=
       '※区間記録比や学内記録比のタイムがプラスの場合は新記録に届かなかったことを表し、マイナスの場合には新記録を表します。ただし、速報値なので誤差がありますことをご了承ください\n';
@@ -1614,9 +1617,10 @@ String kojinSeisekiHonbun({
     // ★ 変更: モードに応じて出力するテキストを切り替え ★
 
     if (viewMode == ViewMode.description) {
+      // 生成AIが補正の符号を読み違えないように、損得と指示の成否を書き足す(1.8.8)
       final String setumei = senshu.string_racesetumei.isEmpty
           ? '(説明文なし)'
-          : senshu.string_racesetumei;
+          : setsumeiSontokuTsuki(senshu.string_racesetumei);
 
       shareText += '\n $setumei\n';
     } else if (viewMode == ViewMode.analysis) {

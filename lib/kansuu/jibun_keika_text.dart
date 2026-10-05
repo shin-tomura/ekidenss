@@ -5,6 +5,7 @@ import 'package:ekiden/ghensuu.dart';
 import 'package:ekiden/senshu_data.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/kansuu/time_date.dart';
+import 'package:ekiden/kansuu/setsumei_sontoku.dart'; // 補正の損得と指示の成否の書き足し(1.8.8)
 
 // ------------------------------------------------------------
 // 自分の大学のレース経過のテキスト(1.8.2)
@@ -79,6 +80,7 @@ String jibunRaceKeikaText(Ghensuu currentGhensuu) {
   sb.write(
     '※※※陸上競技のタイム計算に関係することなので、【数値が小さいほど優秀】と捉えてください。(「プラス」は悪い数値、「マイナス」は良い数値。ただし、項目によっては仕様上「プラスの数値」しか出ないものもあります。その場合は「いかにプラスの数値を小さく（0に近く）抑えられたか」を高く評価してください。)※※※\n',
   );
+  sb.write(setsumeiSontokuChuui);
   sb.write(
     '※[補正の説明]の「○位」は、その${kumi ? '組' : '区間'}を走った選手の中での順位です(選手全体の中での順位ではありません)。\n',
   );
@@ -169,9 +171,10 @@ String jibunRaceKeikaText(Ghensuu currentGhensuu) {
       if (sijiResult.isNotEmpty) sb.writeln('  $sijiResult');
       if (x.string_racesetumei.trim().isNotEmpty) {
         sb.writeln('  [補正の説明]');
-        for (final String gyou in x.string_racesetumei.trimRight().split(
-          '\n',
-        )) {
+        // 補正の秒数に損得(指示は成否も)を書き足す(1.8.8)
+        for (final String gyou in setsumeiSontokuTsuki(
+          x.string_racesetumei.trimRight(),
+        ).split('\n')) {
           sb.writeln('   $gyou');
         }
       }

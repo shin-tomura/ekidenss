@@ -2143,6 +2143,7 @@ class _RecordScreenState extends State<RecordScreen>
   // [titles] 3行の見出し(分けない行、日本人、留学生の順)
   // [ichii] 分けない行の1位の置き場所(区間新などの判定に使う記録)
   // [onReset] 押したリセットボタンの行(_resetAwase の shurui)と見出しを受け取る
+  // [hitoriIkken] 一人につき一番速い記録だけを出すか(個人記録)
   List<Widget> _buildAwaseSections({
     required String kagi,
     required List<String> titles,
@@ -2151,12 +2152,23 @@ class _RecordScreenState extends State<RecordScreen>
     required RekidaiOkiba ryuugakusei,
     required bool isOverallTime,
     required bool daigaku,
+    required bool hitoriIkken,
     required void Function(int shurui, String title) onReset,
   }) {
-    final List<RekidaiKiroku> j = nihonjin.yomu();
-    final List<RekidaiKiroku> r = ryuugakusei.yomu();
+    List<RekidaiKiroku> j = nihonjin.yomu();
+    List<RekidaiKiroku> r = ryuugakusei.yomu();
+    if (hitoriIkken) {
+      // 前から同じ選手の記録が重なって残っていても、一番速い記録だけを出す
+      j = rekidaiHitoriIkken(j);
+      r = rekidaiHitoriIkken(r);
+    }
     final List<List<RekidaiKiroku>> gyou = [
-      rekidaiAwaseru(ichii: ichii.yomu(), nihonjin: j, ryuugakusei: r),
+      rekidaiAwaseru(
+        ichii: ichii.yomu(),
+        nihonjin: j,
+        ryuugakusei: r,
+        hitoriIkken: hitoriIkken,
+      ),
       j,
       r,
     ];
@@ -2382,6 +2394,7 @@ class _RecordScreenState extends State<RecordScreen>
               ryuugakusei: rekidaiUnivKojin(kiroku, true, myUnivId, k),
               isOverallTime: k == 3, // フルマラソンは時間で表示
               daigaku: false,
+              hitoriIkken: true, // 個人記録は一人につき一番速い記録だけ
               onReset: (shurui, title) => _showResetConfirmationDialog(
                 title,
                 () => _resetUnivRekidai(
@@ -2457,6 +2470,7 @@ class _RecordScreenState extends State<RecordScreen>
                   ),
                   isOverallTime: false,
                   daigaku: false,
+                  hitoriIkken: false,
                   onReset: (shurui, title) => _showResetConfirmationDialog(
                     title,
                     () => _resetUnivRekidai(
@@ -2514,6 +2528,7 @@ class _RecordScreenState extends State<RecordScreen>
               ryuugakusei: rekidaiZentaiKojin(kiroku, true, k),
               isOverallTime: k == 3, // フルマラソンは時間で表示
               daigaku: true,
+              hitoriIkken: true, // 個人記録は一人につき一番速い記録だけ
               onReset: (shurui, title) => _showResetConfirmationDialog(
                 title,
                 () => _resetOverallRekidai(
@@ -2577,6 +2592,7 @@ class _RecordScreenState extends State<RecordScreen>
                   ryuugakusei: rekidaiZentaiKukan(kiroku, true, race, index),
                   isOverallTime: false,
                   daigaku: true,
+                  hitoriIkken: false,
                   onReset: (shurui, title) => _showResetConfirmationDialog(
                     title,
                     () => _resetOverallRekidai(

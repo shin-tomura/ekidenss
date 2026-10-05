@@ -21,6 +21,9 @@ import 'package:ekiden/univ_data.dart';
 // ・前の版のセーブデータは長さ1のままで、これからの記録で2位以下が貯まる(移行処理はしない)。
 // ・配列は List.filled の固定長のこともあるため、要素を足さず、書き込むときに配列ごと作り直す。
 // ・[0]は今までどおり1位なので、[0]だけを読む処理(区間新の判定など)はそのままでよい。
+// ・区間記録と大会記録は、同じ選手・大学の記録も全部残す。
+//   個人記録は、同じ選手で埋まらないように、一人につき一番速い記録だけを残す(hitoriIkken)。
+//   記録には選手の番号がない(番号は卒業後に使い回す)ので、名前・大学名・入学年度で同じ選手とみなす(senshuKagi)。
 // ------------------------------------------------------------
 
 /// 歴代の記録の1件
@@ -47,6 +50,24 @@ class RekidaiKiroku {
       year == b.year &&
       month == b.month &&
       name == b.name;
+
+  /// 同じ選手かを見分けるための文字列(名前・大学名・入学年度)
+  /// ・学年は4月5日に上がるので、4月〜12月はその年、1月〜3月は前の年を年度とする
+  /// ・学内記録は大学名が空だが、同じ大学どうししか比べないので差し支えない
+  String get senshuKagi {
+    final int nendo = month >= 4 ? year : year - 1;
+    final int nyuugakuNendo = nendo - (gakunen - 1);
+    return '$name\t$univname\t$nyuugakuNendo';
+  }
+}
+
+/// 速い順の歴代[l]を、一人につき一番速い記録だけにする(先に出てくる方が速い)
+List<RekidaiKiroku> rekidaiHitoriIkken(List<RekidaiKiroku> l) {
+  final Set<String> zumi = <String>{};
+  return [
+    for (final RekidaiKiroku k in l)
+      if (zumi.add(k.senshuKagi)) k,
+  ];
 }
 
 /// 記録があるか(リセット後や初期値は DEFAULTTIME)
@@ -301,8 +322,23 @@ RekidaiOkiba ichiiUnivKojin(UnivData u, int kirokubangou) => RekidaiOkiba(
 
 /// 速い順の歴代[l]に[k]を入れる(同じタイムは先に出した記録を上にする)。
 /// [saidai]位より後ろになるときは入れない。入れたら true
-bool rekidaiIreru(List<RekidaiKiroku> l, RekidaiKiroku k, int saidai) {
+/// [hitoriIkken] が true のときは、一人につき一番速い記録だけにする
+/// (同じ選手の記録があれば、それより速いときだけ入れ替える)
+bool rekidaiIreru(
+  List<RekidaiKiroku> l,
+  RekidaiKiroku k,
+  int saidai, {
+  bool hitoriIkken = false,
+}) {
   if (!rekidaiKirokuAri(k.time)) return false;
+  if (hitoriIkken) {
+    final String kagi = k.senshuKagi;
+    final int mae = l.indexWhere((x) => x.senshuKagi == kagi);
+    if (mae >= 0) {
+      if (l[mae].time <= k.time) return false; // 自分の記録より速くない
+      l.removeAt(mae); // 自分の前の記録と入れ替える
+    }
+  }
   int ichi = l.length;
   for (int r = 0; r < l.length; r++) {
     if (l[r].time > k.time) {
@@ -319,6 +355,8 @@ bool rekidaiIreru(List<RekidaiKiroku> l, RekidaiKiroku k, int saidai) {
 /// 選手[junban]のうち、[ryuugakusei](true:留学生、false:日本人)に合う選手の記録を、
 /// [okiba]の歴代([saidai]位まで)に入れる。変わったら true(保存は呼び出し側で行う)
 /// (タイム順に並んでいなくてもよい)
+/// [hitoriIkken] が true のときは、一人につき一番速い記録だけにする(個人記録)。
+/// 前から同じ選手の記録が重なって残っていたら、そのときに一番速い記録だけにする
 bool rekidaiKousin({
   required RekidaiOkiba okiba,
   required List<SenshuData> junban,
@@ -326,22 +364,34 @@ bool rekidaiKousin({
   required int saidai,
   required Ghensuu gh,
   required List<UnivData> sortedunivdata,
+  bool hitoriIkken = false,
 }) {
-  final List<RekidaiKiroku> l = okiba.yomu();
+  List<RekidaiKiroku> l = okiba.yomu();
   bool kawatta = false;
+  if (hitoriIkken) {
+    final List<RekidaiKiroku> matome = rekidaiHitoriIkken(l);
+    if (matome.length != l.length) {
+      l = matome;
+      kawatta = true;
+    }
+  }
   for (final SenshuData s in junban) {
     if ((s.hirou == 1) != ryuugakusei) continue;
     final RekidaiKiroku k = RekidaiKiroku(
       time: s.time_taikai_total,
       year: gh.year,
       month: gh.month,
-      univname: (s.univid >= 0 && s.univid < sortedunivdata.length)
+      // 大学名のない置き場所(学内記録)では空にする(同じ選手の見分けを、読み出したときとそろえるため)
+      univname:
+          (okiba.univname != null &&
+              s.univid >= 0 &&
+              s.univid < sortedunivdata.length)
           ? sortedunivdata[s.univid].name
           : '',
       name: s.name,
       gakunen: s.gakunen,
     );
-    if (rekidaiIreru(l, k, saidai)) kawatta = true;
+    if (rekidaiIreru(l, k, saidai, hitoriIkken: hitoriIkken)) kawatta = true;
   }
   if (kawatta) okiba.kaku(l);
   return kawatta;
@@ -353,10 +403,12 @@ bool rekidaiKousin({
 /// 1位は[ichii](今の日本人+留学生の記録。区間新などの判定に使うもの)をそのまま1位にし、
 /// 2位以下は、日本人と留学生の歴代のうち、1位より速くないものを合わせて速い順に並べる
 /// (前の版で、全体・日本人・留学生の一部の行だけをリセットしていたデータでも、1位が変わらないように)
+/// [hitoriIkken] が true のとき(個人記録)は、1位の選手も含めて、一人につき一番速い記録だけにする
 List<RekidaiKiroku> rekidaiAwaseru({
   required List<RekidaiKiroku> ichii,
   required List<RekidaiKiroku> nihonjin,
   required List<RekidaiKiroku> ryuugakusei,
+  bool hitoriIkken = false,
 }) {
   if (ichii.isEmpty) return [];
   final RekidaiKiroku ichiban = ichii.first;
@@ -388,6 +440,7 @@ List<RekidaiKiroku> rekidaiAwaseru({
     }
   }
   final List<RekidaiKiroku> l = [ichiban];
+  final Set<String> senshuZumi = {ichiban.senshuKagi}; // 一人1件のときに、もう入れた選手
   bool ichibanWoTobashita = false;
   for (final RekidaiKiroku k in awase) {
     if (l.length >= TEISUU.SUU_REKIDAIKIROKUJUNISUU) break;
@@ -396,6 +449,7 @@ List<RekidaiKiroku> rekidaiAwaseru({
       continue;
     }
     if (k.time < ichiban.time) continue;
+    if (hitoriIkken && !senshuZumi.add(k.senshuKagi)) continue;
     l.add(k);
   }
   return l;

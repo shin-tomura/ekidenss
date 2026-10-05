@@ -1763,7 +1763,7 @@ Future<void> kirokuKousin({
           Chousa.lastGapTime = DateTime.now();
         }
       }
-      // 全体の留学生・日本人(5000m・10000m・ハーフ・フルは歴代10位まで。保存はまとめて1回。1.8.8)
+      // 全体の留学生・日本人(5000m・10000m・ハーフ・フルは歴代10位まで。一人1件。保存はまとめて1回。1.8.8)
       if (kiroku != null) {
         bool kawatta = false;
         for (final bool ryuugakusei in [true, false]) {
@@ -1772,6 +1772,7 @@ Future<void> kirokuKousin({
             junban: kirokujunEntryFilteredSenshuData,
             ryuugakusei: ryuugakusei,
             saidai: kojinRekidaiSaidai,
+            hitoriIkken: true, // 個人記録は一人につき一番速い記録だけ
             gh: gh[0],
             sortedunivdata: sortedunivdata,
           )) {
@@ -1886,7 +1887,7 @@ Future<void> kirokuKousin({
           Chousa.lastGapTime = DateTime.now();
         }
       }
-      // 学内の留学生・日本人(5000m・10000m・ハーフ・フルは歴代10位まで。保存はまとめて1回。1.8.8)
+      // 学内の留学生・日本人(5000m・10000m・ハーフ・フルは歴代10位まで。一人1件。保存はまとめて1回。1.8.8)
       if (kiroku != null) {
         bool kawatta = false;
         for (final bool ryuugakusei in [true, false]) {
@@ -1900,6 +1901,7 @@ Future<void> kirokuKousin({
             junban: kirokujunUnivEntryFilteredSenshuData,
             ryuugakusei: ryuugakusei,
             saidai: kojinRekidaiSaidai,
+            hitoriIkken: true, // 個人記録は一人につき一番速い記録だけ
             gh: gh[0],
             sortedunivdata: sortedunivdata,
           )) {

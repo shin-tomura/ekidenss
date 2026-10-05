@@ -3723,6 +3723,15 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                 sortedUnivsById[12].name_tanshuku +=
                     "\n" + sortedUnivsById[0].name_tanshuku + "\n";
               }
+              // 統計をとっている間に一度も開催されなかった駅伝(カスタム駅伝を開催しない設定など)は、
+              // 0分00秒の行を並べずに1行だけ書く(1.8.8)
+              if (statsContainer.stats[i_racebangou].isEmpty ||
+                  statsContainer.stats[i_racebangou][0].runCount == 0) {
+                print("(統計をとっている間に開催されなかったので、統計はありません)");
+                sortedUnivsById[12].name_tanshuku +=
+                    "(統計をとっている間に開催されなかったので、統計はありません)\n";
+                continue;
+              }
               print("");
               for (
                 int i_kukan = 0;
@@ -4104,7 +4113,13 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             ghensuu.mode = 120;
           }
         } else {
-          ghensuu.mode = 100;
+          // 開催しない設定のときは、ほかのレースのない日と同じにする
+          // (1.8.7まではスキップ中もモード100にしていたので、スキップが毎年ここで止まっていた。1.8.8)
+          if (skip.skipflag == 0) {
+            ghensuu.mode = 100;
+          } else {
+            ghensuu.mode = 5555;
+          }
         }
       } else {
         ghensuu.mode = 5555;

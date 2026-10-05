@@ -684,7 +684,7 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
           child: Text(
-            "${gakurenOpChuui}※学連選抜(OP)の選手の「区」は、その区間を走る大学の選手と比べた場合の持ちタイムの順位(○位相当)、「学」は所属大学の中での順位です。",
+            "${gakurenOpChuui}※学連選抜(OP)の選手の「区」は、その区間を走る大学の選手と比べた場合の持ちタイムの順位(○位相当)、「連」は学連選抜の選手の中での順位です。",
             style: const TextStyle(color: Colors.white70, fontSize: 12),
           ),
         ),
@@ -846,6 +846,8 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
         g.time_bestkiroku.length > idx &&
         g.time_bestkiroku[idx] != TEISUU.DEFAULTTIME;
     final int kukanJuni = gakurenKukanJuniSoutou(g, idx, gh);
+    // 学連選抜の選手の中での順位(所属大学の中の順位の「学」の代わりに出す。1.8.8)
+    final int renJuni = gakurenNaiJuni(g, idx);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
@@ -890,7 +892,7 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
                 children: [
                   // タイムトライアルの4種目も、区間を走る大学の選手全員に記録があれば出す(1.8.8)
                   if (kukanJuni > 0) _rankTagBun("区", "$kukanJuni相当"),
-                  _rankTag("学", g.gakunaijuni_bestkiroku[idx] + 1),
+                  if (renJuni > 0) _rankTag("連", renJuni),
                   if (showRank)
                     _rankTag("全", g.zentaijuni_bestkiroku[idx] + 1),
                 ],

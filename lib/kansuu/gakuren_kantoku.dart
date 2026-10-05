@@ -122,6 +122,13 @@ const int gakurenMokuhyouIndex = 76;
 /// (0が1位。9は10位。これより下の目標では、達成しても報酬はない。1.8.4)
 const int gakurenHoushuuMokuhyouSaikai = 9;
 
+/// 正月駅伝で学連選抜の選手が区間1位相当で走ったときに、その選手の大学に入る名声(1区間につき。1.8.8)
+/// 正月駅伝の区間賞(2000×0.2×倍率)の1/4。[bairitu]は正月駅伝の「駅伝名声設定」の倍率。
+/// 目標順位では割らない(区間賞と同じ)。KirokuKousin.dartと説明書(shiyou_text.dart)で使う
+int gakurenKukanIchiiMeisei(double bairitu) {
+  return (2000.0 * 0.2 * 0.25 * bairitu).toInt();
+}
+
 /// プレイヤーが決めた学連選抜の目標順位(0が1位。yobiint2[76]が0なら10位(初期値)、1〜ならその順位)
 int gakurenMokuhyouSettei(KantokuData kantoku) {
   if (kantoku.yobiint2.length <= gakurenMokuhyouIndex) return 9;

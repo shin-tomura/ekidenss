@@ -1501,6 +1501,26 @@ Future<void> kirokuKousin({
       }
       await sortedunivdata[iUniv].save(); // UnivData の変更を保存
     }
+    // 学連選抜の選手が区間1位相当で走ったときは、その選手の大学に名声(正月駅伝の区間賞の1/4。1.8.8)
+    // (オープン参加なので区間賞ではない。大学の区間賞は今まで通り、大学の選手の中で一番速い選手の
+    //  大学に入る。コンピュータが監督の年も同じ。学連選抜のチームの順位相当では名声はない)
+    for (
+      int i_kukan = 0;
+      i_kukan < gh[0].kukansuu_taikaigoto[racebangou];
+      i_kukan++
+    ) {
+      final GakurenKukanKekka? gakuren = gakurenKukanKekka(gh[0], i_kukan);
+      if (gakuren == null || gakuren.kukanJuni != 0) continue;
+      final int univid = gakuren.senshu.univid;
+      if (univid < 0 || univid >= sortedunivdata.length) continue;
+      final int ryou = gakurenKukanIchiiMeisei(bairitu);
+      sortedunivdata[univid].meisei_yeargoto[0] += ryou;
+      await sortedunivdata[univid].save(); // UnivData の変更を保存
+      // 確認用(どれくらい起きるかを、統計をとるときに数えられるように)
+      print(
+        '学連選抜 ${i_kukan + 1}区 区間1位相当: ${gakuren.senshu.name}(${gakuren.shozoku}大学) 名声+$ryou',
+      );
+    }
     // シード権、10月駅伝出場権
     for (var iUniv = 0; iUniv < sortedunivdata.length; iUniv++) {
       if (sortedunivdata[iUniv].juni_race[racebangou][0] < 10) {

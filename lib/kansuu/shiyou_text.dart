@@ -444,11 +444,14 @@ ShiyouSetsu shiyouMeisei({bool setsumeisho = false}) {
 // ・新規ゲームでは1年生から振り分けるので、受け入れ中の大学の留学生はみな1年生になり、
 //   途中でオンにしたときも次の4月にまとめて入るため、入学する年がそろいやすい
 //   (留学生が入らない年が3年続くことについて、プレイヤーから質問があった)。
-// ・1.8.8までは、スカウトがOFFのときの放出で自分の大学の留学生を他大学へ出せたため、
-//   留学生が2人在籍する大学ができることがあった(1.8.9で放出できないようにした。9003FreshHoushutu.dart)。
-//   それまでのデータには残っていることがあるので、「1大学1人まで」とは言い切らず、
-//   「在籍中の留学生がいない大学に入学する」と書く。
+// ・在籍できる留学生は1大学に1人まで(仕様。2人以上いるのは不具合と同じ扱い)。
+//   1.8.8までは、スカウトがOFFのときの放出・選手トレード・選手のQRコードで、
+//   留学生が2人以上在籍する大学ができることがあった。1.8.9でどれもできないようにした
+//   (9003FreshHoushutu.dart・tradeScreen.dart・senshu_qr_processor.dart)。
+//   それまでのデータに残っている分は、移行処理では直さない(卒業すれば1人以下に戻り、
+//   0人になるまでは次の留学生も入らないので、それ以上は増えない)。
 const List<String> _ryuugakuseiKimariGyou = [
+  '・在籍できる留学生は、1大学に1人までです。',
   '・留学生は、受け入れ中の大学のうち、在籍中の留学生がいない大学に、4月に1人入学します。',
   '・在籍中の留学生がいる大学には、その留学生が卒業するまで、次の留学生は入学しません。',
   '・そのため、同じ大学に留学生が入学するのは4年に1度です。',
@@ -470,6 +473,13 @@ const List<String> _ryuugakuseiSetteiGyou = [
 String ryuugakuseiSetteiSetsumeiText() =>
     [..._ryuugakuseiKimariGyou, ..._ryuugakuseiSetteiGyou].join('\n');
 
+// 1大学1人までを守るための、ほかの画面での決まり(説明書だけに出す)
+const List<String> _ryuugakuseiHokaGamenGyou = [
+  '・選手トレードでは、留学生は同じ学年の留学生とだけ交換できます。',
+  '・コンピュータスカウトがOFFのときの放出選手選択では、留学生は放出できません。',
+  '・留学生がいる大学では、ほかの選手を留学生のQRコードで上書きできません。',
+];
+
 /// 留学生
 ShiyouSetsu shiyouRyuugakusei({bool setsumeisho = false}) {
   final bool ukeireAri = Hive.box<UnivData>(
@@ -489,6 +499,7 @@ ShiyouSetsu shiyouRyuugakusei({bool setsumeisho = false}) {
   if (setsumeisho) {
     gyou.addAll([
       ..._ryuugakuseiSetteiGyou,
+      ..._ryuugakuseiHokaGamenGyou,
       '・留学生の受け入れと優秀度は、大学画面の「留学生受け入れ設定」で変えられます。',
     ]);
   }

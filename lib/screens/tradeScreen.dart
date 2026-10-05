@@ -72,6 +72,18 @@ class _TradeScreenState extends State<TradeScreen> {
       return;
     }
 
+    // 制約: 在籍できる留学生は1大学に1人までなので、留学生は留学生とだけトレード可能とする(1.8.9)
+    // (1.8.8までは留学生と日本人も交換でき、留学生が2人以上いる大学ができていた)
+    if ((_selectedSenshu1!.hirou == 1) != (_selectedSenshu2!.hirou == 1)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('留学生は、同じ学年の留学生とだけトレードできます。'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
     // 同じ学年であることが確認できた場合、確認ダイアログを表示
     showDialog(
       context: context,
@@ -163,7 +175,10 @@ class _TradeScreenState extends State<TradeScreen> {
             color: Colors.grey[800],
             child: Column(
               children: [
-                const Text('同じ学年のみ交換可能', style: TextStyle(color: Colors.white)),
+                const Text(
+                  '同じ学年のみ交換可能(留学生は留学生とだけ)',
+                  style: TextStyle(color: Colors.white),
+                ),
                 const SizedBox(height: 10),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -283,7 +298,8 @@ class _TradeScreenState extends State<TradeScreen> {
                               children: [
                                 Expanded(
                                   child: Text(
-                                    '$univName (${senshu.gakunen}年)  ${senshu.name}',
+                                    // 留学生には印を付ける(留学生は留学生とだけ交換できるため。1.8.9)
+                                    '$univName (${senshu.gakunen}年${senshu.hirou == 1 ? '・留学生' : ''})  ${senshu.name}',
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontSize: 16,
@@ -434,7 +450,7 @@ class _TradeScreenState extends State<TradeScreen> {
                 ),
                 const SizedBox(height: 4), // 少し間隔を空ける
                 Text(
-                  '${senshu.gakunen}年 ${senshu.name}',
+                  '${senshu.gakunen}年${senshu.hirou == 1 ? '・留学生' : ''} ${senshu.name}',
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,

@@ -37,6 +37,29 @@ class SenshuQrProcessor {
         senshuMap,
       );
 
+      // 在籍できる留学生は1大学に1人までなので、その大学にほかの留学生がいるときは、
+      // 日本人の選手を留学生のデータで上書きできないようにする(1.8.9)
+      // (留学生を留学生のデータで上書きするのと、留学生を日本人のデータで上書きするのは、今まで通りできる)
+      if (newShareableData.hirou == 1 &&
+          targetSenshu.hirou != 1 &&
+          senshuBox.values.any(
+            (s) =>
+                s.univid == targetSenshu.univid &&
+                s.hirou == 1 &&
+                s.id != targetSenshu.id,
+          )) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'この大学にはすでに留学生が在籍しているため、留学生のデータでは上書きできません(在籍できる留学生は1大学に1人までです)。',
+              ),
+            ),
+          );
+        }
+        return false;
+      }
+
       final bool confirmUpdate =
           await showDialog(
             context: context,

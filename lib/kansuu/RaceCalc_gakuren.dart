@@ -968,8 +968,9 @@ Future<void> RaceCalc_gakuren({
       gakurensenshudata[senshuid].string_racesetumei +=
           TimeDate.timeToFunByouString(atai_hosei[senshuid][16] + minValue) +
           ")\n";
-      gakurensenshudata[senshuid].string_racesetumei +=
-          "逆算誤差(トータルー走破タイム):${((atai_hosei[senshuid][16] + minValue) - gakurensenshudata[senshuid].time_taikai_total).isNegative ? '' : '+'}${((atai_hosei[senshuid][16] + minValue) - gakurensenshudata[senshuid].time_taikai_total).toStringAsFixed(3)}秒\n";
+      // 検証用の行なので、大学の選手(RaceCalc.dart)と同じく説明文には出さない(1.8.8)
+      //gakurensenshudata[senshuid].string_racesetumei +=
+      //    "逆算誤差(トータルー走破タイム):${((atai_hosei[senshuid][16] + minValue) - gakurensenshudata[senshuid].time_taikai_total).isNegative ? '' : '+'}${((atai_hosei[senshuid][16] + minValue) - gakurensenshudata[senshuid].time_taikai_total).toStringAsFixed(3)}秒\n";
 
       for (int j = 0; j < hoseishuruisuu; j++) {
         if (j < 8) {

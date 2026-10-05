@@ -49,6 +49,15 @@ class _FreshmanTradeScreenState extends State<FreshmanTradeScreen> {
     }
   }
 
+  /// 放出できる選手か(留学生は放出できない。1.8.9)
+  /// (留学生を他校へ出すと、留学生が2人在籍する大学ができてしまうため。
+  ///  留学生も定員5人に数えるので、画面には出して、選べないようにする。
+  ///  自分の大学の1年生の留学生は1人までなので、日本人だけで放出する人数は足りる)
+  bool _houshutuDekiru(SenshuData s) => s.hirou != 1;
+
+  /// 自分の大学の1年生に留学生がいるか
+  bool get _ryuugakuseiIru => _myFreshmen.any((s) => !_houshutuDekiru(s));
+
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -68,7 +77,8 @@ class _FreshmanTradeScreenState extends State<FreshmanTradeScreen> {
                     final isSelected = _selectedPlayerIds.contains(player.id);
 
                     return GestureDetector(
-                      onTap: _isProcessing
+                      // 留学生は放出できないので、押しても何もしない(1.8.9)
+                      onTap: (_isProcessing || !_houshutuDekiru(player))
                           ? null
                           : () => _handlePlayerTap(player.id, isSelected),
                       child: _buildSelectionTradeCard(player, isSelected),
@@ -133,6 +143,9 @@ class _FreshmanTradeScreenState extends State<FreshmanTradeScreen> {
                   ),
                 ),
                 const TextSpan(text: ' を選択して他校へ放出してください。'),
+                // 留学生は放出できない(1.8.9)
+                if (_ryuugakuseiIru)
+                  const TextSpan(text: '\n留学生は放出できません。'),
               ],
             ),
           ),
@@ -142,6 +155,11 @@ class _FreshmanTradeScreenState extends State<FreshmanTradeScreen> {
   }
 
   void _handlePlayerTap(int id, bool isSelected) {
+    // 念のため、留学生は選べないようにする(1.8.9)
+    if (!isSelected &&
+        _myFreshmen.any((s) => s.id == id && !_houshutuDekiru(s))) {
+      return;
+    }
     setState(() {
       if (isSelected) {
         _selectedPlayerIds.remove(id);
@@ -339,8 +357,10 @@ class _FreshmanTradeScreenState extends State<FreshmanTradeScreen> {
       int s = (player.kiroku_nyuugakuji_5000 % 60).floor();
       timeStr = "${m}分${s.toString().padLeft(2, '0')}秒";
     }
+    // 留学生は放出できないので、薄く出して印を付ける(1.8.9)
+    final bool dekinai = !_houshutuDekiru(player);
 
-    return Card(
+    final Widget card = Card(
       color: isSelected ? const Color(0xFF2A1A1A) : const Color(0xFF252A33),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
@@ -398,6 +418,15 @@ class _FreshmanTradeScreenState extends State<FreshmanTradeScreen> {
                       fontSize: HENSUU.fontsize_honbun - 2,
                     ),
                   ),
+                if (dekinai)
+                  const Text(
+                    '放出できません',
+                    style: TextStyle(
+                      color: Colors.white54,
+                      fontWeight: FontWeight.bold,
+                      fontSize: HENSUU.fontsize_honbun - 2,
+                    ),
+                  ),
               ],
             ),
           ),
@@ -424,9 +453,9 @@ class _FreshmanTradeScreenState extends State<FreshmanTradeScreen> {
                   ),
                 ),
                 const Spacer(),
-                const Text(
-                  '1年生',
-                  style: TextStyle(
+                Text(
+                  dekinai ? '1年生・留学生' : '1年生',
+                  style: const TextStyle(
                     color: Colors.white38,
                     fontSize: HENSUU.fontsize_honbun - 2,
                   ),
@@ -437,6 +466,7 @@ class _FreshmanTradeScreenState extends State<FreshmanTradeScreen> {
         ],
       ),
     );
+    return dekinai ? Opacity(opacity: 0.5, child: card) : card;
   }
 
   Widget _buildSingleBadge(String label, int value, bool isMyUniv) {

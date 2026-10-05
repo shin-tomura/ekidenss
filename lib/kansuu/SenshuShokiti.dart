@@ -41,6 +41,7 @@ Future<void> SenshuShokitiSetteiByGakunen(
   // senshuBox.values は Box 内の全ての SenshuData オブジェクトのIterableを返します。
   // .toList() を使うことで、ループ中に Box の内容が変更されても安全に処理できます。
   int count = 0;
+  int itsuzaiSuu = 0; // 隠れた逸材にした人数(確認用のログに出す。1.8.8)
 
   Box<SenshuData> senshuBox = Hive.box<SenshuData>('senshuBox');
   // Box内の全ての値をリストとして取得します
@@ -142,6 +143,7 @@ Future<void> SenshuShokitiSetteiByGakunen(
       bool tokubetuflag = false;
       int tokubetusisuu = 0;
       bool juusanpundaiflag = false; // 13分台の新入生(1.8.5)
+      bool itsuzaiflag = false; // 隠れた逸材(1.8.8。joukai.dart)
       senshu.hirou = 0;
       {
         //選手ごとの成長力とか成長のスタート地点とか
@@ -211,6 +213,11 @@ Future<void> SenshuShokitiSetteiByGakunen(
           senshu.a = aInt * 0.000000001;
           senshu.b = 1645.0 * 0.0001; // 固定値
           senshu.sositu = tempRand;
+          // 13分台でない新入生のうちitsuzaiWariai%を、隠れた逸材にする(1.8.8。joukai.dart)
+          // (入学時5000mの記録・能力値は、ここで決めた素質のまま決め、上限を決めたあとで基本走力と上限を置き換える)
+          if (random.nextInt(100) < itsuzaiWariai) {
+            itsuzaiflag = true;
+          }
         }
 
         // 素質が1600を超える場合の追加処理
@@ -265,6 +272,12 @@ Future<void> SenshuShokitiSetteiByGakunen(
       senshu.magicnumber = joukaiMagicnumberFromNyuugakuji5000(
         senshu.kiroku_nyuugakuji_5000,
       );
+      // 隠れた逸材は、入学時の基本走力と上限を、13分台の新入生と同じ決め方で決め直す(1.8.8。joukai.dart)
+      // (入学時5000mの記録は上で決めたまま。理論タイムは下で、決め直した基本走力から計算する)
+      if (itsuzaiflag) {
+        itsuzaiNiSuru(senshu, random);
+        itsuzaiSuu++;
+      }
       senshu.rirontime5000 = RironTime(5000.0, senshu);
       senshu.rirontime10000 = RironTime(10000.0, senshu);
       senshu.rirontimehalf = RironTime(21097.5, senshu);
@@ -408,4 +421,5 @@ Future<void> SenshuShokitiSetteiByGakunen(
   }
 
   print('SenshuData update completed.');
+  print('隠れた逸材: $itsuzaiSuu人'); // 確認用(1.8.8)
 }

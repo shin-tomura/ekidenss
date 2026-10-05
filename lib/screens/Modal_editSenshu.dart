@@ -8,6 +8,10 @@ import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/kansuu/joukai.dart';
 import 'package:ekiden/kansuu/riron_kirokukai_time.dart';
 import 'package:ekiden/kansuu/gakuren_utsushi.dart'; // 学連選抜用の写しへの反映(1.8.8)
+import 'package:ekiden/ghensuu.dart';
+import 'package:ekiden/kiroku.dart';
+import 'package:ekiden/kansuu/TrialTime.dart'; // 区間の見込みタイム(1.8.8)
+import 'package:ekiden/kansuu/chousi_keiken_hosei.dart'; // 区間の見込みタイムの調子補正(1.8.8)
 
 class SenshuEditView extends StatefulWidget {
   final int senshuId;
@@ -47,6 +51,9 @@ class _SenshuEditViewState extends State<SenshuEditView> {
   // 開いたときの基本走力と上限の値(欄を変えたかどうかを見るため。1.8.5)
   int? _kihonShokiti;
   int? _joukaiShokiti;
+  // 区間の見込みタイムを出す大会と区間(0が1区。1.8.8)
+  int _mikomiRace = 2;
+  int _mikomiKukan = 0;
 
   @override
   void initState() {
@@ -54,6 +61,7 @@ class _SenshuEditViewState extends State<SenshuEditView> {
     _senshuBox = Hive.box<SenshuData>('senshuBox');
     _loadSenshuData();
     // 理論値の欄を、入力に合わせてその場で計算し直す(1.8.5)
+    // (区間の見込みタイムに効く調子・登り・下り・アップダウンも。1.8.8)
     for (final TextEditingController c in [
       _baseAbilityAController,
       _joukaiController,
@@ -61,6 +69,10 @@ class _SenshuEditViewState extends State<SenshuEditView> {
       _spurtryokuController,
       _tandokusouController,
       _paceagesagetaiouryokuController,
+      _chousiController,
+      _noboritekiseiController,
+      _kudaritekiseiController,
+      _noborikudarikirikaenouryokuController,
     ]) {
       c.addListener(_rironchiKoushin);
     }
@@ -286,6 +298,287 @@ class _SenshuEditViewState extends State<SenshuEditView> {
         ),
         gyou('今の基本走力', kihon),
         gyou('上限に届いたとき', joukaiKihon),
+      ],
+    );
+  }
+
+  // ------------------------------------------------------------
+  // 区間の見込みタイム(1.8.8)
+  // 好きな駅伝(予選も)の区間を、入力中の値で走ったときの見込みタイムを出す。
+  // 計算は「指示ごとの損得予測」の見込みタイムと同じ(TrialTime.dart の試走タイムの計算に、
+  // 駅伝では経験補正と調子補正を足す。乱数で濁さない)。
+  // 指示の成否・目標順位による悪化・1区と予選の集団走は、本番でその場で決まるので含めない。
+  // 参考に、全大学の区間記録(と、記録を持っているのが留学生なら日本人最高記録)との差も出す
+  // (区間記録は1位だけ保存している)
+  // ------------------------------------------------------------
+
+  /// 見込みタイムを出せる大会(カスタム駅伝は開催する設定のときだけ)
+  List<int> _mikomiRaceList(Ghensuu gh) => [
+    0,
+    1,
+    2,
+    if (gh.spurtryokuseichousisuu1 == 1) 5,
+    3,
+    4,
+  ];
+
+  /// 大会の名前(カスタム駅伝は設定した名前)
+  String _mikomiRaceMei(int race, List<UnivData> sortedUnivData) {
+    switch (race) {
+      case 0:
+        return '10月駅伝';
+      case 1:
+        return '11月駅伝';
+      case 2:
+        return '正月駅伝';
+      case 3:
+        return '11月駅伝予選';
+      case 4:
+        return '正月駅伝予選';
+      case 5:
+        return sortedUnivData.isNotEmpty && sortedUnivData[0].name_tanshuku.isNotEmpty
+            ? sortedUnivData[0].name_tanshuku
+            : 'カスタム駅伝';
+      default:
+        return '駅伝';
+    }
+  }
+
+  /// 見込みタイムの計算に使う、入力中の値を入れた選手の写し(保存はしない)
+  /// [kihonHyouji]は基本走力の目盛りの値。数値でない欄があるときはnull
+  SenshuData? _mikomiSenshu(int? kihonHyouji) {
+    if (kihonHyouji == null) return null;
+    final int? chousi = int.tryParse(_chousiController.text.trim());
+    final int? nebari = int.tryParse(_choukyorinebariController.text.trim());
+    final int? spurt = int.tryParse(_spurtryokuController.text.trim());
+    final int? nobori = int.tryParse(_noboritekiseiController.text.trim());
+    final int? kudari = int.tryParse(_kudaritekiseiController.text.trim());
+    final int? updown = int.tryParse(
+      _noborikudarikirikaenouryokuController.text.trim(),
+    );
+    final int? road = int.tryParse(_tandokusouController.text.trim());
+    final int? pace = int.tryParse(
+      _paceagesagetaiouryokuController.text.trim(),
+    );
+    if (chousi == null ||
+        nebari == null ||
+        spurt == null ||
+        nobori == null ||
+        kudari == null ||
+        updown == null ||
+        road == null ||
+        pace == null) {
+      return null;
+    }
+    final SenshuData t = SenshuData.fromJson(_editingSenshu!.toJson());
+    t
+      ..kaifukuryoku = _selectedMenu ?? t.kaifukuryoku
+      ..chousi = chousi
+      ..choukyorinebari = nebari
+      ..spurtryoku = spurt
+      ..noboritekisei = nobori
+      ..kudaritekisei = kudari
+      ..noborikudarikirikaenouryoku = updown
+      ..tandokusou = road
+      ..paceagesagetaiouryoku = pace
+      // 保存するときと同じ書き方(b=1550の目盛り。上限は計算の中で打ち消し合うので元のまま)
+      ..a = (kihonHyouji - 300) * 0.000000001
+      ..b = 1550 / 10000;
+    return t;
+  }
+
+  /// タイム差の書き方(例: +1分02秒、-12秒)
+  String _saMojiretsu(double sa) {
+    final String fugou = sa < 0 ? '-' : '+';
+    final int byou = sa.abs().round();
+    if (byou < 60) return '$fugou$byou秒';
+    return '$fugou${byou ~/ 60}分${(byou % 60).toString().padLeft(2, '0')}秒';
+  }
+
+  Widget _buildMikomi(List<UnivData> sortedUnivData) {
+    final Box<Ghensuu> ghensuuBox = Hive.box<Ghensuu>('ghensuuBox');
+    final Ghensuu? gh =
+        ghensuuBox.get('global_ghensuu') ??
+        (ghensuuBox.isNotEmpty ? ghensuuBox.getAt(0) : null);
+    final KantokuData? kantoku = Hive.box<KantokuData>(
+      'kantokuBox',
+    ).get('KantokuData');
+    if (gh == null || kantoku == null) return const SizedBox.shrink();
+
+    final List<int> raceList = _mikomiRaceList(gh);
+    final int race = raceList.contains(_mikomiRace) ? _mikomiRace : 2;
+    final int kukansuu = gh.kukansuu_taikaigoto[race];
+    if (kukansuu <= 0) return const SizedBox.shrink();
+    final int kukan = _mikomiKukan < kukansuu ? _mikomiKukan : 0;
+    final String kuMei = race == 3 ? '組' : '区';
+
+    // 見込みタイム([kihonHyouji]の基本走力で走ったとき)
+    double? mikomi(int? kihonHyouji) {
+      final SenshuData? t = _mikomiSenshu(kihonHyouji);
+      if (t == null) return null;
+      double time = trialTimeKeisan(
+        0,
+        kukan,
+        gh,
+        [t],
+        sortedUnivData,
+        kantoku,
+        nigosu: false,
+        keikenHosei: true,
+        racebangou: race,
+      );
+      // 調子補正は駅伝だけ(本番と同じ。予選にはない)
+      if (race <= 2 || race == 5) time *= chousiHoseiBairitsu(t, kantoku);
+      return time;
+    }
+
+    final int? kihon = int.tryParse(_baseAbilityAController.text.trim());
+    final int? joukai = int.tryParse(_joukaiController.text.trim());
+    final int? joukaiKihon =
+        (kihon == null || joukai == null || _kihonJoukaiMujun(kihon, joukai))
+        ? null
+        : joukaiHyouji(_hozonJoukaiMagicnumber(joukai));
+    final double? imaTime = mikomi(kihon);
+    final double? joukaiTime = mikomi(joukaiKihon);
+
+    // 区間記録(全体)と、日本人最高記録(全体の記録を持っているのが留学生のときだけ出す)
+    double? kirokuTime;
+    String kirokuHito = '';
+    if (gh.time_zentaikukankiroku.length > race &&
+        gh.time_zentaikukankiroku[race].length > kukan &&
+        gh.time_zentaikukankiroku[race][kukan].isNotEmpty) {
+      final double t = gh.time_zentaikukankiroku[race][kukan][0];
+      if (t > 0 && t < TEISUU.DEFAULTTIME) {
+        kirokuTime = t;
+        kirokuHito =
+            '${gh.name_zentaikukankiroku[race][kukan][0]}(${gh.univname_zentaikukankiroku[race][kukan][0]}大 ${gh.gakunen_zentaikukankiroku[race][kukan][0]}年)';
+      }
+    }
+    double? japTime;
+    String japHito = '';
+    final Kiroku? kiroku = Hive.box<Kiroku>('kirokuBox').get('KirokuData');
+    if (kiroku != null &&
+        kiroku.time_zentai_jap_kukankiroku.length > race &&
+        kiroku.time_zentai_jap_kukankiroku[race].length > kukan &&
+        kiroku.time_zentai_jap_kukankiroku[race][kukan].isNotEmpty) {
+      final double t = kiroku.time_zentai_jap_kukankiroku[race][kukan][0];
+      if (t > 0 &&
+          t < TEISUU.DEFAULTTIME &&
+          kirokuTime != null &&
+          t > kirokuTime) {
+        japTime = t;
+        japHito =
+            '${kiroku.name_zentai_jap_kukankiroku[race][kukan][0]}(${kiroku.univname_zentai_jap_kukankiroku[race][kukan][0]}大 ${kiroku.gakunen_zentai_jap_kukankiroku[race][kukan][0]}年)';
+      }
+    }
+
+    // 下の文の組み立て(関数の中)で型が絞り込まれるように、final に入れ直す
+    final double? kirokuT = kirokuTime;
+    final double? japT = japTime;
+
+    const TextStyle midasiStyle = TextStyle(
+      color: Colors.white70,
+      fontSize: HENSUU.fontsize_honbun - 2,
+    );
+    const TextStyle atai = TextStyle(
+      color: Colors.white,
+      fontSize: HENSUU.fontsize_honbun - 2,
+    );
+    const TextStyle dropStyle = TextStyle(
+      color: HENSUU.LinkColor,
+      fontSize: HENSUU.fontsize_honbun,
+    );
+
+    Widget gyou(String label, double? time) {
+      String bun = time == null ? '−' : _rironTimeString(time);
+      if (time != null) {
+        final List<String> sa = [
+          if (kirokuT != null) '区間記録${_saMojiretsu(time - kirokuT)}',
+          if (japT != null) '日本人最高${_saMojiretsu(time - japT)}',
+        ];
+        if (sa.isNotEmpty) bun += '(${sa.join('、')})';
+      }
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: midasiStyle),
+            Text(bun, style: atai),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              flex: 3,
+              child: DropdownButton<int>(
+                value: race,
+                isExpanded: true,
+                dropdownColor: HENSUU.backgroundcolor,
+                style: dropStyle,
+                items: [
+                  for (final int r in raceList)
+                    DropdownMenuItem<int>(
+                      value: r,
+                      child: Text(_mikomiRaceMei(r, sortedUnivData)),
+                    ),
+                ],
+                onChanged: (val) {
+                  if (val == null) return;
+                  setState(() {
+                    _mikomiRace = val;
+                    if (_mikomiKukan >= gh.kukansuu_taikaigoto[val]) {
+                      _mikomiKukan = 0;
+                    }
+                  });
+                },
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              flex: 2,
+              child: DropdownButton<int>(
+                value: kukan,
+                isExpanded: true,
+                dropdownColor: HENSUU.backgroundcolor,
+                style: dropStyle,
+                items: [
+                  for (int k = 0; k < kukansuu; k++)
+                    DropdownMenuItem<int>(
+                      value: k,
+                      child: Text(
+                        '${k + 1}$kuMei(${gh.kyori_taikai_kukangoto[race][k].round()}m)',
+                      ),
+                    ),
+                ],
+                onChanged: (val) {
+                  if (val == null) return;
+                  setState(() => _mikomiKukan = val);
+                },
+              ),
+            ),
+          ],
+        ),
+        gyou('今の基本走力', imaTime),
+        gyou('上限に届いたとき', joukaiTime),
+        const SizedBox(height: 4),
+        Text(
+          kirokuT == null
+              ? '区間記録: 記録なし'
+              : '区間記録: ${_rironTimeString(kirokuT)} $kirokuHito',
+          style: midasiStyle,
+        ),
+        if (japT != null)
+          Text(
+            '日本人最高: ${_rironTimeString(japT)} $japHito',
+            style: midasiStyle,
+          ),
       ],
     );
   }
@@ -587,6 +880,24 @@ class _SenshuEditViewState extends State<SenshuEditView> {
                 '・大学の個性・年間強化練習・タイム調整など、記録会のタイムにかかる設定を含めて計算しています。',
                 '・調子と、能力のタイムへの影響度(駅伝と駅伝予選だけにかかる設定)は含みません。',
                 '・「上限に届いたとき」は、今の能力値のまま上限まで伸びたときのタイムです。',
+              ]),
+              // 区間の見込みタイム(1.8.8)
+              const Divider(color: Colors.white24, height: 32),
+              const Text(
+                "区間の見込みタイム",
+                style: TextStyle(
+                  color: Colors.orangeAccent,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              _buildMikomi(sortedUnivData),
+              const SizedBox(height: 8),
+              _buildSetsumei(const [
+                '・選んだ区間を、指示なしで、目標順位ちょうどの位置で襷を受けて走ったときの見込みタイムです。',
+                '・コースと能力、大学の個性・年間強化練習・能力のタイムへの影響度・タイム調整を含めて計算しています。',
+                '・駅伝では、調子と、その区間を走った回数による経験補正も含みます(予選にはありません)。',
+                '・指示の成否、目標順位による悪化、1区と予選の集団走の効果は含みません。',
+                '・区間記録との差は、マイナスなら区間記録より速いことを表します。',
               ]),
               const SizedBox(height: 40),
               SizedBox(

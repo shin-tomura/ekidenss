@@ -29,6 +29,8 @@ double shisouTimeNigosu(double time) {
 
 /// [nigosu] falseにすると±0.5%の乱数をかけない(コンピュータ大学の当日変更などの判断用)
 /// [keikenHosei] trueにすると、本番と同じ位置で経験補正もかける(指示ごとの損得予測の画面用。1.8.1)
+/// [racebangou] 計算する大会(省略すると表示中の大会 currentGhensuu.hyojiracebangou。
+///   箱庭モードの能力編集の画面で、好きな大会の区間の見込みタイムを出すときに使う。1.8.8)
 Future<double> runTrialCalculation(
   int senshuid,
   int i_kukan,
@@ -39,29 +41,52 @@ Future<double> runTrialCalculation(
   //Ghensuu currentGhensuu,
   bool nigosu = true,
   bool keikenHosei = false,
+  int? racebangou,
 }) async {
+  return trialTimeKeisan(
+    senshuid,
+    i_kukan,
+    currentGhensuu,
+    sortedsenshudata,
+    sortedUnivData,
+    kantoku,
+    nigosu: nigosu,
+    keikenHosei: keikenHosei,
+    racebangou: racebangou,
+  );
+}
+
+/// runTrialCalculation の中身(待ち合わせのない計算なので、画面の組み立ての中からそのまま呼べるようにした。1.8.8)
+double trialTimeKeisan(
+  int senshuid,
+  int i_kukan,
+  Ghensuu currentGhensuu,
+  List<SenshuData> sortedsenshudata,
+  List<UnivData> sortedUnivData,
+  KantokuData kantoku, {
+  bool nigosu = true,
+  bool keikenHosei = false,
+  int? racebangou,
+}) {
   if (senshuid < 0 || senshuid >= sortedsenshudata.length) {
     senshuid = 0;
   }
+  // 計算する大会(省略すると表示中の大会。1.8.8)
+  final int race = racebangou ?? currentGhensuu.hyojiracebangou;
 
   double kotaetime = 0.0;
   final double tempkyori = currentGhensuu
-      .kyori_taikai_kukangoto[currentGhensuu.hyojiracebangou][i_kukan];
+      .kyori_taikai_kukangoto[race][i_kukan];
   final double kyoriwariai_nobori =
-      currentGhensuu.kyoriwariainobori_taikai_kukangoto[currentGhensuu
-          .hyojiracebangou][i_kukan];
+      currentGhensuu.kyoriwariainobori_taikai_kukangoto[race][i_kukan];
   final double kyoriwariai_kudari =
-      currentGhensuu.kyoriwariaikudari_taikai_kukangoto[currentGhensuu
-          .hyojiracebangou][i_kukan];
+      currentGhensuu.kyoriwariaikudari_taikai_kukangoto[race][i_kukan];
   final double heikinkoubai_nobori =
-      currentGhensuu.heikinkoubainobori_taikai_kukangoto[currentGhensuu
-          .hyojiracebangou][i_kukan];
+      currentGhensuu.heikinkoubainobori_taikai_kukangoto[race][i_kukan];
   final double heikinkoubai_kudari =
-      currentGhensuu.heikinkoubaikudari_taikai_kukangoto[currentGhensuu
-          .hyojiracebangou][i_kukan];
+      currentGhensuu.heikinkoubaikudari_taikai_kukangoto[race][i_kukan];
   final int noborikudari_kirikaekaisuu =
-      currentGhensuu.noborikudarikirikaekaisuu_taikai_kukangoto[currentGhensuu
-          .hyojiracebangou][i_kukan];
+      currentGhensuu.noborikudarikirikaekaisuu_taikai_kukangoto[race][i_kukan];
 
   double hoseitotal = 0.0;
   //final kantokuBox = Hive.box<KantokuData>('kantokuBox');
@@ -71,7 +96,7 @@ Future<double> runTrialCalculation(
   // 能力のタイムへの影響度(全大学共通の設定。駅伝と駅伝予選だけ。1.8.2)
   final NouryokuEikyodo nouryokuEikyodo = NouryokuEikyodo.forRace(
     kantoku,
-    currentGhensuu.hyojiracebangou,
+    race,
   );
   //強化練習番号を取得
   final int trainingNum = sortedsenshudata[senshuid].kaifukuryoku;
@@ -232,10 +257,10 @@ Future<double> runTrialCalculation(
   {
     double chousei_zentai = kantoku.yobiint5[60].toDouble() / 2.0;
     double chousei_kukangoto = 0.0;
-    if (currentGhensuu.hyojiracebangou <= 2 ||
-        currentGhensuu.hyojiracebangou == 5) {
+    if (race <= 2 ||
+        race == 5) {
       chousei_kukangoto =
-          kantoku.yobiint5[i_kukan + (currentGhensuu.hyojiracebangou + 3) * 10]
+          kantoku.yobiint5[i_kukan + (race + 3) * 10]
               .toDouble() /
           2.0;
     }
@@ -307,17 +332,17 @@ Future<double> runTrialCalculation(
   double tekiyouritu_tandokusouhosei = 1.0;
   double tekiyouritu_paceagesagehosei = 1.0;
   // Solo Run / Pace Adjustment Adaptability
-  if ((currentGhensuu.hyojiracebangou >= 6 &&
-          currentGhensuu.hyojiracebangou <= 8) ||
-      (currentGhensuu.hyojiracebangou >= 10 &&
-          currentGhensuu.hyojiracebangou <= 16)) {
-    if (currentGhensuu.hyojiracebangou == 8 ||
-        currentGhensuu.hyojiracebangou == 12 ||
-        currentGhensuu.hyojiracebangou == 15) {
+  if ((race >= 6 &&
+          race <= 8) ||
+      (race >= 10 &&
+          race <= 16)) {
+    if (race == 8 ||
+        race == 12 ||
+        race == 15) {
       temptandokusou = eikyou_road;
       temppaceagesagetaiouryoku = 100;
-    } else if (currentGhensuu.hyojiracebangou == 13 ||
-        currentGhensuu.hyojiracebangou == 14) {
+    } else if (race == 13 ||
+        race == 14) {
       temptandokusou = 100;
       temppaceagesagetaiouryoku = 100;
     } else {
@@ -325,13 +350,13 @@ Future<double> runTrialCalculation(
       temppaceagesagetaiouryoku = eikyou_pacehendou;
     }
   }
-  if (currentGhensuu.hyojiracebangou >= 0 &&
-      currentGhensuu.hyojiracebangou <= 5) {
-    if ((currentGhensuu.hyojiracebangou != 4 && i_kukan == 0) ||
-        currentGhensuu.hyojiracebangou == 3) {
+  if (race >= 0 &&
+      race <= 5) {
+    if ((race != 4 && i_kukan == 0) ||
+        race == 3) {
       temptandokusou = 100;
       temppaceagesagetaiouryoku = eikyou_pacehendou;
-    } else if (currentGhensuu.hyojiracebangou == 4 ||
+    } else if (race == 4 ||
         (i_kukan >= 1 && i_kukan <= 2)) {
       temptandokusou = eikyou_road;
       tekiyouritu_tandokusouhosei = 0.5;
@@ -347,7 +372,7 @@ Future<double> runTrialCalculation(
   if (keikenHosei) {
     hoseitotal += keikenHoseiWariai(
       sortedsenshudata[senshuid],
-      currentGhensuu.hyojiracebangou,
+      race,
       i_kukan,
     );
   }
@@ -362,16 +387,16 @@ Future<double> runTrialCalculation(
   temphosei = (100 - temptandokusou) * tanihosei;
   temphosei *= tekiyouritu_tandokusouhosei;
   kotaetime += kotaetime * temphosei;
-  if (currentGhensuu.hyojiracebangou >= 0 &&
-      currentGhensuu.hyojiracebangou <= 5) {}
+  if (race >= 0 &&
+      race <= 5) {}
 
   // Pace adjustment adaptability correction
   tanihosei = 0.03 / 100.0;
   temphosei = (100 - temppaceagesagetaiouryoku) * tanihosei;
   temphosei *= tekiyouritu_paceagesagehosei;
   kotaetime += kotaetime * temphosei;
-  if (currentGhensuu.hyojiracebangou >= 0 &&
-      currentGhensuu.hyojiracebangou <= 5) {}
+  if (race >= 0 &&
+      race <= 5) {}
 
   // Long-distance endurance correction
   final choukyoriHosei = ChoukyoriNebariHoseitime(
@@ -382,8 +407,8 @@ Future<double> runTrialCalculation(
     //sortedsenshudata: sortedsenshudata,
   );
   kotaetime += choukyoriHosei;
-  if (currentGhensuu.hyojiracebangou >= 0 &&
-      currentGhensuu.hyojiracebangou <= 5) {}
+  if (race >= 0 &&
+      race <= 5) {}
 
   // Sprint power correction
   final spurtHosei = SpurtRyokuHoseitime(
@@ -393,8 +418,8 @@ Future<double> runTrialCalculation(
     //sortedsenshudata: sortedsenshudata,
   );
   kotaetime += spurtHosei;
-  if (currentGhensuu.hyojiracebangou >= 0 &&
-      currentGhensuu.hyojiracebangou <= 5) {}
+  if (race >= 0 &&
+      race <= 5) {}
 
   //答えをそのまま見せるわけにはいかないので濁す処理
   // kotaeTimeにランダムな値を加える

@@ -5,6 +5,7 @@ import 'package:ekiden/ghensuu.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/senshu_data.dart';
 import 'package:ekiden/kantoku_data.dart';
+import 'package:ekiden/kansuu/kingin_wariai.dart'; // 難易度ごとの金銀支給量の割合(1.9.1)
 import 'package:hive_flutter/hive_flutter.dart';
 
 // ------------------------------------------------------------
@@ -370,8 +371,14 @@ Future<void> comGoldSilverTeiki({
       if (kDebugMode) print('[COM金銀] 春の定期支給 $univName → 支給なし');
       continue;
     }
+    // 難易度ごとの割合(1.9.1。kingin_wariai.dart)は、支給レベルの難易度の割合
+    final int levelKazeflag = _levelKazeflag(level, gh[0].kazeflag);
     final int ryou =
-        _teikiKakutokusuu(univ, _levelKazeflag(level, gh[0].kazeflag)) *
+        kinginWariaiKakeru(
+          _teikiKakutokusuu(univ, levelKazeflag),
+          kantoku,
+          levelKazeflag,
+        ) *
         kantoku.yobiint2[12];
     _comKinGinKakutoku(
       kantoku: kantoku,
@@ -427,6 +434,7 @@ Future<void> comGoldSilverMokuhyouTassei({
           univ,
           mokuhyouBangou,
           _levelKazeflag(level, gh[0].kazeflag),
+          kantoku,
         ) *
         kantoku.yobiint2[12];
     _comKinGinKakutoku(
@@ -597,7 +605,13 @@ int _teikiKakutokusuu(UnivData univ, int kazeflag) {
 }
 
 /// 目標順位達成時の支給量(KirokuKousinのプレイヤー向けご褒美と同じ式)
-int _mokuhyouTasseiRyou(UnivData univ, int mokuhyouBangou, int kazeflag) {
+/// 難易度ごとの割合(1.9.1。kingin_wariai.dart)も、プレイヤーと同じく優勝の2倍の前に掛ける
+int _mokuhyouTasseiRyou(
+  UnivData univ,
+  int mokuhyouBangou,
+  int kazeflag,
+  KantokuData kantoku,
+) {
   int rSeed = 0;
   int rYuushou = 0;
   if (kazeflag == 0) {
@@ -617,7 +631,11 @@ int _mokuhyouTasseiRyou(UnivData univ, int mokuhyouBangou, int kazeflag) {
 
   // 対校戦総合
   if (mokuhyouBangou == 9) {
-    return (juni == 0) ? rYuushou : rSeed;
+    return kinginWariaiKakeru(
+      (juni == 0) ? rYuushou : rSeed,
+      kantoku,
+      kazeflag,
+    );
   }
 
   int r = 0;
@@ -638,13 +656,14 @@ int _mokuhyouTasseiRyou(UnivData univ, int mokuhyouBangou, int kazeflag) {
       final double persa = (rSeed - 10) / (maxrank - seedrank);
       r = 10 + (persa * (maxrank - targetrank)).toInt();
     }
+    r = kinginWariaiKakeru(r, kantoku, kazeflag);
     // 優勝目標で優勝したら2倍
     if (juni == 0 && targetrank == 0) {
       r *= 2;
     }
   } else {
     // 予選突破は最低量
-    r = 10;
+    r = kinginWariaiKakeru(10, kantoku, kazeflag);
   }
   return r;
 }

@@ -1,5 +1,6 @@
 import 'package:ekiden/ghensuu.dart';
 import 'package:ekiden/kantoku_data.dart';
+import 'package:ekiden/kansuu/kingin_wariai.dart'; // 難易度ごとの金銀支給量の割合(1.9.1)
 
 // ------------------------------------------------------------
 // 目標順位を達成したときにもらえる金銀の量(1.8.3で目標順位を決める画面の外に出した。計算は今までと同じ)
@@ -113,6 +114,8 @@ int mokuhyouKakutokuKingin(
       }
     }
   }
+  // 難易度ごとの割合(1.9.1。kingin_wariai.dart。KirokuKousin.dart と同じ順で掛ける)
+  r = kinginWariaiKakeru(r, kantoku, ghensuu.kazeflag);
   r *= kantoku.yobiint2[12];
   if (targetrank == 0) {
     r *= 2;

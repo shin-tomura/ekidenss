@@ -14,6 +14,7 @@ import 'kansuu/mokuhyou_hosei.dart'; // 目標順位・指示の補正設定の�
 import 'kansuu/nouryoku_eikyodo.dart'; // 能力のタイムへの影響度設定の確認
 import 'kansuu/gakuren_kantoku.dart'; // 学連選抜の監督の設定の確認
 import 'kansuu/meisei_rireki.dart'; // 名声の履歴(1.8.8)
+import 'kansuu/kingin_wariai.dart'; // 難易度ごとの金銀支給量の割合の確認(1.9.1)
 
 // 読み込み時に複数枚のデータを一時的に保持する状態管理クラス
 class QrReceiveState {
@@ -137,6 +138,11 @@ class SettingsQrProcessor {
       data['k_yobiint2_2_11'] = kantoku.yobiint2.sublist(2, 12);
       // 金銀支給量倍率設定(int)
       data['k_yobiint2_12'] = kantoku.yobiint2[12];
+      // 金銀支給量倍率設定の難易度ごとの割合(int) yobiint3[70]〜[73] (1.9.1で追加)
+      data['k_yobiint3_70_73'] = kantoku.yobiint3.sublist(
+        kinginWariaiIndex,
+        kinginWariaiIndex + 4,
+      );
       // 記録会時期設定(int)
       data['k_yobiint2_14'] = kantoku.yobiint2[14];
       // 年間強化練習効果設定(int)
@@ -596,6 +602,19 @@ class SettingsQrProcessor {
         }
         if (ryuugakusei is int && (ryuugakusei == 0 || ryuugakusei == 1)) {
           kantoku.yobiint2[79] = ryuugakusei;
+        }
+      }
+      // 金銀支給量倍率設定の難易度ごとの割合(int) kantoku.yobiint3[70]〜[73] (1.9.1)
+      //   鬼・難しい・普通・易しいの順。0なら100%(初期値)、1〜50なら値×10%
+      final dynamic yobiint3_70_73 = dataMap['k_yobiint3_70_73'];
+      if (yobiint3_70_73 is List && yobiint3_70_73.length == 4) {
+        for (int i = 0; i < 4; i++) {
+          final dynamic v = yobiint3_70_73[i];
+          if (v is int &&
+              kinginWariaiAtaiTadashii(v) &&
+              kantoku.yobiint3.length > kinginWariaiIndex + i) {
+            kantoku.yobiint3[kinginWariaiIndex + i] = v;
+          }
         }
       }
       // 育成力(int) & 名声(int) & 留学生受け入れ設定(int) (UnivData 0から29)

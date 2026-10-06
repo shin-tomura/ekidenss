@@ -20,6 +20,7 @@ import 'package:ekiden/kansuu/gakuren_kantoku.dart'; // 学連選抜の監督・
 import 'package:ekiden/kansuu/gakuren_text.dart'; // 学連選抜の結果(順位相当。1.8.4)
 import 'package:ekiden/kansuu/meisei_rireki.dart'; // 名声の履歴(1.8.8)
 import 'package:ekiden/kansuu/rekidai_kiroku.dart'; // 歴代10位までの記録(1.8.8)
+import 'package:ekiden/kansuu/kingin_wariai.dart'; // 難易度ごとの金銀支給量の割合(1.9.1)
 
 String _timeToMinuteSecondString(double time) {
   if (time == TEISUU.DEFAULTTIME) {
@@ -649,6 +650,8 @@ Future<void> kirokuKousin({
             //予選突破は最低量に
             r = 10;
           }
+          // 難易度ごとの割合(1.9.1。kingin_wariai.dart)。優勝の2倍と金銀支給量倍率はこのあと掛ける
+          r = kinginWariaiKakeru(r, kantoku, gh[0].kazeflag);
 
           // Dartでは `Random()` を使用
           //final random = Random();
@@ -2117,6 +2120,9 @@ Future<void> kirokuKousin({
               r = 200;
               rYuushou = 300;
             }
+            // 難易度ごとの割合(1.9.1。kingin_wariai.dart)。金銀支給量倍率はこのあと掛ける
+            r = kinginWariaiKakeru(r, kantoku, gh[0].kazeflag);
+            rYuushou = kinginWariaiKakeru(rYuushou, kantoku, gh[0].kazeflag);
 
             if (random.nextInt(100) < 10) {
               // 20%の確率
@@ -2582,7 +2588,9 @@ Future<void> _gakurenMokuhyouHoushuu({
 
   // 金銀(難易度モードが通常のときだけ)
   if (kantoku.yobiint2[0] != 0) return;
-  final int ryou = 10 * kantoku.yobiint2[12];
+  // 予選突破と同じく、難易度ごとの割合(1.9.1。kingin_wariai.dart)を掛ける
+  final int ryou =
+      kinginWariaiKakeru(10, kantoku, gh.kazeflag) * kantoku.yobiint2[12];
   if (random.nextInt(100) < 10) {
     gh.last_goldenballkakutokusuu = ryou;
     gh.goldenballsuu += ryou;

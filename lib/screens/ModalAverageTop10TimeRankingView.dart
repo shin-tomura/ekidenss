@@ -12,6 +12,8 @@ import 'package:ekiden/kansuu/time_date.dart';
 import 'dart:math' as math;
 import 'package:share_plus/share_plus.dart'; // 忘れずにインポート
 import 'package:ekiden/kansuu/ChartPanelUniv.dart';
+import 'package:ekiden/kansuu/konki_best.dart'; // 今季ベスト(1.9.1)
+import 'package:ekiden/screens/konki_best_parts.dart';
 
 enum DisplayEvent {
   best5000m,
@@ -212,10 +214,12 @@ class _ModalAverageTop10TimeRankingViewState
     });
   }*/
 
+  // [konki]がtrueなら今季ベストで集計する(今季ベストのない選手はその種目の集計から除く。1.9.1)
   List<UnivAverageTime> _calculateRanking(
     List<SenshuData> allSenshuData,
     Map<int, UnivData> univMap,
     int raceIdx,
+    bool konki,
   ) {
     final Map<int, Map<DisplayEvent, double>> univAverages = {};
     final Map<DisplayEvent, List<double>> allAvgsPool = {
@@ -229,7 +233,9 @@ class _ModalAverageTop10TimeRankingViewState
       tempRaw.putIfAbsent(s.univid, () => {});
       for (var e in DisplayEvent.values) {
         if (e == DisplayEvent.totalScore) continue;
-        double t = s.time_bestkiroku[_getTimeIndex(e)];
+        double t = konki
+            ? konkiBest(s, _getTimeIndex(e))
+            : s.time_bestkiroku[_getTimeIndex(e)];
         if (t < TEISUU.DEFAULTTIME && t > 0) {
           tempRaw[s.univid]!.putIfAbsent(e, () => []).add(t);
         }
@@ -355,10 +361,13 @@ class _ModalAverageTop10TimeRankingViewState
           : ValueListenableBuilder(
               valueListenable: senshuBox.listenable(),
               builder: (context, Box<SenshuData> sBox, _) {
+                // 持ちタイムを今季ベストで表示しているか(1.9.1)
+                final bool konki = konkiBestHyoujiChuu();
                 final ranking = _calculateRanking(
                   sBox.values.toList(),
                   univMap,
                   _targetRaceIdx!,
+                  konki,
                 );
                 _selectedUnivId ??= gh.hyojiunivnum;
                 final selectedData = ranking.firstWhere(
@@ -368,6 +377,8 @@ class _ModalAverageTop10TimeRankingViewState
 
                 return Column(
                   children: [
+                    // 持ちタイムの切り替え(自己ベスト/今季ベスト。1.9.1)
+                    KonkiBestKirikae(onChanged: () => setState(() {})),
                     // ★ ここにドロップダウンを2行で配置
                     if (_displayEvent == DisplayEvent.totalScore)
                       Container(
@@ -533,7 +544,7 @@ class _ModalAverageTop10TimeRankingViewState
                                         """
 【上位10名AI分析レポート】
 対象：$univName
-チームタイプ：$type
+チームタイプ：$type${konki ? '\n集計：今季ベスト(今年度のレースでの最高記録)' : ''}
 
 $analysis
 

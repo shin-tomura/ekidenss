@@ -8,6 +8,8 @@ import 'package:ekiden/kansuu/time_date.dart';
 import 'package:ekiden/screens/Modal_senshu.dart';
 import 'package:ekiden/senshu_gakuren_data.dart';
 import 'package:ekiden/kansuu/gakuren_text.dart';
+import 'package:ekiden/kansuu/konki_best.dart'; // 今季ベスト(1.9.1)
+import 'package:ekiden/screens/konki_best_parts.dart';
 
 // 並べ替えの種類を定義
 enum SortType { univId, best5000m, best10000m, bestHalf }
@@ -25,6 +27,17 @@ class _ModalKukanEntryListViewState extends State<ModalKukanEntryListView> {
   // ★ 画面専用の表示区間を保持するローカル状態変数 ★
   int? _displayKukan;
 
+  // 持ちタイムを今季ベストで表示しているか(build のたびに読み直す。1.9.1)
+  bool _konki = false;
+
+  // 表示と並べ替えに使う持ちタイム(今季ベストで表示しているときは今季ベスト。1.9.1)
+  double _mochi(SenshuData s, int idx) =>
+      _konki ? konkiBest(s, idx) : s.time_bestkiroku[idx];
+
+  // 学連選抜の選手の持ちタイム(同じく。1.9.1)
+  double _mochiGakuren(Senshu_Gakuren_Data g, int idx) =>
+      _konki ? konkiBestGakuren(g, idx) : g.time_bestkiroku[idx];
+
   // 選手のリストを現在のソートタイプに基づいて並べ替える
   List<SenshuData> _sortSenshuList(List<SenshuData> list) {
     list.sort((a, b) {
@@ -34,13 +47,13 @@ class _ModalKukanEntryListViewState extends State<ModalKukanEntryListView> {
           return a.univid.compareTo(b.univid);
         case SortType.best5000m:
           // 5000mベストタイムでソート (短い方が先)
-          return _compareTime(a.time_bestkiroku[0], b.time_bestkiroku[0]);
+          return _compareTime(_mochi(a, 0), _mochi(b, 0));
         case SortType.best10000m:
           // 10000mベストタイムでソート (短い方が先)
-          return _compareTime(a.time_bestkiroku[1], b.time_bestkiroku[1]);
+          return _compareTime(_mochi(a, 1), _mochi(b, 1));
         case SortType.bestHalf:
           // ハーフマラソンベストタイムでソート (短い方が先)
-          return _compareTime(a.time_bestkiroku[2], b.time_bestkiroku[2]);
+          return _compareTime(_mochi(a, 2), _mochi(b, 2));
       }
     });
     return list;
@@ -145,6 +158,8 @@ class _ModalKukanEntryListViewState extends State<ModalKukanEntryListView> {
                 }).toList();
 
                 // 2. ソート: 現在のソートタイプに基づいて並べ替え
+                // (持ちタイムを今季ベストで表示しているときは今季ベストで。1.9.1)
+                _konki = konkiBestHyoujiChuu();
                 filteredSenshuData = _sortSenshuList(filteredSenshuData);
 
                 // 3. 学連選抜(正月駅伝のときだけ)の、この区間の選手を「OP」として入れる(1.8.2)
@@ -161,8 +176,8 @@ class _ModalKukanEntryListViewState extends State<ModalKukanEntryListView> {
                       : (_currentSortType == SortType.best10000m ? 1 : 2);
                   for (int i = 0; i < filteredSenshuData.length; i++) {
                     if (_compareTime(
-                          gakurenSenshu.time_bestkiroku[shumoku],
-                          filteredSenshuData[i].time_bestkiroku[shumoku],
+                          _mochiGakuren(gakurenSenshu, shumoku),
+                          _mochi(filteredSenshuData[i], shumoku),
                         ) <
                         0) {
                       gakurenIchi = i;
@@ -236,6 +251,8 @@ class _ModalKukanEntryListViewState extends State<ModalKukanEntryListView> {
                           ),
                         ),
                       ),
+                      // --- 持ちタイムの切り替え(自己ベスト/今季ベスト。1.9.1) ---
+                      KonkiBestKirikae(onChanged: () => setState(() {})),
                       const Divider(color: Colors.grey),
 
                       // --- 選手一覧リスト ---
@@ -387,15 +404,15 @@ class _ModalKukanEntryListViewState extends State<ModalKukanEntryListView> {
                                                 Text('調子 ${senshu.chousi}'),
                                               _buildTimeRow(
                                                 '5000m',
-                                                senshu.time_bestkiroku[0],
+                                                _mochi(senshu, 0),
                                               ),
                                               _buildTimeRow(
                                                 '10000m',
-                                                senshu.time_bestkiroku[1],
+                                                _mochi(senshu, 1),
                                               ),
                                               _buildTimeRow(
                                                 'ハーフ',
-                                                senshu.time_bestkiroku[2],
+                                                _mochi(senshu, 2),
                                               ),
                                             ],
                                           ),
@@ -520,9 +537,9 @@ class _ModalKukanEntryListViewState extends State<ModalKukanEntryListView> {
                 if (currentGhensuu.hyojiracebangou <= 2 ||
                     currentGhensuu.hyojiracebangou == 5)
                   Text('調子 ${g.chousi}'),
-                _buildTimeRow('5000m', g.time_bestkiroku[0]),
-                _buildTimeRow('10000m', g.time_bestkiroku[1]),
-                _buildTimeRow('ハーフ', g.time_bestkiroku[2]),
+                _buildTimeRow('5000m', _mochiGakuren(g, 0)),
+                _buildTimeRow('10000m', _mochiGakuren(g, 1)),
+                _buildTimeRow('ハーフ', _mochiGakuren(g, 2)),
               ],
             ),
           ),
@@ -547,7 +564,10 @@ class _ModalKukanEntryListViewState extends State<ModalKukanEntryListView> {
           ),
         ),
         Text(
-          TimeDate.timeToFunByouString(time),
+          // 今季ベストで表示していて今季の記録がないときは「今季記録無」(1.9.1)
+          _konki && time >= TEISUU.DEFAULTTIME
+              ? '今季記録無'
+              : TimeDate.timeToFunByouString(time),
           style: TextStyle(
             color: time < TEISUU.DEFAULTTIME
                 ? Colors.amberAccent

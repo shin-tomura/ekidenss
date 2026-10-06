@@ -13,6 +13,8 @@ import 'package:screenshot/screenshot.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:ekiden/screens/ModalAverageTop10TimeRankingView.dart';
 import 'package:ekiden/screens/Modal_senshu.dart';
+import 'package:ekiden/kansuu/konki_best.dart'; // 今季ベスト(1.9.1)
+import 'package:ekiden/screens/konki_best_parts.dart';
 
 /// 選手個人のスコアを保持するクラス
 class SenshuScoreData {
@@ -80,10 +82,15 @@ class _SenshuRadarAnalysisViewState extends State<SenshuRadarAnalysisView> {
         : 50 + 10 * (val - mean) / stdDev;
   }
 
+  // [konki]がtrueなら今季ベストで分析する(今季ベストのない種目は最低の評価。1.9.1)
   List<SenshuScoreData> _calculateSenshuScores(
     List<SenshuData> allSenshu,
     int targetUnivId,
+    bool konki,
   ) {
+    double kiroku(SenshuData s, int idx) =>
+        konki ? konkiBest(s, idx) : s.time_bestkiroku[idx];
+
     Map<int, List<double>> pools = {
       0: [],
       1: [],
@@ -95,7 +102,7 @@ class _SenshuRadarAnalysisViewState extends State<SenshuRadarAnalysisView> {
     };
     for (var s in allSenshu) {
       for (var idx in pools.keys) {
-        double t = s.time_bestkiroku[idx];
+        double t = kiroku(s, idx);
         if (t > 0 && t < TEISUU.DEFAULTTIME) pools[idx]!.add(t);
       }
     }
@@ -107,7 +114,7 @@ class _SenshuRadarAnalysisViewState extends State<SenshuRadarAnalysisView> {
 
     for (var s in targetSenshus) {
       double sc(int idx) {
-        double t = s.time_bestkiroku[idx];
+        double t = kiroku(s, idx);
         if (t <= 0 || t >= TEISUU.DEFAULTTIME) return 1.0;
         double tScore = _calcT(t, pools[idx]!);
         return ((tScore - 30) / 4).clamp(1.0, 10.0);
@@ -140,7 +147,7 @@ class _SenshuRadarAnalysisViewState extends State<SenshuRadarAnalysisView> {
       backgroundColor: Colors.black,
       appBar: AppBar(
         title: Text(
-          '${targetUniv?.name ?? "所属"} 選手AI分析',
+          '${targetUniv?.name ?? "所属"} 選手AI分析${konkiBestHyoujiChuu() ? '(今季ベスト)' : ''}',
           style: const TextStyle(color: Colors.white, fontSize: 16),
         ),
         backgroundColor: Colors.black,
@@ -155,6 +162,7 @@ class _SenshuRadarAnalysisViewState extends State<SenshuRadarAnalysisView> {
                 final rawList = _calculateSenshuScores(
                   sBox.values.toList(),
                   gh.hyojiunivnum,
+                  konkiBestHyoujiChuu(),
                 );
 
                 if (rawList.isEmpty)
@@ -198,6 +206,8 @@ class _SenshuRadarAnalysisViewState extends State<SenshuRadarAnalysisView> {
 
                 return Column(
                   children: [
+                    // 持ちタイムの切り替え(自己ベスト/今季ベスト。1.9.1)
+                    KonkiBestKirikae(onChanged: () => setState(() {})),
                     _buildTopToolbar(sortedList, selectedData),
                     _buildSenshuSelector(sortedList),
                     Expanded(
@@ -557,6 +567,7 @@ class _SenshuRadarAnalysisViewState extends State<SenshuRadarAnalysisView> {
         "【選手能力分析報告】\n"
         "氏名：${data.senshu.name} (${data.senshu.gakunen}年)\n"
         "総合評価：${data.averageScore.toStringAsFixed(1)}\n"
+        "${konkiBestHyoujiChuu() ? '集計：今季ベスト(今年度のレースでの最高記録)\n' : ''}"
         "--- 指標詳細 ---\n"
         "$scoreText\n\n"
         "#箱庭小駅伝SS";

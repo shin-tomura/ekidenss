@@ -8,6 +8,7 @@ import 'package:ekiden/kantoku_data.dart';
 //import 'package:ekiden/kansuu/time_date.dart';
 import 'dart:math' as math;
 import 'package:ekiden/screens/ModalAverageTop10TimeRankingView.dart';
+import 'package:ekiden/kansuu/konki_best.dart'; // 今季ベスト(1.9.1)
 
 class UnivAnalysisEngine {
   static const List<String> scoreKeys = ['スピード', 'スタミナ', '山適性', 'ロード', '起伏耐性'];
@@ -354,6 +355,71 @@ Future<void> refreshAllUnivAnalysisData() async {
   await kantoku.save();
 }
 
+/// 今季ベストで出した大学[univid]の解析スコア(保存せず、その場で計算する。1.9.1)
+/// 計算は refreshAllUnivAnalysisData と同じ(大学ごとの上位10名の平均を、全大学の平均と比べる)で、
+/// 持ちタイムだけ今季ベストにする。保存したものと同じ目盛りになるよう、いったん圧縮してから解凍して返す
+Map<String, dynamic> konkiBestUnivScores(int univid) {
+  final allSenshu = Hive.box<SenshuData>('senshuBox').values.toList();
+  Map<int, List<double>> pools = {
+    0: [],
+    1: [],
+    2: [],
+    4: [],
+    5: [],
+    6: [],
+    7: [],
+  };
+  Map<int, Map<int, List<double>>> rawData = {};
+  for (var s in allSenshu) {
+    for (var idx in pools.keys) {
+      double t = konkiBest(s, idx);
+      if (t > 0 && t < TEISUU.DEFAULTTIME) {
+        rawData
+            .putIfAbsent(s.univid, () => {})
+            .putIfAbsent(idx, () => [])
+            .add(t);
+      }
+    }
+  }
+  Map<int, Map<int, double>> univAverages = {};
+  rawData.forEach((uid, eventMap) {
+    univAverages[uid] = {};
+    eventMap.forEach((eIdx, times) {
+      times.sort();
+      int count = math.min(10, times.length);
+      if (count > 0) {
+        double avg = times.sublist(0, count).reduce((a, b) => a + b) / count;
+        univAverages[uid]![eIdx] = avg;
+        pools[eIdx]!.add(avg);
+      }
+    });
+  });
+  double sc(int idx) {
+    final val = univAverages[univid]?[idx];
+    if (val == null || val <= 0) return 1.0;
+    final pool = pools[idx]!;
+    double mean = pool.reduce((a, b) => a + b) / pool.length;
+    double varSum = pool
+        .map((x) => math.pow(x - mean, 2).toDouble())
+        .reduce((a, b) => a + b);
+    double stdDev = math.sqrt(varSum / pool.length);
+    double tScore = (stdDev == 0) ? 50 : 50 + 10 * (mean - val) / stdDev;
+    return ((tScore - 30) / 4).clamp(1.0, 10.0);
+  }
+
+  Map<String, double> scores = {
+    'スピード': (sc(0) + sc(1)) / 2,
+    'スタミナ': sc(2),
+    '山適性': (sc(4) + sc(5)) / 2,
+    'ロード': sc(6),
+    '起伏耐性': sc(7),
+  };
+  double avg = scores.values.reduce((a, b) => a + b) / scores.length;
+  return UnivAnalysisEngine.decompressScores(
+    UnivAnalysisEngine.compressScores(scores, avg),
+  );
+}
+
 /// 大学解析パネルを返す共通Widget
 /// 引数が targetUnivId のみの場合は保存データを表示、
 /// override... 引数がある場合はその値を優先表示する。
@@ -383,6 +449,18 @@ Widget buildUnivAnalysisPanel(
     average = scores.values.reduce((a, b) => a + b) / scores.length;
     type = overrideType;
     analysis = overrideAnalysis;
+  } else if (konkiBestHyoujiChuu()) {
+    // 【モードC】持ちタイムを今季ベストで表示しているときは、今季ベストでその場で計算する
+    // (保存されているのは自己ベストで計算したもの。1.9.1)
+    final scoreData = konkiBestUnivScores(targetUnivId);
+    scores = scoreData['scores'];
+    average = scoreData['average'];
+    type = UnivAnalysisEngine.determineTeamType(scores);
+    analysis = UnivAnalysisEngine.generateDetailedAnalysis(
+      sortedUnivs.firstWhere((u) => u.id == targetUnivId).name,
+      scores,
+      Hive.box<Ghensuu>('ghensuuBox').getAt(0)!,
+    );
   } else {
     // 【モードB】Hiveに保存されているデータを使用（大学詳細画面用）
     final allTexts = sortedUnivs[11].name_tanshuku.split(
@@ -547,6 +625,17 @@ Widget buildUnivAnalysisPanel(
           ),
           textAlign: TextAlign.center,
         ),
+        // 今季ベストで分析しているときの注意書き(1.9.1)
+        if (konkiBestHyoujiChuu())
+          const Text(
+            "※今季ベスト(今年度のレースでの最高記録)で分析しています",
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 9,
+              letterSpacing: -0.5,
+            ),
+            textAlign: TextAlign.center,
+          ),
       ],
     ),
   );

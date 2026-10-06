@@ -5,6 +5,8 @@ import 'package:ekiden/constants.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/senshu_data.dart';
 import 'package:ekiden/kansuu/time_date.dart';
+import 'package:ekiden/kansuu/konki_best.dart'; // 今季ベスト(1.9.1)
+import 'package:ekiden/screens/konki_best_parts.dart';
 // import 'package:ekiden/screens/Modal_senshu.dart'; // 選手詳細が不要であればコメントアウト
 
 // 表示対象の種目を定義
@@ -47,12 +49,14 @@ class _ModalAverageTimeRankingViewState
   }*/
 
   // 大学ごとの平均タイムを計算し、ランキングリストを返す
+  // [konki]がtrueなら今季ベストで平均する(今季ベストのない選手は集計から除く。1.9.1)
   List<UnivAverageTime> _calculateUnivAverageTimes(
     List<SenshuData> allSenshuData,
     Map<int, UnivData> univDataMap,
     DisplayEvent event,
     int raceBangou,
     Ghensuu ghensuu,
+    bool konki,
   ) {
     // 1. 各大学の合計タイムと人数を保持するMap
     final Map<int, List<double>> univTimeData = {}; // {univid: [合計タイム, 人数]}
@@ -105,7 +109,9 @@ class _ModalAverageTimeRankingViewState
           break;
       }
 
-      final double senshuTime = senshu.time_bestkiroku[timeIndex];
+      final double senshuTime = konki
+          ? konkiBest(senshu, timeIndex)
+          : senshu.time_bestkiroku[timeIndex];
 
       // 記録がない選手 (TEISUU.DEFAULTTIME以上) は集計から除外
       if (senshuTime >= TEISUU.DEFAULTTIME) {
@@ -185,6 +191,8 @@ class _ModalAverageTimeRankingViewState
               builder: (context, senshudataBox, _) {
                 final List<SenshuData> allSenshuData = senshudataBox.values
                     .toList();
+                // 持ちタイムを今季ベストで表示しているか(1.9.1)
+                final bool konki = konkiBestHyoujiChuu();
 
                 // 1. 大学ごとの平均タイムランキングを計算
                 final List<UnivAverageTime> ranking =
@@ -194,6 +202,7 @@ class _ModalAverageTimeRankingViewState
                       _displayEvent,
                       raceBangou,
                       currentGhensuu,
+                      konki,
                     );
 
                 return Scaffold(
@@ -201,7 +210,7 @@ class _ModalAverageTimeRankingViewState
                   appBar: AppBar(
                     title: Text(
                       //'大学別平均${currentEventLabel}タイムランキング',
-                      'エントリー選手平均持ちタイム',
+                      konki ? 'エントリー選手平均今季ベスト' : 'エントリー選手平均持ちタイム',
                       style: const TextStyle(color: Colors.white, fontSize: 16),
                     ),
                     backgroundColor: HENSUU.backgroundcolor,
@@ -209,6 +218,8 @@ class _ModalAverageTimeRankingViewState
                   ),
                   body: Column(
                     children: <Widget>[
+                      // --- 持ちタイムの切り替え(自己ベスト/今季ベスト。1.9.1) ---
+                      KonkiBestKirikae(onChanged: () => setState(() {})),
                       // --- ランキング一覧リスト ---
                       Expanded(
                         child: ranking.isEmpty

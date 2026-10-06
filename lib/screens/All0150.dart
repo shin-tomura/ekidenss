@@ -9,6 +9,8 @@ import 'package:ekiden/screens/Modal_courseshoukai.dart';
 import 'package:ekiden/screens/Modal_matrix.dart';
 import 'package:ekiden/screens/Modal_matrix2.dart';
 import 'package:ekiden/screens/Modal_matrix3.dart';
+import 'package:ekiden/kansuu/custom_seigen.dart'; // カスタム駅伝の出場制限(1.9.1)
+import 'package:ekiden/screens/custom_seigen_parts.dart';
 
 class All0150 extends StatefulWidget {
   final Ghensuu ghensuu;
@@ -196,6 +198,22 @@ class _All0150State extends State<All0150> {
                       displaySenshu,
                       raceIndex,
                     );
+                    // カスタム駅伝の出場制限(1.9.1)。かけているときは、定員を表示中の大学のものにする
+                    final CustomEntryJoukyou? joukyou =
+                        (raceIndex == customRaceBangou &&
+                            customSeigenAri() &&
+                            selectedUnivId != null)
+                        ? customEntryJoukyou(
+                            selectedUnivId!,
+                            currentGhensuu.kukansuu_taikaigoto[raceIndex],
+                            team: displaySenshu,
+                          )
+                        : null;
+                    final int teiin = joukyou?.teiin ?? MAX_ENTRIES;
+                    final String seigenOshirase =
+                        raceIndex == customRaceBangou
+                        ? customHojuuOshirase()
+                        : '';
 
                     return Column(
                       children: [
@@ -205,9 +223,9 @@ class _All0150State extends State<All0150> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
-                                '登録状況: $currentEntryCount / $MAX_ENTRIES 人',
+                                '登録状況: $currentEntryCount / $teiin 人',
                                 style: TextStyle(
-                                  color: currentEntryCount == MAX_ENTRIES
+                                  color: currentEntryCount == teiin
                                       ? HENSUU.LinkColor
                                       : Colors.orange,
                                   fontSize: HENSUU.fontsize_honbun,
@@ -235,6 +253,11 @@ class _All0150State extends State<All0150> {
                               if (index == 0) {
                                 return Column(
                                   children: [
+                                    // 出場制限で補った選手のお知らせ(1.9.1)
+                                    if (seigenOshirase.isNotEmpty)
+                                      CustomSeigenOshiraseBox(
+                                        bun: seigenOshirase,
+                                      ),
                                     // 1. 区間コース確認ボタン
                                     TextButton(
                                       onPressed: () {
@@ -462,6 +485,12 @@ class _All0150State extends State<All0150> {
                                     -1;
                               }
 
+                              // 出場制限で選べない選手(入っている選手は外せるようにする。1.9.1)
+                              final bool erabenai =
+                                  joukyou != null &&
+                                  !isEntry &&
+                                  !joukyou.erabeRu(senshu);
+
                               return Container(
                                 decoration: const BoxDecoration(
                                   border: Border(
@@ -472,18 +501,22 @@ class _All0150State extends State<All0150> {
                                   leading: Switch(
                                     value: isEntry,
                                     activeColor: Colors.green,
-                                    onChanged: (bool newValue) async {
-                                      await _updateEntryStatus(
-                                        senshu,
-                                        raceIndex,
-                                        newValue,
-                                      );
-                                    },
+                                    onChanged: erabenai
+                                        ? null
+                                        : (bool newValue) async {
+                                            await _updateEntryStatus(
+                                              senshu,
+                                              raceIndex,
+                                              newValue,
+                                            );
+                                          },
                                   ),
                                   title: Text(
-                                    '${senshu.name} (${senshu.gakunen}年)',
-                                    style: const TextStyle(
-                                      color: HENSUU.textcolor,
+                                    '${senshu.name} (${senshu.gakunen}年)${customSeigenHyouji(joukyou, senshu)}',
+                                    style: TextStyle(
+                                      color: erabenai
+                                          ? Colors.white38
+                                          : HENSUU.textcolor,
                                     ),
                                   ),
                                   trailing: _buildDetailButton(senshu),

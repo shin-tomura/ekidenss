@@ -13,6 +13,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 //import 'package:ekiden/senshu_r_data.dart';
 import 'package:ekiden/album.dart';
 import 'package:ekiden/kansuu/konki_best.dart'; // 今季ベスト(1.9.1)
+import 'package:ekiden/kansuu/custom_seigen.dart'; // カスタム駅伝の出場制限(1.9.1)
 
 List<int> kukanIDs = [];
 
@@ -146,8 +147,31 @@ Future<List<int>> Entry1Calc({
         timehalfjunsenshudata.sort(
           (a, b) => hikakuMochiTime(a, 2).compareTo(hikakuMochiTime(b, 2)),
         );
+        // カスタム駅伝の出場制限(1.9.1。custom_seigen.dart)
+        // 出場できる選手と、走る選手が区間数に足りないときに補う選手の中から選ぶ。
+        // 定員は、出場できる選手が少なければその人数(補うときは区間数)
+        int teiinUniv = ninzuu_teiin;
+        if (racebangou == customRaceBangou && customSeigenAri()) {
+          final CustomEntryJoukyou joukyou = customEntryJoukyou(
+            id_univ,
+            gh[0].kukansuu_taikaigoto[racebangou],
+            team: sortedSenshuData.where((s) => s.univid == id_univ).toList(),
+          );
+          // 補う選手は、区間の平均距離に合った種目の今季ベスト(なければ自己ベスト)の速い順
+          final int hojuuShumoku = averagekyori < 7500.0
+              ? 0
+              : (averagekyori < 15000.0 ? 1 : 2);
+          final Set<int> erabeRu = {
+            for (final s in joukyou.shutsujouKa) s.id,
+            for (final s in customHojuuJidou(joukyou, hojuuShumoku)) s.id,
+          };
+          time5000junsenshudata.removeWhere((s) => !erabeRu.contains(s.id));
+          time10000junsenshudata.removeWhere((s) => !erabeRu.contains(s.id));
+          timehalfjunsenshudata.removeWhere((s) => !erabeRu.contains(s.id));
+          teiinUniv = joukyou.teiin;
+        }
         int hoketusuu =
-            ninzuu_teiin -
+            teiinUniv -
             kukansuu_near5000 -
             kukansuu_near10000 -
             kukansuu_nearhalf;
@@ -198,7 +222,13 @@ Future<List<int>> Entry1Calc({
           }
         }
         for (int i = 0; i < TEISUU.SENSHUSUU_UNIV; i++) {
-          if (entryzumisuu >= ninzuu_teiin) break;
+          if (entryzumisuu >= teiinUniv) break;
+          // 出場制限で選べる選手を絞ったときに、リストの外を読まないように(1.9.1)
+          if (i >= time5000junsenshudata.length ||
+              i >= time10000junsenshudata.length ||
+              i >= timehalfjunsenshudata.length) {
+            break;
+          }
           if (averagekyori < 7500.0) {
             if (time5000junsenshudata[i]
                     .entrykukan_race[racebangou][time5000junsenshudata[i]

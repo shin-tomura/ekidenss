@@ -19,6 +19,7 @@ import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/kansuu/shiyou_text.dart'; // ゲームの仕様(1.8.3)
 import 'package:ekiden/kansuu/mokuhyou_kingin.dart'; // 目標達成時の金銀(1.8.3)
 import 'package:ekiden/kansuu/siji_sontoku_text.dart'; // 指示ごとの損得予測(1.8.8)
+import 'package:ekiden/kansuu/custom_seigen.dart'; // カスタム駅伝の出場制限(1.9.1)
 
 // ------------------------------------------------------------
 // 生成AIに渡すテキストのまとめボタン(1.8.2)
@@ -551,11 +552,16 @@ class AiCopyMatomeButton extends StatelessWidget {
     // 駅伝予選では、先頭に「この大会の決まり」を入れる(1.8.4)
     if (!entryAri && ekiden && shutsujou) {
       final bool yosen = race == 3 || race == 4;
+      // カスタム駅伝で出場制限をかけているときも、先頭に「この大会の決まり」が入る(1.9.1)
+      final bool customKimari =
+          race == customRaceBangou && customSeigenAri();
       list.add(
         _AiCopyKoumoku(
           '相談セット',
           yosen
               ? 'この大会の決まり(経験補正がないことなど)・エントリーの状況・コース情報・自分の大学の今季タイム一覧表・駅伝出場履歴をまとめてコピー。メンバー選びの相談に'
+              : customKimari
+              ? 'この大会の決まり(出場できる選手)・エントリーの状況(選んでいる選手・今の区間配置)・コース情報・自分の大学の今季タイム一覧表・駅伝出場履歴をまとめてコピー。エントリーや区間配置の相談に'
               : 'エントリーの状況(選んでいる選手・今の区間配置)・コース情報・自分の大学の今季タイム一覧表・駅伝出場履歴をまとめてコピー。エントリーや区間配置の相談に',
           Icons.library_books,
           () => [

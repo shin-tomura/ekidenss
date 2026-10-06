@@ -159,6 +159,8 @@ class SettingsQrProcessor {
       data['k_yobiint2_68_74'] = kantoku.yobiint2.sublist(68, 75);
       // 学連選抜の監督をするか(int) [75] (1.8.2で追加。0=する、1=しない)
       data['k_yobiint2_75'] = kantoku.yobiint2[75];
+      // カスタム駅伝の出場制限(int) [78]学年・[79]留学生 (1.9.1で追加。custom_seigen.dart)
+      data['k_yobiint2_78_79'] = kantoku.yobiint2.sublist(78, 80);
     } else if (department == SettingsDepartment.octoberTime) {
       //区間ごとタイム調整(int)
       data['k_yobiint5_30_39_time'] = kantoku.yobiint5.sublist(30, 40);
@@ -566,6 +568,19 @@ class SettingsQrProcessor {
       final dynamic yobiint2_75 = dataMap['k_yobiint2_75'];
       if (yobiint2_75 is int && gakurenKantokuAtaiTadashii(yobiint2_75)) {
         kantoku.yobiint2[75] = yobiint2_75;
+      }
+      // カスタム駅伝の出場制限(int) kantoku.yobiint2[78]・[79] (1.9.1)
+      //   [78]学年(0=全学年(初期値)・1=3年生以下・2=2年生以下)、[79]留学生(0=制限なし(初期値)・1=出場できない)
+      final dynamic yobiint2_78_79 = dataMap['k_yobiint2_78_79'];
+      if (yobiint2_78_79 is List && yobiint2_78_79.length == 2) {
+        final dynamic gakunen = yobiint2_78_79[0];
+        final dynamic ryuugakusei = yobiint2_78_79[1];
+        if (gakunen is int && gakunen >= 0 && gakunen <= 2) {
+          kantoku.yobiint2[78] = gakunen;
+        }
+        if (ryuugakusei is int && (ryuugakusei == 0 || ryuugakusei == 1)) {
+          kantoku.yobiint2[79] = ryuugakusei;
+        }
       }
       // 育成力(int) & 名声(int) & 留学生受け入れ設定(int) (UnivData 0から29)
       final List<dynamic> ikuseiryokuList = dataMap['ud_ikuseiryoku'] ?? [];

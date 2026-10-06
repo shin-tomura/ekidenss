@@ -7,6 +7,7 @@ import 'package:ekiden/screens/Modal_courseshoukai.dart'; // カスタム駅伝�
 import 'package:ekiden/kansuu/gakuren_kantoku.dart'; // 学連選抜の報酬がもらえる目標順位(1.8.4)
 import 'package:ekiden/kansuu/nouryoku_eikyodo.dart';
 import 'package:ekiden/kansuu/mokuhyou_hosei.dart';
+import 'package:ekiden/kansuu/custom_seigen.dart'; // カスタム駅伝の出場制限(1.9.1)
 
 // ------------------------------------------------------------
 // ゲームの仕様の文(1.8.3で生成AI向けに作り、1.8.4から説明書と共通にした)
@@ -134,7 +135,44 @@ ShiyouSetsu shiyouTaikai({bool setsumeisho = false}) {
     '・正月駅伝の当日変更は、往路のスタート前と復路のスタート前に、それぞれ最大4人です。',
     '・入れ替えで外れた選手は、その大会では走れません。',
   ]);
+  // カスタム駅伝の出場制限(1.9.1。説明書の設定の行は、この見出しの最後になる)
+  gyou.addAll(_customSeigenGyou(setsumeisho));
   return ShiyouSetsu('大会と人数', gyou);
+}
+
+/// カスタム駅伝の出場制限の行(1.9.1。custom_seigen.dart)
+/// 説明書には仕組みと設定の場所をいつも書く。生成AI向けには、カスタム駅伝を開催していて
+/// 制限をかけているときだけ、このデータの制限を書く(相談セットの「この大会の決まり」でも使う)
+List<String> _customSeigenGyou(bool setsumeisho) {
+  final Ghensuu? gh = Hive.box<Ghensuu>('ghensuuBox').getAt(0);
+  final bool kaisai = gh != null && gh.spurtryokuseichousisuu1 == 1;
+  final bool ari = kaisai && customSeigenAri();
+  if (!setsumeisho && !ari) return [];
+  final String kd = _konoData(setsumeisho);
+  final String mei = courseRaceTitle(customRaceBangou);
+  final List<String> gyou = [];
+  if (setsumeisho) {
+    gyou.add('・カスタム駅伝では、出場できる学年(3年生以下・2年生以下)と、留学生の出場を制限できます。');
+  }
+  if (ari) {
+    final int gakunen = customGakunenSettei();
+    if (gakunen != 0) {
+      gyou.add('・$kd、カスタム駅伝($mei)に出場できるのは${customGakunenMei(gakunen)}の選手です。');
+    }
+    if (customRyuugakuseiFuka()) {
+      gyou.add('・$kd、カスタム駅伝($mei)には留学生は出場できません。');
+    }
+  }
+  gyou.addAll([
+    '・出場できない選手は、一次エントリーで選べません。',
+    '・出場できる選手が一次エントリーの人数より少ない大学は、出場できる全員が一次エントリーになります。',
+    '・走る選手が区間数に足りない大学は、足りない人数だけ上級生で補います。',
+    '　・留学生が出場できないときは、上級生でも足りなければ留学生で補います。',
+  ]);
+  if (setsumeisho) {
+    gyou.add('・設定タブの「カスタム駅伝設定」で変えられます。');
+  }
+  return gyou;
 }
 
 /// 選手の能力(どの場面で効くか)
@@ -570,7 +608,21 @@ ShiyouSetsu shiyouGakuren({bool setsumeisho = false}) {
 /// 駅伝予選の相談セットの先頭に入れる「この大会の決まり」(1.8.4)
 /// メンバーを選ぶ相談で、生成AIが駅伝と同じ決まり(経験補正など)だと思い込まないように入れる。
 /// 文は仕様の文と同じもの(11月駅伝予選・正月駅伝予選以外では空)
+/// カスタム駅伝で出場制限をかけているときは、出場できる選手の決まりと、補った選手を書く(1.9.1)
+/// (今季タイム一覧表には全員が載るので、生成AIが出場できない選手を勧めないように)
 String yosenKimariText(int race) {
+  if (race == customRaceBangou) {
+    final List<String> gyou = _customSeigenGyou(false);
+    if (gyou.isEmpty) return '';
+    final StringBuffer sb = StringBuffer();
+    sb.writeln('【${courseRaceTitle(customRaceBangou)}(カスタム駅伝) この大会の決まり】');
+    for (final String g in gyou) {
+      sb.writeln(g);
+    }
+    final String oshirase = customHojuuOshirase();
+    if (oshirase.isNotEmpty) sb.writeln(oshirase);
+    return sb.toString();
+  }
   final List<String> gyou;
   if (race == 3) {
     gyou = [..._yosen11Gyou, ...shiyouShuudansou().gyou, _keikenYosenGyou];

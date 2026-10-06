@@ -26,6 +26,8 @@ import 'package:ekiden/screens/Modal_matrix.dart';
 import 'package:ekiden/screens/ai_copy_matome.dart';
 import 'package:ekiden/screens/Modal_matrix2.dart';
 import 'package:ekiden/screens/Modal_matrix3.dart';
+import 'package:ekiden/kansuu/custom_seigen.dart'; // カスタム駅伝の出場制限(1.9.1)
+import 'package:ekiden/screens/custom_seigen_parts.dart';
 import 'package:ekiden/screens/All0300.dart';
 import 'package:ekiden/screens/Modal_Taichoufuryou.dart';
 import 'package:ekiden/kansuu/ShoriGuard.dart';
@@ -2811,8 +2813,15 @@ class _Mode0300ContentState extends State<Mode0300Content> {
     final kantokuBox = Hive.box<KantokuData>('kantokuBox');
     final KantokuData kantoku = kantokuBox.get('KantokuData')!;
 
+    // 出場制限で補った選手のお知らせ(カスタム駅伝だけ。1.9.1)
+    final String seigenOshirase = raceBangou == customRaceBangou
+        ? customHojuuOshirase()
+        : '';
+
     return Column(
       children: [
+        if (seigenOshirase.isNotEmpty)
+          CustomSeigenOshiraseBox(bun: seigenOshirase),
         // 生成AIに渡すテキストのまとめボタン(1.8.2)
         // 区間エントリーの画面では、ほかの大学の区間エントリーが分かってしまうものを出さない
         // (一次エントリーの画面と同じ一覧にする)

@@ -4,6 +4,7 @@ import 'package:ekiden/ghensuu.dart'; // Ghensuuクラスをインポート
 
 import 'package:ekiden/constants.dart'; // TEISUU, HENSUUクラスをインポート
 import 'package:ekiden/univ_data.dart'; // UnivDataクラスをインポート
+import 'package:ekiden/kansuu/custom_seigen.dart'; // 出場制限(1.9.1)
 
 class ModalCustomEkidenSettings extends StatefulWidget {
   const ModalCustomEkidenSettings({super.key});
@@ -23,6 +24,11 @@ class _ModalCustomEkidenSettingsState extends State<ModalCustomEkidenSettings> {
       TextEditingController(); // 区間数用のコントローラー
 
   late bool _isEkidenHeld;
+
+  // 出場制限(1.9.1。custom_seigen.dart)
+  // 学年: 0=全学年・1=3年生以下・2=2年生以下、留学生: 0=制限なし・1=出場できない
+  int _gakunenSettei = 0;
+  int _ryuugakuseiSettei = 0;
 
   @override
   void initState() {
@@ -108,7 +114,13 @@ class _ModalCustomEkidenSettingsState extends State<ModalCustomEkidenSettings> {
               _fameDenominatorController.text = gh.spurtryokuseichousisuu5
                   .clamp(1, 10)
                   .toString();
+              _gakunenSettei = customGakunenSettei();
+              _ryuugakuseiSettei = customRyuugakuseiSettei();
             }
+            // この画面で選んでいる出場制限で、走る選手が足りなくならない区間数の目安(1.9.1)
+            final int kukansuuMeyasu =
+                TEISUU.NINZUU_1GAKUNEN_INUNIV * (4 - _gakunenSettei) -
+                (_ryuugakuseiSettei == 1 ? 1 : 0);
 
             return Scaffold(
               backgroundColor: HENSUU.backgroundcolor,
@@ -233,6 +245,84 @@ class _ModalCustomEkidenSettingsState extends State<ModalCustomEkidenSettings> {
                                   },
                                 ),
                               ),
+                              const SizedBox(height: 24),
+                              // 出場制限(1.9.1)
+                              Text(
+                                "出場できる学年",
+                                style: TextStyle(
+                                  color: HENSUU.textcolor,
+                                  fontSize: HENSUU.fontsize_honbun,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 8,
+                                children: [
+                                  for (int v = 0; v <= 2; v++)
+                                    ChoiceChip(
+                                      label: Text(customGakunenMei(v)),
+                                      selected: _gakunenSettei == v,
+                                      onSelected: (selected) {
+                                        if (selected) {
+                                          setState(() => _gakunenSettei = v);
+                                        }
+                                      },
+                                      selectedColor: Colors.orange.shade700,
+                                      backgroundColor: Colors.grey.shade800,
+                                      labelStyle: const TextStyle(
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                "留学生の出場",
+                                style: TextStyle(
+                                  color: HENSUU.textcolor,
+                                  fontSize: HENSUU.fontsize_honbun,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 8,
+                                children: [
+                                  for (int v = 0; v <= 1; v++)
+                                    ChoiceChip(
+                                      label: Text(v == 0 ? '制限なし' : '出場できない'),
+                                      selected: _ryuugakuseiSettei == v,
+                                      onSelected: (selected) {
+                                        if (selected) {
+                                          setState(
+                                            () => _ryuugakuseiSettei = v,
+                                          );
+                                        }
+                                      },
+                                      selectedColor: Colors.orange.shade700,
+                                      backgroundColor: Colors.grey.shade800,
+                                      labelStyle: const TextStyle(
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                "出場できない選手は、一次エントリーで選べません。出場できる選手が一次エントリーの人数より少ない大学は、出場できる全員が一次エントリーになります。",
+                                style: TextStyle(color: HENSUU.textcolor),
+                              ),
+                              if (kukansuuMeyasu < 10)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: Text(
+                                    "※区間数が${kukansuuMeyasu}より多いと、走る選手が区間数に足りない大学が出ることがあります。そのときは、足りない人数だけ上級生${_ryuugakuseiSettei == 1 ? '(それでも足りなければ留学生)' : ''}で補います。",
+                                    style: const TextStyle(
+                                      color: Colors.orangeAccent,
+                                    ),
+                                  ),
+                                ),
                               const SizedBox(height: 24),
                               Text(
                                 "獲得名声倍率 (1～10の整数)",
@@ -413,6 +503,12 @@ class _ModalCustomEkidenSettingsState extends State<ModalCustomEkidenSettings> {
                                       clampedDenominator;
 
                                   await ghToUpdate.save();
+
+                                  // 出場制限を更新(1.9.1)
+                                  await customSeigenHozon(
+                                    _gakunenSettei,
+                                    _ryuugakuseiSettei,
+                                  );
                                 }
                                 Navigator.pop(context);
                               },

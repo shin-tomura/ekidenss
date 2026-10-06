@@ -12,6 +12,8 @@ import 'package:ekiden/screens/Modal_matrix.dart';
 import 'package:ekiden/screens/ai_copy_matome.dart';
 import 'package:ekiden/screens/Modal_matrix2.dart';
 import 'package:ekiden/screens/Modal_matrix3.dart';
+import 'package:ekiden/kansuu/custom_seigen.dart'; // カスタム駅伝の出場制限(1.9.1)
+import 'package:ekiden/screens/custom_seigen_parts.dart';
 
 class Mode0150Content extends StatefulWidget {
   final Ghensuu ghensuu;
@@ -178,10 +180,25 @@ class _Mode0150ContentState extends State<Mode0150Content> {
             }
           }
 
-          if (countMinus1 != maxEntries) {
+          // カスタム駅伝の出場制限をかけているときは、大学ごとの定員と決まり(1.9.1)
+          int teiin = maxEntries;
+          String? seigenMondai;
+          if (raceIndex == customRaceBangou && customSeigenAri()) {
+            final CustomEntryJoukyou joukyou = customEntryJoukyou(
+              univ.id,
+              currentGhensuu.kukansuu_taikaigoto[raceIndex],
+              team: univSenshu,
+            );
+            teiin = joukyou.teiin;
+            seigenMondai = customEntryMondai(joukyou, univSenshu, raceIndex);
+          }
+
+          if (countMinus1 != teiin) {
             errorMessages.add('${univ.name}: 人数不備($countMinus1人)');
           } else if (hasInvalidValue) {
             errorMessages.add('${univ.name}: 未設定の選手がいます');
+          } else if (seigenMondai != null) {
+            errorMessages.add('${univ.name}: $seigenMondai');
           }
         }
         return errorMessages;
@@ -315,6 +332,20 @@ class _Mode0150ContentState extends State<Mode0150Content> {
                   : a.id.compareTo(b.id);
             });
 
+            // カスタム駅伝の出場制限(1.9.1)。かけているときは、定員を自分の大学のものにする
+            final CustomEntryJoukyou? joukyou =
+                (raceIndex == customRaceBangou && customSeigenAri())
+                ? customEntryJoukyou(
+                    myUnivId,
+                    currentGhensuu.kukansuu_taikaigoto[raceIndex],
+                    team: myTeamSenshu,
+                  )
+                : null;
+            if (joukyou != null) MAX_ENTRIES = joukyou.teiin;
+            final String seigenOshirase = raceIndex == customRaceBangou
+                ? customHojuuOshirase(myUnivid: myUnivId, ichijiEntry: true)
+                : '';
+
             final int currentEntryCount = _calculateEntryCount(
               myTeamSenshu,
               raceIndex,
@@ -381,6 +412,9 @@ class _Mode0150ContentState extends State<Mode0150Content> {
                         if (index == 0) {
                           return Column(
                             children: [
+                              // 出場制限で補った選手のお知らせ(1.9.1)
+                              if (seigenOshirase.isNotEmpty)
+                                CustomSeigenOshiraseBox(bun: seigenOshirase),
                               if (kantoku.yobiint2[17] == 1 &&
                                   (raceIndex <= 2 || raceIndex == 5))
                                 TextButton(
@@ -631,6 +665,16 @@ class _Mode0150ContentState extends State<Mode0150Content> {
                               -1;
                         }
 
+                        // 出場制限で選べない選手(入っている選手は外せるようにする。1.9.1)
+                        final bool erabenai =
+                            joukyou != null &&
+                            !isEntry &&
+                            !joukyou.erabeRu(senshu);
+                        final String seigenHyouji = customSeigenHyouji(
+                          joukyou,
+                          senshu,
+                        );
+
                         return Padding(
                           padding: const EdgeInsets.symmetric(
                             vertical: 4.0,
@@ -640,13 +684,15 @@ class _Mode0150ContentState extends State<Mode0150Content> {
                             children: [
                               Switch(
                                 value: isEntry,
-                                onChanged: (bool newValue) async {
-                                  await _updateEntryStatus(
-                                    senshu,
-                                    raceIndex,
-                                    newValue,
-                                  );
-                                },
+                                onChanged: erabenai
+                                    ? null
+                                    : (bool newValue) async {
+                                        await _updateEntryStatus(
+                                          senshu,
+                                          raceIndex,
+                                          newValue,
+                                        );
+                                      },
                                 activeColor: Colors.green,
                                 inactiveThumbColor: Colors.grey.shade400,
                               ),
@@ -654,9 +700,11 @@ class _Mode0150ContentState extends State<Mode0150Content> {
                                 child: Padding(
                                   padding: const EdgeInsets.only(left: 8.0),
                                   child: Text(
-                                    '${senshu.name} (${senshu.gakunen}年)',
-                                    style: const TextStyle(
-                                      color: HENSUU.textcolor,
+                                    '${senshu.name} (${senshu.gakunen}年)$seigenHyouji',
+                                    style: TextStyle(
+                                      color: erabenai
+                                          ? Colors.white38
+                                          : HENSUU.textcolor,
                                       fontSize: HENSUU.fontsize_honbun,
                                     ),
                                     softWrap: true,

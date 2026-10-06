@@ -19,6 +19,7 @@ import 'package:ekiden/screens/Modal_ChartHyojiHijyojiKirikae.dart';
 import 'package:ekiden/kansuu/joukai.dart';
 import 'package:ekiden/kansuu/konki_best.dart'; // 今季ベスト(1.9.1)
 import 'package:ekiden/screens/konki_best_parts.dart';
+import 'package:ekiden/kansuu/gin_tokkun_menu.dart'; // 夏合宿の銀特訓の練習メニュー(1.9.1)
 
 String _getCombinedDifficultyText(KantokuData kantoku, Ghensuu currentGhensuu) {
   // 難易度モードを取得 (0:通常, 1:極, 2:天)
@@ -1091,6 +1092,116 @@ class ModalTokkunSilver extends StatefulWidget {
 }
 
 class _ModalTokkunSilverState extends State<ModalTokkunSilver> {
+  /// 直前の銀特訓で伸びた能力のお知らせ(1.9.1)
+  String _kekka = '';
+
+  /// 能力の値が見えるか(見抜く力。番号は gin_tokkun_menu.dart と同じ)
+  bool _mieru(Ghensuu currentGhensuu, int bangou) {
+    return bangou < currentGhensuu.nouryokumieruflag.length &&
+        currentGhensuu.nouryokumieruflag[bangou] == 1;
+  }
+
+  /// 銀特訓を1回する(銀10で、メニューの能力が1つ+10。1.9.1)
+  Future<void> _ginTokkunSuru(
+    Ghensuu currentGhensuu,
+    SenshuData senshu,
+    int menuBangou,
+  ) async {
+    if (currentGhensuu.silverballsuu < 10) return;
+    final int? bangou = ginTokkunSuru(senshu, menuBangou, currentGhensuu.year);
+    if (bangou == null) return;
+    final String mei = ginTokkunNouryokuMei(bangou);
+    final int ato = ginTokkunNouryokuAtai(senshu, bangou);
+    setState(() {
+      currentGhensuu.silverballsuu -= 10;
+      _kekka = _mieru(currentGhensuu, bangou)
+          ? '${senshu.name}選手の$meiが伸びた！(${ato - 10}→$ato)'
+          : '${senshu.name}選手の$meiが伸びた！';
+    });
+    await currentGhensuu.save(); // Hiveに保存
+    await senshu.save(); // Hiveに保存
+  }
+
+  /// 銀特訓のメニュー1つ分(1.9.1)
+  /// スマホの文字を大きくしていても読めるように、名前・能力・ボタンを縦に並べる
+  Widget _ginMenuKoumoku({
+    required Ghensuu currentGhensuu,
+    required SenshuData senshu,
+    required int menuBangou,
+  }) {
+    final GinTokkunMenu menu = ginTokkunMenuList[menuBangou];
+    final bool eraberu = ginTokkunMenuEraberu(senshu, menuBangou);
+    final bool oseru = eraberu && currentGhensuu.silverballsuu >= 10;
+    // 伸びる能力(見抜く力があれば、今の値も出す)
+    final String nouryokuStr = menu.nouryoku
+        .map((bangou) {
+          final String mei = ginTokkunNouryokuMei(bangou);
+          return _mieru(currentGhensuu, bangou)
+              ? '$mei ${ginTokkunNouryokuAtai(senshu, bangou)}'
+              : mei;
+        })
+        .join('・');
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            menu.mei,
+            style: TextStyle(
+              color: HENSUU.textcolor,
+              fontSize: HENSUU.fontsize_honbun,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          Text(
+            '伸びる能力: $nouryokuStr',
+            style: TextStyle(
+              color: HENSUU.textcolor.withOpacity(0.8),
+              fontSize: HENSUU.fontsize_honbun * 0.9,
+            ),
+          ),
+          if (!eraberu)
+            Text(
+              '(伸びきっているので選べません)',
+              style: TextStyle(
+                color: Colors.grey,
+                fontSize: HENSUU.fontsize_honbun * 0.9,
+              ),
+            ),
+          const SizedBox(height: 4),
+          Align(
+            alignment: Alignment.centerRight,
+            child: ElevatedButton(
+              onPressed: oseru
+                  ? () => _ginTokkunSuru(currentGhensuu, senshu, menuBangou)
+                  : null, // 条件を満たさない場合はボタンを無効化
+              style: ElevatedButton.styleFrom(
+                backgroundColor: oseru
+                    ? Colors.green
+                    : Colors.grey, // 無効時はグレー
+                foregroundColor: Colors.black,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                minimumSize: const Size(100, 48),
+                padding: const EdgeInsets.all(12.0),
+              ),
+              child: Text(
+                "練習する",
+                style: TextStyle(
+                  fontSize: HENSUU.fontsize_honbun,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+          const Divider(color: Colors.grey),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Hive Boxにアクセス
@@ -1194,6 +1305,31 @@ class _ModalTokkunSilverState extends State<ModalTokkunSilver> {
                     ),
                     textAlign: TextAlign.center,
                   ),
+                  // 伸びた能力のお知らせ(1.9.1)
+                  if (_kekka.isNotEmpty)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12.0),
+                      margin: const EdgeInsets.symmetric(
+                        horizontal: 16.0,
+                        vertical: 8.0,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(8.0),
+                        border: Border.all(
+                          color: Colors.green.withOpacity(0.5),
+                        ),
+                      ),
+                      child: Text(
+                        _kekka,
+                        style: TextStyle(
+                          color: Colors.greenAccent,
+                          fontSize: HENSUU.fontsize_honbun,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
                   const Divider(color: Colors.grey),
 
                   Expanded(
@@ -1203,509 +1339,36 @@ class _ModalTokkunSilverState extends State<ModalTokkunSilver> {
                         // LazyVStackに相当
                         crossAxisAlignment: CrossAxisAlignment.start, // 左寄せ
                         children: <Widget>[
-                          // 長距離粘り (choukyorinebari)
-                          Row(
-                            // SwiftUIのHStackに相当
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              if (currentGhensuu.nouryokumieruflag[2] == 1)
-                                Text(
-                                  "長距離粘り ${targetSenshu.choukyorinebari}",
-                                  style: TextStyle(
-                                    color: HENSUU.textcolor,
-                                    fontSize: HENSUU.fontsize_honbun,
-                                  ),
-                                )
-                              else
-                                Text(
-                                  "長距離粘り",
-                                  style: TextStyle(
-                                    color: HENSUU.textcolor,
-                                    fontSize: HENSUU.fontsize_honbun,
-                                  ),
-                                ),
-                              ElevatedButton(
-                                onPressed:
-                                    (currentGhensuu.silverballsuu >= 10 &&
-                                        targetSenshu.choukyorinebari <= 89)
-                                    ? () async {
-                                        setState(() {
-                                          currentGhensuu.silverballsuu -= 10;
-                                          targetSenshu!.choukyorinebari += 10;
-                                        });
-                                        await currentGhensuu.save(); // Hiveに保存
-                                        await targetSenshu!.save(); // Hiveに保存
-                                      }
-                                    : null, // 条件を満たさない場合はボタンを無効化
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor:
-                                      (currentGhensuu.silverballsuu >= 10 &&
-                                          targetSenshu.choukyorinebari <= 89)
-                                      ? Colors.green
-                                      : Colors.grey, // 無効時はグレー
-                                  foregroundColor: Colors.black,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  minimumSize: const Size(100, 48),
-                                  padding: const EdgeInsets.all(12.0),
-                                ),
-                                child: Text(
-                                  "10up",
-                                  style: TextStyle(
-                                    fontSize: HENSUU.fontsize_honbun,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16), // 要素間のスペース
-                          // スパート力 (spurtryoku)
-                          Row(
-                            // SwiftUIのHStackに相当
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              if (currentGhensuu.nouryokumieruflag[3] == 1)
-                                Text(
-                                  "スパート力 ${targetSenshu.spurtryoku}",
-                                  style: TextStyle(
-                                    color: HENSUU.textcolor,
-                                    fontSize: HENSUU.fontsize_honbun,
-                                  ),
-                                )
-                              else
-                                Text(
-                                  "スパート力",
-                                  style: TextStyle(
-                                    color: HENSUU.textcolor,
-                                    fontSize: HENSUU.fontsize_honbun,
-                                  ),
-                                ),
-                              ElevatedButton(
-                                onPressed:
-                                    (currentGhensuu.silverballsuu >= 10 &&
-                                        targetSenshu.spurtryoku <= 89)
-                                    ? () async {
-                                        setState(() {
-                                          currentGhensuu.silverballsuu -= 10;
-                                          targetSenshu!.spurtryoku += 10;
-                                        });
-                                        await currentGhensuu.save(); // Hiveに保存
-                                        await targetSenshu!.save(); // Hiveに保存
-                                      }
-                                    : null, // 条件を満たさない場合はボタンを無効化
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor:
-                                      (currentGhensuu.silverballsuu >= 10 &&
-                                          targetSenshu.spurtryoku <= 89)
-                                      ? Colors.green
-                                      : Colors.grey, // 無効時はグレー
-                                  foregroundColor: Colors.black,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  minimumSize: const Size(100, 48),
-                                  padding: const EdgeInsets.all(12.0),
-                                ),
-                                child: Text(
-                                  "10up",
-                                  style: TextStyle(
-                                    fontSize: HENSUU.fontsize_honbun,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16), // 要素間のスペース
-                          // カリスマ (karisuma)
-                          Row(
-                            // SwiftUIのHStackに相当
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              if (currentGhensuu.nouryokumieruflag[4] == 1)
-                                Text(
-                                  "カリスマ ${targetSenshu.karisuma}",
-                                  style: TextStyle(
-                                    color: HENSUU.textcolor,
-                                    fontSize: HENSUU.fontsize_honbun,
-                                  ),
-                                )
-                              else
-                                Text(
-                                  "カリスマ",
-                                  style: TextStyle(
-                                    color: HENSUU.textcolor,
-                                    fontSize: HENSUU.fontsize_honbun,
-                                  ),
-                                ),
-                              ElevatedButton(
-                                onPressed:
-                                    (currentGhensuu.silverballsuu >= 10 &&
-                                        targetSenshu.karisuma <= 99)
-                                    ? () async {
-                                        setState(() {
-                                          currentGhensuu.silverballsuu -= 10;
-                                          targetSenshu!.karisuma += 10;
-                                        });
-                                        await currentGhensuu.save(); // Hiveに保存
-                                        await targetSenshu!.save(); // Hiveに保存
-                                      }
-                                    : null, // 条件を満たさない場合はボタンを無効化
-                                style: ElevatedButton.styleFrom(
-                                  // カリスマは99まで押せる(100を超えて伸ばせるのは意図どおり)ので、色も押せる条件と揃える(1.8.6)
-                                  backgroundColor:
-                                      (currentGhensuu.silverballsuu >= 10 &&
-                                          targetSenshu.karisuma <= 99)
-                                      ? Colors.green
-                                      : Colors.grey, // 無効時はグレー
-                                  foregroundColor: Colors.black,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  minimumSize: const Size(100, 48),
-                                  padding: const EdgeInsets.all(12.0),
-                                ),
-                                child: Text(
-                                  "10up",
-                                  style: TextStyle(
-                                    fontSize: HENSUU.fontsize_honbun,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16), // 要素間のスペース
-                          // 登り適性 (noboritekisei)
-                          Row(
-                            // SwiftUIのHStackに相当
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              if (currentGhensuu.nouryokumieruflag[5] == 1)
-                                Text(
-                                  "登り適性 ${targetSenshu.noboritekisei}",
-                                  style: TextStyle(
-                                    color: HENSUU.textcolor,
-                                    fontSize: HENSUU.fontsize_honbun,
-                                  ),
-                                )
-                              else
-                                Text(
-                                  "登り適性",
-                                  style: TextStyle(
-                                    color: HENSUU.textcolor,
-                                    fontSize: HENSUU.fontsize_honbun,
-                                  ),
-                                ),
-                              ElevatedButton(
-                                onPressed:
-                                    (currentGhensuu.silverballsuu >= 10 &&
-                                        targetSenshu.noboritekisei <= 89)
-                                    ? () async {
-                                        setState(() {
-                                          currentGhensuu.silverballsuu -= 10;
-                                          targetSenshu!.noboritekisei += 10;
-                                        });
-                                        await currentGhensuu.save(); // Hiveに保存
-                                        await targetSenshu!.save(); // Hiveに保存
-                                      }
-                                    : null, // 条件を満たさない場合はボタンを無効化
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor:
-                                      (currentGhensuu.silverballsuu >= 10 &&
-                                          targetSenshu.noboritekisei <= 89)
-                                      ? Colors.green
-                                      : Colors.grey, // 無効時はグレー
-                                  foregroundColor: Colors.black,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  minimumSize: const Size(100, 48),
-                                  padding: const EdgeInsets.all(12.0),
-                                ),
-                                child: Text(
-                                  "10up",
-                                  style: TextStyle(
-                                    fontSize: HENSUU.fontsize_honbun,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16), // 要素間のスペース
-                          // 下り適性 (kudaritekisei)
-                          Row(
-                            // SwiftUIのHStackに相当
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              if (currentGhensuu.nouryokumieruflag[6] == 1)
-                                Text(
-                                  "下り適性 ${targetSenshu.kudaritekisei}",
-                                  style: TextStyle(
-                                    color: HENSUU.textcolor,
-                                    fontSize: HENSUU.fontsize_honbun,
-                                  ),
-                                )
-                              else
-                                Text(
-                                  "下り適性",
-                                  style: TextStyle(
-                                    color: HENSUU.textcolor,
-                                    fontSize: HENSUU.fontsize_honbun,
-                                  ),
-                                ),
-                              ElevatedButton(
-                                onPressed:
-                                    (currentGhensuu.silverballsuu >= 10 &&
-                                        targetSenshu.kudaritekisei <= 89)
-                                    ? () async {
-                                        setState(() {
-                                          currentGhensuu.silverballsuu -= 10;
-                                          targetSenshu!.kudaritekisei += 10;
-                                        });
-                                        await currentGhensuu.save(); // Hiveに保存
-                                        await targetSenshu!.save(); // Hiveに保存
-                                      }
-                                    : null, // 条件を満たさない場合はボタンを無効化
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor:
-                                      (currentGhensuu.silverballsuu >= 10 &&
-                                          targetSenshu.kudaritekisei <= 89)
-                                      ? Colors.green
-                                      : Colors.grey, // 無効時はグレー
-                                  foregroundColor: Colors.black,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  minimumSize: const Size(100, 48),
-                                  padding: const EdgeInsets.all(12.0),
-                                ),
-                                child: Text(
-                                  "10up",
-                                  style: TextStyle(
-                                    fontSize: HENSUU.fontsize_honbun,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16), // 要素間のスペース
-                          // アップダウン対応力 (noborikudarikirikaenouryoku)
-                          Row(
-                            // SwiftUIのHStackに相当
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              // テキストをExpandedで囲むことで、残りのスペースを柔軟に利用させる
-                              Expanded(
-                                child:
-                                    // ★ここを三項演算子に変更します
-                                    currentGhensuu.nouryokumieruflag[7] == 1
-                                    ? Text(
-                                        "アップダウン対応力 ${targetSenshu.noborikudarikirikaenouryoku}",
-                                        style: TextStyle(
-                                          color: HENSUU.textcolor,
-                                          fontSize: HENSUU.fontsize_honbun,
-                                        ),
-                                        overflow: TextOverflow
-                                            .ellipsis, // 長すぎるテキストを省略
-                                        maxLines: 1,
-                                      )
-                                    : Text(
-                                        "アップダウン対応力",
-                                        style: TextStyle(
-                                          color: HENSUU.textcolor,
-                                          fontSize: HENSUU.fontsize_honbun,
-                                        ),
-                                        overflow: TextOverflow
-                                            .ellipsis, // 長すぎるテキストを省略
-                                        maxLines: 1,
-                                      ),
-                              ), // Expandedの閉じタグ
-                              ElevatedButton(
-                                onPressed:
-                                    (currentGhensuu.silverballsuu >= 10 &&
-                                        targetSenshu
-                                                .noborikudarikirikaenouryoku <=
-                                            89)
-                                    ? () async {
-                                        // ここは元のコードのまま
-                                        setState(() {
-                                          currentGhensuu.silverballsuu -= 10;
-                                          targetSenshu!
-                                                  .noborikudarikirikaenouryoku +=
-                                              10;
-                                        });
-                                        await currentGhensuu.save();
-                                        await targetSenshu!.save();
-                                      }
-                                    : null,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor:
-                                      (currentGhensuu.silverballsuu >= 10 &&
-                                          targetSenshu
-                                                  .noborikudarikirikaenouryoku <=
-                                              89)
-                                      ? Colors.green
-                                      : Colors.grey,
-                                  foregroundColor: Colors.black,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  minimumSize: const Size(100, 48),
-                                  padding: const EdgeInsets.all(12.0),
-                                ),
-                                child: Text(
-                                  "10up",
-                                  style: TextStyle(
-                                    fontSize: HENSUU.fontsize_honbun,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16), // 要素間のスペース
-                          // ロード適性 (tandokusou)
-                          Row(
-                            // SwiftUIのHStackに相当
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              if (currentGhensuu.nouryokumieruflag[8] == 1)
-                                Text(
-                                  "ロード適性 ${targetSenshu.tandokusou}",
-                                  style: TextStyle(
-                                    color: HENSUU.textcolor,
-                                    fontSize: HENSUU.fontsize_honbun,
-                                  ),
-                                )
-                              else
-                                Text(
-                                  "ロード適性",
-                                  style: TextStyle(
-                                    color: HENSUU.textcolor,
-                                    fontSize: HENSUU.fontsize_honbun,
-                                  ),
-                                ),
-                              ElevatedButton(
-                                onPressed:
-                                    (currentGhensuu.silverballsuu >= 10 &&
-                                        targetSenshu.tandokusou <= 89)
-                                    ? () async {
-                                        setState(() {
-                                          currentGhensuu.silverballsuu -= 10;
-                                          targetSenshu!.tandokusou += 10;
-                                        });
-                                        await currentGhensuu.save(); // Hiveに保存
-                                        await targetSenshu!.save(); // Hiveに保存
-                                      }
-                                    : null, // 条件を満たさない場合はボタンを無効化
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor:
-                                      (currentGhensuu.silverballsuu >= 10 &&
-                                          targetSenshu.tandokusou <= 89)
-                                      ? Colors.green
-                                      : Colors.grey, // 無効時はグレー
-                                  foregroundColor: Colors.black,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  minimumSize: const Size(100, 48),
-                                  padding: const EdgeInsets.all(12.0),
-                                ),
-                                child: Text(
-                                  "10up",
-                                  style: TextStyle(
-                                    fontSize: HENSUU.fontsize_honbun,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16), // 要素間のスペース
-                          // ペース変動対応力 (paceagesagetaiouryoku)
-                          Row(
-                            // SwiftUIのHStackに相当
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              // テキストをExpandedで囲むことで、残りのスペースを柔軟に利用させる
-                              Expanded(
-                                child: // ★ここが変更点：if文で直接ウィジェットを返す
-                                currentGhensuu.nouryokumieruflag[9] == 1
-                                    ? Text(
-                                        "ペース変動対応力 ${targetSenshu.paceagesagetaiouryoku}",
-                                        style: TextStyle(
-                                          color: HENSUU.textcolor,
-                                          fontSize: HENSUU.fontsize_honbun,
-                                        ),
-                                        overflow: TextOverflow
-                                            .ellipsis, // 長すぎるテキストを省略
-                                        maxLines: 1,
-                                      )
-                                    : Text(
-                                        "ペース変動対応力",
-                                        style: TextStyle(
-                                          color: HENSUU.textcolor,
-                                          fontSize: HENSUU.fontsize_honbun,
-                                        ),
-                                        overflow: TextOverflow
-                                            .ellipsis, // 長すぎるテキストを省略
-                                        maxLines: 1,
-                                      ),
-                              ), // Expandedの閉じタグ
-                              ElevatedButton(
-                                onPressed:
-                                    (currentGhensuu.silverballsuu >= 10 &&
-                                        targetSenshu.paceagesagetaiouryoku <=
-                                            89)
-                                    ? () async {
-                                        setState(() {
-                                          currentGhensuu.silverballsuu -= 10;
-                                          targetSenshu!.paceagesagetaiouryoku +=
-                                              10;
-                                        });
-                                        await currentGhensuu.save(); // Hiveに保存
-                                        await targetSenshu!.save(); // Hiveに保存
-                                      }
-                                    : null, // 条件を満たさない場合はボタンを無効化
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor:
-                                      (currentGhensuu.silverballsuu >= 10 &&
-                                          targetSenshu.paceagesagetaiouryoku <=
-                                              89)
-                                      ? Colors.green
-                                      : Colors.grey, // 無効時はグレー
-                                  foregroundColor: Colors.black,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  minimumSize: const Size(
-                                    100,
-                                    48,
-                                  ), // ボタンの最小サイズを保持
-                                  padding: const EdgeInsets.all(12.0),
-                                ),
-                                child: Text(
-                                  "10up",
-                                  style: TextStyle(
-                                    fontSize: HENSUU.fontsize_honbun,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16), // 要素間のスペース
-                          // 注意書きテキスト
+                          // 練習メニュー(1.9.1。能力を直接選ぶ形から、コンピュータの大学の銀の使い道と
+                          // 同じように練習メニューを選ぶ形にした。gin_tokkun_menu.dart)
                           Text(
-                            "※能力値が90以上の場合には、それ以上は能力値を上げられない仕様です。（カリスマは除く）",
+                            "練習メニューを選ぶと、銀10を使って、メニューに対応する能力が1つ10伸びます。",
                             style: TextStyle(
                               color: HENSUU.textcolor,
-                              fontSize: HENSUU.fontsize_honbun! * 0.8, // 少し小さめに
+                              fontSize: HENSUU.fontsize_honbun,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            "スピード練習と距離走は、2つの能力のうち、この夏に伸びやすいほうが選手ごとに決まっています(そちらが伸びきると、もう一方が伸びます)。",
+                            style: TextStyle(
+                              color: HENSUU.textcolor,
+                              fontSize: HENSUU.fontsize_honbun * 0.8, // 少し小さめに
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          for (int i = 0; i < ginTokkunMenuList.length; i++)
+                            _ginMenuKoumoku(
+                              currentGhensuu: currentGhensuu,
+                              senshu: targetSenshu,
+                              menuBangou: i,
+                            ),
+                          // 注意書きテキスト
+                          Text(
+                            "※能力値が90以上になった能力は、それ以上は伸びません(カリスマは除く)。メニューの能力がすべて伸びきったときは、そのメニューは選べません。",
+                            style: TextStyle(
+                              color: HENSUU.textcolor,
+                              fontSize: HENSUU.fontsize_honbun * 0.8, // 少し小さめに
                             ),
                           ),
                         ],

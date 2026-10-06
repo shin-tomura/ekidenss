@@ -1093,7 +1093,9 @@ class ModalTokkunSilver extends StatefulWidget {
 
 class _ModalTokkunSilverState extends State<ModalTokkunSilver> {
   /// 直前の銀特訓で伸びた能力のお知らせ(1.9.1)
-  String _kekka = '';
+  /// 1行目は選手、2行目は伸びた能力。まだ練習していないときは空で、案内の文を出す
+  String _kekkaSenshu = '';
+  String _kekkaNouryoku = '';
 
   /// 能力の値が見えるか(見抜く力。番号は gin_tokkun_menu.dart と同じ)
   bool _mieru(Ghensuu currentGhensuu, int bangou) {
@@ -1114,12 +1116,64 @@ class _ModalTokkunSilverState extends State<ModalTokkunSilver> {
     final int ato = ginTokkunNouryokuAtai(senshu, bangou);
     setState(() {
       currentGhensuu.silverballsuu -= 10;
-      _kekka = _mieru(currentGhensuu, bangou)
-          ? '${senshu.name}選手の$meiが伸びた！(${ato - 10}→$ato)'
-          : '${senshu.name}選手の$meiが伸びた！';
+      _kekkaSenshu = '${senshu.name}選手';
+      _kekkaNouryoku = _mieru(currentGhensuu, bangou)
+          ? '$meiが伸びた！(${ato - 10}→$ato)'
+          : '$meiが伸びた！';
     });
     await currentGhensuu.save(); // Hiveに保存
     await senshu.save(); // Hiveに保存
+  }
+
+  /// 伸びた能力のお知らせの枠(1.9.1)
+  /// 連打してもメニューの位置がずれないように、最初から出しておき、高さはいつも2行分にする
+  /// (2行分の高さは、見えない2行の文字で確保するので、スマホの文字の大きさの設定に合わせて決まる)。
+  /// 1行に入らない行は、その行だけ文字を縮めて1行に収める
+  Widget _kekkaWaku() {
+    final bool mada = _kekkaNouryoku.isEmpty;
+    final TextStyle style = TextStyle(
+      color: mada ? Colors.grey : Colors.greenAccent,
+      fontSize: HENSUU.fontsize_honbun,
+      fontWeight: FontWeight.bold,
+    );
+    Widget gyou(String text) => Expanded(
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.centerLeft,
+        child: Text(text, style: style, maxLines: 1, softWrap: false),
+      ),
+    );
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12.0),
+      margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      decoration: BoxDecoration(
+        color: Colors.green.withOpacity(mada ? 0.05 : 0.15),
+        borderRadius: BorderRadius.circular(8.0),
+        border: Border.all(color: Colors.green.withOpacity(0.5)),
+      ),
+      child: Stack(
+        children: [
+          // 2行分の高さを確保する見えない文字
+          Visibility(
+            visible: false,
+            maintainSize: true,
+            maintainAnimation: true,
+            maintainState: true,
+            child: Text('あ\nあ', style: style),
+          ),
+          Positioned.fill(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                gyou(mada ? '練習メニューを選ぶと、' : _kekkaSenshu),
+                gyou(mada ? 'ここに伸びた能力が出ます' : _kekkaNouryoku),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   /// 銀特訓のメニュー1つ分(1.9.1)
@@ -1161,14 +1215,7 @@ class _ModalTokkunSilverState extends State<ModalTokkunSilver> {
               fontSize: HENSUU.fontsize_honbun * 0.9,
             ),
           ),
-          if (!eraberu)
-            Text(
-              '(伸びきっているので選べません)',
-              style: TextStyle(
-                color: Colors.grey,
-                fontSize: HENSUU.fontsize_honbun * 0.9,
-              ),
-            ),
+          // 伸びきったときは、行を足さずにボタンの文字を変える(連打中にボタンの位置がずれないように)
           const SizedBox(height: 4),
           Align(
             alignment: Alignment.centerRight,
@@ -1188,7 +1235,7 @@ class _ModalTokkunSilverState extends State<ModalTokkunSilver> {
                 padding: const EdgeInsets.all(12.0),
               ),
               child: Text(
-                "練習する",
+                eraberu ? "練習する" : "伸びきった",
                 style: TextStyle(
                   fontSize: HENSUU.fontsize_honbun,
                   fontWeight: FontWeight.bold,
@@ -1296,8 +1343,10 @@ class _ModalTokkunSilverState extends State<ModalTokkunSilver> {
               body: Column(
                 // SwiftUIのVStackに相当
                 children: <Widget>[
+                  // 銀の残りは別の行にする(残りの桁が減って行の折り返しが変わり、
+                  // 連打中にメニューの位置がずれないように。1.9.1)
                   Text(
-                    "${targetSenshu.name}(${targetSenshu.gakunen}) に銀特訓をする 残${currentGhensuu.silverballsuu}",
+                    "${targetSenshu.name}(${targetSenshu.gakunen}) に銀特訓をする",
                     style: TextStyle(
                       color: HENSUU.textcolor,
                       fontSize: HENSUU.fontsize_honbun,
@@ -1305,31 +1354,16 @@ class _ModalTokkunSilverState extends State<ModalTokkunSilver> {
                     ),
                     textAlign: TextAlign.center,
                   ),
-                  // 伸びた能力のお知らせ(1.9.1)
-                  if (_kekka.isNotEmpty)
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12.0),
-                      margin: const EdgeInsets.symmetric(
-                        horizontal: 16.0,
-                        vertical: 8.0,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.green.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(8.0),
-                        border: Border.all(
-                          color: Colors.green.withOpacity(0.5),
-                        ),
-                      ),
-                      child: Text(
-                        _kekka,
-                        style: TextStyle(
-                          color: Colors.greenAccent,
-                          fontSize: HENSUU.fontsize_honbun,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                  Text(
+                    "残り 銀${currentGhensuu.silverballsuu}",
+                    style: TextStyle(
+                      color: HENSUU.textcolor,
+                      fontSize: HENSUU.fontsize_honbun,
                     ),
+                    textAlign: TextAlign.center,
+                  ),
+                  // 伸びた能力のお知らせ(1.9.1)
+                  _kekkaWaku(),
                   const Divider(color: Colors.grey),
 
                   Expanded(

@@ -1176,6 +1176,67 @@ class _ModalTokkunSilverState extends State<ModalTokkunSilver> {
     );
   }
 
+  /// 1.9.0までの、能力を直接選ぶ形の1行(能力の名前と「10up」。ginTokkunMenuShiki が false のとき)
+  /// 決まりは1.9.0までと同じ(89以下なら上げられる。カリスマは99以下。見抜く力がないと値は出さない)
+  Widget _chokusetsuGyou({
+    required Ghensuu currentGhensuu,
+    required SenshuData senshu,
+    required int bangou,
+  }) {
+    final bool oseru =
+        currentGhensuu.silverballsuu >= 10 &&
+        ginTokkunAgerareru(senshu, bangou);
+    final String mei = ginTokkunNouryokuMei(bangou);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16.0), // 要素間のスペース
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // 長い能力名でもはみ出さないように、残りの幅に収める
+          Expanded(
+            child: Text(
+              _mieru(currentGhensuu, bangou)
+                  ? "$mei ${ginTokkunNouryokuAtai(senshu, bangou)}"
+                  : mei,
+              style: TextStyle(
+                color: HENSUU.textcolor,
+                fontSize: HENSUU.fontsize_honbun,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: oseru
+                ? () async {
+                    setState(() {
+                      currentGhensuu.silverballsuu -= 10;
+                      ginTokkunNouryokuAgeru(senshu, bangou);
+                    });
+                    await currentGhensuu.save(); // Hiveに保存
+                    await senshu.save(); // Hiveに保存
+                  }
+                : null, // 条件を満たさない場合はボタンを無効化
+            style: ElevatedButton.styleFrom(
+              backgroundColor: oseru ? Colors.green : Colors.grey, // 無効時はグレー
+              foregroundColor: Colors.black,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              minimumSize: const Size(100, 48),
+              padding: const EdgeInsets.all(12.0),
+            ),
+            child: Text(
+              "10up",
+              style: TextStyle(
+                fontSize: HENSUU.fontsize_honbun,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// 銀特訓のメニュー1つ分(1.9.1)
   /// スマホの文字を大きくしていても読めるように、名前・能力・ボタンを縦に並べる
   Widget _ginMenuKoumoku({
@@ -1362,8 +1423,8 @@ class _ModalTokkunSilverState extends State<ModalTokkunSilver> {
                     ),
                     textAlign: TextAlign.center,
                   ),
-                  // 伸びた能力のお知らせ(1.9.1)
-                  _kekkaWaku(),
+                  // 伸びた能力のお知らせ(1.9.1。練習メニューの形のときだけ)
+                  if (ginTokkunMenuShiki) _kekkaWaku(),
                   const Divider(color: Colors.grey),
 
                   Expanded(
@@ -1375,36 +1436,56 @@ class _ModalTokkunSilverState extends State<ModalTokkunSilver> {
                         children: <Widget>[
                           // 練習メニュー(1.9.1。能力を直接選ぶ形から、コンピュータの大学の銀の使い道と
                           // 同じように練習メニューを選ぶ形にした。gin_tokkun_menu.dart)
-                          Text(
-                            "練習メニューを選ぶと、銀10を使って、メニューに対応する能力が1つ10伸びます。",
-                            style: TextStyle(
-                              color: HENSUU.textcolor,
-                              fontSize: HENSUU.fontsize_honbun,
+                          if (ginTokkunMenuShiki) ...[
+                            Text(
+                              "練習メニューを選ぶと、銀10を使って、メニューに対応する能力が1つ10伸びます。",
+                              style: TextStyle(
+                                color: HENSUU.textcolor,
+                                fontSize: HENSUU.fontsize_honbun,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            "スピード練習と距離走は、2つの能力のうち、この夏に伸びやすいほうが選手ごとに決まっています(そちらが伸びきると、もう一方が伸びます)。",
-                            style: TextStyle(
-                              color: HENSUU.textcolor,
-                              fontSize: HENSUU.fontsize_honbun * 0.8, // 少し小さめに
+                            const SizedBox(height: 4),
+                            Text(
+                              "スピード練習と距離走は、2つの能力のうち、この夏に伸びやすいほうが選手ごとに決まっています(そちらが伸びきると、もう一方が伸びます)。",
+                              style: TextStyle(
+                                color: HENSUU.textcolor,
+                                fontSize: HENSUU.fontsize_honbun * 0.8, // 少し小さめに
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 16),
-                          for (int i = 0; i < ginTokkunMenuList.length; i++)
-                            _ginMenuKoumoku(
-                              currentGhensuu: currentGhensuu,
-                              senshu: targetSenshu,
-                              menuBangou: i,
+                            const SizedBox(height: 16),
+                            for (int i = 0; i < ginTokkunMenuList.length; i++)
+                              _ginMenuKoumoku(
+                                currentGhensuu: currentGhensuu,
+                                senshu: targetSenshu,
+                                menuBangou: i,
+                              ),
+                            // 注意書きテキスト
+                            Text(
+                              "※能力値が90以上になった能力は、それ以上は伸びません(カリスマは除く)。メニューの能力がすべて伸びきったときは、そのメニューは選べません。",
+                              style: TextStyle(
+                                color: HENSUU.textcolor,
+                                fontSize: HENSUU.fontsize_honbun * 0.8, // 少し小さめに
+                              ),
                             ),
-                          // 注意書きテキスト
-                          Text(
-                            "※能力値が90以上になった能力は、それ以上は伸びません(カリスマは除く)。メニューの能力がすべて伸びきったときは、そのメニューは選べません。",
-                            style: TextStyle(
-                              color: HENSUU.textcolor,
-                              fontSize: HENSUU.fontsize_honbun * 0.8, // 少し小さめに
+                          ]
+                          // 1.9.0までの、能力を直接選んで「10up」を押す形
+                          // (gin_tokkun_menu.dart の ginTokkunMenuShiki を false にしたとき)
+                          else ...[
+                            for (final int bangou in ginTokkunChokusetsuNouryoku)
+                              _chokusetsuGyou(
+                                currentGhensuu: currentGhensuu,
+                                senshu: targetSenshu,
+                                bangou: bangou,
+                              ),
+                            // 注意書きテキスト
+                            Text(
+                              "※能力値が90以上の場合には、それ以上は能力値を上げられない仕様です。（カリスマは除く）",
+                              style: TextStyle(
+                                color: HENSUU.textcolor,
+                                fontSize: HENSUU.fontsize_honbun * 0.8, // 少し小さめに
+                              ),
                             ),
-                          ),
+                          ],
                         ],
                       ),
                     ),

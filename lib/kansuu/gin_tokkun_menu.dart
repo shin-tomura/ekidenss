@@ -19,6 +19,17 @@ import 'package:ekiden/senshu_data.dart';
 //     8ロード適性 9ペース変動対応力
 // ------------------------------------------------------------
 
+/// 銀特訓の形の切り替え(1.9.1。ここを書き換えてビルドし直すだけで切り替わる)
+///   true: 練習メニューを選ぶ形(1.9.1から)
+///   false: 1.9.0までの、能力を直接選んで「10up」を押す形
+/// 画面(senshu_screen.dart の ModalTokkunSilver)と説明書(shiyou_text.dart の銀特訓の行)が
+/// この値で書き分ける。切り替えたときは、変更履歴(ToDo.txt)だけ書き足す。
+/// コンピュータの大学の銀の使い方(goldsilver_com.dart)は、この値と関係ない
+const bool ginTokkunMenuShiki = true;
+
+/// 能力を直接選ぶ形(ginTokkunMenuShiki が false のとき)で並べる能力の番号(1.9.0までと同じ並び)
+const List<int> ginTokkunChokusetsuNouryoku = [2, 3, 4, 5, 6, 7, 8, 9];
+
 /// 銀特訓のメニュー1つ分
 class GinTokkunMenu {
   final String mei; // メニューの名前
@@ -84,8 +95,8 @@ int ginTokkunNouryokuAtai(SenshuData s, int bangou) {
   }
 }
 
-/// 能力に+10する
-void _juuAgeru(SenshuData s, int bangou) {
+/// 能力に+10する(上限の確認は呼び出し側で行う)
+void ginTokkunNouryokuAgeru(SenshuData s, int bangou) {
   switch (bangou) {
     case 2:
       s.choukyorinebari += 10;
@@ -156,7 +167,7 @@ int? ginTokkunSuru(SenshuData s, int menuBangou, int nen) {
   if (!ginTokkunMenuEraberu(s, menuBangou)) return null;
   for (final int bangou in _ageruJunban(s, menuBangou, nen)) {
     if (ginTokkunAgerareru(s, bangou)) {
-      _juuAgeru(s, bangou);
+      ginTokkunNouryokuAgeru(s, bangou);
       return bangou;
     }
   }

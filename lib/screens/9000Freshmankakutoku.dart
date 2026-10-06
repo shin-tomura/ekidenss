@@ -204,6 +204,7 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
     // 進路未定の選手の成功率をkegaflagに入れる(決まった選手と、あなたの大学に断った選手は目印のまま)
     final Map<int, double> seikouritsu = comScoutSeikouritsuIchiran(
       univid: myUnivId,
+      nen: _ghensuu!.year, // 変わり者を決めるのに使う(1.9.0)
     );
     for (final SenshuData s in _targetFreshmen) {
       if (comScoutKettei(s)) continue;
@@ -614,7 +615,8 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
               '(大学画面の「コンピュータスカウト」でOFFにすると、今まで通りのスカウトになります)。\n\n'
               '新入生は全員「進路未定」です(あなたの大学も含め、どの大学にも分かりません)。\n\n'
               '交渉するたびに、コンピュータの大学も同じラウンドで1人ずつ交渉し、成功した大学に確定します。'
-              '同じ選手に複数の大学が成功した場合は、名声の高い大学ほど選ばれやすい抽選で決まります。'
+              '同じ選手に複数の大学が成功した場合は争奪戦になり、選手が進学先を選びます(名声の高い大学ほど選ばれやすくなります)。'
+              'まれに、大学の名声をあまり気にしない新入生もいます。'
               '確定した選手は、その年はもう交渉に応じません。'
               '交渉に失敗した選手とは、その年はもう交渉できません(コンピュータの大学も同じです)。\n\n'
               '確定できるのは、日本人の新入生の枠(5人。留学生が入学する大学は4人)までです。'

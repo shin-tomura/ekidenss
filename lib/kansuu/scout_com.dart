@@ -42,6 +42,12 @@ import 'package:ekiden/kansuu/ShozokusakiKettei_By_Univmeisei.dart'; // 振り�
 //     大学ほど、持ちタイムの良い選手の成功率が下がる。どの大学も同じ10%で大物に挑めると、
 //     成功率の低い大物を後回しにするコンピュータより、粘って大物を狙う人間が有利になるため)
 // ・同じ選手に複数の大学が成功した場合は、名声の重みを付けた抽選で1校に決める(名声0は重み1)
+//   (画面では「争奪戦」と呼び、選手が進学先を選んだ形で出す。「抽選」という言葉は使わない。1.9.0)
+// ・変わり者(1.9.0): 日本人の新入生の約2%は、大学の名声をあまり気にしない(comScoutKawarimono)
+//     年と選手のidから決める(保存しない。開き直しても変わらない)
+//     成功率は、今の計算と「タイム順位による上限の半分」(名声が平均くらいの大学と同じ扱い)の高いほう
+//     争奪戦では、名声の重みを付けずに、成功した大学から等しい確率で選ぶ
+//     説明書には「まれに、大学の名声をあまり気にしない新入生もいる」とだけ書く(数字は書かない)
 // ・留学生は交渉の対象外(年度替わりの処理で決まった大学にそのまま入学する)
 // ・コンピュータの判断(見るのは5000m持ちタイムと能力の値そのもの。個性の設定や、
 //   プレイヤーにも見えない成長タイプ、仮の振り分けの大学は使わない)
@@ -545,10 +551,12 @@ String scoutSeikouritsuBun(int kegaflag) {
 /// 交渉の成功率(ONのとき。丸め方は scoutSeikouritsuMarume)
 /// 名声の比は全大学の平均の名声と比べる(仮の振り分けの大学によらないように)
 /// 成功率 = タイム順位による上限 × 名声の比 ÷ 75%(名声の比が75%以上なら上限のまま)
+/// [kawarimono] が true(変わり者)なら、上限の半分より下がらない(1.9.0)
 double _seikouritsu({
   required UnivData kousyouUniv,
   required double heikinMeisei,
   required int timeJuni,
+  bool kawarimono = false,
 }) {
   double meiseiHi;
   if (kousyouUniv.meisei_total + heikinMeisei > 0) {
@@ -560,8 +568,34 @@ double _seikouritsu({
   meiseiHi = meiseiHi.clamp(0.001, 0.9);
   final double jougen = (0.10 + (timeJuni - 1) * (0.75 - 0.10) / (87.0 - 1.0))
       .clamp(0.10, 0.75);
-  final double p = jougen * min(1.0, meiseiHi / _meiseiHiKijun);
+  double p = jougen * min(1.0, meiseiHi / _meiseiHiKijun);
+  if (kawarimono) {
+    p = max(p, jougen * _kawarimonoKouka);
+  }
   return scoutSeikouritsuMarume(p);
+}
+
+/// 変わり者の割合(1000人あたり。約2%)
+const int _kawarimonoPermil = 20;
+
+/// 変わり者の成功率の下限(タイム順位による上限に掛ける。名声が平均くらいの大学と同じ扱い)
+const double _kawarimonoKouka = 0.5;
+
+/// 変わり者を決めるための、年と選手idから作る数(保存しないで、いつも同じ値になるように)
+int _kawarimonoHash(int nen, int senshuId) {
+  int h = (nen * 73856093) ^ (senshuId * 19349663) ^ 0x5bd1e995;
+  h &= 0x7fffffff;
+  h = ((h ^ (h >> 15)) * 0x2c1b3c6d) & 0x7fffffff;
+  h = ((h ^ (h >> 12)) * 0x297a2d39) & 0x7fffffff;
+  h ^= h >> 15;
+  return h;
+}
+
+/// 変わり者(大学の名声をあまり気にしない新入生)かどうか(1.9.0。留学生は除く)
+/// 交渉方式(コンピュータスカウトON)でだけ使う
+bool comScoutKawarimono(SenshuData s, int nen) {
+  if (s.hirou == 1) return false;
+  return _kawarimonoHash(nen, s.id) % 1000 < _kawarimonoPermil;
 }
 
 /// 性格ごとの要件(まだ進路未定の新入生の中で、自校の方針での点数が上位何%以内か)
@@ -643,7 +677,11 @@ List<SenshuData> comScoutShinnyuusei() {
 }
 
 /// プレイヤーのスカウト画面に出す成功率(進路未定の新入生ごと。選手id → 成功率)
-Map<int, double> comScoutSeikouritsuIchiran({required int univid}) {
+/// [nen] は今の年(変わり者を決めるのに使う。1.9.0)
+Map<int, double> comScoutSeikouritsuIchiran({
+  required int univid,
+  required int nen,
+}) {
   final List<UnivData> sortedUnivData = _sortedUnivData();
   if (univid < 0 || univid >= sortedUnivData.length) return {};
   final List<SenshuData> shinnyuusei = comScoutShinnyuusei();
@@ -656,6 +694,7 @@ Map<int, double> comScoutSeikouritsuIchiran({required int univid}) {
           kousyouUniv: sortedUnivData[univid],
           heikinMeisei: heikin,
           timeJuni: timeJuni[s.id] ?? 999,
+          kawarimono: comScoutKawarimono(s, nen),
         ),
   };
 }
@@ -687,6 +726,11 @@ class ComScoutKekka {
   final bool seikou; // 交渉が成立したか
   final int kimariUnivid; // 確定した大学(成立しなかった場合は-1)
   final String riyuu; // 狙いの理由(コンピュータのみ。例: 登り重視・大物狙い)
+  // このラウンドで同じ選手と交渉した大学(成否を問わず。この大学も含む。1.9.0)
+  final List<int> kousyouUnivids;
+  // このラウンドで同じ選手との交渉が成立した大学(2校以上なら争奪戦。この大学も含む。1.9.0)
+  final List<int> seikouUnivids;
+  final bool kawarimono; // 変わり者(名声にこだわらずに選んだ。1.9.0)
 
   ComScoutKekka({
     required this.kousyouUnivid,
@@ -695,6 +739,9 @@ class ComScoutKekka {
     required this.seikou,
     required this.kimariUnivid,
     required this.riyuu,
+    this.kousyouUnivids = const [],
+    this.seikouUnivids = const [],
+    this.kawarimono = false,
   });
 }
 
@@ -717,6 +764,7 @@ class ComScoutKoudou {
   final int kimariUnivid; // 交渉が成立した選手が確定した大学(成立しなかった場合は-1)
   final int ketteiSuu; // このラウンドのあとの、進学先が決まった新入生の人数
   final int waku; // 日本人の新入生の枠
+  final bool kawarimono; // 交渉した選手が変わり者か(争奪戦のまとめで使う。1.9.0)
 
   ComScoutKoudou({
     required this.univid,
@@ -729,6 +777,7 @@ class ComScoutKoudou {
     required this.kimariUnivid,
     required this.ketteiSuu,
     required this.waku,
+    this.kawarimono = false,
   });
 }
 
@@ -885,6 +934,7 @@ Future<List<ComScoutKekka>> comScoutRound({
               kousyouUniv: univ,
               heikinMeisei: heikin,
               timeJuni: timeJuni[s.id] ?? 999,
+              kawarimono: comScoutKawarimono(s, gh.year),
             ),
           ),
         );
@@ -954,6 +1004,8 @@ Future<List<ComScoutKekka>> comScoutRound({
   }
 
   // 成功した交渉を選手ごとにまとめ、名声の重みを付けた抽選で1校に決めて確定させる
+  // (画面では「争奪戦」として、選手が進学先を選んだ形で出す。
+  //  変わり者は名声にこだわらないので、成功した大学から等しい確率で選ぶ。1.9.0)
   final Map<int, List<_Kousyou>> seikouBetsu = {};
   for (final _Kousyou k in kousyouList) {
     if (!k.seikou) continue;
@@ -962,13 +1014,16 @@ Future<List<ComScoutKekka>> comScoutRound({
   final Map<int, int> kimari = {}; // 選手id → 確定した大学
   for (final MapEntry<int, List<_Kousyou>> e in seikouBetsu.entries) {
     final List<_Kousyou> list = e.value;
+    final bool kawari = comScoutKawarimono(list.first.senshu, gh.year);
     final int idx = list.length == 1
         ? 0
         : _omomiChuusen(
             list
                 .map(
-                  (k) =>
-                      max(1, sortedUnivData[k.univid].meisei_total).toDouble(),
+                  (k) => kawari
+                      ? 1.0
+                      : max(1, sortedUnivData[k.univid].meisei_total)
+                            .toDouble(),
                 )
                 .toList(),
             rnd,
@@ -982,7 +1037,7 @@ Future<List<ComScoutKekka>> comScoutRound({
       print(
         '[COMスカウト] ラウンド$roundBangou ${kachi.senshu.name}は'
         '${list.map((k) => sortedUnivData[k.univid].name).join('・')}が競合 → '
-        '${sortedUnivData[kachi.univid].name}に確定',
+        '${sortedUnivData[kachi.univid].name}に確定${kawari ? '(変わり者)' : ''}',
       );
     }
   }
@@ -1021,9 +1076,16 @@ Future<List<ComScoutKekka>> comScoutRound({
           kimariUnivid: s == null ? -1 : (kimari[s.id] ?? -1),
           ketteiSuu: comScoutKetteiSuu(shinnyuusei, univ.id),
           waku: comScoutWaku(shinnyuusei, univ.id),
+          kawarimono: s != null && comScoutKawarimono(s, gh.year),
         ),
       );
     }
+  }
+
+  // 選手ごとの、このラウンドで交渉した大学と、交渉が成立した大学(争奪戦の表示に使う。1.9.0)
+  final Map<int, List<int>> kousyouBetsu = {};
+  for (final _Kousyou k in kousyouList) {
+    kousyouBetsu.putIfAbsent(k.senshu.id, () => []).add(k.univid);
   }
 
   return [
@@ -1035,6 +1097,13 @@ Future<List<ComScoutKekka>> comScoutRound({
         seikou: k.seikou,
         kimariUnivid: kimari[k.senshu.id] ?? -1,
         riyuu: k.riyuu,
+        kousyouUnivids: kousyouBetsu[k.senshu.id] ?? const <int>[],
+        seikouUnivids: [
+          for (final _Kousyou x
+              in seikouBetsu[k.senshu.id] ?? const <_Kousyou>[])
+            x.univid,
+        ],
+        kawarimono: comScoutKawarimono(k.senshu, gh.year),
       ),
   ];
 }
@@ -1150,8 +1219,14 @@ String comScoutTimeMoji(double time) => _timeMoji(time);
 Map<int, int> comScoutTimeJuni(List<SenshuData> shinnyuusei) =>
     _timeJuniTsukuru(shinnyuusei);
 
+/// 大学名を「△△大学・□□大学」の形でつなぐ
+String _univMeiNarabe(List<UnivData> sortedUnivData, Iterable<int> univids) =>
+    univids.map((u) => _univMei(sortedUnivData, u)).join('・');
+
 /// ラウンドの結果を、画面に出す文にする(プレイヤーの交渉を先に)
 /// [jibunNomi] がtrueなら、プレイヤーの交渉の結果だけ
+/// 同じ選手に複数の大学が成立したときは「争奪戦」として、選手が進学先を選んだ形で出す
+/// (中は名声の重みの抽選だが、「抽選」という言葉は使わない。1.9.0)
 List<String> comScoutKekkaBun(
   List<ComScoutKekka> kekka,
   int myUnivid, {
@@ -1162,17 +1237,47 @@ List<String> comScoutKekkaBun(
   final List<String> hoka = []; // ほかの大学の確定
   for (final ComScoutKekka k in kekka) {
     if (k.kousyouUnivid == myUnivid) {
+      final String name = '${k.senshuName}選手';
+      // 同じ選手と交渉した、ほかの大学(成否を問わず)
+      final List<int> hokaKousyou = k.kousyouUnivids
+          .where((u) => u != myUnivid)
+          .toList();
+      // 同じ選手との交渉が成立した、ほかの大学
+      final List<int> hokaSeikou = k.seikouUnivids
+          .where((u) => u != myUnivid)
+          .toList();
+      final String kodawarazu = k.kawarimono ? '名声にこだわらず、' : '';
       if (k.seikou && k.kimariUnivid == myUnivid) {
-        jibun.add('【確定】${k.senshuName}選手があなたの大学に確定しました！');
+        if (hokaSeikou.isNotEmpty) {
+          jibun.add(
+            '【争奪戦を制した】$nameは${_univMeiNarabe(sortedUnivData, hokaSeikou)}とも'
+            '交渉が成立していましたが、$kodawarazuあなたの大学を選びました！',
+          );
+        } else {
+          jibun.add('【確定】$nameがあなたの大学に確定しました！');
+          if (hokaKousyou.isNotEmpty) {
+            jibun.add(
+              '(${_univMeiNarabe(sortedUnivData, hokaKousyou)}も$nameと交渉していました)',
+            );
+          }
+        }
       } else if (k.seikou) {
         final String mei = _univMei(sortedUnivData, k.kimariUnivid);
         jibun.add(
-          '【競合】${k.senshuName}選手との交渉は成立しましたが、$meiと競合し、$meiに確定しました',
+          '【争奪戦に敗れた】$nameは${_univMeiNarabe(sortedUnivData, hokaSeikou)}とも'
+          '交渉が成立していて、$kodawarazu$meiを選びました',
         );
+      } else if (k.kimariUnivid >= 0) {
+        // 失敗したが、同じラウンドでほかの大学との交渉が成立した
+        final String mei = _univMei(sortedUnivData, k.kimariUnivid);
+        jibun.add('【先を越された】$nameとの交渉は失敗しました。$nameは$meiを選びました');
       } else {
-        jibun.add(
-          '【失敗】${k.senshuName}選手との交渉は失敗しました(この選手とは、今年はもう交渉できません)',
-        );
+        jibun.add('【失敗】$nameとの交渉は失敗しました(この選手とは、今年はもう交渉できません)');
+        if (hokaKousyou.isNotEmpty) {
+          jibun.add(
+            '(${_univMeiNarabe(sortedUnivData, hokaKousyou)}も$nameと交渉していました)',
+          );
+        }
       }
       continue;
     }
@@ -1186,18 +1291,70 @@ List<String> comScoutKekkaBun(
   return jibunNomi ? jibun : [...jibun, ...hoka];
 }
 
+/// 1ラウンドの行動から、争奪戦(同じ選手に2校以上が成立)を選手ごとにまとめる(1.9.0)
+/// 戻り値は 選手id → 成立した大学(大学id順)。「全大学の動きを見る」の画面で使う
+Map<int, List<int>> comScoutSoudatsusen(List<ComScoutKoudou> koudou) {
+  final Map<int, List<int>> seikou = {};
+  for (final ComScoutKoudou k in koudou) {
+    if (k.shurui != comScoutKoudouKousyou || !k.seikou || k.senshuId < 0) {
+      continue;
+    }
+    seikou.putIfAbsent(k.senshuId, () => []).add(k.univid);
+  }
+  seikou.removeWhere((_, v) => v.length < 2);
+  for (final List<int> v in seikou.values) {
+    v.sort();
+  }
+  return seikou;
+}
+
+/// 「全大学の動きを見る」の画面の上に出す、争奪戦のまとめの文(1.9.0)
+/// 例: 争奪戦 ○○選手(5000m 14分05秒) △△・□□・あなたの大学 → △△大学を選択
+List<String> comScoutSoudatsusenBun(List<ComScoutKoudou> koudou, int myUnivid) {
+  final List<UnivData> sortedUnivData = _sortedUnivData();
+  final Map<int, List<int>> soudatsu = comScoutSoudatsusen(koudou);
+  final List<String> bun = [];
+  for (final MapEntry<int, List<int>> e in soudatsu.entries) {
+    final ComScoutKoudou k = koudou.firstWhere(
+      (x) => x.senshuId == e.key && x.shurui == comScoutKoudouKousyou,
+    );
+    final String daigaku = e.value
+        .map(
+          (u) => u == myUnivid
+              ? 'あなたの大学'
+              : (u >= 0 && u < sortedUnivData.length
+                    ? sortedUnivData[u].name
+                    : '不明'),
+        )
+        .join('・');
+    final String kimari = k.kimariUnivid == myUnivid
+        ? 'あなたの大学'
+        : _univMei(sortedUnivData, k.kimariUnivid);
+    bun.add(
+      '争奪戦 ${k.senshuName}選手(5000m ${_timeMoji(k.senshuTime)}) '
+      '$daigaku → ${k.kawarimono ? '名声にこだわらず' : ''}$kimariを選択',
+    );
+  }
+  return bun;
+}
+
 /// 「ラウンドの結果」の画面に出す、大学の行動の文
-String comScoutKoudouBun(ComScoutKoudou k) {
+/// [soudatsusen] を渡すと、争奪戦になった交渉は「争奪戦を制した」「争奪戦の末△△大学へ」と出す(1.9.0)
+String comScoutKoudouBun(
+  ComScoutKoudou k, {
+  Map<int, List<int>> soudatsusen = const {},
+}) {
   switch (k.shurui) {
     case comScoutKoudouKousyou:
+      final bool soudatsu = soudatsusen.containsKey(k.senshuId);
       final String kekka;
       if (!k.seikou) {
         kekka = '失敗';
       } else if (k.kimariUnivid == k.univid) {
-        kekka = '確定';
+        kekka = soudatsu ? '確定(争奪戦を制した)' : '確定';
       } else {
         final String mei = _univMei(_sortedUnivData(), k.kimariUnivid);
-        kekka = '成立したが$meiと競合し、確定ならず';
+        kekka = '成立したが、争奪戦の末$meiへ';
       }
       return '${k.senshuName}選手(5000m ${_timeMoji(k.senshuTime)})に交渉 → $kekka';
     case comScoutKoudouMiokuri:

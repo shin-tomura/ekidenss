@@ -115,16 +115,26 @@ class _ScoutRoundKekkaScreenState extends State<ScoutRoundKekkaScreen> {
   }
 
   /// 大学ごとの一覧(あなたの大学を先頭に、そのあとは大学の順)
+  /// 争奪戦があったラウンドは、一覧の先頭に争奪戦のまとめを出す(1.9.0)
   Widget _ichiran(List<ComScoutKoudou> koudou, Map<int, UnivData> univs) {
     final List<ComScoutKoudou> narabi = [
       ...koudou.where((k) => k.univid == widget.myUnivid),
       ...koudou.where((k) => k.univid != widget.myUnivid),
     ];
+    final Map<int, List<int>> soudatsusen = comScoutSoudatsusen(koudou);
+    final List<String> matome = comScoutSoudatsusenBun(
+      koudou,
+      widget.myUnivid,
+    );
+    final int sakiSuu = matome.isEmpty ? 0 : 1; // 先頭のまとめの数
     return ListView.builder(
       padding: const EdgeInsets.all(12),
-      itemCount: narabi.length,
+      itemCount: narabi.length + sakiSuu,
       itemBuilder: (context, index) {
-        final ComScoutKoudou k = narabi[index];
+        if (index < sakiSuu) {
+          return _matomeCard(matome);
+        }
+        final ComScoutKoudou k = narabi[index - sakiSuu];
         final bool jibun = k.univid == widget.myUnivid;
         final bool kakutei =
             k.shurui == comScoutKoudouKousyou &&
@@ -178,7 +188,7 @@ class _ScoutRoundKekkaScreenState extends State<ScoutRoundKekkaScreen> {
                   ),
                 const SizedBox(height: 4),
                 Text(
-                  comScoutKoudouBun(k),
+                  comScoutKoudouBun(k, soudatsusen: soudatsusen),
                   style: TextStyle(
                     color: kakutei ? Colors.cyanAccent : HENSUU.textcolor,
                     fontSize: HENSUU.fontsize_honbun,
@@ -190,6 +200,46 @@ class _ScoutRoundKekkaScreenState extends State<ScoutRoundKekkaScreen> {
           ),
         );
       },
+    );
+  }
+
+  /// 争奪戦のまとめ(一覧の先頭に出す。1.9.0)
+  Widget _matomeCard(List<String> matome) {
+    return Card(
+      color: const Color(0xFF2A2418),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: const BorderSide(color: Colors.orangeAccent, width: 1.5),
+      ),
+      margin: const EdgeInsets.only(bottom: 10),
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'このラウンドの争奪戦',
+              style: TextStyle(
+                color: Colors.orangeAccent,
+                fontSize: HENSUU.fontsize_honbun,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 4),
+            for (final String bun in matome)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  bun,
+                  style: TextStyle(
+                    color: HENSUU.textcolor,
+                    fontSize: HENSUU.fontsize_honbun,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

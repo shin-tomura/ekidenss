@@ -153,6 +153,11 @@ class SettingsQrProcessor {
       data['k_yobiint2_58_62'] = kantoku.yobiint2.sublist(58, 63);
       // コンピュータスカウトの評価の割合(タイム:能力)(int) [63] (1.8.0で追加)
       data['k_yobiint2_63'] = kantoku.yobiint2[63];
+      // コンピュータスカウトの大学ごとの評価の割合と積極性(int) yobiint3[40]〜[69] (1.9.1で追加)
+      data['k_yobiint3_40_69'] = kantoku.yobiint3.sublist(
+        comScoutUnivSetteiIndex,
+        comScoutUnivSetteiIndex + 30,
+      );
       // 目標順位・指示の補正設定(int) [64]〜[67] (1.8.2で追加)
       data['k_yobiint2_64_67'] = kantoku.yobiint2.sublist(64, 68);
       // 能力のタイムへの影響度設定(int) [68]〜[74] (1.8.2で追加)
@@ -537,6 +542,17 @@ class SettingsQrProcessor {
       final dynamic yobiint2_63 = dataMap['k_yobiint2_63'];
       if (yobiint2_63 is int && comScoutTimeWariaiTadashii(yobiint2_63)) {
         kantoku.yobiint2[63] = yobiint2_63;
+      }
+      // コンピュータスカウトの大学ごとの評価の割合と積極性(int) kantoku.yobiint3[40]〜[69] (1.9.1)
+      //   割合のコード+積極性のコード×100。どちらも0なら全大学共通の設定(初期値)、1〜11なら(値−1)×10%
+      final dynamic yobiint3_40_69 = dataMap['k_yobiint3_40_69'];
+      if (yobiint3_40_69 is List && yobiint3_40_69.length == 30) {
+        for (int i = 0; i < 30; i++) {
+          final dynamic v = yobiint3_40_69[i];
+          if (v is int && comScoutUnivSetteiTadashii(v)) {
+            kantoku.yobiint3[comScoutUnivSetteiIndex + i] = v;
+          }
+        }
       }
       // 以下は1.8.2で追加した設定。古いQRコードには含まれないので、
       // 含まれていない場合や範囲外の値の場合は、今の設定のままにする

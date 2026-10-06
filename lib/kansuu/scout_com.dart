@@ -54,7 +54,7 @@ import 'package:ekiden/kansuu/ShozokusakiKettei_By_Univmeisei.dart'; // 振り�
 //     点数 = タイム点(新入生の中での持ちタイムの順位を0〜100点にしたもの)×タイムの割合
 //            + 能力点(スカウト方針で重視する能力の重み付き平均)×(1−タイムの割合)
 //       タイムの割合は全大学共通の設定(yobiint2[63]。0〜100%の10%刻み、初期値50%。1.8.0で追加。
-//       1.7.9までは50%で固定)
+//       1.7.9までは50%で固定)。1.9.1からは大学ごとにも変えられる(下の「大学ごとの割合と積極性」)
 //       (タイム重視は設定に関係なくタイム点だけ)
 //     スカウト方針(大学ごと、yobiint2[59]・[60]に1大学1桁)
 //       0自動: 長距離粘り・ロード適性(重み2)、ペース変動対応力(重み1)と、チーム事情による
@@ -75,6 +75,9 @@ import 'package:ekiden/kansuu/ShozokusakiKettei_By_Univmeisei.dart'; // 振り�
 //       ほとんどの選手が同じ成功率になるので、この順番で狙う選手が決まる)
 //     全大学が同じ選手に集中しないように、上から3人を3:2:1の重みの抽選で選ぶ
 //     積極性(全体): 各大学が1ラウンドで動く確率
+//     大学ごとの割合と積極性(1.9.1): KantokuData.yobiint3[40+大学id] に
+//       割合のコード + 積極性のコード×100 を入れる。どちらも0なら全大学共通の設定(初期値)、
+//       1〜11なら(値−1)×10%。ラウンド回数は全大学共通のまま(大学ごとにすると分かりにくいため)
 // ・デバッグ実行時は、VS Codeのデバッグコンソールに「[COMスカウト]」で始まるログを出す
 // ------------------------------------------------------------
 
@@ -220,6 +223,75 @@ void comScoutTimeWariaiSettei(List<int> yobiint2, int wariai) {
 /// 各種設定のQRコードから読んだタイムの割合の値が、正しい形かどうか
 bool comScoutTimeWariaiTadashii(int v) => v >= 0 && v <= 11;
 
+// ------------------------------------------------------------
+// 大学ごとの評価の割合と積極性(1.9.1)
+// ------------------------------------------------------------
+
+/// KantokuData.yobiint3 の使用番号: 大学ごとの評価の割合と積極性([40+大学id]。大学0〜29で[40]〜[69])
+/// 割合のコード + 積極性のコード×100。どちらも0なら全大学共通の設定(初期値)、1〜11なら(値−1)×10%
+const int comScoutUnivSetteiIndex = 40;
+
+/// 大学[univid]の割合と積極性を詰めた値(範囲外なら0)
+int _univSettei(List<int> yobiint3, int univid) {
+  if (univid < 0 || univid >= TEISUU.UNIVSUU) return 0;
+  final int idx = comScoutUnivSetteiIndex + univid;
+  if (yobiint3.length <= idx) return 0;
+  final int v = yobiint3[idx];
+  return v < 0 ? 0 : v;
+}
+
+/// コード(0なら共通、1〜11なら(値−1)×10%)を%にする(共通ならnull)
+int? _codeWariai(int code) =>
+    (code >= 1 && code <= 11) ? (code - 1) * 10 : null;
+
+/// %(nullなら共通)をコードにする(10%刻みに丸める)
+int _wariaiCode(int? wariai) =>
+    wariai == null ? 0 : (wariai.clamp(0, 100) / 10).round() + 1;
+
+/// 大学[univid]の評価のタイムの割合(大学ごとの設定。共通ならnull)
+int? comScoutTimeWariaiUnivSettei(KantokuData kantoku, int univid) =>
+    _codeWariai(_univSettei(kantoku.yobiint3, univid) % 100);
+
+/// 大学[univid]の積極性(大学ごとの設定。共通ならnull)
+int? comScoutSekkyokuseiUnivSettei(KantokuData kantoku, int univid) =>
+    _codeWariai((_univSettei(kantoku.yobiint3, univid) ~/ 100) % 100);
+
+/// 大学[univid]が新入生を評価するときのタイムの割合(大学ごとの設定がなければ全大学共通の設定)
+int comScoutTimeWariaiUniv(KantokuData kantoku, int univid) =>
+    comScoutTimeWariaiUnivSettei(kantoku, univid) ??
+    comScoutTimeWariai(kantoku);
+
+/// 大学[univid]の積極性(大学ごとの設定がなければ全大学共通の設定)
+int comScoutSekkyokuseiUniv(KantokuData kantoku, int univid) =>
+    comScoutSekkyokuseiUnivSettei(kantoku, univid) ??
+    comScoutSekkyokusei(kantoku);
+
+/// 大学[univid]の評価のタイムの割合をyobiint3のリストに書き込む([wariai]がnullなら共通。保存は呼び出し側で行う)
+void comScoutTimeWariaiUnivKaku(List<int> yobiint3, int univid, int? wariai) {
+  if (univid < 0 || univid >= TEISUU.UNIVSUU) return;
+  final int idx = comScoutUnivSetteiIndex + univid;
+  if (yobiint3.length <= idx) return;
+  final int v = _univSettei(yobiint3, univid);
+  yobiint3[idx] = (v ~/ 100) * 100 + _wariaiCode(wariai);
+}
+
+/// 大学[univid]の積極性をyobiint3のリストに書き込む([sekkyokusei]がnullなら共通。保存は呼び出し側で行う)
+void comScoutSekkyokuseiUnivKaku(
+  List<int> yobiint3,
+  int univid,
+  int? sekkyokusei,
+) {
+  if (univid < 0 || univid >= TEISUU.UNIVSUU) return;
+  final int idx = comScoutUnivSetteiIndex + univid;
+  if (yobiint3.length <= idx) return;
+  final int v = _univSettei(yobiint3, univid);
+  yobiint3[idx] = _wariaiCode(sekkyokusei) * 100 + v % 100;
+}
+
+/// 各種設定のQRコードから読んだ大学ごとの割合と積極性の値が、正しい形かどうか
+bool comScoutUnivSetteiTadashii(int v) =>
+    v >= 0 && v < 10000 && v % 100 <= 11 && v ~/ 100 <= 11;
+
 /// 1大学1桁で詰めた値(大学0〜14は[idx0]、15〜29は[idx1])から、大学の桁(0〜9)を取り出す
 int _univKetaYomu(List<int> yobiint2, int idx0, int idx1, int univid) {
   if (univid < 0 || univid >= _ketasuu * 2) return 0;
@@ -304,7 +376,7 @@ class _Mekiki {
   final int houshin; // スカウト方針(0〜7)
   final int seikaku; // 性格(1〜3。自動は名声順位で決めたもの)
   final List<int> hokyou; // 自動のときの補強ポイント(3登り・4下り・5アップダウン)
-  final int timeWariai; // 評価のタイムの割合(0〜100%。全大学共通の設定)
+  final int timeWariai; // 評価のタイムの割合(0〜100%。大学ごとの設定がなければ全大学共通の設定)
   // 能力のタイムへの影響度(全大学共通の設定。自動のときの重みに掛ける。1.8.2)
   final NouryokuEikyodo eikyodo;
 
@@ -466,7 +538,8 @@ _Mekiki _mekikiTsukuru(
     houshin: houshin,
     seikaku: seikaku,
     hokyou: hokyou,
-    timeWariai: comScoutTimeWariai(kantoku),
+    // 評価のタイムの割合(大学ごとの設定がなければ全大学共通の設定。1.9.1)
+    timeWariai: comScoutTimeWariaiUniv(kantoku, univ.id),
     eikyodo: eikyodo,
   );
 }
@@ -900,9 +973,10 @@ Future<List<ComScoutKekka>> comScoutRound({
     final List<SenshuData> nihonjin = shinnyuusei
         .where((s) => s.hirou != 1)
         .toList();
-    final int sekkyoku = comScoutSekkyokusei(kantoku);
     for (final UnivData univ in sortedUnivData) {
       if (univ.id == myUnivid) continue;
+      // 積極性(大学ごとの設定がなければ全大学共通の設定。1.9.1)
+      final int sekkyoku = comScoutSekkyokuseiUniv(kantoku, univ.id);
       final _Mekiki m = _mekikiTsukuru(kantoku, univ, zenSenshu);
       if (comScoutKetteiSuu(shinnyuusei, univ.id) >=
           comScoutWaku(shinnyuusei, univ.id)) {

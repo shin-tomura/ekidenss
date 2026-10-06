@@ -15,6 +15,8 @@ import 'package:ekiden/qr_gallery_scanner_screen.dart';
 import 'package:ekiden/kansuu/ChartPanelSenshu.dart';
 import 'package:ekiden/screens/Modal_ChartHyojiHijyojiKirikae.dart';
 import 'package:ekiden/kansuu/joukai.dart';
+import 'package:ekiden/kansuu/konki_best.dart'; // 今季ベスト(1.9.1)
+import 'package:ekiden/screens/konki_best_parts.dart';
 
 // タイムを「分秒」形式の文字列に変換するヘルパー関数
 String _timeToMinuteSecondString(double time) {
@@ -355,6 +357,8 @@ class _ModalSenshuDetailViewState extends State<ModalSenshuDetailView> {
             final String menuName = TrainingMenu.getMenuString(
               currentSenshu.kaifukuryoku,
             );
+            // 今季ベストの学内順位・全体順位(自己ベストの行の下に出す。1.9.1)
+            final KonkiBestJuni konkiJuni = KonkiBestJuni();
             // 提示されたコードに基づき、表示用の基本走力(aInt)を計算
             int newbint = 1550;
             int b_int = (currentSenshu.b * 10000.0).toInt();
@@ -627,29 +631,39 @@ class _ModalSenshuDetailViewState extends State<ModalSenshuDetailView> {
                             currentSenshu.gakunaijuni_bestkiroku[0],
                             currentSenshu.zentaijuni_bestkiroku[0],
                           ),
+                          konkiBestGyou(currentSenshu, 0, konkiJuni),
                           _buildBestRecordRow(
                             '1万best',
                             currentSenshu.time_bestkiroku[1],
                             currentSenshu.gakunaijuni_bestkiroku[1],
                             currentSenshu.zentaijuni_bestkiroku[1],
                           ),
+                          konkiBestGyou(currentSenshu, 1, konkiJuni),
                           _buildBestRecordRow(
                             'ハーフbest',
                             currentSenshu.time_bestkiroku[2],
                             currentSenshu.gakunaijuni_bestkiroku[2],
                             currentSenshu.zentaijuni_bestkiroku[2],
                           ),
+                          konkiBestGyou(currentSenshu, 2, konkiJuni),
                           _buildBestRecordRow_full(
                             'フルbest',
                             currentSenshu.time_bestkiroku[3],
                             currentSenshu.gakunaijuni_bestkiroku[3],
                             currentSenshu.zentaijuni_bestkiroku[3],
                           ),
+                          konkiBestGyou(currentSenshu, 3, konkiJuni),
                           _buildBestRecordRow(
                             '登り1万best',
                             currentSenshu.time_bestkiroku[4],
                             currentSenshu.gakunaijuni_bestkiroku[4],
                             null,
+                          ),
+                          konkiBestGyou(
+                            currentSenshu,
+                            4,
+                            konkiJuni,
+                            zentaiAri: false,
                           ),
                           _buildBestRecordRow(
                             '下り1万best',
@@ -657,17 +671,35 @@ class _ModalSenshuDetailViewState extends State<ModalSenshuDetailView> {
                             currentSenshu.gakunaijuni_bestkiroku[5],
                             null,
                           ),
+                          konkiBestGyou(
+                            currentSenshu,
+                            5,
+                            konkiJuni,
+                            zentaiAri: false,
+                          ),
                           _buildBestRecordRow(
                             'ロード1万best',
                             currentSenshu.time_bestkiroku[6],
                             currentSenshu.gakunaijuni_bestkiroku[6],
                             null,
                           ),
+                          konkiBestGyou(
+                            currentSenshu,
+                            6,
+                            konkiJuni,
+                            zentaiAri: false,
+                          ),
                           _buildBestRecordRow(
                             'クロカン1万best',
                             currentSenshu.time_bestkiroku[7],
                             currentSenshu.gakunaijuni_bestkiroku[7],
                             null,
+                          ),
+                          konkiBestGyou(
+                            currentSenshu,
+                            7,
+                            konkiJuni,
+                            zentaiAri: false,
                           ),
 
                           const SizedBox(height: 16),

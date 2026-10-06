@@ -17,6 +17,7 @@ import 'package:ekiden/album.dart';
 import 'package:ekiden/fastest_filteredplayer.dart';
 import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/kansuu/gakuren_kantoku.dart';
+import 'package:ekiden/kansuu/konki_best.dart'; // 今季ベスト(1.9.1)
 
 List<int> kukanIDs = [];
 
@@ -280,9 +281,10 @@ Future<List<int>> EntryCalc({
             double hosei_tani = 0.0;
             double hosei_time = 0.0;
             double temp_time = 0.0;
+            // 持ちタイムは今季ベスト(なければ自己ベスト)を使う(1.9.1。konki_best.dart)
             if (senshu.time_bestkiroku.length > 2 &&
                 gh[0].kyori_taikai_kukangoto[racebangou][kukanIndex] > 15000) {
-              temp_time = senshu.time_bestkiroku[2];
+              temp_time = hikakuMochiTime(senshu, 2);
               hosei_tani = 105.4875 / 100.0;
               if (kukanIndex == 0) {
                 kukanbetuhosei =
@@ -304,7 +306,7 @@ Future<List<int>> EntryCalc({
               senshuKyoriScore = (-5 / 12) * temp_time + 1625;
             } else if (senshu.time_bestkiroku.length > 1 &&
                 gh[0].kyori_taikai_kukangoto[racebangou][kukanIndex] > 7500) {
-              temp_time = senshu.time_bestkiroku[1];
+              temp_time = hikakuMochiTime(senshu, 1);
               hosei_tani = 50.0 / 100.0;
               if (kukanIndex == 0) {
                 //補正なし
@@ -325,7 +327,7 @@ Future<List<int>> EntryCalc({
               }
               senshuKyoriScore = (-10 / 9) * temp_time + 1983.33;
             } else if (senshu.time_bestkiroku.length > 0) {
-              temp_time = senshu.time_bestkiroku[0];
+              temp_time = hikakuMochiTime(senshu, 0);
               hosei_tani = 25.0 / 100.0;
               if (kukanIndex == 0) {
                 //補正なし
@@ -767,9 +769,10 @@ Future<List<int>> EntryCalc({
         double hosei_tani = 0.0;
         double hosei_time = 0.0;
         double temp_time = 0.0;
+        // 持ちタイムは今季ベスト(なければ自己ベスト)を使う(1.9.1。konki_best.dart)
         if (senshu.time_bestkiroku.length > 2 &&
             gh[0].kyori_taikai_kukangoto[racebangou][kukanIndex] > 15000) {
-          temp_time = senshu.time_bestkiroku[2];
+          temp_time = hikakuMochiTimeGakuren(senshu, 2);
           hosei_tani = 105.4875 / 100.0;
           if (kukanIndex == 0) {
             kukanbetuhosei =
@@ -791,7 +794,7 @@ Future<List<int>> EntryCalc({
           senshuKyoriScore = (-5 / 12) * temp_time + 1625;
         } else if (senshu.time_bestkiroku.length > 1 &&
             gh[0].kyori_taikai_kukangoto[racebangou][kukanIndex] > 7500) {
-          temp_time = senshu.time_bestkiroku[1];
+          temp_time = hikakuMochiTimeGakuren(senshu, 1);
           hosei_tani = 50.0 / 100.0;
           if (kukanIndex == 0) {
             //補正なし
@@ -812,7 +815,7 @@ Future<List<int>> EntryCalc({
           }
           senshuKyoriScore = (-10 / 9) * temp_time + 1983.33;
         } else if (senshu.time_bestkiroku.length > 0) {
-          temp_time = senshu.time_bestkiroku[0];
+          temp_time = hikakuMochiTimeGakuren(senshu, 0);
           hosei_tani = 25.0 / 100.0;
           if (kukanIndex == 0) {
             //補正なし
@@ -1072,10 +1075,11 @@ Future<List<int>> EntryCalc({
               double hosei_tani = 0.0;
               double hosei_time = 0.0;
               double temp_time = 0.0;
+              // 持ちタイムは今季ベスト(なければ自己ベスト)を使う(1.9.1。konki_best.dart)
               if (senshu.time_bestkiroku.length > 2 &&
                   gh[0].kyori_taikai_kukangoto[racebangou][kukanIndex] >
                       15000) {
-                temp_time = senshu.time_bestkiroku[2];
+                temp_time = hikakuMochiTime(senshu, 2);
                 hosei_tani = 105.4875 / 100.0;
                 if (kukanIndex == 0) {
                   kukanbetuhosei =
@@ -1097,7 +1101,7 @@ Future<List<int>> EntryCalc({
                 senshuKyoriScore = (-5 / 12) * temp_time + 1625;
               } else if (senshu.time_bestkiroku.length > 1 &&
                   gh[0].kyori_taikai_kukangoto[racebangou][kukanIndex] > 7500) {
-                temp_time = senshu.time_bestkiroku[1];
+                temp_time = hikakuMochiTime(senshu, 1);
                 hosei_tani = 50.0 / 100.0;
                 if (kukanIndex == 0) {
                   //補正なし
@@ -1118,7 +1122,7 @@ Future<List<int>> EntryCalc({
                 }
                 senshuKyoriScore = (-10 / 9) * temp_time + 1983.33;
               } else if (senshu.time_bestkiroku.length > 0) {
-                temp_time = senshu.time_bestkiroku[0];
+                temp_time = hikakuMochiTime(senshu, 0);
                 hosei_tani = 25.0 / 100.0;
                 if (kukanIndex == 0) {
                   //補正なし
@@ -1237,8 +1241,9 @@ Future<List<int>> EntryCalc({
         .where((s) => s.time_bestkiroku.length > 1)
         .toList();
 
+    // 1万mの今季ベスト(なければ自己ベスト)の速い順(1.9.1)
     time10000junsenshudata.sort(
-      (a, b) => a.time_bestkiroku[1].compareTo(b.time_bestkiroku[1]),
+      (a, b) => hikakuMochiTime(a, 1).compareTo(hikakuMochiTime(b, 1)),
     );
 
     for (

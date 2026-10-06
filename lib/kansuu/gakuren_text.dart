@@ -11,6 +11,7 @@ import 'package:ekiden/kansuu/time_date.dart';
 import 'package:ekiden/kansuu/kukannai_juni.dart'; // 持ちタイムの区間内順位(1.8.8)
 import 'package:ekiden/kansuu/gakuren_kantoku.dart';
 import 'package:ekiden/kansuu/setsumei_sontoku.dart'; // 補正の損得と指示の成否の書き足し(1.8.8)
+import 'package:ekiden/kansuu/konki_best.dart'; // 今季ベスト(1.9.1)
 
 // ------------------------------------------------------------
 // 学連選抜のテキスト(1.8.2)
@@ -198,11 +199,13 @@ List<SenshuData> _kukanDaigakuSenshu(int kukan) {
 
 /// 区間配置確認の「全大学詳細リスト」と同じ形で、学連選抜の選手の詳しい情報を書く
 /// 持ちタイムの「区」は、その区間を走る大学の選手と比べた順位(○位相当)。補欠は「区」を書かない
+/// [konki]を渡したときは、持ちタイムを今季ベストで書く(順位も今季ベストで比べる。1.9.1)
 void gakurenSenshuShousaiKaku(
   StringBuffer sb,
   Senshu_Gakuren_Data s,
-  Ghensuu gh,
-) {
+  Ghensuu gh, {
+  KonkiBestJuni? konki,
+}) {
   final int kukan = gakurenEntry(s);
   final bool hashiru =
       kukan >= 0 && kukan < gh.kukansuu_taikaigoto[_raceIndex];
@@ -226,7 +229,39 @@ void gakurenSenshuShousaiKaku(
   final String yosen = _yosenBun(s);
   if (yosen.isNotEmpty) sb.writeln('  $yosen');
 
+  // 今季ベストで書くとき(1.9.1)
+  String getKonkiRec(KonkiBestJuni konki, int idx, bool showRank) {
+    final double time = konkiBestGakuren(s, idx);
+    if (time >= TEISUU.DEFAULTTIME) {
+      return konkiKirokuNashiBun(
+        s.time_bestkiroku.length > idx
+            ? s.time_bestkiroku[idx]
+            : TEISUU.DEFAULTTIME,
+        idx,
+      );
+    }
+    String base = TimeDate.timeToFunByouString(time);
+    final List<String> juniList = [];
+    if (hashiru) {
+      // 夏の学内タイムトライアルの4種目は、区間を走る大学の選手全員に今季の記録があるときだけ
+      final int juni = konki.hikakuJuni(
+        time,
+        idx,
+        daigaku,
+        zenninHitsuyou: !showRank,
+      );
+      if (juni > 0) juniList.add('区間内$juni位相当');
+    }
+    final int renJuni = gakurenNaiJuni(s, idx, konki: true);
+    if (renJuni > 0) juniList.add('学連選抜内$renJuni位');
+    if (showRank) juniList.add('全体${konki.zentai(time, idx)}位');
+    if (juniList.isNotEmpty) base += " [${juniList.join(' ')}]";
+    return base;
+  }
+
   String getRec(int idx, bool showRank) {
+    final KonkiBestJuni? k = konki;
+    if (k != null) return getKonkiRec(k, idx, showRank);
     if (s.time_bestkiroku.length <= idx ||
         s.time_bestkiroku[idx] == TEISUU.DEFAULTTIME) {
       return "記録無";
@@ -275,25 +310,27 @@ void gakurenSenshuShousaiKaku(
 /// 学連選抜の選手全員に記録があるときだけ出す(記録のない選手がいると0)。
 /// 学連選抜の選手の「学内」(所属大学の中の順位)を、生成AIが学連選抜の中の順位と読み違えるので、
 /// 区間配置確認の画面とコピーでは、こちらを出す
-int gakurenNaiJuni(Senshu_Gakuren_Data s, int idx) {
-  if (s.time_bestkiroku.length <= idx ||
-      s.time_bestkiroku[idx] >= TEISUU.DEFAULTTIME) {
-    return 0;
+/// [konki]がtrueなら今季ベストで比べる(1.9.1)
+int gakurenNaiJuni(Senshu_Gakuren_Data s, int idx, {bool konki = false}) {
+  double kiroku(Senshu_Gakuren_Data d) {
+    if (konki) return konkiBestGakuren(d, idx);
+    if (d.time_bestkiroku.length <= idx) return TEISUU.DEFAULTTIME;
+    return d.time_bestkiroku[idx];
   }
-  final double time = s.time_bestkiroku[idx];
+
+  final double time = kiroku(s);
+  if (time >= TEISUU.DEFAULTTIME) return 0;
   int juni = 1;
   for (final Senshu_Gakuren_Data d in Hive.box<Senshu_Gakuren_Data>(
     'gakurenSenshuBox',
   ).values) {
     if (d.id == s.id) continue;
-    final bool kirokuAri =
-        d.time_bestkiroku.length > idx &&
-        d.time_bestkiroku[idx] < TEISUU.DEFAULTTIME;
-    if (!kirokuAri) {
+    final double t = kiroku(d);
+    if (t >= TEISUU.DEFAULTTIME) {
       if (ttShumoku(idx)) return 0;
       continue;
     }
-    if (d.time_bestkiroku[idx] < time) juni++;
+    if (t < time) juni++;
   }
   return juni;
 }
@@ -301,9 +338,23 @@ int gakurenNaiJuni(Senshu_Gakuren_Data s, int idx) {
 /// 学連選抜の選手[s]の種目[idx]の持ちタイムを、走る区間の大学の選手と比べた順位相当(1が1位相当)。
 /// 区間を走らない(補欠)ときや記録がないときは0(区間配置確認の画面の「区」で使う。1.8.2)
 /// 夏の学内タイムトライアルの4種目は、区間を走る大学の選手全員に記録があるときだけ出す(1.8.8)
-int gakurenKukanJuniSoutou(Senshu_Gakuren_Data s, int idx, Ghensuu gh) {
+/// [konki]を渡したときは、今季ベストで比べる(1.9.1)
+int gakurenKukanJuniSoutou(
+  Senshu_Gakuren_Data s,
+  int idx,
+  Ghensuu gh, {
+  KonkiBestJuni? konki,
+}) {
   final int kukan = gakurenEntry(s);
   if (kukan < 0 || kukan >= gh.kukansuu_taikaigoto[_raceIndex]) return 0;
+  if (konki != null) {
+    return konki.hikakuJuni(
+      konkiBestGakuren(s, idx),
+      idx,
+      _kukanDaigakuSenshu(kukan),
+      zenninHitsuyou: ttShumoku(idx),
+    );
+  }
   if (s.time_bestkiroku.length <= idx ||
       s.time_bestkiroku[idx] == TEISUU.DEFAULTTIME) {
     return 0;
@@ -332,6 +383,8 @@ const String gakurenKukanJuniChuui =
 /// 学連選抜の区間配置のテキスト(学連選抜の区間配置の画面からコピーする)
 String gakurenKukanHaitiText(Ghensuu gh) {
   final int kukansuu = gh.kukansuu_taikaigoto[_raceIndex];
+  // 持ちタイムを今季ベストで表示しているときは、今季ベストで書く(1.9.1)
+  final KonkiBestJuni? konki = konkiBestHyoujiChuu() ? KonkiBestJuni() : null;
   final List<Senshu_Gakuren_Data> senshu = Hive.box<Senshu_Gakuren_Data>(
     'gakurenSenshuBox',
   ).values.toList();
@@ -350,7 +403,7 @@ String gakurenKukanHaitiText(Ghensuu gh) {
       sb.writeln('(選手が決まっていません)');
       sb.writeln("-----------------------------------");
     } else {
-      gakurenSenshuShousaiKaku(sb, s, gh);
+      gakurenSenshuShousaiKaku(sb, s, gh, konki: konki);
     }
   }
   // 補欠(予選の順位の良い順)
@@ -369,10 +422,11 @@ String gakurenKukanHaitiText(Ghensuu gh) {
   if (hoketsu.isNotEmpty) {
     sb.writeln('=== 補欠 ===');
     for (final s in hoketsu) {
-      gakurenSenshuShousaiKaku(sb, s, gh);
+      gakurenSenshuShousaiKaku(sb, s, gh, konki: konki);
     }
   }
   sb.writeln('');
+  if (konki != null) sb.writeln(konkiBestChuui);
   sb.writeln(gakurenKukanJuniChuui);
   sb.writeln('※「全体」はその種目の学生全体での持ちタイムの順位です。');
   sb.writeln(ttKirokuChuui);

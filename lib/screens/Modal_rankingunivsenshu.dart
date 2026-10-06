@@ -7,6 +7,8 @@ import 'package:ekiden/senshu_data.dart';
 import 'package:ekiden/kansuu/time_date.dart';
 // ModalSenshuDetailView を使用するため、インポートを有効にします
 import 'package:ekiden/screens/Modal_senshu.dart';
+import 'package:ekiden/kansuu/konki_best.dart'; // 今季ベスト(1.9.1)
+import 'package:ekiden/screens/konki_best_parts.dart';
 
 // ------------------------------------------------
 // 新しい種目定義: timeIndex 0から7に対応
@@ -99,10 +101,12 @@ class _ModalUnivSenshuRankingViewState
   }
 
   // 大学内の選手ランキングリストを作成
+  // [konki]がtrueなら今季ベストで並べる(今季ベストのない選手は「---」で最後。1.9.1)
   List<SenshuTime> _createUnivSenshuRanking(
     List<SenshuData> allSenshuData,
     int targetUnivId,
     DisplayEvent event,
+    bool konki,
   ) {
     final int timeIndex = _getTimeIndex(event);
     List<SenshuTime> rankingList = [];
@@ -119,7 +123,9 @@ class _ModalUnivSenshuRankingViewState
         continue;
       }
 
-      final double senshuTime = senshu.time_bestkiroku[timeIndex];
+      final double senshuTime = konki
+          ? konkiBest(senshu, timeIndex)
+          : senshu.time_bestkiroku[timeIndex];
 
       rankingList.add(SenshuTime(senshu, senshuTime, timeIndex));
     }
@@ -170,19 +176,22 @@ class _ModalUnivSenshuRankingViewState
           builder: (context, senshudataBox, _) {
             final List<SenshuData> allSenshuData = senshudataBox.values
                 .toList();
+            // 持ちタイムを今季ベストで表示しているか(1.9.1)
+            final bool konki = konkiBestHyoujiChuu();
 
             // 1. 大学内の選手ランキングを計算
             final List<SenshuTime> ranking = _createUnivSenshuRanking(
               allSenshuData,
               targetUnivId,
               _displayEvent,
+              konki,
             );
 
             return Scaffold(
               backgroundColor: HENSUU.backgroundcolor,
               appBar: AppBar(
                 title: Text(
-                  '$univName 選手別 ${currentEventLabel}ランキング',
+                  '$univName 選手別 $currentEventLabel${konki ? ' 今季' : ''}ランキング',
                   style: const TextStyle(color: Colors.white, fontSize: 16),
                 ),
                 backgroundColor: HENSUU.backgroundcolor,
@@ -190,6 +199,8 @@ class _ModalUnivSenshuRankingViewState
               ),
               body: Column(
                 children: <Widget>[
+                  // --- 持ちタイムの切り替え(自己ベスト/今季ベスト。1.9.1) ---
+                  KonkiBestKirikae(onChanged: () => setState(() {})),
                   // --- ランキング一覧リスト ---
                   Expanded(
                     child: ranking.isEmpty

@@ -6,6 +6,8 @@ import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/senshu_data.dart';
 import 'package:ekiden/kansuu/time_date.dart';
 import 'package:ekiden/screens/Modal_senshu.dart';
+import 'package:ekiden/kansuu/konki_best.dart'; // 今季ベスト(1.9.1)
+import 'package:ekiden/screens/konki_best_parts.dart';
 
 // ------------------------------------------------
 // 新しい種目定義: timeIndex 0から7に対応
@@ -104,10 +106,12 @@ class _ModalAllUnivSenshuRankingViewState
   }
 
   // ★ 改良：ランキング作成ロジックに学年フィルタを追加
+  // [konki]がtrueなら今季ベストで並べ、今季ベストのない選手は入れない(1.9.1)
   List<SenshuTime> _createAllUnivSenshuRanking(
     List<SenshuData> allSenshuData,
     DisplayEvent event,
     int filterGakunen,
+    bool konki,
   ) {
     final int timeIndex = _getTimeIndex(event);
     List<SenshuTime> rankingList = [];
@@ -115,6 +119,13 @@ class _ModalAllUnivSenshuRankingViewState
     for (final senshu in allSenshuData) {
       // 学年フィルタリング
       if (filterGakunen != 0 && senshu.gakunen != filterGakunen) {
+        continue;
+      }
+
+      if (konki) {
+        final double konkiTime = konkiBest(senshu, timeIndex);
+        if (konkiTime >= TEISUU.DEFAULTTIME) continue;
+        rankingList.add(SenshuTime(senshu, konkiTime, timeIndex));
         continue;
       }
 
@@ -144,17 +155,20 @@ class _ModalAllUnivSenshuRankingViewState
       valueListenable: senshudataBox.listenable(),
       builder: (context, box, _) {
         final List<SenshuData> allSenshuData = box.values.toList();
+        // 持ちタイムを今季ベストで表示しているか(1.9.1)
+        final bool konki = konkiBestHyoujiChuu();
         final List<SenshuTime> ranking = _createAllUnivSenshuRanking(
           allSenshuData,
           _displayEvent,
           _selectedGakunen,
+          konki,
         );
 
         return Scaffold(
           backgroundColor: HENSUU.backgroundcolor,
           appBar: AppBar(
             title: Text(
-              '${_getGakunenLabel(_selectedGakunen)} ${_getEventLabel(_displayEvent)} TOP30',
+              '${_getGakunenLabel(_selectedGakunen)} ${_getEventLabel(_displayEvent)}${konki ? ' 今季' : ''} TOP30',
               style: const TextStyle(color: Colors.white, fontSize: 16),
             ),
             backgroundColor: HENSUU.backgroundcolor,
@@ -162,6 +176,8 @@ class _ModalAllUnivSenshuRankingViewState
           ),
           body: Column(
             children: <Widget>[
+              // --- 持ちタイムの切り替え(自己ベスト/今季ベスト。1.9.1) ---
+              KonkiBestKirikae(onChanged: () => setState(() {})),
               // --- 学年切り替えタブ ---
               _buildGakunenSelector(),
 
@@ -170,7 +186,9 @@ class _ModalAllUnivSenshuRankingViewState
                 child: ranking.isEmpty
                     ? Center(
                         child: Text(
-                          '該当する選手がいません',
+                          konki
+                              ? '今季はまだこの種目の記録がありません'
+                              : '該当する選手がいません',
                           style: TextStyle(color: HENSUU.textcolor),
                         ),
                       )

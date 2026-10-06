@@ -12,6 +12,8 @@ import 'package:ekiden/kansuu/gakuren_kantoku.dart';
 import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/senshu_gakuren_data.dart';
 import 'package:ekiden/screens/Modal_senshu.dart';
+import 'package:ekiden/kansuu/konki_best.dart'; // 今季ベスト(1.9.1)
+import 'package:ekiden/screens/konki_best_parts.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -32,6 +34,10 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
   final ScreenshotController _screenshotController = ScreenshotController();
   int? _selectedUnivId;
   bool _isExporting = false;
+
+  // 持ちタイムを今季ベストで表示しているときの順位表(build のたびに作り直す。
+  // 自己ベストで表示しているときはnull。1.9.1)
+  KonkiBestJuni? _konkiJuni;
 
   String _formatDoubleToFixed(double value, int fractionDigits) {
     return value.toStringAsFixed(fractionDigits);
@@ -73,7 +79,7 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '${univ.name} - 区間配置 (${showDetail ? "詳細" : "標準"})',
+              '${univ.name} - 区間配置 (${showDetail ? (_konkiJuni != null ? "詳細・今季ベスト" : "詳細") : "標準"})',
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 32,
@@ -297,6 +303,8 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
                 final displaySenshuData = allSenshuData
                     .where((s) => s.univid == _selectedUnivId)
                     .toList();
+                // 持ちタイムを今季ベストで表示しているときの順位表(1.9.1)
+                _konkiJuni = konkiBestHyoujiChuu() ? KonkiBestJuni() : null;
 
                 if (currentGhensuu.hyojiracebangou == 4) {
                   displaySenshuData.sort((a, b) {
@@ -333,6 +341,8 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
                       body: Column(
                         children: [
                           _buildUnivSelector(entryUnivs, gakurenAri),
+                          // 持ちタイムの切り替え(自己ベスト/今季ベスト。1.9.1)
+                          KonkiBestKirikae(onChanged: () => setState(() {})),
                           const Divider(color: Colors.white24, height: 1),
                           Expanded(
                             child: _selectedUnivId == _gakurenId
@@ -842,12 +852,21 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
     int idx,
     bool showRank,
   ) {
-    final bool hasRecord =
-        g.time_bestkiroku.length > idx &&
-        g.time_bestkiroku[idx] != TEISUU.DEFAULTTIME;
-    final int kukanJuni = gakurenKukanJuniSoutou(g, idx, gh);
+    // 今季ベストで表示しているときは、タイムも順位も今季ベスト(1.9.1)
+    final KonkiBestJuni? konki = _konkiJuni;
+    final double jikoBest = g.time_bestkiroku.length > idx
+        ? g.time_bestkiroku[idx]
+        : TEISUU.DEFAULTTIME;
+    final double time = konki != null ? konkiBestGakuren(g, idx) : jikoBest;
+    final bool hasRecord = time < TEISUU.DEFAULTTIME;
+    final int kukanJuni = gakurenKukanJuniSoutou(g, idx, gh, konki: konki);
     // 学連選抜の選手の中での順位(所属大学の中の順位の「学」の代わりに出す。1.8.8)
-    final int renJuni = gakurenNaiJuni(g, idx);
+    final int renJuni = gakurenNaiJuni(g, idx, konki: konki != null);
+    final int zentaiJuni = !hasRecord
+        ? 0
+        : (konki != null
+              ? konki.zentai(time, idx)
+              : g.zentaijuni_bestkiroku[idx] + 1);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
@@ -865,17 +884,10 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
             ),
           ),
           if (!hasRecord)
-            const Text(
-              "記録無",
-              style: TextStyle(
-                color: Colors.white38,
-                fontSize: 13,
-                decoration: TextDecoration.none,
-              ),
-            )
+            _kirokuNashi(konki != null, jikoBest, idx)
           else ...[
             Text(
-              TimeDate.timeToFunByouString(g.time_bestkiroku[idx]),
+              TimeDate.timeToFunByouString(time),
               style: const TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
@@ -893,8 +905,7 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
                   // タイムトライアルの4種目も、区間を走る大学の選手全員に記録があれば出す(1.8.8)
                   if (kukanJuni > 0) _rankTagBun("区", "$kukanJuni相当"),
                   if (renJuni > 0) _rankTag("連", renJuni),
-                  if (showRank)
-                    _rankTag("全", g.zentaijuni_bestkiroku[idx] + 1),
+                  if (showRank) _rankTag("全", zentaiJuni),
                 ],
               ),
             ),
@@ -1137,6 +1148,10 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
     int idx,
     bool showRank,
   ) {
+    final KonkiBestJuni? konki = _konkiJuni;
+    if (konki != null) {
+      return _buildKonkiRecordRow(gh, s, label, idx, showRank, konki);
+    }
     final bool hasRecord = s.time_bestkiroku[idx] != TEISUU.DEFAULTTIME;
     // 夏の学内タイムトライアルの4種目は、その区間を走る選手全員に記録があるときだけ
     // 区間内順位も出す(0なら出さない。1.8.8)
@@ -1198,6 +1213,97 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
             ),
           ],
         ],
+      ),
+    );
+  }
+
+  // 今季ベストで表示しているときの持ちタイムの行(1.9.1)
+  // 「区」はその区間を走る選手、「学」は大学の選手、「全」は全選手の中での今季ベストの順位
+  // (夏の学内タイムトライアルの4種目の「区」は、自己ベストのときと同じく、
+  //  その区間を走る選手全員に今季の記録があるときだけ出す)
+  Widget _buildKonkiRecordRow(
+    Ghensuu gh,
+    SenshuData s,
+    String label,
+    int idx,
+    bool showRank,
+    KonkiBestJuni konki,
+  ) {
+    final double time = konki.best(s, idx);
+    final bool hasRecord = time < TEISUU.DEFAULTTIME;
+    int kukanJuni = 0;
+    final int race = gh.hyojiracebangou;
+    if (hasRecord &&
+        s.gakunen >= 1 &&
+        s.entrykukan_race.length > race &&
+        s.entrykukan_race[race].length >= s.gakunen) {
+      final int kukan = s.entrykukan_race[race][s.gakunen - 1];
+      if (kukan >= 0) {
+        kukanJuni = konki.hikakuJuni(
+          time,
+          idx,
+          kukanHashiruSenshu(race, kukan),
+          zenninHitsuyou: !showRank,
+        );
+      }
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 85,
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 13,
+                decoration: TextDecoration.none,
+              ),
+            ),
+          ),
+          if (!hasRecord)
+            _kirokuNashi(true, s.time_bestkiroku[idx], idx)
+          else ...[
+            Text(
+              TimeDate.timeToFunByouString(time),
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+                decoration: TextDecoration.none,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Wrap(
+                alignment: WrapAlignment.end,
+                spacing: 4,
+                runSpacing: 4,
+                children: [
+                  if (kukanJuni > 0) _rankTag("区", kukanJuni),
+                  _rankTag("学", konki.gakunai(time, idx, s.univid)),
+                  if (showRank) _rankTag("全", konki.zentai(time, idx)),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // 持ちタイムの記録がないときの文([konki]がtrueなら、今季の記録がないことと参考の自己ベスト。1.9.1)
+  Widget _kirokuNashi(bool konki, double jikoBest, int idx) {
+    return Expanded(
+      child: Text(
+        konki ? konkiKirokuNashiBun(jikoBest, idx) : "記録無",
+        style: const TextStyle(
+          color: Colors.white38,
+          fontSize: 13,
+          decoration: TextDecoration.none,
+        ),
       ),
     );
   }
@@ -1289,6 +1395,8 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
     final allSenshus = sBox.values
         .where((s) => s.univid == _selectedUnivId)
         .toList();
+    // 持ちタイムを今季ベストで表示しているときは、今季ベストで書く(1.9.1)
+    final KonkiBestJuni? konki = konkiBestHyoujiChuu() ? KonkiBestJuni() : null;
 
     String modeName = mode == 2 ? "詳細版" : (mode == 1 ? "簡易版" : "超簡易版");
     StringBuffer sb = StringBuffer();
@@ -1299,6 +1407,10 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
       final target = allSenshus
           .where((s) => s.entrykukan_race[raceIdx][s.gakunen - 1] == i)
           .toList();
+      // この区間を走る選手(今季ベストの区間内順位に使う。1.9.1)
+      final List<SenshuData> kukanSenshu = konki != null && mode == 2
+          ? kukanHashiruSenshu(raceIdx, i)
+          : const <SenshuData>[];
       for (var s in target) {
         String kukanLabel = "${i + 1}${raceIdx == 3 ? "組" : "区"}";
         if (raceIdx == 4) kukanLabel = "正月駅伝予選";
@@ -1336,6 +1448,9 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
 
           // 記録情報の生成用サブ関数
           String getRec(int idx, bool showRank) {
+            if (konki != null) {
+              return _konkiRec(konki, s, idx, showRank, kukanSenshu, mode == 2);
+            }
             if (s.time_bestkiroku[idx] == TEISUU.DEFAULTTIME) return "記録無";
             String base = TimeDate.timeToFunByouString(s.time_bestkiroku[idx]);
             if (mode == 2) {
@@ -1370,6 +1485,9 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
         sb.writeln('');
       }
     }
+    if (konki != null && mode >= 1) {
+      sb.writeln("\n$konkiBestChuui");
+    }
     if (mode == 2) {
       sb.writeln("\n$mochiTimeJuniChuui");
       sb.writeln(ttKirokuChuui);
@@ -1377,6 +1495,41 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
 
     return sb.toString();
   }
+}
+
+/// 今季ベストで書く持ちタイムの文(区間配置確認のテキストと全大学詳細リストで使う。1.9.1)
+/// [juniAri]がtrueなら順位も書く(区間内はその区間を走る選手[kukanSenshu]、学内は大学、全体は全選手の中での順位。
+/// 夏の学内タイムトライアルの4種目の区間内順位は、区間を走る選手全員に今季の記録があるときだけ書く)
+String _konkiRec(
+  KonkiBestJuni konki,
+  SenshuData s,
+  int idx,
+  bool showRank,
+  List<SenshuData> kukanSenshu,
+  bool juniAri,
+) {
+  final double time = konki.best(s, idx);
+  if (time >= TEISUU.DEFAULTTIME) {
+    return konkiKirokuNashiBun(s.time_bestkiroku[idx], idx);
+  }
+  String base = TimeDate.timeToFunByouString(time);
+  if (!juniAri) return base;
+  final int kukanJuni = konki.hikakuJuni(
+    time,
+    idx,
+    kukanSenshu,
+    zenninHitsuyou: !showRank,
+  );
+  final int gakunai = konki.gakunai(time, idx, s.univid);
+  if (showRank) {
+    base +=
+        " [区間内$kukanJuni位 学内$gakunai位 全体${konki.zentai(time, idx)}位]";
+  } else {
+    base += kukanJuni > 0
+        ? " [区間内$kukanJuni位 学内$gakunai位]"
+        : " [学内$gakunai位]";
+  }
+  return base;
 }
 
 /// 全区間・全大学詳細リストのテキスト(区間配置確認の「全大学一括出力」の全区間と同じ文)
@@ -1387,13 +1540,16 @@ String zenKukanZenDaigakuText() {
   final int raceIdx = currentGhensuu.hyojiracebangou;
   final int kukanCount = currentGhensuu.kukansuu_taikaigoto[raceIdx];
 
+  // 持ちタイムを今季ベストで表示しているときの順位表(区間ごとに作り直さないよう、先に作る。1.9.1)
+  final KonkiBestJuni? konki = konkiBestHyoujiChuu() ? KonkiBestJuni() : null;
+
   StringBuffer sb = StringBuffer();
   sb.writeln("=== 全区間・全大学詳細リスト ===");
   sb.writeln("-----------------------------------\n");
 
   for (int i = 0; i < kukanCount; i++) {
     // 既存の単一区間生成ロジックを再利用
-    sb.write(kukanZenDaigakuText(i));
+    sb.write(kukanZenDaigakuText(i, konkiJuni: konki));
     sb.writeln("\n"); // 区間ごとに改行を入れる
   }
 
@@ -1401,7 +1557,9 @@ String zenKukanZenDaigakuText() {
 }
 
 /// 指定された区間の全大学選手リスト（詳細版フォーマット）のテキスト(1.8.2で画面の外に出した)
-String kukanZenDaigakuText(int targetKukanIdx) {
+/// 持ちタイムを今季ベストで表示しているときは、今季ベストで書く(1.9.1)
+/// ([konkiJuni]は今季ベストの順位表。渡さなければここで作る)
+String kukanZenDaigakuText(int targetKukanIdx, {KonkiBestJuni? konkiJuni}) {
   final gBox = Hive.box<Ghensuu>('ghensuuBox');
   final sBox = Hive.box<SenshuData>('senshuBox');
   final uBox = Hive.box<UnivData>('univBox');
@@ -1423,6 +1581,10 @@ String kukanZenDaigakuText(int targetKukanIdx) {
     raceIdx,
     targetKukanIdx,
   );
+  // 持ちタイムを今季ベストで表示しているときの順位表(1.9.1)
+  final KonkiBestJuni? konki = konkiBestHyoujiChuu()
+      ? (konkiJuni ?? KonkiBestJuni())
+      : null;
 
   StringBuffer sb = StringBuffer();
   String kyoristring =
@@ -1482,6 +1644,9 @@ String kukanZenDaigakuText(int targetKukanIdx) {
 
         // 記録情報の生成用ローカル関数 (詳細版固定)
         String getRec(int idx, bool showRank) {
+          if (konki != null) {
+            return _konkiRec(konki, s, idx, showRank, kukanSenshu, true);
+          }
           if (s.time_bestkiroku[idx] == TEISUU.DEFAULTTIME) return "記録無";
           String base = TimeDate.timeToFunByouString(s.time_bestkiroku[idx]);
 
@@ -1530,10 +1695,16 @@ String kukanZenDaigakuText(int targetKukanIdx) {
     );
     if (gakurenSenshu != null) {
       hasEntry = true;
-      gakurenSenshuShousaiKaku(sb, gakurenSenshu, currentGhensuu);
+      gakurenSenshuShousaiKaku(
+        sb,
+        gakurenSenshu,
+        currentGhensuu,
+        konki: konki,
+      );
     }
   }
 
+  if (konki != null) sb.writeln("\n$konkiBestChuui");
   sb.writeln("\n$mochiTimeJuniChuui");
   sb.writeln(ttKirokuChuui);
   if (gakurenAri) {

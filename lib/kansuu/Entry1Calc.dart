@@ -12,6 +12,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 //import 'package:ekiden/Shuudansou.dart';
 //import 'package:ekiden/senshu_r_data.dart';
 import 'package:ekiden/album.dart';
+import 'package:ekiden/kansuu/konki_best.dart'; // 今季ベスト(1.9.1)
 
 List<int> kukanIDs = [];
 
@@ -119,8 +120,9 @@ Future<List<int>> Entry1Calc({
               (s) => s.time_bestkiroku.isNotEmpty && s.univid == id_univ,
             ) // time_bestkirokuが空でないことを確認
             .toList();
+        // 持ちタイムは今季ベスト(なければ自己ベスト)を使う(1.9.1。konki_best.dart)
         time5000junsenshudata.sort(
-          (a, b) => a.time_bestkiroku[0].compareTo(b.time_bestkiroku[0]),
+          (a, b) => hikakuMochiTime(a, 0).compareTo(hikakuMochiTime(b, 0)),
         );
 
         List<SenshuData> time10000junsenshudata = sortedSenshuData
@@ -131,7 +133,7 @@ Future<List<int>> Entry1Calc({
             ) // time_bestkiroku[1]が存在することを確認
             .toList();
         time10000junsenshudata.sort(
-          (a, b) => a.time_bestkiroku[1].compareTo(b.time_bestkiroku[1]),
+          (a, b) => hikakuMochiTime(a, 1).compareTo(hikakuMochiTime(b, 1)),
         );
 
         List<SenshuData> timehalfjunsenshudata = sortedSenshuData
@@ -142,7 +144,7 @@ Future<List<int>> Entry1Calc({
             ) // time_bestkiroku[1]が存在することを確認
             .toList();
         timehalfjunsenshudata.sort(
-          (a, b) => a.time_bestkiroku[2].compareTo(b.time_bestkiroku[2]),
+          (a, b) => hikakuMochiTime(a, 2).compareTo(hikakuMochiTime(b, 2)),
         );
         int hoketusuu =
             ninzuu_teiin -

@@ -39,8 +39,10 @@ import 'package:hive_flutter/hive_flutter.dart';
 //       (kaifukuryoku自体は変えない)
 //     1〜5(大学方針): 10人全員がその練習メニューに対応する能力
 //   練習メニューに対応する能力
-//     1スピード→スパート力・ペース変動対応力(低いほうから)
-//     2距離走→長距離粘り・ロード適性(低いほうから)
+//     1スピード→スパート力・ペース変動対応力
+//     2距離走→長距離粘り・ロード適性
+//       (スピード・距離走は、夏合宿ごとに選手ごとにどちらかをランダムに重点に決め、
+//        重点の能力から上げて、上限ならもう一方を上げる。1.9.1。1.9.0までは低いほうから)
 //     3登り→登り適性、4下り→下り適性、5アップダウン→アップダウン対応力
 // ・カリスマ・安定感には使わない
 // ・能力値が89以下の場合のみ+10(プレイヤーの金銀特訓と同じ上限)
@@ -733,6 +735,8 @@ Future<List<int>> _comKinGinShiyou({
   final Map<int, Set<int>> menugai = {}; // メニュー外で上げた能力の番号(デバッグログ用)
   final Map<int, int> menuMap = {}; // 銀で使うメニュー(大学方針、なければ個人の練習メニュー。バランスの選手は0)
   final Map<int, List<int>> balanceChuusen = {}; // バランスの選手が抽選で選んだメニュー(デバッグログ用)
+  // スピード・距離走で、この夏合宿に重点的に上げる能力(選手ごと・メニューごとにランダム。1.9.1)
+  final Map<int, int> natsuJuuten = {};
   final bool daigakuHoushin =
       ginHoushin >= 1 && ginHoushin <= comGinHoushinMax;
 
@@ -771,8 +775,8 @@ Future<List<int>> _comKinGinShiyou({
       shuryoku,
       ginKaisuu,
       (s) => menuMap[s.id] == 0
-          ? _balanceGinTokkun(s, random, balanceChuusen)
-          : _ginTokkun(s, menuMap[s.id]!),
+          ? _balanceGinTokkun(s, random, balanceChuusen, natsuJuuten)
+          : _ginTokkun(s, menuMap[s.id]!, random, natsuJuuten),
       henkouari,
       jougen,
     );
@@ -847,7 +851,17 @@ Future<List<int>> _comKinGinShiyou({
       }
       final String waku = kakyuuseiWakuIds.contains(s.id) ? '[下級生枠]' : '';
       final String kekka = henka.isEmpty ? '（上限のため使えず）' : henka.join(' / ');
-      print('[COM金銀]   $waku${s.name}(${s.gakunen}年) $menuStr$kekka');
+      // スピード・距離走の、この夏合宿の重点の能力(1.9.1)
+      final List<String> juuten = [
+        if (natsuJuuten.containsKey(s.id * 10 + 1))
+          natsuJuuten[s.id * 10 + 1] == 1 ? 'ペース変動対応力' : 'スパート力',
+        if (natsuJuuten.containsKey(s.id * 10 + 2))
+          natsuJuuten[s.id * 10 + 2] == 1 ? 'ロード適性' : '長距離粘り',
+      ];
+      final String juutenStr = juuten.isEmpty
+          ? ''
+          : '重点:${juuten.join('・')}  ';
+      print('[COM金銀]   $waku${s.name}(${s.gakunen}年) $menuStr$juutenStr$kekka');
     }
   }
   return [kinHasuu, ginHasuu];
@@ -1019,6 +1033,7 @@ bool _balanceGinTokkun(
   SenshuData s,
   Random random,
   Map<int, List<int>> balanceChuusen, // 抽選で選んだメニュー(デバッグログ用)
+  Map<int, int> natsuJuuten, // スピード・距離走の重点の能力(_natsuJuutenNiban)
 ) {
   final List<int> kouho = [
     for (int menu = 1; menu <= 5; menu++)
@@ -1027,33 +1042,74 @@ bool _balanceGinTokkun(
   if (kouho.isEmpty) return false;
   final int menu = kouho[random.nextInt(kouho.length)];
   balanceChuusen.putIfAbsent(s.id, () => <int>[]).add(menu);
-  return _ginTokkun(s, menu);
+  return _ginTokkun(s, menu, random, natsuJuuten);
+}
+
+/// スピード・距離走の2つの能力のうち、この夏合宿で重点的に上げるほう(1.9.1)
+/// 選手ごと・メニューごとに、初めて順番が回ってきたときにランダムに決め、その夏合宿の間は変えない
+/// (1回ごとにランダムだと、年をまたぐと2つの能力がならされて尖らないため)
+/// [natsuJuuten] のキーは 選手id*10+メニュー、値は0=1つ目(スパート力・長距離粘り)、
+/// 1=2つ目(ペース変動対応力・ロード適性)
+bool _natsuJuutenNiban(
+  SenshuData s,
+  int menu,
+  Random random,
+  Map<int, int> natsuJuuten,
+) {
+  return natsuJuuten.putIfAbsent(s.id * 10 + menu, () => random.nextInt(2)) ==
+      1;
 }
 
 /// 銀特訓: 年間強化メニューに対応する能力
-bool _ginTokkun(SenshuData s, int menu) {
+/// スピード・距離走は、この夏合宿の重点の能力から上げ、上限ならもう一方を上げる(1.9.1。
+/// 1.9.0までは低いほうから上げていた)
+bool _ginTokkun(
+  SenshuData s,
+  int menu,
+  Random random,
+  Map<int, int> natsuJuuten,
+) {
   switch (menu) {
-    case 1: // スピード: スパート力、ペース変動対応力(低いほうから、同じならスパート力)
-      if (s.spurtryoku <= 89 &&
-          (s.spurtryoku <= s.paceagesagetaiouryoku ||
-              s.paceagesagetaiouryoku > 89)) {
-        s.spurtryoku += 10;
-        return true;
-      }
-      if (s.paceagesagetaiouryoku <= 89) {
-        s.paceagesagetaiouryoku += 10;
-        return true;
+    case 1: // スピード: スパート力、ペース変動対応力
+      if (_natsuJuutenNiban(s, menu, random, natsuJuuten)) {
+        if (s.paceagesagetaiouryoku <= 89) {
+          s.paceagesagetaiouryoku += 10;
+          return true;
+        }
+        if (s.spurtryoku <= 89) {
+          s.spurtryoku += 10;
+          return true;
+        }
+      } else {
+        if (s.spurtryoku <= 89) {
+          s.spurtryoku += 10;
+          return true;
+        }
+        if (s.paceagesagetaiouryoku <= 89) {
+          s.paceagesagetaiouryoku += 10;
+          return true;
+        }
       }
       return false;
-    case 2: // 距離走: 長距離粘り、ロード適性(低いほうから、同じなら長距離粘り)
-      if (s.choukyorinebari <= 89 &&
-          (s.choukyorinebari <= s.tandokusou || s.tandokusou > 89)) {
-        s.choukyorinebari += 10;
-        return true;
-      }
-      if (s.tandokusou <= 89) {
-        s.tandokusou += 10;
-        return true;
+    case 2: // 距離走: 長距離粘り、ロード適性
+      if (_natsuJuutenNiban(s, menu, random, natsuJuuten)) {
+        if (s.tandokusou <= 89) {
+          s.tandokusou += 10;
+          return true;
+        }
+        if (s.choukyorinebari <= 89) {
+          s.choukyorinebari += 10;
+          return true;
+        }
+      } else {
+        if (s.choukyorinebari <= 89) {
+          s.choukyorinebari += 10;
+          return true;
+        }
+        if (s.tandokusou <= 89) {
+          s.tandokusou += 10;
+          return true;
+        }
       }
       return false;
     case 3: // 登り

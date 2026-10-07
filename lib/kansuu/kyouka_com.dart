@@ -12,17 +12,24 @@ import 'package:hive_flutter/hive_flutter.dart';
 //
 // 1.9.0までは、選手の能力の得意不得意だけで、決まった人数(下り・アップダウン・登り2人ずつ、
 // スピード最大4人、距離走最大8人、残りはバランス)にしていた。
-// 1.9.1からは、その大学が今年走る駅伝・駅伝予選のコースと、大会の大きさ(名声)を見て決める。
+// 1.9.1からは、その大学が今年走る駅伝・駅伝予選のコースや対校戦の種目と、大会の大きさ(名声)を見て決める。
 //
 // ・大会の重み: 1位の名声(10月駅伝500・11月駅伝500・正月駅伝2000)×「駅伝名声設定」の倍率。
 //   カスタム駅伝は、開催するときに、正月駅伝の量×カスタム駅伝の獲得名声倍率。
 //   出場権(4月5日に前年度の順位で決まる taikaientryflag)がない駅伝は、
 //   予選に出る大学なら予選の重みを本戦と同じにし、本戦は半分にする(予選に通れば走るため)
+// ・対校戦(5月。全大学の全員が5000m・1万m・ハーフを走る)の重みは、総合1位の名声(1000)。
+//   対校戦の名声には「駅伝名声設定」の倍率がかからないので掛けない。種目ごとの個人の名声は、
+//   駅伝の区間賞と同じく入れない。3種目を区間と同じように扱い、重みを3等分して、
+//   種目ごとに一番得なメニューに、走りそうな選手の人数分を足す(控えのメニューは変わらないため。
+//   一番多く走る大会の人数には入れない)
 // ・区間ごとに、能力が1上がったときに縮まるタイムを、レースの計算(RaceCalc.dart)と同じ式で出し、
 //   メニューごとの上乗せ(強度4のときの量)を掛けて、その区間で一番得なメニューを決める
 //   (能力の効き方は式の上で選手の能力の値によらないので、区間ごとに決まる)。
 //   能力のタイムへの影響度の設定も掛ける
-// ・区間ごとの一番得なメニューを、大会の重み(一番重い大会を1)×その区間を走る人数で足して、
+//   対校戦の種目は、坂がなく、能力のタイムへの影響度もかからない(5000m・1万mはペース変動対応力、
+//   ハーフはロード適性が効く。RaceCalc.dart と同じ)
+// ・区間ごとの一番得なメニューを、大会の重み(対校戦も含めて一番重い大会を1)×その区間を走る人数で足して、
 //   メニューごとの必要度にする(駅伝は1区間1人、11月駅伝予選は1組2人、正月駅伝予選は12人)
 // ・走りそうな選手(基本走力の上位。人数は一番多く走る大会の人数+4)に割り当てる
 //   登り・下り・アップダウン: 必要度が0なら0人、1未満なら1人、それ以上は「切り捨て+1人」(控え1人分)。
@@ -175,6 +182,35 @@ List<double> _ichiAtariGain(Ghensuu gh, int r, int k, NouryokuEikyodo e) {
   return [nebari, spurt, nobori, kudari, updown, road, pace];
 }
 
+/// 対校戦の総合1位の名声(KirokuKousin.dart と同じ量。倍率はかからない)
+const double _taikousenMeisei = 1000.0;
+
+/// 対校戦の種目の距離(5000m・1万m・ハーフ。RaceCalc.dart と同じ)
+const List<double> _taikousenKyori = [5000.0, 10000.0, 21097.5];
+
+/// 対校戦の種目の名前(デバッグログ用)
+const List<String> _taikousenMei = ['5000m', '1万m', 'ハーフ'];
+
+/// 対校戦の種目(0: 5000m、1: 1万m、2: ハーフ)で、能力が1上がったときに縮まるタイム(秒)。
+/// RaceCalc.dart と同じ式から出す。坂はなく、5000m・1万mはペース変動対応力、
+/// ハーフはロード適性が効く。能力のタイムへの影響度はかからない(駅伝と駅伝予選だけのため)。
+/// 並びは _ichiAtariGain と同じ
+List<double> _taikousenGain(int shumoku) {
+  final double kyori = _taikousenKyori[shumoku];
+  // タイムの目安(1kmおよそ3分)
+  final double t = kyori * 0.18;
+  final double nebari = kyori > 15000.0
+      ? (kyori - 14999.999) /
+            100.0 *
+            (TEISUU.MAXTIMEHOSEI_CHOUKYORINEBARI_PER100m / 98.0)
+      : 0.0;
+  final double spurt = 8.0 * (-TEISUU.MAXTIMEHOSEI_SPURTRYOKU_PER100m / 98.0);
+  final bool road = shumoku == 2;
+  final double roadGain = road ? t * 0.0003 : 0.0;
+  final double pace = road ? 0.0 : t * 0.0003;
+  return [nebari, spurt, 0.0, 0.0, 0.0, roadGain, pace];
+}
+
 /// メニューごとの上乗せ(RaceCalc.dart と同じ量)。並びは _ichiAtariGain と同じ
 List<int> _uwanose(int menu, int kyoudo) {
   final List<int> u = List.filled(7, 0);
@@ -283,6 +319,11 @@ Future<void> Kyouka_com({
           _ichibanTokunaMenu(_ichiAtariGain(gh[0], r, k, eikyodo)),
       ],
   ];
+  // 対校戦の種目ごとの一番得なメニュー(大学によらない)
+  final List<int> taikousenMenu = [
+    for (int i = 0; i < _taikousenKyori.length; i++)
+      _ichibanTokunaMenu(_taikousenGain(i)),
+  ];
   if (kDebugMode) {
     for (int r = 0; r < 6; r++) {
       print(
@@ -290,6 +331,10 @@ Future<void> Kyouka_com({
         '${kukanMenu[r].map((m) => _menuMei[m]).join('・')}',
       );
     }
+    print(
+      '[COM強化] 対校戦 種目ごとの一番得なメニュー: '
+      '${[for (int i = 0; i < taikousenMenu.length; i++) '${_taikousenMei[i]}${_menuMei[taikousenMenu[i]]}'].join('・')}',
+    );
   }
 
   for (int targetunivid = 0; targetunivid < TEISUU.UNIVSUU; targetunivid++) {
@@ -302,12 +347,12 @@ Future<void> Kyouka_com({
         senshu.kaifukuryoku = _balance;
       }
 
-      // 大会ごとの重み(一番重い大会を1にする)
+      // 大会ごとの重み(対校戦も含めて、一番重い大会を1にする)
       final UnivData? u = univ[targetunivid];
       final List<double> w = u != null
           ? _daigakuOmomi(u, kihon)
           : List.filled(6, 0.0);
-      double wMax = 0.0;
+      double wMax = _taikousenMeisei;
       for (final double x in w) {
         if (x > wMax) wMax = x;
       }
@@ -339,6 +384,12 @@ Future<void> Kyouka_com({
       if (poolSuu > narabi.length) poolSuu = narabi.length;
       final List<SenshuData> pool = narabi.take(poolSuu).toList();
       final List<SenshuData> hikae = narabi.skip(poolSuu).toList();
+
+      // 対校戦(全員が3種目を走る。重みを3等分し、種目ごとの一番得なメニューに、走りそうな選手の人数分を足す)
+      for (final int menu in taikousenMenu) {
+        hitsuyoudo[menu] +=
+            _taikousenMeisei / taikousenMenu.length / wMax * poolSuu;
+      }
 
       // 登り・下り・アップダウン(必要度の大きいメニューから、適性の高い選手に)
       final Set<SenshuData> kimeta = {};
@@ -407,7 +458,8 @@ Future<void> Kyouka_com({
         }
         print(
           '[COM強化] ${u?.name ?? targetunivid} 重み:'
-          '${[for (final double x in w) x.toStringAsFixed(0)].join('/')} '
+          '${[for (final double x in w) x.toStringAsFixed(0)].join('/')}'
+          '/対校戦${_taikousenMeisei.toStringAsFixed(0)} '
           '必要度:${[for (int m = 0; m < 6; m++) '${_menuMei[m]}${hitsuyoudo[m].toStringAsFixed(1)}'].join(' ')} '
           '走りそうな選手$poolSuu人:'
           '${[for (int m = 0; m < 6; m++) if (kazu[m] > 0) '${_menuMei[m]}${kazu[m]}'].join(' ')}'

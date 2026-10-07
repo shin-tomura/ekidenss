@@ -20,6 +20,12 @@ import 'package:ekiden/kansuu/kukan_haichi.dart'; // 区間配置の方針
 //   留学生: 受け入れと優秀度(UnivData.r。0は受け入れない、1最高優秀〜4)
 //   走りの特徴: 実力発揮度(KantokuData.yobiint5[大学id]。univkosei.dart)。
 //     あまり使われないので一番下に置く
+// ・大学の型(画面の一番上): 押すと、実力発揮度・銀の使い道・スカウト方針をまとめてその型にそろえる。
+//   型そのものは保存しない(そろえたあとに個別に直せる。今の設定がどの型と同じかは値から判断する)。
+//   強さ(弱め・普通・強め)で、得意な能力の実力発揮度を4・3・2(110%・120%・130%)、
+//   苦手な能力を6・7・8(90%・80%・70%)にし、それ以外の能力は5(100%)に戻す。
+//   130%より上げないのは、アップダウンのあるコースのほうが平らなコースより速くなるといった、
+//   不自然なことが起きうるため。銀の使い道とスカウト方針は、型と同じ練習メニューの番号にする
 // ・スクロールの指で値が変わらないように、スライダーは使わず、プルダウンとボタンにしている
 // ・大学名は画面の上に、大学の切り替えボタンは画面の下に固定する(大学画面と同じ配置)。
 //   切り替えは、大学画面の表示(Ghensuu.hyojiunivnum)も一緒に切り替える
@@ -60,6 +66,73 @@ const List<String> _ryuugakuseiMei = [
   'やや優秀でない',
 ];
 
+/// 大学の型
+class _Kata {
+  final String mei; // 型の名前
+  // 銀の使い道とスカウト方針の番号(1スピード・2距離走・3登り・4下り・5アップダウン。
+  // 年間強化練習メニューと同じ番号。0は標準で、個人の練習メニュー通り・自動)
+  final int menu;
+  final List<AbilityType> tokui; // 得意な能力(強さに合わせて上げる)
+  final List<AbilityType> nigate; // 苦手な能力(強さに合わせて下げる)
+  const _Kata(this.mei, this.menu, this.tokui, this.nigate);
+}
+
+/// 大学の型の一覧(先頭は標準に戻すもの)
+const List<_Kata> _kataList = [
+  _Kata('標準', 0, [], []),
+  _Kata(
+    'スピード型',
+    1,
+    [AbilityType.spurtPower, AbilityType.paceHendoTaiouryoku],
+    [AbilityType.nagakyoriNebari, AbilityType.roadTekisei],
+  ),
+  _Kata(
+    '距離型',
+    2,
+    [AbilityType.nagakyoriNebari, AbilityType.roadTekisei],
+    [AbilityType.spurtPower, AbilityType.paceHendoTaiouryoku],
+  ),
+  // 山の3つの型は、坂の適性を上げると切れ味が落ちるイメージで、スパート力を苦手にする
+  _Kata(
+    '山登り型',
+    3,
+    [AbilityType.noboriTekisei],
+    [AbilityType.spurtPower],
+  ),
+  _Kata(
+    '山下り型',
+    4,
+    [AbilityType.kudariTekisei],
+    [AbilityType.spurtPower],
+  ),
+  _Kata(
+    'アップダウン型',
+    5,
+    [AbilityType.upDownTaiouryoku],
+    [AbilityType.spurtPower],
+  ),
+];
+
+/// 型の強さの名前(0弱め・1普通・2強め)。得意は 5−(強さ+1)、苦手は 5+(強さ+1) にする
+const List<String> _tsuyosaMei = ['弱め', '普通', '強め'];
+
+/// 型と強さで決まる実力発揮度(表示する7つの能力)
+Map<AbilityType, int> _kataNoHakki(_Kata kata, int tsuyosa) {
+  final Map<AbilityType, int> hakki = {
+    for (final AbilityType type in _hakkiNouryoku) type: 5,
+  };
+  for (final AbilityType type in kata.tokui) {
+    hakki[type] = 5 - (tsuyosa + 1);
+  }
+  for (final AbilityType type in kata.nigate) {
+    hakki[type] = 5 + (tsuyosa + 1);
+  }
+  return hakki;
+}
+
+/// 実力発揮度の値(0〜9)を、%の文字にする
+String _hakkiPercent(int v) => '${150 - v * 10}%';
+
 class ModalDaigakuKosei extends StatefulWidget {
   const ModalDaigakuKosei({super.key});
 
@@ -73,6 +146,7 @@ class _ModalDaigakuKoseiState extends State<ModalDaigakuKosei> {
   final Box<UnivData> _univBox = Hive.box<UnivData>('univBox');
 
   int _univid = 0; // 表示している大学
+  int _tsuyosa = 1; // 大学の型をそろえるときの強さ(0弱め・1普通・2強め)
 
   @override
   void initState() {
@@ -101,6 +175,15 @@ class _ModalDaigakuKoseiState extends State<ModalDaigakuKosei> {
   // ------------------------------------------------
 
   // 実力発揮度(8つの能力を4ビットずつ詰めて yobiint5[大学id] に入れる。Modal_univkosei.dart と同じ形)
+  int _tsumeru(Map<AbilityType, int> hakki) {
+    int tsumeta = 0;
+    for (int i = 0; i < AbilityType.values.length; i++) {
+      final int v = (hakki[AbilityType.values[i]] ?? 5).clamp(0, 9);
+      tsumeta |= (v << (i * 4));
+    }
+    return tsumeta;
+  }
+
   Future<void> _hakkiHozon(
     KantokuData kantoku,
     AbilityType type,
@@ -109,17 +192,112 @@ class _ModalDaigakuKoseiState extends State<ModalDaigakuKosei> {
     if (_univid >= kantoku.yobiint5.length) return;
     final Map<AbilityType, int> hakki = getAbilitySettingsForUniv(_univid);
     hakki[type] = atai;
-    int tsumeta = 0;
-    for (int i = 0; i < AbilityType.values.length; i++) {
-      final int v = (hakki[AbilityType.values[i]] ?? 5).clamp(0, 9);
-      tsumeta |= (v << (i * 4));
-    }
     final List<int> y = List.from(kantoku.yobiint5);
-    y[_univid] = tsumeta;
+    y[_univid] = _tsumeru(hakki);
     setState(() {
       kantoku.yobiint5 = y;
     });
     await kantoku.save();
+  }
+
+  // 大学の型にそろえる(実力発揮度・銀の使い道・スカウト方針。カリスマの実力発揮度は今のまま)
+  Future<void> _kataSoroeru(KantokuData kantoku, _Kata kata, int tsuyosa) async {
+    final List<int> y5 = List.from(kantoku.yobiint5);
+    final List<int> y2 = List.from(kantoku.yobiint2);
+    if (_univid >= y5.length ||
+        y2.length <= comGinHoushinIndex1 ||
+        y2.length <= comScoutHoushinIndex1) {
+      return;
+    }
+    final Map<AbilityType, int> hakki = getAbilitySettingsForUniv(_univid);
+    hakki.addAll(_kataNoHakki(kata, tsuyosa));
+    y5[_univid] = _tsumeru(hakki);
+    comGinHoushinSettei(y2, _univid, kata.menu);
+    comScoutHoushinSettei(y2, _univid, kata.menu);
+    setState(() {
+      kantoku.yobiint5 = y5;
+      kantoku.yobiint2 = y2;
+    });
+    await kantoku.save();
+  }
+
+  // 今の設定と同じ型(と強さ)の名前。どの型とも違えばnull
+  String? _imaNoKata(KantokuData kantoku) {
+    final Map<AbilityType, int> hakki = getAbilitySettingsForUniv(_univid);
+    final int gin = comGinHoushin(kantoku, _univid);
+    final int scout = comScoutHoushin(kantoku, _univid);
+    for (final _Kata kata in _kataList) {
+      if (gin != kata.menu || scout != kata.menu) continue;
+      for (int tsuyosa = 0; tsuyosa < _tsuyosaMei.length; tsuyosa++) {
+        final Map<AbilityType, int> kataHakki = _kataNoHakki(kata, tsuyosa);
+        final bool onaji = _hakkiNouryoku.every(
+          (type) => (hakki[type] ?? 5) == kataHakki[type],
+        );
+        if (onaji) {
+          return kata.menu == 0
+              ? kata.mei
+              : '${kata.mei}(${_tsuyosaMei[tsuyosa]})';
+        }
+      }
+    }
+    return null;
+  }
+
+  // 大学の型にそろえる前の確認
+  Future<void> _kataKakunin(
+    KantokuData kantoku,
+    UnivData univ,
+    _Kata kata,
+  ) async {
+    final int tsuyosa = _tsuyosa;
+    String naiyou;
+    if (kata.menu == 0) {
+      naiyou =
+          '${univ.name}の実力発揮度・銀の使い道・スカウト方針を、標準に戻します。\n\n'
+          '・実力発揮度: すべて5(100%)\n'
+          '・銀の使い道: 個人の練習メニュー通り\n'
+          '・スカウト方針: 自動\n\n'
+          'よろしいですか？';
+    } else {
+      String nouryoku(List<AbilityType> list) =>
+          list.map((type) => _nouryokuMei[type] ?? '').join('・');
+      naiyou =
+          '${univ.name}の実力発揮度・銀の使い道・スカウト方針を、'
+          '${kata.mei}(${_tsuyosaMei[tsuyosa]})にそろえます。\n\n'
+          '・得意: ${nouryoku(kata.tokui)}を${_hakkiPercent(5 - (tsuyosa + 1))}\n'
+          '・苦手: ${nouryoku(kata.nigate)}を${_hakkiPercent(5 + (tsuyosa + 1))}\n'
+          '・ほかの能力: 100%\n'
+          '・銀の使い道: ${comGinHoushinMei(kata.menu)}\n'
+          '・スカウト方針: ${comScoutHoushinMei[kata.menu]}\n\n'
+          'よろしいですか？';
+    }
+    final bool? soroeru = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(
+            kata.menu == 0 ? '標準に戻す' : '${kata.mei}にそろえる',
+            style: const TextStyle(color: Colors.black),
+          ),
+          content: SingleChildScrollView(
+            child: Text(naiyou, style: const TextStyle(color: Colors.black)),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('やめる'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text(kata.menu == 0 ? '戻す' : 'そろえる'),
+            ),
+          ],
+        );
+      },
+    );
+    if (soroeru == true && mounted) {
+      await _kataSoroeru(kantoku, kata, tsuyosa);
+    }
   }
 
   // yobiint2 を書き換えて保存する(saidaiIdx まで要素がなければ何もしない)
@@ -333,6 +511,7 @@ class _ModalDaigakuKoseiState extends State<ModalDaigakuKosei> {
     final int timeWariai = comScoutTimeWariai(kantoku);
     final int sekkyokusei = comScoutSekkyokusei(kantoku);
     final Map<AbilityType, int> hakki = getAbilitySettingsForUniv(_univid);
+    final String? imaNoKata = _imaNoKata(kantoku);
 
     return Scaffold(
       backgroundColor: HENSUU.backgroundcolor,
@@ -379,6 +558,61 @@ class _ModalDaigakuKoseiState extends State<ModalDaigakuKosei> {
                       style: _honbun,
                     ),
                   ),
+
+                  // 大学の型(実力発揮度・銀の使い道・スカウト方針をまとめてそろえる)
+                  _midashi('大学の型'),
+                  _setsumei(
+                    '型を押すと、実力発揮度・銀の使い道・スカウト方針を、その型にまとめてそろえます。'
+                    '得意な能力の実力発揮度を上げ、苦手な能力を下げます。'
+                    '型は保存しないので、そろえたあとに下の項目で個別に直せます。',
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4.0),
+                    child: Text(
+                      '今の設定: ${imaNoKata ?? '型にそろえていない(個別の設定)'}',
+                      style: TextStyle(
+                        color: HENSUU.textcolor,
+                        fontSize: HENSUU.fontsize_honbun,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  _koumoku(
+                    '強さ',
+                    _hamidasanaiDropdown(
+                      value: _tsuyosa,
+                      atai: List.generate(_tsuyosaMei.length, (i) => i),
+                      hyoujiMei: [
+                        for (int t = 0; t < _tsuyosaMei.length; t++)
+                          '${_tsuyosaMei[t]}(得意${_hakkiPercent(5 - (t + 1))}・'
+                              '苦手${_hakkiPercent(5 + (t + 1))})',
+                      ],
+                      onChanged: (v) => setState(() => _tsuyosa = v),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final _Kata kata in _kataList)
+                        OutlinedButton(
+                          onPressed: () => _kataKakunin(kantoku, univ, kata),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: kata.menu == 0
+                                ? HENSUU.textcolor
+                                : Colors.lightGreenAccent,
+                            side: const BorderSide(color: Colors.grey),
+                            minimumSize: const Size(48, 40),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                            ),
+                          ),
+                          child: Text(kata.menu == 0 ? '標準に戻す' : kata.mei),
+                        ),
+                    ],
+                  ),
+                  const Divider(color: Colors.grey),
 
                   // 育成力
                   _midashi('育成力'),

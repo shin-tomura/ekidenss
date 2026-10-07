@@ -269,35 +269,43 @@ class _SenshuEditViewState extends State<SenshuEditView> {
       color: Colors.white,
       fontSize: HENSUU.fontsize_honbun - 2,
     );
-    TableRow gyou(String label, int? kihonHyouji) {
+    // 種目ごとに1行(種目名が長いので、種目を行にし、今の基本走力と上限に届いたときを列にする。1.9.1)
+    // (rironKirokukaiKyori の並び: 5000m・1万m・ハーフ。どれも記録会と対校戦は同じ計算)
+    const List<String> shumokuMei = ['トラック5000m', 'トラック1万m', 'ハーフマラソン'];
+    TableRow gyou(String label, double kyori) {
       return TableRow(
         children: [
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 4.0),
             child: Text(label, style: midasiStyle),
           ),
-          for (final double kyori in rironKirokukaiKyori)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4.0),
-              child: Text(timeMojiretsu(kihonHyouji, kyori), style: atai),
-            ),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4.0),
+            child: Text(timeMojiretsu(kihon, kyori), style: atai),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4.0),
+            child: Text(timeMojiretsu(joukaiKihon, kyori), style: atai),
+          ),
         ],
       );
     }
 
     return Table(
-      columnWidths: const {0: FlexColumnWidth(1.6)},
+      columnWidths: const {0: FlexColumnWidth(1.4)},
       children: [
         const TableRow(
           children: [
             Text('', style: midasiStyle),
-            Text('5000m', style: midasiStyle),
-            Text('1万m', style: midasiStyle),
-            Text('ハーフ', style: midasiStyle),
+            Text('今の基本走力', style: midasiStyle),
+            Text('上限に届いたとき', style: midasiStyle),
           ],
         ),
-        gyou('今の基本走力', kihon),
-        gyou('上限に届いたとき', joukaiKihon),
+        for (int i = 0; i < rironKirokukaiKyori.length; i++)
+          gyou(
+            i < shumokuMei.length ? shumokuMei[i] : '',
+            rironKirokukaiKyori[i],
+          ),
       ],
     );
   }
@@ -878,8 +886,9 @@ class _SenshuEditViewState extends State<SenshuEditView> {
                 '・選手を遅くしたいときは、基本走力と上限の両方を大きくしてください。',
               ]),
               const Divider(color: Colors.white24, height: 32),
+              // 1.8.5で「理論値」として出したもの。1.9.1で見出しと種目名を分かりやすくした
               const Text(
-                "理論値",
+                "平地のレースのタイム(運に左右されないとき)",
                 style: TextStyle(
                   color: Colors.orangeAccent,
                   fontWeight: FontWeight.bold,
@@ -889,8 +898,9 @@ class _SenshuEditViewState extends State<SenshuEditView> {
               _buildRironchi(sortedUnivData),
               const SizedBox(height: 8),
               _buildSetsumei(const [
-                '・理論値: 平地の記録会で、運に左右されずに走ったときのタイムです。',
-                '・大学の個性・年間強化練習・タイム調整など、記録会のタイムにかかる設定を含めて計算しています。',
+                '・トラック5000m・トラック1万m・ハーフマラソンを、運に左右されずに走ったときのタイムです。',
+                '・記録会と対校戦は同じ計算なので、どちらも同じタイムになります。',
+                '・大学の個性・年間強化練習・タイム調整など、これらのレースのタイムにかかる設定を含めて計算しています。',
                 '・調子と、能力のタイムへの影響度(駅伝と駅伝予選だけにかかる設定)は含みません。',
                 '・「上限に届いたとき」は、今の能力値のまま上限まで伸びたときのタイムです。限界突破すると、さらに速くなることがあります。',
               ]),

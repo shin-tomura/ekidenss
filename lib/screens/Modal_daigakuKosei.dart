@@ -13,14 +13,18 @@ import 'package:ekiden/kansuu/kukan_haichi.dart'; // 区間配置の方針
 // 大学の個性(1.9.1)
 // 大学画面で表示している大学1校の、大学ごとの設定を1画面にまとめて変える。
 // 値の保存場所は、それぞれの設定の画面と同じ(新しく保存する値はない)。
-//   走りの特徴: 実力発揮度(KantokuData.yobiint5[大学id]。univkosei.dart)
-//   育て方: 育成力(UnivData.ikuseiryoku)と、金銀の支給レベル・銀の使い道(goldsilver_com.dart)
+//   育成力: UnivData.ikuseiryoku(10〜150)
+//   金銀: 支給レベル・銀の使い道(goldsilver_com.dart)
 //   スカウト: 方針・性格(yobiint2)と、評価の割合・積極性(yobiint3。scout_com.dart)
 //   レース: 区間配置の方針(kukan_haichi.dart)
 //   留学生: 受け入れと優秀度(UnivData.r。0は受け入れない、1最高優秀〜4)
-// 全大学を並べて比べたり一括で変えたりする画面(大学画面の「全大学の一覧で設定」)も、
-// 今まで通り使える。
-// 大学の切り替えは、大学画面の表示(Ghensuu.hyojiunivnum)も一緒に切り替える。
+//   走りの特徴: 実力発揮度(KantokuData.yobiint5[大学id]。univkosei.dart)。
+//     あまり使われないので一番下に置く
+// ・スクロールの指で値が変わらないように、スライダーは使わず、プルダウンとボタンにしている
+// ・大学名は画面の上に、大学の切り替えボタンは画面の下に固定する(大学画面と同じ配置)。
+//   切り替えは、大学画面の表示(Ghensuu.hyojiunivnum)も一緒に切り替える
+// ・全大学を並べて比べたり一括で変えたりする画面(大学画面の「全大学の一覧で設定」)も、
+//   今まで通り使える
 // ------------------------------------------------------------
 
 /// 実力発揮度を設定する能力(カリスマはレースの計算で使っていないので出さない。
@@ -47,21 +51,14 @@ const Map<AbilityType, String> _nouryokuMei = {
   AbilityType.paceHendoTaiouryoku: 'ペース変動対応力',
 };
 
-/// 留学生の優秀度の名前(UnivData.r。ModalRyugakuseiNinzu と同じ)
-String _ryuugakuseiYuushuudo(int r) {
-  switch (r) {
-    case 1:
-      return '最高優秀';
-    case 2:
-      return '優秀';
-    case 3:
-      return '普通';
-    case 4:
-      return 'やや優秀でない';
-    default:
-      return '受け入れない';
-  }
-}
+/// 留学生の受け入れと優秀度の名前(UnivData.r の0〜4。ModalRyugakuseiNinzu と同じ言葉)
+const List<String> _ryuugakuseiMei = [
+  '受け入れない',
+  '最高優秀',
+  '優秀',
+  '普通',
+  'やや優秀でない',
+];
 
 class ModalDaigakuKosei extends StatefulWidget {
   const ModalDaigakuKosei({super.key});
@@ -76,25 +73,12 @@ class _ModalDaigakuKoseiState extends State<ModalDaigakuKosei> {
   final Box<UnivData> _univBox = Hive.box<UnivData>('univBox');
 
   int _univid = 0; // 表示している大学
-  // スライダーを動かしている間の値(離したときに保存する)
-  Map<AbilityType, int> _hakki = {};
-  int _ikuseiryoku = 10;
-  int _ryuugakuseiR = 0;
 
   @override
   void initState() {
     super.initState();
     final Ghensuu? gh = _ghensuuBox.getAt(0);
     _univid = (gh?.hyojiunivnum ?? 0).clamp(0, TEISUU.UNIVSUU - 1);
-    _yomikomi();
-  }
-
-  // 表示している大学の、スライダーで動かす値を読み込む
-  void _yomikomi() {
-    _hakki = getAbilitySettingsForUniv(_univid);
-    final UnivData? univ = _univBox.get(_univid);
-    _ikuseiryoku = univ?.ikuseiryoku ?? 10;
-    _ryuugakuseiR = univ?.r ?? 0;
   }
 
   // 大学を切り替える(大学画面の表示も一緒に切り替える)
@@ -104,7 +88,6 @@ class _ModalDaigakuKoseiState extends State<ModalDaigakuKosei> {
     if (id >= TEISUU.UNIVSUU) id = 0;
     setState(() {
       _univid = id;
-      _yomikomi();
     });
     final Ghensuu? gh = _ghensuuBox.getAt(0);
     if (gh != null) {
@@ -118,15 +101,21 @@ class _ModalDaigakuKoseiState extends State<ModalDaigakuKosei> {
   // ------------------------------------------------
 
   // 実力発揮度(8つの能力を4ビットずつ詰めて yobiint5[大学id] に入れる。Modal_univkosei.dart と同じ形)
-  Future<void> _hakkiHozon(KantokuData kantoku) async {
+  Future<void> _hakkiHozon(
+    KantokuData kantoku,
+    AbilityType type,
+    int atai,
+  ) async {
     if (_univid >= kantoku.yobiint5.length) return;
-    int atai = 0;
+    final Map<AbilityType, int> hakki = getAbilitySettingsForUniv(_univid);
+    hakki[type] = atai;
+    int tsumeta = 0;
     for (int i = 0; i < AbilityType.values.length; i++) {
-      final int v = (_hakki[AbilityType.values[i]] ?? 5).clamp(0, 9);
-      atai |= (v << (i * 4));
+      final int v = (hakki[AbilityType.values[i]] ?? 5).clamp(0, 9);
+      tsumeta |= (v << (i * 4));
     }
     final List<int> y = List.from(kantoku.yobiint5);
-    y[_univid] = atai;
+    y[_univid] = tsumeta;
     setState(() {
       kantoku.yobiint5 = y;
     });
@@ -164,10 +153,8 @@ class _ModalDaigakuKoseiState extends State<ModalDaigakuKosei> {
 
   // 育成力(10〜150)
   Future<void> _ikuseiHozon(UnivData univ, int atai) async {
-    final int v = atai.clamp(10, 150);
     setState(() {
-      _ikuseiryoku = v;
-      univ.ikuseiryoku = v;
+      univ.ikuseiryoku = atai.clamp(10, 150);
     });
     await univ.save();
   }
@@ -175,7 +162,6 @@ class _ModalDaigakuKoseiState extends State<ModalDaigakuKosei> {
   // 留学生の受け入れと優秀度(0は受け入れない、1最高優秀〜4)
   Future<void> _ryuugakuseiHozon(UnivData univ, int r) async {
     setState(() {
-      _ryuugakuseiR = r;
       univ.r = r;
     });
     await univ.save();
@@ -185,7 +171,10 @@ class _ModalDaigakuKoseiState extends State<ModalDaigakuKosei> {
   // 画面の部品
   // ------------------------------------------------
 
-  // 見出し(走りの特徴など)
+  TextStyle get _honbun =>
+      TextStyle(color: HENSUU.textcolor, fontSize: HENSUU.fontsize_honbun);
+
+  // 見出し(育成力・金銀など)
   Widget _midashi(String text) {
     return Padding(
       padding: const EdgeInsets.only(top: 24.0, bottom: 4.0),
@@ -214,8 +203,8 @@ class _ModalDaigakuKoseiState extends State<ModalDaigakuKosei> {
     );
   }
 
-  // プルダウンの前に付ける小さな見出し
-  Widget _komidashi(String text) {
+  // 小さな補足(保有量など)
+  Widget _hosoku(String text) {
     return Text(
       text,
       style: TextStyle(
@@ -225,15 +214,18 @@ class _ModalDaigakuKoseiState extends State<ModalDaigakuKosei> {
     );
   }
 
-  // 見出しとプルダウンの組(画面が狭いときは、プルダウンを縮めて文字を「…」で省略する)
-  Widget _kumi(String midashi, Widget dropdown) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _komidashi(midashi),
-        const SizedBox(width: 6),
-        Flexible(child: dropdown),
-      ],
+  // 項目の1行(項目名は本文と同じ大きさ。入らないときは、プルダウンを次の行に折り返す)
+  Widget _koumoku(String mei, Widget control) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2.0),
+      child: Wrap(
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 12,
+        children: [
+          Text(mei, style: _honbun),
+          control,
+        ],
+      ),
     );
   }
 
@@ -252,10 +244,7 @@ class _ModalDaigakuKoseiState extends State<ModalDaigakuKosei> {
         value: value,
         isExpanded: true,
         dropdownColor: Colors.grey[900],
-        style: TextStyle(
-          color: HENSUU.textcolor,
-          fontSize: HENSUU.fontsize_honbun,
-        ),
+        style: _honbun,
         items: [
           for (int i = 0; i < atai.length; i++)
             DropdownMenuItem<int>(value: atai[i], child: Text(hyoujiMei[i])),
@@ -280,6 +269,20 @@ class _ModalDaigakuKoseiState extends State<ModalDaigakuKosei> {
     );
   }
 
+  // 育成力を増減するボタン
+  Widget _zougenBotan(UnivData univ, int sa) {
+    return OutlinedButton(
+      onPressed: () => _ikuseiHozon(univ, univ.ikuseiryoku + sa),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: HENSUU.textcolor,
+        side: const BorderSide(color: Colors.grey),
+        minimumSize: const Size(48, 40),
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+      ),
+      child: Text(sa > 0 ? '+$sa' : '−${-sa}'),
+    );
+  }
+
   // 前の大学・自分の大学・次の大学のボタン
   Widget _kirikaeBotan(String label, VoidCallback onPressed) {
     return Expanded(
@@ -298,45 +301,6 @@ class _ModalDaigakuKoseiState extends State<ModalDaigakuKosei> {
           child: FittedBox(fit: BoxFit.scaleDown, child: Text(label)),
         ),
       ),
-    );
-  }
-
-  // 実力発揮度の1行(能力の名前と今の値、スライダー)
-  Widget _hakkiGyou(KantokuData kantoku, AbilityType type) {
-    final int v = (_hakki[type] ?? 5).clamp(0, 9);
-    // 0が最も有利なので、緑から赤へ
-    final Color iro = Color.lerp(Colors.green, Colors.red.shade700, v / 9)!;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '${_nouryokuMei[type] ?? ''}  実力${150 - v * 10}%発揮($v)',
-          style: TextStyle(
-            color: v == 5 ? HENSUU.textcolor : iro,
-            fontSize: HENSUU.fontsize_honbun,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        Slider(
-          value: v.toDouble(),
-          min: 0,
-          max: 9,
-          divisions: 9,
-          label: '$v',
-          onChanged: (double atai) {
-            // 動かしている間は表示だけ変える
-            setState(() {
-              _hakki[type] = atai.toInt();
-            });
-          },
-          onChangeEnd: (double atai) {
-            _hakki[type] = atai.toInt();
-            _hakkiHozon(kantoku);
-          },
-          activeColor: iro,
-          inactiveColor: Colors.grey.withOpacity(0.5),
-        ),
-      ],
     );
   }
 
@@ -368,10 +332,7 @@ class _ModalDaigakuKoseiState extends State<ModalDaigakuKosei> {
     final int scoutHoushin = comScoutHoushin(kantoku, _univid);
     final int timeWariai = comScoutTimeWariai(kantoku);
     final int sekkyokusei = comScoutSekkyokusei(kantoku);
-    final TextStyle honbun = TextStyle(
-      color: HENSUU.textcolor,
-      fontSize: HENSUU.fontsize_honbun,
-    );
+    final Map<AbilityType, int> hakki = getAbilitySettingsForUniv(_univid);
 
     return Scaffold(
       backgroundColor: HENSUU.backgroundcolor,
@@ -380,106 +341,74 @@ class _ModalDaigakuKoseiState extends State<ModalDaigakuKosei> {
         backgroundColor: HENSUU.backgroundcolor,
         foregroundColor: Colors.white,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              // 大学の切り替え
-              Row(
-                children: [
-                  _kirikaeBotan('前の大学', () => _kirikae(_univid - 1)),
-                  _kirikaeBotan('自分の大学', () => _kirikae(myUnivid)),
-                  _kirikaeBotan('次の大学', () => _kirikae(_univid + 1)),
-                ],
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // 大学名(スクロールしない)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: Text(
+              jibun ? '${univ.name}(自分の大学)' : univ.name,
+              style: TextStyle(
+                color: HENSUU.textcolor,
+                fontSize: HENSUU.fontsize_honbun + 4,
+                fontWeight: FontWeight.bold,
               ),
-              const SizedBox(height: 16),
-              Text(
-                jibun ? '${univ.name}(自分の大学)' : univ.name,
-                style: TextStyle(
-                  color: HENSUU.textcolor,
-                  fontSize: HENSUU.fontsize_honbun + 4,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12.0),
-                decoration: BoxDecoration(
-                  color: Colors.grey.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8.0),
-                  border: Border.all(color: Colors.grey.withOpacity(0.3)),
-                ),
-                child: Text(
-                  "この大学の個性に関わる設定を、まとめて変えられます。\n"
-                  "全大学を並べて比べたり、一括で変えたりするときは、大学画面の「全大学の一覧で設定」の各画面を使ってください。",
-                  style: honbun,
-                ),
-              ),
+            ),
+          ),
+          const Divider(color: Colors.grey, height: 1),
 
-              // 走りの特徴(実力発揮度)
-              _midashi('走りの特徴(実力発揮度)'),
-              _setsumei(
-                'レースで、能力ごとに実力をどれだけ発揮できるかです。'
-                '0が実力150%発揮(有利)、5が100%、9が60%(不利)です。'
-                '留学生には適用されません。',
-              ),
-              for (final AbilityType type in _hakkiNouryoku)
-                _hakkiGyou(kantoku, type),
-              const Divider(color: Colors.grey),
+          // 設定(ここだけスクロールする)
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12.0),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8.0),
+                      border: Border.all(color: Colors.grey.withOpacity(0.3)),
+                    ),
+                    child: Text(
+                      "この大学の個性に関わる設定を、まとめて変えられます。\n"
+                      "全大学を並べて比べたり、一括で変えたりするときは、大学画面の「全大学の一覧で設定」の各画面を使ってください。",
+                      style: _honbun,
+                    ),
+                  ),
 
-              // 育て方(育成力と金銀)
-              _midashi('育て方'),
-              _setsumei('育成力は、選手の基本走力の伸びやすさです(10〜150)。'),
-              Row(
-                children: [
-                  Expanded(child: Text('育成力 $_ikuseiryoku', style: honbun)),
-                  IconButton(
-                    icon: const Icon(Icons.remove),
-                    color: HENSUU.textcolor,
-                    onPressed: () => _ikuseiHozon(univ, _ikuseiryoku - 1),
+                  // 育成力
+                  _midashi('育成力'),
+                  _setsumei('選手の基本走力の伸びやすさです(10〜150)。'),
+                  Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: [
+                      Text('育成力 ${univ.ikuseiryoku}', style: _honbun),
+                      _zougenBotan(univ, -10),
+                      _zougenBotan(univ, -1),
+                      _zougenBotan(univ, 1),
+                      _zougenBotan(univ, 10),
+                    ],
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.add),
-                    color: HENSUU.textcolor,
-                    onPressed: () => _ikuseiHozon(univ, _ikuseiryoku + 1),
+                  const Divider(color: Colors.grey),
+
+                  // 金銀
+                  _midashi('金銀'),
+                  _setsumei(
+                    jibun
+                        ? '支給レベルと銀の使い道は、コンピュータの大学のときだけ効きます(総監督をする大学を変えたときにそなえて設定できます)。'
+                        : 'コンピュータの大学が受け取る金銀の量と、夏合宿での銀の使い道です。',
                   ),
-                ],
-              ),
-              Slider(
-                value: _ikuseiryoku.clamp(10, 150).toDouble(),
-                min: 10,
-                max: 150,
-                divisions: 140,
-                label: '$_ikuseiryoku',
-                onChanged: (double atai) {
-                  setState(() {
-                    _ikuseiryoku = atai.toInt();
-                  });
-                },
-                onChangeEnd: (double atai) {
-                  _ikuseiHozon(univ, atai.toInt());
-                },
-              ),
-              const SizedBox(height: 8),
-              _setsumei(
-                jibun
-                    ? '金銀の支給レベルと銀の使い道は、コンピュータの大学のときだけ効きます(総監督をする大学を変えたときにそなえて設定できます)。'
-                    : '金銀の支給レベルと銀の使い道は、コンピュータの大学が夏合宿で使う金銀の量と使い道です。',
-              ),
-              if (!isComGoldSilverOn(kantoku))
-                _setsumei('今は大学画面の「コンピュータ金銀使用」がOFFなので、どの大学も金銀を使いません。'),
-              _komidashi(
-                '保有 金${comKinHoyuu(kantoku, _univid)} '
-                '銀${comGinHoyuu(kantoku, _univid)}',
-              ),
-              Wrap(
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: 16,
-                children: [
-                  _kumi(
+                  if (!isComGoldSilverOn(kantoku))
+                    _setsumei(
+                      '今は大学画面の「コンピュータ金銀使用」がOFFなので、どの大学も金銀を使いません。',
+                    ),
+                  _koumoku(
                     '支給レベル',
                     _hamidasanaiDropdown(
                       value: comGoldSilverLevel(kantoku, _univid),
@@ -499,7 +428,7 @@ class _ModalDaigakuKoseiState extends State<ModalDaigakuKosei> {
                       ),
                     ),
                   ),
-                  _kumi(
+                  _koumoku(
                     '銀の使い道',
                     _hamidasanaiDropdown(
                       value: comGinHoushin(kantoku, _univid),
@@ -515,200 +444,225 @@ class _ModalDaigakuKoseiState extends State<ModalDaigakuKosei> {
                       ),
                     ),
                   ),
-                ],
-              ),
-              const Divider(color: Colors.grey),
+                  _hosoku(
+                    '保有 金${comKinHoyuu(kantoku, _univid)} '
+                    '銀${comGinHoyuu(kantoku, _univid)}(夏合宿で使います)',
+                  ),
+                  const Divider(color: Colors.grey),
 
-              // スカウト
-              _midashi('スカウト'),
-              _setsumei(
-                jibun
-                    ? 'スカウトの設定は、コンピュータの大学のときだけ効きます(総監督をする大学を変えたときにそなえて設定できます)。'
-                    : 'コンピュータの大学が新入生スカウトで重視する能力や、欲しい選手の基準です。'
-                          '詳しいことは、大学画面の「コンピュータスカウト」の説明をご覧ください。',
-              ),
-              if (!isComScoutOn(kantoku))
-                _setsumei('今は大学画面の「コンピュータスカウト」がOFFなので、スカウトの設定は使われません。'),
-              _kumi(
-                '方針',
-                _hamidasanaiDropdown(
-                  value: scoutHoushin,
-                  atai: List.generate(comScoutHoushinMei.length, (i) => i),
-                  hyoujiMei: comScoutHoushinMei,
-                  onChanged: (v) => _hozon2(
-                    kantoku,
-                    comScoutHoushinIndex1,
-                    (y) => comScoutHoushinSettei(y, _univid, v),
+                  // スカウト
+                  _midashi('スカウト'),
+                  _setsumei(
+                    jibun
+                        ? 'スカウトの設定は、コンピュータの大学のときだけ効きます(総監督をする大学を変えたときにそなえて設定できます)。'
+                        : 'コンピュータの大学が新入生スカウトで重視する能力や、欲しい選手の基準です。'
+                              '詳しいことは、大学画面の「コンピュータスカウト」の説明をご覧ください。',
                   ),
-                ),
-              ),
-              _kumi(
-                '性格',
-                _hamidasanaiDropdown(
-                  value: comScoutSeikaku(kantoku, _univid),
-                  atai: List.generate(comScoutSeikakuMei.length, (i) => i),
-                  hyoujiMei: comScoutSeikakuMei,
-                  onChanged: (v) => _hozon2(
-                    kantoku,
-                    comScoutSeikakuIndex1,
-                    (y) => comScoutSeikakuSettei(y, _univid, v),
+                  if (!isComScoutOn(kantoku))
+                    _setsumei(
+                      '今は大学画面の「コンピュータスカウト」がOFFなので、スカウトの設定は使われません。',
+                    ),
+                  _koumoku(
+                    '方針',
+                    _hamidasanaiDropdown(
+                      value: scoutHoushin,
+                      atai: List.generate(
+                        comScoutHoushinMei.length,
+                        (i) => i,
+                      ),
+                      hyoujiMei: comScoutHoushinMei,
+                      onChanged: (v) => _hozon2(
+                        kantoku,
+                        comScoutHoushinIndex1,
+                        (y) => comScoutHoushinSettei(y, _univid, v),
+                      ),
+                    ),
                   ),
-                ),
-              ),
-              // 評価の割合(タイム重視の大学は持ちタイムだけで評価するので選べない)
-              scoutHoushin == comScoutHoushinMei.indexOf('タイム重視')
-                  ? Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: _komidashi('評価の割合 タイム重視のため、持ちタイムだけで評価'),
-                    )
-                  : _kumi(
-                      '評価の割合(タイム:能力)',
-                      _hamidasanaiDropdown(
-                        value:
-                            comScoutTimeWariaiUnivSettei(kantoku, _univid) ??
-                            -1,
-                        atai: [-1, for (int w = 100; w >= 0; w -= 10) w],
-                        hyoujiMei: [
-                          '共通($timeWariai:${100 - timeWariai})',
-                          for (int w = 100; w >= 0; w -= 10) '$w:${100 - w}',
-                        ],
-                        onChanged: (v) => _hozon3(
-                          kantoku,
-                          (y) => comScoutTimeWariaiUnivKaku(
-                            y,
-                            _univid,
-                            v < 0 ? null : v,
+                  _koumoku(
+                    '性格',
+                    _hamidasanaiDropdown(
+                      value: comScoutSeikaku(kantoku, _univid),
+                      atai: List.generate(
+                        comScoutSeikakuMei.length,
+                        (i) => i,
+                      ),
+                      hyoujiMei: comScoutSeikakuMei,
+                      onChanged: (v) => _hozon2(
+                        kantoku,
+                        comScoutSeikakuIndex1,
+                        (y) => comScoutSeikakuSettei(y, _univid, v),
+                      ),
+                    ),
+                  ),
+                  // 評価の割合(タイム重視の大学は持ちタイムだけで評価するので選べない)
+                  scoutHoushin == comScoutHoushinMei.indexOf('タイム重視')
+                      ? Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Text(
+                            '評価の割合(タイム:能力) タイム重視のため、持ちタイムだけで評価',
+                            style: _honbun,
                           ),
+                        )
+                      : _koumoku(
+                          '評価の割合(タイム:能力)',
+                          _hamidasanaiDropdown(
+                            value:
+                                comScoutTimeWariaiUnivSettei(
+                                  kantoku,
+                                  _univid,
+                                ) ??
+                                -1,
+                            atai: [-1, for (int w = 100; w >= 0; w -= 10) w],
+                            hyoujiMei: [
+                              '共通($timeWariai:${100 - timeWariai})',
+                              for (int w = 100; w >= 0; w -= 10)
+                                '$w:${100 - w}',
+                            ],
+                            onChanged: (v) => _hozon3(
+                              kantoku,
+                              (y) => comScoutTimeWariaiUnivKaku(
+                                y,
+                                _univid,
+                                v < 0 ? null : v,
+                              ),
+                            ),
+                          ),
+                        ),
+                  _koumoku(
+                    '積極性',
+                    _hamidasanaiDropdown(
+                      value:
+                          comScoutSekkyokuseiUnivSettei(kantoku, _univid) ??
+                          -1,
+                      atai: [-1, for (int p = 0; p <= 100; p += 10) p],
+                      hyoujiMei: [
+                        '共通($sekkyokusei%)',
+                        for (int p = 0; p <= 100; p += 10) '$p%',
+                      ],
+                      onChanged: (v) => _hozon3(
+                        kantoku,
+                        (y) => comScoutSekkyokuseiUnivKaku(
+                          y,
+                          _univid,
+                          v < 0 ? null : v,
                         ),
                       ),
                     ),
-              _kumi(
-                '積極性',
-                _hamidasanaiDropdown(
-                  value: comScoutSekkyokuseiUnivSettei(kantoku, _univid) ?? -1,
-                  atai: [-1, for (int p = 0; p <= 100; p += 10) p],
-                  hyoujiMei: [
-                    '共通($sekkyokusei%)',
-                    for (int p = 0; p <= 100; p += 10) '$p%',
-                  ],
-                  onChanged: (v) => _hozon3(
-                    kantoku,
-                    (y) => comScoutSekkyokuseiUnivKaku(
-                      y,
-                      _univid,
-                      v < 0 ? null : v,
+                  ),
+                  const Divider(color: Colors.grey),
+
+                  // レース(区間配置の方針)
+                  _midashi('レース'),
+                  _setsumei(
+                    jibun
+                        ? '区間配置の方針は、自分の大学では区間エントリーの最初の案に使います。'
+                        : '区間配置で、前の区間をどのくらい重く見るか(前半重視の強さ)です。'
+                              '詳しいことは、大学画面の「区間配置の方針」の説明をご覧ください。',
+                  ),
+                  _koumoku(
+                    '前半重視の強さ',
+                    // 前半重視の弱い順に並べる(値は保存する番号のまま。kukanHaichiHoushinNarabi)
+                    _hamidasanaiDropdown(
+                      value: kukanHaichiHoushin(kantoku, _univid),
+                      atai: kukanHaichiHoushinNarabi,
+                      hyoujiMei: [
+                        for (final int code in kukanHaichiHoushinNarabi)
+                          kukanHaichiHoushinMei[code],
+                      ],
+                      onChanged: (v) => _hozon2(
+                        kantoku,
+                        kukanHaichiHoushinIndex1,
+                        (y) => kukanHaichiHoushinSettei(y, _univid, v),
+                      ),
                     ),
                   ),
-                ),
-              ),
-              const Divider(color: Colors.grey),
+                  const Divider(color: Colors.grey),
 
-              // レース(区間配置の方針)
-              _midashi('レース'),
-              _setsumei(
-                jibun
-                    ? '区間配置の方針は、自分の大学では区間エントリーの最初の案に使います。'
-                    : '区間配置で、前の区間をどのくらい重く見るか(前半重視の強さ)です。'
-                          '詳しいことは、大学画面の「区間配置の方針」の説明をご覧ください。',
-              ),
-              _kumi(
-                '前半重視の強さ',
-                // 前半重視の弱い順に並べる(値は保存する番号のまま。kukanHaichiHoushinNarabi)
-                _hamidasanaiDropdown(
-                  value: kukanHaichiHoushin(kantoku, _univid),
-                  atai: kukanHaichiHoushinNarabi,
-                  hyoujiMei: [
-                    for (final int code in kukanHaichiHoushinNarabi)
-                      kukanHaichiHoushinMei[code],
-                  ],
-                  onChanged: (v) => _hozon2(
-                    kantoku,
-                    kukanHaichiHoushinIndex1,
-                    (y) => kukanHaichiHoushinSettei(y, _univid, v),
+                  // 留学生
+                  _midashi('留学生'),
+                  _setsumei(
+                    '入学の決まりなどは、大学画面の「留学生受け入れ設定」の説明をご覧ください。',
                   ),
-                ),
-              ),
-              const Divider(color: Colors.grey),
-
-              // 留学生
-              _midashi('留学生'),
-              _setsumei(
-                '入学の決まりなどは、大学画面の「留学生受け入れ設定」の説明をご覧ください。',
-              ),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text('留学生を受け入れる', style: honbun),
-                subtitle: Text(
-                  _ryuugakuseiR > 0
-                      ? '受け入れ中(${_ryuugakuseiYuushuudo(_ryuugakuseiR)})'
-                      : '受け入れない',
-                  style: TextStyle(
-                    color: _ryuugakuseiR > 0 ? Colors.lightGreen : Colors.grey,
-                  ),
-                ),
-                value: _ryuugakuseiR > 0,
-                // 受け入れに変えたときは、最も優秀な1にする(ModalRyugakuseiNinzu と同じ)
-                onChanged: (bool ukeireru) =>
-                    _ryuugakuseiHozon(univ, ukeireru ? 1 : 0),
-                activeColor: Colors.blue,
-              ),
-              if (_ryuugakuseiR > 0) ...[
-                // 優秀度のスライダー(右端が最高優秀のr=1、左端がr=4)
-                Slider(
-                  value: (5 - _ryuugakuseiR.clamp(1, 4)).toDouble(),
-                  min: 1,
-                  max: 4,
-                  divisions: 3,
-                  label: _ryuugakuseiYuushuudo(_ryuugakuseiR),
-                  onChanged: (double atai) {
-                    setState(() {
-                      _ryuugakuseiR = 5 - atai.toInt();
-                    });
-                  },
-                  onChangeEnd: (double atai) {
-                    _ryuugakuseiHozon(univ, 5 - atai.toInt());
-                  },
-                  activeColor: Colors.teal,
-                  inactiveColor: Colors.grey.withOpacity(0.5),
-                ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _komidashi('最低優秀'),
-                    _komidashi('最高優秀'),
-                  ],
-                ),
-              ],
-              const Divider(color: Colors.grey),
-              const SizedBox(height: 24),
-
-              Center(
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    minimumSize: const Size(200, 48),
-                    padding: const EdgeInsets.all(12.0),
-                  ),
-                  child: Text(
-                    "閉じる",
-                    style: TextStyle(
-                      fontSize: HENSUU.fontsize_honbun,
-                      fontWeight: FontWeight.bold,
+                  _koumoku(
+                    '受け入れ',
+                    // 受け入れない(0)と、受け入れるときの優秀度(1最高優秀〜4)を1つのプルダウンで選ぶ
+                    _hamidasanaiDropdown(
+                      value: univ.r.clamp(0, 4),
+                      atai: List.generate(_ryuugakuseiMei.length, (i) => i),
+                      hyoujiMei: _ryuugakuseiMei,
+                      onChanged: (v) => _ryuugakuseiHozon(univ, v),
                     ),
                   ),
-                ),
+                  const Divider(color: Colors.grey),
+
+                  // 走りの特徴(実力発揮度。あまり使われないので一番下)
+                  _midashi('走りの特徴(実力発揮度)'),
+                  _setsumei(
+                    'レースで、能力ごとに実力をどれだけ発揮できるかです。'
+                    '0が実力150%発揮(有利)、5が100%、9が60%(不利)です。'
+                    '留学生には適用されません。',
+                  ),
+                  for (final AbilityType type in _hakkiNouryoku)
+                    _koumoku(
+                      _nouryokuMei[type] ?? '',
+                      _hamidasanaiDropdown(
+                        value: (hakki[type] ?? 5).clamp(0, 9),
+                        atai: List.generate(10, (i) => i),
+                        hyoujiMei: [
+                          for (int v = 0; v <= 9; v++)
+                            '$v(${150 - v * 10}%)',
+                        ],
+                        onChanged: (v) => _hakkiHozon(kantoku, type, v),
+                      ),
+                    ),
+                  const Divider(color: Colors.grey),
+                  const SizedBox(height: 24),
+
+                  Center(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        minimumSize: const Size(200, 48),
+                        padding: const EdgeInsets.all(12.0),
+                      ),
+                      child: Text(
+                        "閉じる",
+                        style: TextStyle(
+                          fontSize: HENSUU.fontsize_honbun,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
               ),
-              const SizedBox(height: 24),
-            ],
+            ),
           ),
-        ),
+
+          // 大学の切り替え(スクロールしない。大学画面と同じく画面の下)
+          const Divider(color: Colors.grey, height: 1),
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Row(
+                children: [
+                  _kirikaeBotan('前の大学', () => _kirikae(_univid - 1)),
+                  _kirikaeBotan('自分の大学', () => _kirikae(myUnivid)),
+                  _kirikaeBotan('次の大学', () => _kirikae(_univid + 1)),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

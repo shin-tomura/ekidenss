@@ -237,7 +237,8 @@ class _SettingsQrPageState extends State<SettingsQrPage> {
             '・コンピュータスカウト設定(ON/OFF・積極性・ラウンド回数・評価の割合・大学ごとのスカウト方針と性格と評価の割合と積極性)\n'
             '・目標順位・指示の補正設定\n'
             '・能力のタイムへの影響度設定\n'
-            '・学連選抜の監督をするかどうか\n',
+            '・学連選抜の監督をするかどうか\n'
+            '・区間配置の方針(大学ごと)\n',
 
             style: TextStyle(color: Colors.white70, fontSize: 14),
           ),

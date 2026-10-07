@@ -841,7 +841,9 @@ class _ModalCourseEditViewState extends State<ModalCourseEditView> {
         sortedSenshuData: sortedSenshuData,
       );
       await ShoriGuard.end();
-      String kukanstring = "区間配置の検討順は\n";
+      // 1.9.1から、区間を決める順は大学ごとに違うので、自分の大学の順を出す
+      // (自分の大学が出場しない大会では出さない)
+      String kukanstring = kukanIDs.isEmpty ? "" : "自分の大学の区間配置の検討順は\n";
       for (int i = 0; i < kukanIDs.length; i++) {
         kukanstring = kukanstring + "${kukanIDs[i] + 1}区 ";
       }
@@ -1103,7 +1105,9 @@ class _ModalCourseEditViewState extends State<ModalCourseEditView> {
         sortedSenshuData: sortedSenshuData,
       );
       await ShoriGuard.end();
-      String kukanstring = "区間配置の検討順は\n";
+      // 1.9.1から、区間を決める順は大学ごとに違うので、自分の大学の順を出す
+      // (自分の大学が出場しない大会では出さない)
+      String kukanstring = kukanIDs.isEmpty ? "" : "自分の大学の区間配置の検討順は\n";
       for (int i = 0; i < kukanIDs.length; i++) {
         kukanstring = kukanstring + "${kukanIDs[i] + 1}区 ";
       }

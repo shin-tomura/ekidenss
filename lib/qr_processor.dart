@@ -15,6 +15,7 @@ import 'kansuu/nouryoku_eikyodo.dart'; // 能力のタイムへの影響度設�
 import 'kansuu/gakuren_kantoku.dart'; // 学連選抜の監督の設定の確認
 import 'kansuu/meisei_rireki.dart'; // 名声の履歴(1.8.8)
 import 'kansuu/kingin_wariai.dart'; // 難易度ごとの金銀支給量の割合の確認(1.9.1)
+import 'kansuu/kukan_haichi.dart'; // 区間配置の方針の確認(1.9.1)
 
 // 読み込み時に複数枚のデータを一時的に保持する状態管理クラス
 class QrReceiveState {
@@ -172,6 +173,11 @@ class SettingsQrProcessor {
       data['k_yobiint2_75'] = kantoku.yobiint2[75];
       // カスタム駅伝の出場制限(int) [78]学年・[79]留学生 (1.9.1で追加。custom_seigen.dart)
       data['k_yobiint2_78_79'] = kantoku.yobiint2.sublist(78, 80);
+      // 大学ごとの区間配置の方針(int) [80]・[81] (1.9.1で追加。kukan_haichi.dart)
+      data['k_yobiint2_80_81'] = kantoku.yobiint2.sublist(
+        kukanHaichiHoushinIndex0,
+        kukanHaichiHoushinIndex1 + 1,
+      );
     } else if (department == SettingsDepartment.octoberTime) {
       //区間ごとタイム調整(int)
       data['k_yobiint5_30_39_time'] = kantoku.yobiint5.sublist(30, 40);
@@ -602,6 +608,17 @@ class SettingsQrProcessor {
         }
         if (ryuugakusei is int && (ryuugakusei == 0 || ryuugakusei == 1)) {
           kantoku.yobiint2[79] = ryuugakusei;
+        }
+      }
+      // 大学ごとの区間配置の方針(int) kantoku.yobiint2[80]・[81] (1.9.1)
+      //   1大学1桁(大学id%15の位)、0標準(初期値)・1なし・2弱め・3強め・4とても強め・5後半重視
+      final dynamic yobiint2_80_81 = dataMap['k_yobiint2_80_81'];
+      if (yobiint2_80_81 is List && yobiint2_80_81.length == 2) {
+        for (int i = 0; i < 2; i++) {
+          final dynamic v = yobiint2_80_81[i];
+          if (v is int && kukanHaichiHoushinAtaiTadashii(v)) {
+            kantoku.yobiint2[kukanHaichiHoushinIndex0 + i] = v;
+          }
         }
       }
       // 金銀支給量倍率設定の難易度ごとの割合(int) kantoku.yobiint3[70]〜[73] (1.9.1)

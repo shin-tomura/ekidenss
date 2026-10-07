@@ -30,6 +30,7 @@ import 'package:ekiden/kansuu/ChartPanelUniv.dart';
 import 'package:ekiden/screens/tradeScreen.dart';
 import 'package:ekiden/screens/Modal_comGoldSilver.dart';
 import 'package:ekiden/screens/Modal_comScout.dart';
+import 'package:ekiden/screens/Modal_kukanHaichiHoushin.dart'; // 区間配置の方針(1.9.1)
 import 'package:ekiden/screens/Modal_shinnyuuseiShingakusaki.dart';
 import 'package:ekiden/kansuu/meisei_rireki.dart'; // 名声の履歴(1.8.8)
 import 'package:ekiden/kansuu/shiyou_text.dart'; // 留学生の入学の決まり(1.8.9)
@@ -4929,6 +4930,41 @@ class _UnivScreenState extends State<UnivScreen> {
           },
           child: Text(
             "コンピュータスカウト",
+            style: TextStyle(
+              color: const Color.fromARGB(255, 0, 255, 0),
+              decoration: TextDecoration.underline,
+              decorationColor: HENSUU.textcolor,
+            ),
+          ),
+        ),
+        // 大学ごとの区間配置の方針(前半重視など。自分の大学は区間エントリーの初期案に使う。1.9.1)
+        TextButton(
+          onPressed: () {
+            showGeneralDialog(
+              context: context,
+              barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+              barrierDismissible: true, // 背景タップで閉じられるようにする
+              barrierLabel: '区間配置の方針', // アクセシビリティ用ラベル
+              transitionDuration: const Duration(
+                milliseconds: 300,
+              ), // アニメーション時間
+              pageBuilder: (context, animation, secondaryAnimation) {
+                return const ModalKukanHaichiHoushin();
+              },
+              transitionBuilder:
+                  (context, animation, secondaryAnimation, child) {
+                    return FadeTransition(
+                      opacity: CurvedAnimation(
+                        parent: animation,
+                        curve: Curves.easeOut,
+                      ),
+                      child: child,
+                    );
+                  },
+            );
+          },
+          child: Text(
+            "区間配置の方針",
             style: TextStyle(
               color: const Color.fromARGB(255, 0, 255, 0),
               decoration: TextDecoration.underline,

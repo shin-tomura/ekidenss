@@ -96,6 +96,15 @@ class IkkuPaceYosouBox extends StatelessWidget {
   /// 他大学の1区の当日変更を添えるか(目標順位の確認の画面)
   final bool toujitsuHenkou;
 
+  /// 1区の区間エントリーの選手のid→代わりに走らせる選手のid(当日変更の画面で選んでいる交代)
+  final Map<int, int> irekae;
+
+  /// 調子を入れるか(直前順位予想では入れない)
+  final bool chousiIreru;
+
+  /// 他大学の当日変更の前の予想か(直前順位予想と当日変更の画面。注意書きを添える)
+  final bool kakuteiMae;
+
   const IkkuPaceYosouBox({
     super.key,
     this.jibunSenshuId,
@@ -103,6 +112,9 @@ class IkkuPaceYosouBox extends StatelessWidget {
     this.jibunShijiNashi = false,
     this.gakurenSenshu,
     this.toujitsuHenkou = false,
+    this.irekae = const {},
+    this.chousiIreru = true,
+    this.kakuteiMae = false,
   });
 
   @override
@@ -125,9 +137,11 @@ class IkkuPaceYosouBox extends StatelessWidget {
       sortedSenshu: sortedSenshu,
       sortedUniv: sortedUniv,
       kantoku: kantoku,
+      chousiIreru: chousiIreru,
       tobidasuSenshu: (jibunTobidasu && jibunId != null)
           ? <int>{jibunId}
           : <int>{},
+      irekae: irekae,
     );
     if (yosou == null) return const SizedBox.shrink();
 
@@ -163,6 +177,7 @@ class IkkuPaceYosouBox extends StatelessWidget {
           sortedSenshu: sortedSenshu,
           sortedUniv: sortedUniv,
           kantoku: kantoku,
+          chousiIreru: chousiIreru,
         );
         a = ikkuAishou(t, yosou.pace);
       }
@@ -185,12 +200,134 @@ class IkkuPaceYosouBox extends StatelessWidget {
       }
     }
 
+    if (!chousiIreru) gyou.add('・当日の調子は、まだ予想に入っていません');
+    if (kakuteiMae) {
+      gyou.add('・他大学が当日変更で1区の選手を入れ替えると、ペースが変わることがあります');
+    }
     gyou.add('・他大学の選手が飛び出すと、集団を引っ張る選手が変わり、ペースが変わることがあります');
 
     return _IkkuPaceWaku(
       midashi: '1区のペース予想: ${ikkuPaceMidashiMoji[yosou.midashi]}',
       gyou: gyou,
       iro: Colors.lightBlueAccent,
+    );
+  }
+}
+
+/// 当日変更の画面の「1区の候補を比べる」の画面
+/// 1区の区間エントリーの選手と補欠のそれぞれを1区に置いたときの予想を並べる(1.9.2)
+class IkkuPaceKouhoView extends StatelessWidget {
+  /// 1区の区間エントリーの選手のid
+  final int motoSenshuId;
+
+  /// 比べる選手のid(1区の区間エントリーの選手と補欠)
+  final List<int> kouhoIds;
+
+  /// 今選んでいる選手のid
+  final int sentakuchuuId;
+
+  const IkkuPaceKouhoView({
+    super.key,
+    required this.motoSenshuId,
+    required this.kouhoIds,
+    required this.sentakuchuuId,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final Ghensuu? gh = Hive.box<Ghensuu>('ghensuuBox').getAt(0);
+    final KantokuData? kantoku = Hive.box<KantokuData>(
+      'kantokuBox',
+    ).get('KantokuData');
+    final List<SenshuData> sortedSenshu = _sortedSenshu();
+    final List<UnivData> sortedUniv = _sortedUniv();
+
+    final List<Widget> naiyou = [];
+    if (gh != null && kantoku != null && ikkuPaceTaishou(gh.hyojiracebangou)) {
+      final int race = gh.hyojiracebangou;
+      for (final int id in kouhoIds) {
+        if (id < 0 || id >= sortedSenshu.length) continue;
+        final SenshuData s = sortedSenshu[id];
+        final IkkuPaceYosou? yosou = ikkuPaceYosou(
+          gh: gh,
+          racebangou: race,
+          sortedSenshu: sortedSenshu,
+          sortedUniv: sortedUniv,
+          kantoku: kantoku,
+          irekae: {motoSenshuId: id},
+        );
+        if (yosou == null) continue;
+        final List<String> gyou = [];
+        final IkkuAishou a = yosou.aishou(s.id);
+        if (a == IkkuAishou.hipparu) {
+          gyou.add(
+            '${ikkuPaceMidashiMoji[yosou.midashi]}(自分で集団を引っ張る見込み。'
+            '${ikkuTimeMoji(yosou.pace)}前後)',
+          );
+        } else {
+          final SenshuData pm = yosou.pacemaker;
+          gyou.add(
+            '${ikkuPaceMidashiMoji[yosou.midashi]}'
+            '(${_senshuMei(pm.name, pm.gakunen, sortedUniv, pm.univid)}が引っ張る見込み。'
+            '${ikkuTimeMoji(yosou.pace)}前後)',
+          );
+          gyou.add(ikkuAishouYosouMoji(a));
+        }
+        final String chousi = s.chousi == 0 ? '【体調不良】' : '調子${s.chousi}';
+        final String shirushi = [
+          if (id == motoSenshuId) '区間エントリーどおり',
+          if (id == sentakuchuuId) '選択中',
+        ].join('・');
+        naiyou.add(
+          _IkkuPaceWaku(
+            midashi:
+                '${s.name}(${s.gakunen}年) $chousi${shirushi.isEmpty ? '' : '($shirushi)'}',
+            gyou: gyou,
+            iro: id == sentakuchuuId
+                ? Colors.lightBlueAccent
+                : Colors.white70,
+          ),
+        );
+      }
+    }
+    if (naiyou.isEmpty) {
+      naiyou.add(
+        const Text(
+          '予想を出せませんでした',
+          style: TextStyle(color: HENSUU.textcolor),
+        ),
+      );
+    }
+
+    return Scaffold(
+      backgroundColor: HENSUU.backgroundcolor,
+      appBar: AppBar(
+        title: const Text('1区の候補を比べる', style: TextStyle(color: Colors.white)),
+        backgroundColor: HENSUU.backgroundcolor,
+        foregroundColor: Colors.white,
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          const Text(
+            '1区の選手だけを入れ替えたときの、1区の集団のペースの予想です。'
+            '入れる選手のカリスマが一番高ければ、その選手が集団を引っ張ります。',
+            style: TextStyle(
+              color: HENSUU.textcolor,
+              fontSize: HENSUU.fontsize_honbun - 2,
+            ),
+          ),
+          ...naiyou,
+          const SizedBox(height: 8),
+          const Text(
+            '・他大学が当日変更で1区の選手を入れ替えたり、他大学の選手が飛び出したりすると、ペースが変わることがあります',
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: HENSUU.fontsize_honbun - 2,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

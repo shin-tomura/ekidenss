@@ -6,6 +6,8 @@ import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/senshu_data.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ekiden/screens/ModalAverageTimeRankingView.dart';
+import 'package:ekiden/kansuu/ikku_pace.dart'; // 1区の集団のペース(1.9.2)
+import 'package:ekiden/screens/ikku_pace_box.dart'; // 1区のペース予想の枠(1.9.2)
 
 // 予想結果を保持するためのクラス
 class Prediction {
@@ -44,6 +46,19 @@ class Mode0330Content extends StatelessWidget {
   // ゲームを進めるボタンのアクション
   void _advanceGameMode() {
     onAdvanceMode?.call();
+  }
+
+  /// 自分の大学の1区の選手のid(1区のペース予想用。いなければnull。1.9.2)
+  int? _ikkuJibunSenshuId(Ghensuu gh, List<SenshuData> sortedSenshuData) {
+    final int race = gh.hyojiracebangou;
+    for (final SenshuData s in sortedSenshuData) {
+      if (s.univid != gh.MYunivid) continue;
+      if (race >= s.entrykukan_race.length) continue;
+      final int g = s.gakunen - 1;
+      if (g < 0 || g >= s.entrykukan_race[race].length) continue;
+      if (s.entrykukan_race[race][g] == 0) return s.id;
+    }
+    return null;
   }
 
   // 複数の大学の予想結果から順位を決定する関数
@@ -556,6 +571,22 @@ class Mode0330Content extends StatelessWidget {
                                   ),
                                 ),
                                 const SizedBox(height: 20),
+
+                                // 1区の集団のペースの予想(駅伝だけ。区間エントリーどおりの選手で予想し、
+                                // 当日の調子はまだ入れない。1.9.2)
+                                if (ikkuPaceTaishou(
+                                  currentGhensuu.hyojiracebangou,
+                                )) ...[
+                                  IkkuPaceYosouBox(
+                                    jibunSenshuId: _ikkuJibunSenshuId(
+                                      currentGhensuu,
+                                      sortedSenshuData,
+                                    ),
+                                    chousiIreru: false,
+                                    kakuteiMae: true,
+                                  ),
+                                  const SizedBox(height: 20),
+                                ],
 
                                 // オッシーの予想
                                 const Text(

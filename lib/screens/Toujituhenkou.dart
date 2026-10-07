@@ -18,6 +18,8 @@ import 'package:ekiden/screens/Modal_Taichoufuryou.dart';
 import 'package:ekiden/kansuu/ToujituHenkou_com.dart';
 import 'package:ekiden/kansuu/ShoriGuard.dart';
 import 'package:ekiden/screens/ai_copy_matome.dart'; // 生成AIに渡すテキスト(1.8.3)
+import 'package:ekiden/kansuu/ikku_pace.dart'; // 1区の集団のペース(1.9.2)
+import 'package:ekiden/screens/ikku_pace_box.dart'; // 1区のペース予想の枠(1.9.2)
 
 // --- 当日変更画面ウィジェット ---
 
@@ -419,6 +421,44 @@ class _ToujitsuHenkouScreenState extends State<ToujitsuHenkouScreen> {
         });
       }
     }
+  }
+
+  // 1区の候補を比べる画面を開くボタン(1区の選手と補欠のそれぞれを1区に置いたときの予想。1.9.2)
+  Widget _buildIkkuKouhoButton(int motoSenshuId, int sentakuchuuId) {
+    return TextButton(
+      onPressed: () {
+        showGeneralDialog(
+          context: context,
+          barrierColor: Colors.black.withOpacity(0.8),
+          barrierDismissible: true,
+          barrierLabel: '1区の候補を比べる',
+          transitionDuration: const Duration(milliseconds: 300),
+          pageBuilder: (context, animation, secondaryAnimation) {
+            return IkkuPaceKouhoView(
+              motoSenshuId: motoSenshuId,
+              kouhoIds: [motoSenshuId, for (final s in hokenSenshu) s.id],
+              sentakuchuuId: sentakuchuuId,
+            );
+          },
+          transitionBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(
+              opacity: CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeOut,
+              ),
+              child: child,
+            );
+          },
+        );
+      },
+      child: const Text(
+        '1区の候補を比べる',
+        style: TextStyle(
+          color: HENSUU.LinkColor,
+          fontSize: HENSUU.fontsize_honbun,
+        ),
+      ),
+    );
   }
 
   // 選手詳細モーダルを呼び出す共通関数 (変更なし)
@@ -1025,6 +1065,19 @@ class _ToujitsuHenkouScreenState extends State<ToujitsuHenkouScreen> {
                               ),
                             ],
                           ),
+                          // 1区は、集団のペースの予想(選んでいる交代を入れる)と、
+                          // 候補を比べる画面を開くボタン(1.9.2)
+                          if (kukan == 0 && ikkuPaceTaishou(raceIndex)) ...[
+                            IkkuPaceYosouBox(
+                              jibunSenshuId: currentValue,
+                              irekae: {entrySenshu.id: currentValue},
+                              kakuteiMae: true,
+                            ),
+                            _buildIkkuKouhoButton(
+                              entrySenshu.id,
+                              currentValue,
+                            ),
+                          ],
                         ],
                       ),
                     );

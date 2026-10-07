@@ -261,8 +261,9 @@ class IkkuPaceYosou {
 
 /// 1区の集団のペースの予想(1区を走る選手がいないときなどはnull)
 /// [sortedSenshu]・[sortedUniv] は id 順(並びの番号が id と同じ)
-/// [chousiIreru] 調子を入れるか
+/// [chousiIreru] 調子を入れるか(直前順位予想は、このあと当日の調子を決めるので入れない)
 /// [tobidasuSenshu] 飛び出す前提にする選手のid(自分の大学の選手で「スタート直後に飛び出す」を選んでいるとき)
+/// [irekae] 1区の区間エントリーの選手のid→代わりに走らせる選手のid(当日変更の画面で選んでいる交代。1.9.2)
 IkkuPaceYosou? ikkuPaceYosou({
   required Ghensuu gh,
   required int racebangou,
@@ -271,16 +272,34 @@ IkkuPaceYosou? ikkuPaceYosou({
   required KantokuData kantoku,
   bool chousiIreru = true,
   Set<int> tobidasuSenshu = const {},
+  Map<int, int> irekae = const {},
 }) {
   if (!ikkuPaceTaishou(racebangou)) return null;
 
-  final Map<int, double> mikomi = {};
-  SenshuData? pacemaker;
-  int maxKarisuma = -1;
+  // 1区を走る大学の選手(当日変更の画面で選んでいる交代を入れる)
+  final List<SenshuData> ikku = [];
   for (int i = 0; i < sortedSenshu.length; i++) {
     final SenshuData s = sortedSenshu[i];
     if (s.id != i) continue; // 試走タイムの計算は、並びの番号と選手idが同じことが前提
     if (!_ikkuEntry(s, racebangou)) continue;
+    final int? saki = irekae[s.id];
+    if (saki != null && saki != s.id) {
+      if (saki >= 0 &&
+          saki < sortedSenshu.length &&
+          sortedSenshu[saki].id == saki) {
+        ikku.add(sortedSenshu[saki]);
+      }
+      continue;
+    }
+    ikku.add(s);
+  }
+  // 集団を引っ張る選手は、選手idの小さい順に見て決める(RaceCalc.dart と同じ)
+  ikku.sort((a, b) => a.id.compareTo(b.id));
+
+  final Map<int, double> mikomi = {};
+  SenshuData? pacemaker;
+  int maxKarisuma = -1;
+  for (final SenshuData s in ikku) {
     mikomi[s.id] = ikkuMikomiTime(
       senshuId: s.id,
       chousi: s.chousi,

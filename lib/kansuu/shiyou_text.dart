@@ -143,7 +143,7 @@ ShiyouSetsu shiyouTaikai({bool setsumeisho = false}) {
   gyou.addAll(_customSeigenGyou(setsumeisho));
   // 区間配置の方針(説明書だけ。1.9.1)
   if (setsumeisho) {
-    gyou.add('・区間配置で前の区間を重く見る度合いは、大学画面の「区間配置の方針」で大学ごとに変えられます。');
+    gyou.add('・区間配置で前の区間を重く見る度合いは、大学画面の「大学の個性」で大学ごとに変えられます(全大学を並べるときは「区間配置の方針」)。');
   }
   return ShiyouSetsu('大会と人数', gyou);
 }
@@ -490,6 +490,7 @@ ShiyouSetsu shiyouIkusei({bool setsumeisho = false}) {
       '　・「金銀支給量倍率設定」では、難易度ごとに支給量の割合(10%〜500%)も変えられます。',
       '・年間強化練習の効果の大きさは、設定タブの「年間強化練習効果設定」で変えられます。',
       '・コンピュータの大学の金銀の使い方は、大学画面の「コンピュータ金銀使用」で設定できます。',
+      '　・大学ごとの支給レベルと銀の使い道は、大学画面の「大学の個性」でも変えられます。',
     ]);
   }
   return ShiyouSetsu('育成(年間強化練習と金銀)', gyou);
@@ -511,7 +512,7 @@ ShiyouSetsu shiyouMeisei({bool setsumeisho = false}) {
   ];
   if (setsumeisho) {
     gyou.addAll([
-      '・駅伝で得られる名声の倍率は、大学画面の「駅伝名声設定」で変えられます(カスタム駅伝は、設定タブの「カスタム駅伝設定」)。',
+      '・駅伝で得られる名声の倍率は、設定タブの「駅伝名声設定」で変えられます(カスタム駅伝は「カスタム駅伝設定」)。',
       '・コンピュータスカウトの詳しいことは、大学画面の「コンピュータスカウト」の説明をご覧ください。',
       // 名声の履歴(1.8.8。Modal_meiseiRireki.dart)
       '・大学画面の「全大学名声一覧」で大学をタップすると、過去10年の名声の内訳を見られます。',
@@ -582,7 +583,7 @@ ShiyouSetsu shiyouRyuugakusei({bool setsumeisho = false}) {
     gyou.addAll([
       ..._ryuugakuseiSetteiGyou,
       ..._ryuugakuseiHokaGamenGyou,
-      '・留学生の受け入れと優秀度は、大学画面の「留学生受け入れ設定」で変えられます。',
+      '・留学生の受け入れと優秀度は、大学画面の「大学の個性」で変えられます(全大学を並べるときは「留学生受け入れ設定」)。',
     ]);
   }
   return ShiyouSetsu('留学生', gyou);
@@ -720,7 +721,7 @@ bool _comKinginOff(KantokuData? kantoku) =>
 // 練習メニューと大学の個性の行(年間強化練習の効果が0のときは、大学の個性だけ)
 String _kouseiGyou(KantokuData? kantoku, bool setsumeisho) {
   final String kosei = setsumeisho
-      ? '大学画面の「大学の個性(実力発揮度)設定」'
+      ? '大学画面の「大学の個性」の実力発揮度'
       : '大学の個性(実力発揮度)';
   if (_kyoukaKyoudo(kantoku) == 0) {
     return '・$koseiによって、レースでの能力の効き方が変わります。';

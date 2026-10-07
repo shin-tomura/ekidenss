@@ -31,6 +31,13 @@ import 'package:ekiden/screens/Modal_Skip.dart';
 import 'package:ekiden/share_exporter.dart';
 import 'package:ekiden/screens/Modal_memo.dart';
 import 'package:ekiden/screens/setsumeisho_tab.dart'; // 説明書タブ(折りたたみ)
+// 全大学共通の設定の画面(1.9.1で大学画面から設定タブに移した)
+import 'package:ekiden/screens/univ_screen.dart'
+    show
+        ModalEkidenFameSettings,
+        ModalSpurtryokuseichousisuu3,
+        ModalSpurtryokuseichousisuu2,
+        ModalGakurenHosei;
 
 class SettingScreen extends StatefulWidget {
   const SettingScreen({super.key});
@@ -653,6 +660,154 @@ class _SettingScreenState extends State<SettingScreen>
             },
             child: Text(
               "年間強化練習効果設定",
+              style: TextStyle(
+                color: const Color.fromARGB(255, 0, 255, 0),
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+              ),
+            ),
+          ),
+
+          // ここから4つは、全大学共通の設定なので大学画面から移した(1.9.1。画面は univ_screen.dart)
+          const SizedBox(height: 20),
+          if (ghensuu.mode != 300 && ghensuu.mode != 330 && ghensuu.mode != 350)
+            TextButton(
+              onPressed: () {
+                showGeneralDialog(
+                  context: context,
+                  barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                  barrierDismissible: true, // 背景タップで閉じられるようにする
+                  barrierLabel: '駅伝名声設定', // アクセシビリティ用ラベル
+                  transitionDuration: const Duration(
+                    milliseconds: 300,
+                  ), // アニメーション時間
+                  pageBuilder: (context, animation, secondaryAnimation) {
+                    return const ModalEkidenFameSettings();
+                  },
+                  transitionBuilder:
+                      (context, animation, secondaryAnimation, child) {
+                        return FadeTransition(
+                          opacity: CurvedAnimation(
+                            parent: animation,
+                            curve: Curves.easeOut,
+                          ),
+                          child: child,
+                        );
+                      },
+                );
+              },
+              child: Text(
+                "駅伝名声設定",
+                style: TextStyle(
+                  color: const Color.fromARGB(255, 0, 255, 0),
+                  decoration: TextDecoration.underline,
+                  decorationColor: HENSUU.textcolor,
+                ),
+              ),
+            )
+          else
+            Text("(エントリー画面や指示画面では駅伝名声設定はできません)"),
+
+          const SizedBox(height: 20),
+          TextButton(
+            onPressed: () {
+              showGeneralDialog(
+                context: context,
+                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                barrierDismissible: true, // 背景タップで閉じられるようにする
+                barrierLabel: '入学時名声影響度設定', // アクセシビリティ用ラベル
+                transitionDuration: const Duration(
+                  milliseconds: 300,
+                ), // アニメーション時間
+                pageBuilder: (context, animation, secondaryAnimation) {
+                  return const ModalSpurtryokuseichousisuu3();
+                },
+                transitionBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                      return FadeTransition(
+                        opacity: CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOut,
+                        ),
+                        child: child,
+                      );
+                    },
+              );
+            },
+            child: Text(
+              "入学時名声影響度設定",
+              style: TextStyle(
+                color: const Color.fromARGB(255, 0, 255, 0),
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 20),
+          TextButton(
+            onPressed: () {
+              showGeneralDialog(
+                context: context,
+                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                barrierDismissible: true, // 背景タップで閉じられるようにする
+                barrierLabel: '目標順位決め方設定(コンピュータの大学)', // アクセシビリティ用ラベル
+                transitionDuration: const Duration(
+                  milliseconds: 300,
+                ), // アニメーション時間
+                pageBuilder: (context, animation, secondaryAnimation) {
+                  return const ModalSpurtryokuseichousisuu2();
+                },
+                transitionBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                      return FadeTransition(
+                        opacity: CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOut,
+                        ),
+                        child: child,
+                      );
+                    },
+              );
+            },
+            child: Text(
+              "目標順位決め方設定(コンピュータの大学)",
+              style: TextStyle(
+                color: const Color.fromARGB(255, 0, 255, 0),
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 20),
+          TextButton(
+            onPressed: () {
+              showGeneralDialog(
+                context: context,
+                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                barrierDismissible: true, // 背景タップで閉じられるようにする
+                barrierLabel: '学連選抜モチベーション設定', // アクセシビリティ用ラベル
+                transitionDuration: const Duration(
+                  milliseconds: 300,
+                ), // アニメーション時間
+                pageBuilder: (context, animation, secondaryAnimation) {
+                  return const ModalGakurenHosei();
+                },
+                transitionBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                      return FadeTransition(
+                        opacity: CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOut,
+                        ),
+                        child: child,
+                      );
+                    },
+              );
+            },
+            child: Text(
+              "学連選抜モチベーション設定",
               style: TextStyle(
                 color: const Color.fromARGB(255, 0, 255, 0),
                 decoration: TextDecoration.underline,

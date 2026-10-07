@@ -25,7 +25,9 @@ import 'package:ekiden/senshu_data.dart';
 /// 画面(senshu_screen.dart の ModalTokkunSilver)と説明書(shiyou_text.dart の銀特訓の行)が
 /// この値で書き分ける。切り替えたときは、変更履歴(ToDo.txt)だけ書き足す。
 /// コンピュータの大学の銀の使い方(goldsilver_com.dart)は、この値と関係ない
-const bool ginTokkunMenuShiki = true;
+/// (1.9.1の開発中に練習メニューの形を試したが、能力の値で考えるヘビーユーザーには、
+///  スピード練習・距離走で上げる能力を選べないのが不便なので、リリース前に false に戻した)
+const bool ginTokkunMenuShiki = false;
 
 /// 能力を直接選ぶ形(ginTokkunMenuShiki が false のとき)で並べる能力の番号(1.9.0までと同じ並び)
 const List<int> ginTokkunChokusetsuNouryoku = [2, 3, 4, 5, 6, 7, 8, 9];

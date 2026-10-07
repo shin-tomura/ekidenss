@@ -54,10 +54,7 @@ class _ModalKukanHaichiHoushinState extends State<ModalKukanHaichiHoushin> {
     required int value,
     required ValueChanged<int> onChanged,
   }) {
-    final List<String> hyoujiMei = [
-      for (int i = 0; i < kukanHaichiHoushinMei.length; i++)
-        '${kukanHaichiHoushinMei[i]}(${kukanHaichiHoushinSetsumei[i]})',
-    ];
+    // 前半重視の弱い順に並べる(値は保存する番号のまま。kukanHaichiHoushinNarabi)
     return IntrinsicWidth(
       child: DropdownButton<int>(
         value: value,
@@ -68,15 +65,19 @@ class _ModalKukanHaichiHoushinState extends State<ModalKukanHaichiHoushin> {
           fontSize: HENSUU.fontsize_honbun,
         ),
         items: [
-          for (int i = 0; i < hyoujiMei.length; i++)
-            DropdownMenuItem<int>(value: i, child: Text(hyoujiMei[i])),
+          for (final int code in kukanHaichiHoushinNarabi)
+            DropdownMenuItem<int>(
+              value: code,
+              child: Text(kukanHaichiHoushinMei[code]),
+            ),
         ],
+        // 選んでいる項目の表示(itemsと同じ並び)
         selectedItemBuilder: (context) => [
-          for (final String mei in hyoujiMei)
+          for (final int code in kukanHaichiHoushinNarabi)
             Align(
               alignment: AlignmentDirectional.centerStart,
               child: Text(
-                mei,
+                kukanHaichiHoushinMei[code],
                 maxLines: 1,
                 softWrap: false,
                 overflow: TextOverflow.ellipsis,
@@ -139,12 +140,11 @@ class _ModalKukanHaichiHoushinState extends State<ModalKukanHaichiHoushin> {
                     ),
                     child: Text(
                       "【区間配置の方針】\n\n"
-                      "駅伝の区間配置で、前の区間ほど重く見るか(前半重視)を、大学ごとに選べます。\n\n"
+                      "駅伝の区間配置で、前の区間をどのくらい重く見るか(前半重視の強さ)を、大学ごとに選べます。\n\n"
                       "区間配置では、持ちタイムと能力(年間強化練習の上乗せと、同じ区間を走った経験も含む)から区間ごとのタイムを見積もり、選手によって差がつく区間から順に選手を決めます。"
                       "前半重視にすると、前の区間ほど差を大きく見るので、前の区間に力のある選手が回りやすくなります。"
                       "襷を受けた時点で目標順位を下回っていると、焦ってタイムが悪くなる仕組みがあるためです。\n\n"
-                      "前半重視の強さは、その焦りの仕組みの強さ(説明画面の設定タブの「目標順位・指示の補正設定」の、目標順位を下回ったときの悪化の強さ)に比例します。"
-                      "かっこの中の倍率は、悪化の強さが100%のときのもので、0%にしていると前半重視はしません。"
+                      "前半重視の強さは、その焦りの仕組みの強さ(説明画面の設定タブの「目標順位・指示の補正設定」の、目標順位を下回ったときの悪化の強さ)に比例し、0%にしていると前半重視はしません。"
                       "後半重視は、焦りの仕組みとは関係なく、最終区ほど重く見ます。\n\n"
                       "1区は集団走になるので、集団より速い選手は差が半分になり、集団のペースより大きく遅い選手は大失速しやすい、という見込みで選びます。\n\n"
                       "自分の大学の方針は、区間エントリーの最初の案に使います。"
@@ -161,6 +161,16 @@ class _ModalKukanHaichiHoushinState extends State<ModalKukanHaichiHoushin> {
                   const Divider(color: Colors.grey),
                   const SizedBox(height: 16),
 
+                  // 見出し(前半重視の強さを選ぶ一覧だと分かるように)
+                  Text(
+                    "前半重視の強さ",
+                    style: TextStyle(
+                      color: HENSUU.textcolor,
+                      fontSize: HENSUU.fontsize_honbun,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
                   // 一括設定
                   Wrap(
                     alignment: WrapAlignment.center,
@@ -168,7 +178,7 @@ class _ModalKukanHaichiHoushinState extends State<ModalKukanHaichiHoushin> {
                     spacing: 12,
                     children: [
                       Text(
-                        "全大学の方針を",
+                        "全大学の前半重視の強さを",
                         style: TextStyle(
                           color: HENSUU.textcolor,
                           fontSize: HENSUU.fontsize_honbun,

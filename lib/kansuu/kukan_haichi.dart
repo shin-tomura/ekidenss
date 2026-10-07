@@ -60,15 +60,9 @@ const List<String> kukanHaichiHoushinMei = [
   '後半重視',
 ];
 
-/// 区間配置の方針の説明(画面用)
-const List<String> kukanHaichiHoushinSetsumei = [
-  '前半重視(1区1.5倍)',
-  '前半重視しない',
-  '前半重視(1区1.25倍)',
-  '前半重視(1区2倍)',
-  '前半重視(1区2.5倍)',
-  '最終区1.25倍',
-];
+/// 画面のプルダウンに並べる順(前半重視の弱い順: 後半重視・なし・弱め・標準・強め・とても強め)
+/// 画面には倍率を出さない(見てもピンとこないため。倍率はこのファイルの先頭のコメントだけ)
+const List<int> kukanHaichiHoushinNarabi = [5, 1, 2, 0, 3, 4];
 
 const int _houshinKouhan = 5;
 

@@ -116,6 +116,80 @@ bool kukanHaichiHoushinAtaiTadashii(int v) {
   return x == 0;
 }
 
+// ------------------------------------------------------------
+// 大学ごとの最適解区間配置の使い方(1.9.1)
+// 区間エントリーのとき、全大学をまず方針のやり方で配置し、そのあと最適解区間配置を使う大学だけ
+// 試走タイムで決め直す(EntryCalc.dart)。使うかどうかを大学ごとに選べる。
+//   0 確率どおり(初期値): 「最適解区間配置確率設定」の確率(Album.tourokusuu_total)でくじを引く
+//   1 使わない: いつも方針のやり方
+//   2 毎回使う: いつも最適解区間配置
+// ・プレイヤーの大学と学連選抜は、今まで通り最適解区間配置を使わない
+// ・配置がうまくいかなかったときに全大学を方針のやり方で配置し直す処理は、この設定に関係なく働く
+// ------------------------------------------------------------
+
+/// KantokuData.yobiint2 の使用番号: 大学ごとの最適解区間配置の使い方(1大学1桁)
+const int saitekikaiShiyouIndex0 = 82; // 大学0〜14
+const int saitekikaiShiyouIndex1 = 83; // 大学15〜29
+
+/// 最適解区間配置の使い方の名前(番号0〜2)。0(確率どおり)が初期値
+const List<String> saitekikaiShiyouMei = ['確率どおり', '使わない(方針どおり)', '毎回使う'];
+
+const int saitekikaiTsukawanai = 1; // 使わない
+const int saitekikaiMaikai = 2; // 毎回使う
+
+/// 大学の最適解区間配置の使い方(0〜2)
+int saitekikaiShiyou(KantokuData kantoku, int univid) {
+  if (univid < 0 || univid >= TEISUU.UNIVSUU) return 0;
+  final int idx = univid < kukanHaichiHoushinKetasuu
+      ? saitekikaiShiyouIndex0
+      : saitekikaiShiyouIndex1;
+  if (kantoku.yobiint2.length <= idx) return 0;
+  final int v = kantoku.yobiint2[idx];
+  if (v < 0) return 0;
+  final int code = (v ~/ _juu(univid % kukanHaichiHoushinKetasuu)) % 10;
+  return code < saitekikaiShiyouMei.length ? code : 0;
+}
+
+/// 大学の最適解区間配置の使い方を書き換える(yobiint2 のリストを直接書き換える。保存は呼び出し側)
+void saitekikaiShiyouSettei(List<int> yobiint2, int univid, int code) {
+  if (univid < 0 || univid >= TEISUU.UNIVSUU) return;
+  if (code < 0 || code >= saitekikaiShiyouMei.length) return;
+  final int idx = univid < kukanHaichiHoushinKetasuu
+      ? saitekikaiShiyouIndex0
+      : saitekikaiShiyouIndex1;
+  if (yobiint2.length <= idx) return;
+  final int keta = _juu(univid % kukanHaichiHoushinKetasuu);
+  int v = yobiint2[idx];
+  if (v < 0) v = 0;
+  final int ima = (v ~/ keta) % 10;
+  yobiint2[idx] = v + (code - ima) * keta;
+}
+
+/// yobiint2[82]・[83]に保存する値として正しいか(QRコードの読み込みで使う)
+bool saitekikaiShiyouAtaiTadashii(int v) {
+  if (v < 0) return false;
+  int x = v;
+  for (int i = 0; i < kukanHaichiHoushinKetasuu; i++) {
+    if (x % 10 >= saitekikaiShiyouMei.length) return false;
+    x ~/= 10;
+  }
+  return x == 0;
+}
+
+/// この大学が今回の区間エントリーで最適解区間配置を使うか
+/// (確率どおりなら、[kakuritsu]%の確率でくじを引く。[kakuritsu]は「最適解区間配置確率設定」の値)
+bool saitekikaiTsukau(
+  KantokuData kantoku,
+  int univid,
+  int kakuritsu,
+  Random random,
+) {
+  final int shiyou = saitekikaiShiyou(kantoku, univid);
+  if (shiyou == saitekikaiTsukawanai) return false;
+  if (shiyou == saitekikaiMaikai) return true;
+  return random.nextInt(100) < kakuritsu;
+}
+
 /// 区間ごとの重み(差がつく区間から決めるときに、見積もりの差に掛ける)
 List<double> kukanOmomi(KantokuData kantoku, int houshin, int kukansuu) {
   final List<double> w = List.filled(kukansuu, 1.0);

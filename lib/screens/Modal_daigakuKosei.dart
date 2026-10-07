@@ -7,7 +7,8 @@ import 'package:ekiden/constants.dart'; // TEISUU・HENSUUクラス
 import 'package:ekiden/kansuu/univkosei.dart'; // 実力発揮度(AbilityType)
 import 'package:ekiden/kansuu/goldsilver_com.dart'; // 金銀の支給レベル・銀の使い道
 import 'package:ekiden/kansuu/scout_com.dart'; // スカウト方針・性格・評価の割合・積極性
-import 'package:ekiden/kansuu/kukan_haichi.dart'; // 区間配置の方針
+import 'package:ekiden/kansuu/kukan_haichi.dart'; // 区間配置の方針と最適解区間配置の使い方
+import 'package:ekiden/album.dart'; // 最適解区間配置確率(Album.tourokusuu_total)
 
 // ------------------------------------------------------------
 // 大学の個性(1.9.1)
@@ -512,6 +513,9 @@ class _ModalDaigakuKoseiState extends State<ModalDaigakuKosei> {
     final int sekkyokusei = comScoutSekkyokusei(kantoku);
     final Map<AbilityType, int> hakki = getAbilitySettingsForUniv(_univid);
     final String? imaNoKata = _imaNoKata(kantoku);
+    // 最適解区間配置確率(設定タブの「最適解区間配置確率設定」。「確率どおり」の大学に使う)
+    final int saitekikaiKakuritsu =
+        Hive.box<Album>('albumBox').get('AlbumData')?.tourokusuu_total ?? 30;
 
     return Scaffold(
       backgroundColor: HENSUU.backgroundcolor,
@@ -790,7 +794,8 @@ class _ModalDaigakuKoseiState extends State<ModalDaigakuKosei> {
                   _setsumei(
                     jibun
                         ? '区間配置の方針は、自分の大学では区間エントリーの最初の案に使います。'
-                        : '区間配置で、前の区間をどのくらい重く見るか(前半重視の強さ)です。'
+                        : '区間配置で、前の区間をどのくらい重く見るか(前半重視の強さ)と、'
+                              '最適解区間配置(試走タイムで選ぶやり方)を使うかどうかです。'
                               '詳しいことは、大学画面の「区間配置の方針」の説明をご覧ください。',
                   ),
                   _koumoku(
@@ -810,6 +815,30 @@ class _ModalDaigakuKoseiState extends State<ModalDaigakuKosei> {
                       ),
                     ),
                   ),
+                  // 最適解区間配置の使い方(1.9.1。「確率どおり」には今の確率を添える)
+                  _koumoku(
+                    '最適解区間配置',
+                    _hamidasanaiDropdown(
+                      value: saitekikaiShiyou(kantoku, _univid),
+                      atai: List.generate(saitekikaiShiyouMei.length, (i) => i),
+                      hyoujiMei: [
+                        for (int i = 0; i < saitekikaiShiyouMei.length; i++)
+                          i == 0
+                              ? '${saitekikaiShiyouMei[i]}($saitekikaiKakuritsu%)'
+                              : saitekikaiShiyouMei[i],
+                      ],
+                      onChanged: (v) => _hozon2(
+                        kantoku,
+                        saitekikaiShiyouIndex1,
+                        (y) => saitekikaiShiyouSettei(y, _univid, v),
+                      ),
+                    ),
+                  ),
+                  if (jibun)
+                    _hosoku('最適解区間配置は、コンピュータの大学のときだけ効きます。')
+                  else if (saitekikaiShiyou(kantoku, _univid) ==
+                      saitekikaiMaikai)
+                    _hosoku('最適解区間配置を毎回使うので、前半重視の方針は使いません。'),
                   const Divider(color: Colors.grey),
 
                   // 留学生

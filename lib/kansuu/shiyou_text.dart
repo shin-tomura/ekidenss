@@ -144,6 +144,8 @@ ShiyouSetsu shiyouTaikai({bool setsumeisho = false}) {
   // 区間配置の方針(説明書だけ。1.9.1)
   if (setsumeisho) {
     gyou.add('・区間配置で前の区間を重く見る度合いは、大学画面の「大学の個性」で大学ごとに変えられます(全大学を並べるときは「区間配置の方針」)。');
+    // 大学ごとの最適解区間配置の使い方(1.9.1。kukan_haichi.dart)
+    gyou.add('　・コンピュータの大学が最適解区間配置(試走タイムで選ぶやり方)を使うかどうかも、同じ画面で大学ごとに選べます。');
   }
   return ShiyouSetsu('大会と人数', gyou);
 }

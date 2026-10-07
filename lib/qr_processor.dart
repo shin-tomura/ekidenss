@@ -178,6 +178,11 @@ class SettingsQrProcessor {
         kukanHaichiHoushinIndex0,
         kukanHaichiHoushinIndex1 + 1,
       );
+      // 大学ごとの最適解区間配置の使い方(int) [82]・[83] (1.9.1で追加。kukan_haichi.dart)
+      data['k_yobiint2_82_83'] = kantoku.yobiint2.sublist(
+        saitekikaiShiyouIndex0,
+        saitekikaiShiyouIndex1 + 1,
+      );
     } else if (department == SettingsDepartment.octoberTime) {
       //区間ごとタイム調整(int)
       data['k_yobiint5_30_39_time'] = kantoku.yobiint5.sublist(30, 40);
@@ -618,6 +623,18 @@ class SettingsQrProcessor {
           final dynamic v = yobiint2_80_81[i];
           if (v is int && kukanHaichiHoushinAtaiTadashii(v)) {
             kantoku.yobiint2[kukanHaichiHoushinIndex0 + i] = v;
+          }
+        }
+      }
+      // 大学ごとの最適解区間配置の使い方(int) kantoku.yobiint2[82]・[83] (1.9.1)
+      //   1大学1桁(大学id%15の位)、0確率どおり(初期値)・1使わない・2毎回使う
+      //   (古いQRコードには含まれていないので、そのときは今の設定のまま)
+      final dynamic yobiint2_82_83 = dataMap['k_yobiint2_82_83'];
+      if (yobiint2_82_83 is List && yobiint2_82_83.length == 2) {
+        for (int i = 0; i < 2; i++) {
+          final dynamic v = yobiint2_82_83[i];
+          if (v is int && saitekikaiShiyouAtaiTadashii(v)) {
+            kantoku.yobiint2[saitekikaiShiyouIndex0 + i] = v;
           }
         }
       }

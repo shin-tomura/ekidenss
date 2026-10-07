@@ -200,8 +200,15 @@ Future<List<int>> EntryCalc({
         }
       }
       if (sortedUnivData[targetunivid].taikaientryflag[racebangou] == 1) {
-        if (Random().nextInt(100) < album.tourokusuu_total &&
-            targetunivid != gh[0].MYunivid) {
+        // 最適解区間配置を使うかは、大学ごとの使い方で決める(1.9.1。kukan_haichi.dart。
+        // 「確率どおり」の大学だけ、今まで通り最適解区間配置確率でくじを引く)
+        if (targetunivid != gh[0].MYunivid &&
+            saitekikaiTsukau(
+              kantoku,
+              targetunivid,
+              album.tourokusuu_total,
+              Random(),
+            )) {
           for (
             int id_senshu = 0;
             id_senshu < sortedSenshuData.length;

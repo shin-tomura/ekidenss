@@ -16,6 +16,8 @@ import 'package:ekiden/screens/Modal_kukanresult350.dart';
 import 'package:ekiden/screens/Modal_tuukajuni.dart';
 import 'package:ekiden/kansuu/mokuhyou_kingin.dart'; // 目標達成時の金銀(1.8.3)
 import 'package:ekiden/screens/ai_copy_matome.dart'; // 生成AIに渡すテキスト(1.8.3)
+import 'package:ekiden/kansuu/ikku_pace.dart'; // 1区の集団のペース(1.9.2)
+import 'package:ekiden/screens/ikku_pace_box.dart'; // 1区のペース予想の枠(1.9.2)
 
 class Mode0280Content extends StatefulWidget {
   final Ghensuu ghensuu;
@@ -60,6 +62,14 @@ class _Mode0280Content extends State<Mode0280Content> {
 
       _selectedRank = rank;
     }
+  }
+
+  /// 自分の大学の1区の選手のid(1区のペース予想用。いなければnull。1.9.2)
+  int? _ikkuJibunSenshuId(List<SenshuData> entrySenshu, int raceIdx) {
+    for (final SenshuData s in entrySenshu) {
+      if (s.entrykukan_race[raceIdx][s.gakunen - 1] == 0) return s.id;
+    }
+    return null;
   }
 
   /// レース番号に応じた最大順位を返す(lib/kansuu/mokuhyou_kingin.dart と共通。1.8.3)
@@ -417,6 +427,20 @@ class _Mode0280Content extends State<Mode0280Content> {
                     // 生成AIに渡すテキストのまとめボタン(目標順位の相談用。1.8.3。
                     // 当日変更のあとの画面なので、全大学の区間配置が分かるものも出してよい)
                     const AiCopyMatomeButton(mokuhyouGamen: true),
+                    // 1区の集団のペースの予想(当日変更のあとなので、実際に走る選手で予想する。
+                    // 他大学の1区の当日変更も添える。1.9.2)
+                    if (widget.ghensuu.nowracecalckukan == 0 &&
+                        ikkuPaceTaishou(raceIdx))
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        child: IkkuPaceYosouBox(
+                          jibunSenshuId: _ikkuJibunSenshuId(
+                            entrySenshu,
+                            raceIdx,
+                          ),
+                          toujitsuHenkou: true,
+                        ),
+                      ),
                     if (widget.ghensuu.hyojiracebangou == 2 &&
                         widget.ghensuu.nowracecalckukan == 5) ...[
                       const SizedBox(height: 20),

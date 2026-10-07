@@ -33,6 +33,8 @@ import 'package:ekiden/kansuu/jibun_keika_text.dart';
 import 'package:ekiden/kansuu/gakuren_text.dart'; // 学連選抜の指示の内容と結果の文(1.8.3)
 import 'package:ekiden/screens/ai_copy_matome.dart';
 import 'package:ekiden/kansuu/yosen_omakase.dart'; // 正月駅伝予選の「おまかせで組む」(1.8.8)
+import 'package:ekiden/kansuu/ikku_pace.dart'; // 1区の集団のペース(1.9.2)
+import 'package:ekiden/screens/ikku_pace_box.dart'; // 1区のペースの予想と結果の枠(1.9.2)
 
 String _getCombinedDifficultyText(KantokuData kantoku, Ghensuu currentGhensuu) {
   // 難易度モードを取得 (0:通常, 1:極, 2:天)
@@ -528,6 +530,8 @@ class _Mode0350ContentState extends State<Mode0350Content> {
                           child: Column(
                             children: [
                               Text(timesastr),
+                              // 1区の集団のペースの結果(駅伝の2区の指示のとき。1.9.2)
+                              const IkkuPaceKekkaBox(),
                               // 生成AIに渡すテキストのまとめボタン(1.8.2)
                               const AiCopyMatomeButton(),
                               // リンクボタン
@@ -1312,6 +1316,8 @@ class _Mode0350ContentState extends State<Mode0350Content> {
                     ),
                   ),
                   Text(saBun),
+                  // 1区の集団のペースの結果(2区の指示のとき。学連選抜の選手の分を出す。1.9.2)
+                  const IkkuPaceKekkaBox(gakurenKantoku: true),
                   // 正月駅伝の6区のスタート前は、大学と同じく復路の目標順位を決め直せる
                   // (6区は判定せず、7区から効く。1.8.2)
                   if (kukan == 5 && shutsujouSuu > 0) ...[
@@ -1457,6 +1463,10 @@ class _Mode0350ContentState extends State<Mode0350Content> {
                               ),
                           ],
                         ),
+                        // 1区は、集団のペースの予想を出す(選んだ指示で変わる。1.9.2)
+                        if (kukan == 0 &&
+                            ikkuPaceTaishou(currentGhensuu.hyojiracebangou))
+                          IkkuPaceYosouBox(gakurenSenshu: sonoSenshu),
                         // 2区以降は、指示ごとのタイムの損得予測を見られる
                         // (ドロップダウンを押すつもりで間違って押さないよう、少し離す)
                         if (kukan > 0) ...[
@@ -2379,6 +2389,14 @@ class _Mode0350ContentState extends State<Mode0350Content> {
                   );
                 }).toList(),
               ),
+              // 駅伝の1区は、集団のペースの予想を出す(選んだ指示で変わる。1.9.2)
+              if (currentGhensuu.nowracecalckukan == 0 &&
+                  ikkuPaceTaishou(currentGhensuu.hyojiracebangou))
+                IkkuPaceYosouBox(
+                  jibunSenshuId: senshu.id,
+                  jibunTobidasu: currentSijiOption == 1,
+                  jibunShijiNashi: currentSijiOption == 0,
+                ),
               // 駅伝の2区以降は、指示ごとのタイムの損得予測を見られる(1.8.1)
               // (ドロップダウンを押すつもりで間違って押さないよう、少し離す)
               if (sijiSontokuTaishou(

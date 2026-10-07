@@ -18,6 +18,7 @@ import 'package:ekiden/kansuu/ToujituHenkou_com.dart';
 import 'package:ekiden/kansuu/mokuhyou_hosei.dart';
 import 'package:ekiden/kansuu/chousi_keiken_hosei.dart';
 import 'package:ekiden/kansuu/nouryoku_eikyodo.dart';
+import 'package:ekiden/kansuu/ikku_pace.dart'; // 1区の集団のペースの結果(1.9.2)
 
 String _timeToMinuteSecondString(double time) {
   if (time == TEISUU.DEFAULTTIME) {
@@ -1012,6 +1013,7 @@ Future<void> RaceCalc({
     int maxkarisuma = -1;
     int pacemaker_senshu_id = -1;
     double kijuntime = 0.0;
+    SenshuData? pacemakerSenshu; // 集団を引っ張った選手(1区のペースの結果用。1.9.2)
 
     // Filter players who are in this section and not doing an early burst
     final entryFilteredsenshudata = sortedsenshudata
@@ -1031,6 +1033,7 @@ Future<void> RaceCalc({
           kijuntime = senshu.time_taikai_total;
           pacemaker_senshu_id = senshu
               .hashCode; // Use hashCode as a unique identifier for comparison
+          pacemakerSenshu = senshu;
         }
       }
 
@@ -1038,6 +1041,20 @@ Future<void> RaceCalc({
       final Album album = albumBox.get('AlbumData')!;
       album.yobiint5 = kijuntime.toInt();
       await album.save();
+
+      // 1区の集団のペースの結果(駅伝の1区だけ。2区の指示の画面で出す。ikku_pace.dart。1.9.2)
+      // 見出しを決める「ほかの選手のタイムの真ん中」は、集団走の補正の前のタイムで出す
+      final bool ikkuKekka =
+          ikkuPaceTaishou(racebangou) && gh[0].nowracecalckukan == 0;
+      final List<double> ikkuHokaTime = [
+        for (var senshu in entryFilteredsenshudata)
+          if (senshu.hashCode != pacemaker_senshu_id) senshu.time_taikai_total,
+      ];
+      final List<int> ikkuKazu = List.filled(ikkuKazuShuruisuu, 0);
+      void ikkuKazoeru(IkkuAishou a) {
+        final int? bangou = ikkuKazuBangou(a);
+        if (bangou != null) ikkuKazu[bangou]++;
+      }
 
       for (var senshu in entryFilteredsenshudata) {
         if (senshu.startchokugotobidasiflag != 1) {
@@ -1052,6 +1069,7 @@ Future<void> RaceCalc({
               senshu.string_racesetumei +=
                   "集団のペースは自分の本来のペースよりも遅かった→タイム損(${sontokutime.isNegative ? '' : '+'}${sontokutime.toStringAsFixed(1)}秒)\n";
               atai_hosei[senshu.id][14] = sontokutime;
+              ikkuKazoeru(IkkuAishou.osokuSon);
             } else if (senshu.time_taikai_total > kijuntime) {
               if (kijuntime * 1.01 > senshu.time_taikai_total) {
                 // Own pace is slower, but manageable
@@ -1062,10 +1080,12 @@ Future<void> RaceCalc({
                 senshu.string_racesetumei +=
                     "集団のペースは自分の本来のペースよりも速かったが速すぎるというほどではなかった→少しタイム得(${sontokutime.isNegative ? '' : '+'}${sontokutime.toStringAsFixed(1)}秒)\n";
                 atai_hosei[senshu.id][14] = sontokutime;
+                ikkuKazoeru(IkkuAishou.sukoshiToku);
               } else if (kijuntime * 1.03 > senshu.time_taikai_total) {
                 // Own pace is much slower, but managed to avoid collapse
                 senshu.string_racesetumei +=
                     "集団のペースは自分の本来のペースよりも速かったが後半の大失速は免れた→タイム損得なし\n";
+                ikkuKazoeru(IkkuAishou.sonTokuNashi);
               } else {
                 // Group pace is too fast, collapse scenario
                 final lasttime = senshu.time_taikai_total;
@@ -1074,6 +1094,7 @@ Future<void> RaceCalc({
                 senshu.string_racesetumei +=
                     "集団のペースは自分の本来のペースよりも速すぎた→無理して付いていって後半大失速→大きくタイム損(${sontokutime.isNegative ? '' : '+'}${sontokutime.toStringAsFixed(1)}秒)\n";
                 atai_hosei[senshu.id][14] = sontokutime;
+                ikkuKazoeru(IkkuAishou.daiShissoku);
               }
             }
           } else {
@@ -1083,6 +1104,43 @@ Future<void> RaceCalc({
             tensuu[senshu.id][2] = atai_hosei[senshu.id][14];
           }
         }
+      }
+
+      if (ikkuKekka) {
+        // 飛び出した選手の人数(集団に入っていないので、上の並びにはいない)
+        ikkuKazu[ikkuKazuBangou(IkkuAishou.tobidashi)!] = sortedsenshudata
+            .where(
+              (s) =>
+                  s.entrykukan_race[racebangou][s.gakunen - 1] ==
+                      gh[0].nowracecalckukan &&
+                  s.startchokugotobidasiflag == 1,
+            )
+            .length;
+        // 1区の指示の画面で出していたのと同じ予想(答え合わせ用。他大学の飛び出しは見ず、
+        // 自分の大学の選手は「スタート直後に飛び出す」の指示のときだけ飛び出す前提)
+        final IkkuPaceYosou? ikkuYosou = ikkuPaceYosou(
+          gh: gh[0],
+          racebangou: racebangou,
+          sortedSenshu: sortedsenshudata,
+          sortedUniv: sortedunivdata,
+          kantoku: kantoku,
+          tobidasuSenshu: ikkuJibunTobidasuSenshu(
+            gh[0].MYunivid,
+            racebangou,
+            sortedsenshudata,
+          ),
+        );
+        ikkuPaceKekkaHozon(
+          kantoku,
+          year: gh[0].year,
+          racebangou: racebangou,
+          pacemakerId: pacemakerSenshu?.id,
+          pace: kijuntime,
+          mannaka: ikkuMannaka(ikkuHokaTime),
+          kazu: ikkuKazu,
+          yosou: ikkuYosou,
+        );
+        await kantoku.save();
       }
     }
   }

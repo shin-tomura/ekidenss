@@ -17,6 +17,7 @@ import 'package:ekiden/kansuu/univkosei.dart';
 import 'package:ekiden/kansuu/mokuhyou_hosei.dart';
 import 'package:ekiden/kansuu/nouryoku_eikyodo.dart';
 import 'package:ekiden/kansuu/gakuren_kantoku.dart';
+import 'package:ekiden/kansuu/ikku_pace.dart'; // 1区の集団のペースの結果(1.9.2)
 
 String _timeToMinuteSecondString(double time) {
   if (time == TEISUU.DEFAULTTIME) {
@@ -1019,6 +1020,11 @@ Future<void> RaceCalc_gakuren({
   final Album album = albumBox.get('AlbumData')!;
   if (gh[0].nowracecalckukan == 0) {
     final double kijuntime = album.yobiint5.toDouble();
+    // 1区の集団のペースの結果の人数に、学連選抜の選手の分を足す(ikku_pace.dart。1.9.2)
+    void ikkuKazoeru(IkkuAishou a) {
+      ikkuPaceKekkaKazuTasu(kantoku, gh[0].year, racebangou, a);
+    }
+
     for (var senshuid = 0; senshuid < gakurensenshudata.length; senshuid++) {
       final senshu = gakurensenshudata[senshuid];
       if (senshu.entrykukan_race[racebangou][senshu.gakunen - 1] !=
@@ -1026,11 +1032,13 @@ Future<void> RaceCalc_gakuren({
         continue;
       }
       if (senshu.startchokugotobidasiflag == 1) {
+        ikkuKazoeru(IkkuAishou.tobidashi);
         continue; // 前もって飛び出しの印が付いている(指示の計算で補正済み)
       }
       if (senshu.sijiflag == 0 &&
           senshu.konjou >= 85 &&
           Random().nextInt(100) < TEISUU.STARTTOBIDASIKAKURITU) {
+        ikkuKazoeru(IkkuAishou.tobidashi);
         // 指示なしの自動の飛び出し(「飛び出さない」の指示(sijiflag 2)のときは抽選しない)
         senshu.startchokugotobidasiflag = 1;
         final lasttime = senshu.time_taikai_total;
@@ -1055,6 +1063,7 @@ Future<void> RaceCalc_gakuren({
         senshu.string_racesetumei +=
             "集団のペースは自分の本来のペースよりも遅かった→タイム損(${sontokutime.isNegative ? '' : '+'}${sontokutime.toStringAsFixed(1)}秒)\n";
         atai_hosei[senshuid][14] = sontokutime;
+        ikkuKazoeru(IkkuAishou.osokuSon);
       } else if (senshu.time_taikai_total > kijuntime) {
         if (kijuntime * 1.01 > senshu.time_taikai_total) {
           final lasttime = senshu.time_taikai_total;
@@ -1064,9 +1073,11 @@ Future<void> RaceCalc_gakuren({
           senshu.string_racesetumei +=
               "集団のペースは自分の本来のペースよりも速かったが速すぎるというほどではなかった→少しタイム得(${sontokutime.isNegative ? '' : '+'}${sontokutime.toStringAsFixed(1)}秒)\n";
           atai_hosei[senshuid][14] = sontokutime;
+          ikkuKazoeru(IkkuAishou.sukoshiToku);
         } else if (kijuntime * 1.03 > senshu.time_taikai_total) {
           senshu.string_racesetumei +=
               "集団のペースは自分の本来のペースよりも速かったが後半の大失速は免れた→タイム損得なし\n";
+          ikkuKazoeru(IkkuAishou.sonTokuNashi);
         } else {
           final lasttime = senshu.time_taikai_total;
           senshu.time_taikai_total *= 1.025;
@@ -1074,9 +1085,11 @@ Future<void> RaceCalc_gakuren({
           senshu.string_racesetumei +=
               "集団のペースは自分の本来のペースよりも速すぎた→無理して付いていって後半大失速→大きくタイム損(${sontokutime.isNegative ? '' : '+'}${sontokutime.toStringAsFixed(1)}秒)\n";
           atai_hosei[senshuid][14] = sontokutime;
+          ikkuKazoeru(IkkuAishou.daiShissoku);
         }
       }
     }
+    await kantoku.save(); // 1区の結果の人数(1.9.2)
   }
 
   // Assignment of times and rankings

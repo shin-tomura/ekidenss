@@ -489,7 +489,7 @@ class _SettingScreenState extends State<SettingScreen>
                 context: context,
                 barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
                 barrierDismissible: true, // 背景タップで閉じられるようにする
-                barrierLabel: '金銀支給量倍率設定', // アクセシビリティ用ラベル
+                barrierLabel: '金銀支給量設定', // アクセシビリティ用ラベル
                 transitionDuration: const Duration(
                   milliseconds: 300,
                 ), // アニメーション時間
@@ -511,7 +511,7 @@ class _SettingScreenState extends State<SettingScreen>
               );
             },
             child: Text(
-              "金銀支給量倍率設定",
+              "金銀支給量設定",
               style: TextStyle(
                 color: const Color.fromARGB(255, 0, 255, 0),
                 decoration: TextDecoration.underline,

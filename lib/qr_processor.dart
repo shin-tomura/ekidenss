@@ -137,9 +137,9 @@ class SettingsQrProcessor {
       data['ud_name_tanshuku_9'] = sortedUnivData[9].name_tanshuku;
       // 調子関連設定(int)
       data['k_yobiint2_2_11'] = kantoku.yobiint2.sublist(2, 12);
-      // 金銀支給量倍率設定(int)
+      // 金銀支給量設定(int)
       data['k_yobiint2_12'] = kantoku.yobiint2[12];
-      // 金銀支給量倍率設定の難易度ごとの割合(int) yobiint3[70]〜[73] (1.9.1で追加)
+      // 金銀支給量設定の難易度ごとの割合(int) yobiint3[70]〜[73] (1.9.1で追加)
       data['k_yobiint3_70_73'] = kantoku.yobiint3.sublist(
         kinginWariaiIndex,
         kinginWariaiIndex + 4,
@@ -482,7 +482,7 @@ class SettingsQrProcessor {
         }
       }
 
-      // 金銀支給量倍率設定(int)
+      // 金銀支給量設定(int)
       kantoku.yobiint2[12] = dataMap['k_yobiint2_12'] as int;
       if (kantoku.yobiint2[12] < 1 || kantoku.yobiint2[12] > 2) {
         kantoku.yobiint2[12] = 2;
@@ -621,7 +621,7 @@ class SettingsQrProcessor {
           }
         }
       }
-      // 金銀支給量倍率設定の難易度ごとの割合(int) kantoku.yobiint3[70]〜[73] (1.9.1)
+      // 金銀支給量設定の難易度ごとの割合(int) kantoku.yobiint3[70]〜[73] (1.9.1)
       //   鬼・難しい・普通・易しいの順。0なら100%(初期値)、1〜50なら値×10%
       final dynamic yobiint3_70_73 = dataMap['k_yobiint3_70_73'];
       if (yobiint3_70_73 is List && yobiint3_70_73.length == 4) {

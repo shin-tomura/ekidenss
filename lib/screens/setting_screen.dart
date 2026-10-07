@@ -19,6 +19,7 @@ import 'package:ekiden/screens/Modal_bairitu_goldsilver.dart';
 import 'package:ekiden/screens/Modal_racejiki.dart';
 import 'package:ekiden/screens/Modal_shumihihyouji.dart';
 import 'package:ekiden/screens/konki_best_parts.dart'; // 持ちタイムの表示設定(1.9.1)
+import 'package:ekiden/screens/shuudan_settei.dart'; // 集団走設定(1.9.2)
 import 'package:ekiden/screens/Modal_TrainingEffect.dart';
 import 'package:ekiden/screens/Modal_TimeChousei.dart';
 import 'package:ekiden/settings_qr_page.dart';
@@ -475,6 +476,42 @@ class _SettingScreenState extends State<SettingScreen>
             },
             child: Text(
               "能力のタイムへの影響度設定",
+              style: TextStyle(
+                color: const Color.fromARGB(255, 0, 255, 0),
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          // 集団走設定(集団を引っ張る選手を決めるときの、その日の勢いの大きさ。1.9.2)
+          TextButton(
+            onPressed: () {
+              showGeneralDialog(
+                context: context,
+                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                barrierDismissible: true, // 背景タップで閉じられるようにする
+                barrierLabel: '集団走設定', // アクセシビリティ用ラベル
+                transitionDuration: const Duration(
+                  milliseconds: 300,
+                ), // アニメーション時間
+                pageBuilder: (context, animation, secondaryAnimation) {
+                  return const ModalShuudanSettei();
+                },
+                transitionBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                      return FadeTransition(
+                        opacity: CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOut,
+                        ),
+                        child: child,
+                      );
+                    },
+              );
+            },
+            child: Text(
+              "集団走設定",
               style: TextStyle(
                 color: const Color.fromARGB(255, 0, 255, 0),
                 decoration: TextDecoration.underline,

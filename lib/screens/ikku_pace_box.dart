@@ -64,11 +64,34 @@ class _IkkuPaceWaku extends StatelessWidget {
 }
 
 /// 選手の名前・学年・大学(「山田太郎(3年・○○)」の形)
-String _senshuMei(String name, int gakunen, List<UnivData> sortedUniv, int univid) {
+/// [tsuika]を渡すと、かっこの中の最後に「。」でつないで足す
+String _senshuMei(
+  String name,
+  int gakunen,
+  List<UnivData> sortedUniv,
+  int univid, {
+  String tsuika = '',
+}) {
   final String univ = (univid >= 0 && univid < sortedUniv.length)
       ? sortedUniv[univid].name
       : '';
-  return univ.isEmpty ? '$name($gakunen年)' : '$name($gakunen年・$univ)';
+  final String naka = univ.isEmpty ? '$gakunen年' : '$gakunen年・$univ';
+  return tsuika.isEmpty ? '$name($naka)' : '$name($naka。$tsuika)';
+}
+
+/// ほかに引っ張るかもしれない選手の並び(「○○(3年・○○。引っ張ればスローペース)、…」。いなければ空)
+String _taikouMoji(IkkuPaceYosou yosou, List<UnivData> sortedUniv) {
+  return yosou.taikou
+      .map((t) {
+        return _senshuMei(
+          t.senshu.name,
+          t.senshu.gakunen,
+          sortedUniv,
+          t.senshu.univid,
+          tsuika: '引っ張れば${ikkuPaceMidashiMoji[t.midashi]}',
+        );
+      })
+      .join('、');
 }
 
 List<SenshuData> _sortedSenshu() =>
@@ -150,6 +173,8 @@ class IkkuPaceYosouBox extends StatelessWidget {
       '集団を引っ張りそうな選手: ${_senshuMei(pm.name, pm.gakunen, sortedUniv, pm.univid)}',
       '予想ペース: ${ikkuPaceMoji(gh, race, yosou.pace, atoMoji: '前後')}',
     ];
+    final String taikou = _taikouMoji(yosou, sortedUniv);
+    if (taikou.isNotEmpty) gyou.add('ほかに引っ張るかもしれない選手: $taikou');
 
     // 自分の大学の選手
     if (jibunId != null && jibunId >= 0 && jibunId < sortedSenshu.length) {
@@ -273,6 +298,8 @@ class IkkuPaceKouhoView extends StatelessWidget {
           );
           gyou.add(ikkuAishouYosouMoji(a));
         }
+        final String taikou = _taikouMoji(yosou, sortedUniv);
+        if (taikou.isNotEmpty) gyou.add('ほかに引っ張るかもしれない選手: $taikou');
         final String chousi = s.chousi == 0 ? '【体調不良】' : '調子${s.chousi}';
         final String shirushi = [
           if (id == motoSenshuId) '区間エントリーどおり',
@@ -311,7 +338,7 @@ class IkkuPaceKouhoView extends StatelessWidget {
         children: [
           const Text(
             '1区の選手だけを入れ替えたときの、1区の集団のペースの予想です。'
-            '入れる選手のカリスマが一番高ければ、その選手が集団を引っ張ります。',
+            '入れる選手のカリスマが一番高ければ、その選手が集団を引っ張る見込みです。',
             style: TextStyle(
               color: HENSUU.textcolor,
               fontSize: HENSUU.fontsize_honbun - 2,

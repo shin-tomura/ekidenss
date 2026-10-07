@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:ekiden/ghensuu.dart';
 import 'package:ekiden/senshu_data.dart';
 import 'package:ekiden/univ_data.dart';
@@ -10,8 +11,9 @@ import 'package:ekiden/kansuu/time_date.dart';
 // 駅伝の1区の集団のペースの予想と結果(1.9.2)
 //
 // ■ 集団走の決まり(RaceCalc.dart と同じ)
-// ・1区を走る大学の選手のうち、飛び出さなかった選手の中でカリスマが一番高い選手
-//   (同じなら選手idの小さい選手)の、その日のタイムが集団のペースになる
+// ・1区を走る大学の選手のうち、飛び出さなかった選手それぞれに「カリスマ+その日の勢い
+//   (0〜幅の乱数)」を出し、一番高い選手(同じなら選手idの小さい選手)の、その日のタイムが
+//   集団のペースになる(勢いの幅は集団走設定。下の「集団を引っ張る選手の決め方」)
 // ・学連選抜の選手はペースを作らない(集団のペースの影響は受ける)
 // ・ほかの選手は、自分の本来のタイムと比べて、集団のほうが遅いとタイム損、1%以内速いと少し得、
 //   1〜3%速いと損得なし、3%より速いと大失速(2.5%悪化)
@@ -25,7 +27,9 @@ import 'package:ekiden/kansuu/time_date.dart';
 //   1区の計算のときの答え合わせでも同じ値にする
 // ・見出し(スローペース〜ハイペース)は、集団のペースを、ペースを作る選手以外の
 //   見込みタイムの真ん中と比べて決める
-// ・出す画面: 目標順位の確認(当日変更のあと)と1区の指示の画面
+// ・集団を引っ張りそうな選手(本命)はカリスマが一番高い選手。本命とのカリスマの差が
+//   勢いの幅より小さい選手を、最大2人まで「ほかに引っ張るかもしれない選手」(対抗)として出す
+// ・出す画面: 直前順位予想・当日変更・目標順位の確認(当日変更のあと)・1区の指示の画面
 //
 // ■ 結果(KantokuData.yobiint4[60]〜[66]。1区の計算のときに RaceCalc.dart で保存し、
 //   2区の指示の画面で出す)
@@ -42,6 +46,55 @@ import 'package:ekiden/kansuu/time_date.dart';
 /// 1区の集団のペースの予想と結果を出す大会か(駅伝。11月駅伝予選は出さない)
 bool ikkuPaceTaishou(int racebangou) =>
     (racebangou >= 0 && racebangou <= 2) || racebangou == 5;
+
+// ------------------------------------------------------------
+// 集団を引っ張る選手の決め方(1.9.2。駅伝の1区と11月駅伝予選の各組。RaceCalc.dart で使う)
+// ・飛び出さなかった選手それぞれに「カリスマ+その日の勢い(0〜幅の乱数)」を出し、
+//   一番高い選手が引っ張る。カリスマの差が幅以上あれば、必ずカリスマの高い選手が引っ張る
+// ・幅は説明画面の設定タブの「集団走設定」で選ぶ(KantokuData.yobiint2[84])
+//   0普通(初期値。幅10)・1なし(幅0。1.9.1までと同じく、いつもカリスマが一番高い選手)・
+//   2小さい(幅5)・3大きい(幅20)
+// ------------------------------------------------------------
+
+/// 集団走設定(その日の勢いの大きさ)の保存先
+const int shuudanIkioiIndex = 84;
+
+/// 集団走設定の名前(番号は保存する値)
+const List<String> shuudanIkioiMei = ['普通', 'なし', '小さい', '大きい'];
+
+/// 集団走設定を画面に並べる順(なし・小さい・普通・大きい)
+const List<int> shuudanIkioiNarabi = [1, 2, 0, 3];
+
+// 集団走設定ごとの勢いの幅(カリスマに足す乱数の最大)
+const List<int> _ikioiHaba = [10, 0, 5, 20];
+
+/// 集団走設定の値として正しいか(QRコードの読み込みで使う)
+bool shuudanIkioiAtaiTadashii(int v) => v >= 0 && v < _ikioiHaba.length;
+
+/// 今の集団走設定(保存されていない・範囲外なら0=普通)
+int shuudanIkioiSettei(KantokuData kantoku) {
+  if (kantoku.yobiint2.length <= shuudanIkioiIndex) return 0;
+  final int v = kantoku.yobiint2[shuudanIkioiIndex];
+  return shuudanIkioiAtaiTadashii(v) ? v : 0;
+}
+
+/// 今の集団走設定の勢いの幅
+int shuudanIkioiHaba(KantokuData kantoku) =>
+    _ikioiHaba[shuudanIkioiSettei(kantoku)];
+
+/// 集団走設定を保存する
+Future<void> shuudanIkioiHozon(KantokuData kantoku, int v) async {
+  if (kantoku.yobiint2.length <= shuudanIkioiIndex) return;
+  if (!shuudanIkioiAtaiTadashii(v)) return;
+  kantoku.yobiint2[shuudanIkioiIndex] = v;
+  await kantoku.save();
+}
+
+/// 集団を引っ張る選手を決める点(カリスマ+その日の勢い)。幅が0なら乱数を使わない
+double shuudanHipparuTen(int karisuma, int haba, Random random) {
+  if (haba <= 0) return karisuma.toDouble();
+  return karisuma + random.nextDouble() * haba;
+}
 
 /// ペースの見出し(番号は ikkuPaceMidashi の戻り値)
 const List<String> ikkuPaceMidashiMoji = [
@@ -241,12 +294,16 @@ class IkkuPaceYosou {
   /// 飛び出す前提にした選手のid
   final Set<int> tobidasu;
 
+  /// ほかに引っ張るかもしれない選手(その日の勢いで本命と入れ替わることがある選手。最大2人)
+  final List<IkkuTaikou> taikou;
+
   const IkkuPaceYosou({
     required this.pacemaker,
     required this.pace,
     required this.midashi,
     required this.mikomi,
     required this.tobidasu,
+    this.taikou = const [],
   });
 
   /// 大学の選手の相性
@@ -310,7 +367,8 @@ IkkuPaceYosou? ikkuPaceYosou({
       kantoku: kantoku,
       chousiIreru: chousiIreru,
     );
-    // 集団を引っ張る選手(カリスマが一番高い選手。同じなら選手idの小さい選手。RaceCalc.dart と同じ)
+    // 集団を引っ張りそうな選手(本命。その日の勢いを入れないときに引っ張る、カリスマが
+    // 一番高い選手。同じなら選手idの小さい選手。RaceCalc.dart で勢いが「なし」のときと同じ)
     if (tobidasuSenshu.contains(s.id)) continue;
     if (s.karisuma > maxKarisuma) {
       maxKarisuma = s.karisuma;
@@ -320,19 +378,66 @@ IkkuPaceYosou? ikkuPaceYosou({
   final SenshuData? pm = pacemaker;
   if (pm == null) return null;
 
-  final double pace =
-      mikomi[pm.id]! * ikkuPaceBokashiBairitsu(gh.year, racebangou);
-  final List<double> hoka = [
-    for (final MapEntry<int, double> e in mikomi.entries)
-      if (e.key != pm.id && !tobidasuSenshu.contains(e.key)) e.value,
+  final double bokashi = ikkuPaceBokashiBairitsu(gh.year, racebangou);
+  // [hipparu]が引っ張ったときの予想(ペースと見出し)
+  IkkuTaikou hipparuToki(SenshuData hipparu) {
+    final double p = mikomi[hipparu.id]! * bokashi;
+    final List<double> hoka = [
+      for (final MapEntry<int, double> e in mikomi.entries)
+        if (e.key != hipparu.id && !tobidasuSenshu.contains(e.key)) e.value,
+    ];
+    return IkkuTaikou(
+      senshu: hipparu,
+      pace: p,
+      midashi: ikkuPaceMidashi(p, ikkuMannaka(hoka)),
+    );
+  }
+
+  final IkkuTaikou honmei = hipparuToki(pm);
+
+  // ほかに引っ張るかもしれない選手(本命とのカリスマの差が勢いの幅より小さい選手。
+  // カリスマの高い順に最大2人。勢いが「なし」ならいない)
+  final int haba = shuudanIkioiHaba(kantoku);
+  final List<SenshuData> taikouKouho = [
+    for (final SenshuData s in ikku)
+      if (s.id != pm.id &&
+          !tobidasuSenshu.contains(s.id) &&
+          pm.karisuma - s.karisuma < haba)
+        s,
   ];
+  taikouKouho.sort((a, b) {
+    final int c = b.karisuma.compareTo(a.karisuma);
+    return c != 0 ? c : a.id.compareTo(b.id);
+  });
+  final List<IkkuTaikou> taikou = [
+    for (final SenshuData s in taikouKouho.take(2)) hipparuToki(s),
+  ];
+
   return IkkuPaceYosou(
     pacemaker: pm,
-    pace: pace,
-    midashi: ikkuPaceMidashi(pace, ikkuMannaka(hoka)),
+    pace: honmei.pace,
+    midashi: honmei.midashi,
     mikomi: mikomi,
     tobidasu: tobidasuSenshu,
+    taikou: taikou,
   );
+}
+
+/// 選手が集団を引っ張ったときの予想(ほかに引っ張るかもしれない選手(対抗)と、本命の計算に使う)
+class IkkuTaikou {
+  final SenshuData senshu;
+
+  /// その選手が引っ張ったときの予想ペース(ぼかし込み)
+  final double pace;
+
+  /// その選手が引っ張ったときの見出しの番号
+  final int midashi;
+
+  const IkkuTaikou({
+    required this.senshu,
+    required this.pace,
+    required this.midashi,
+  });
 }
 
 /// 自分の大学の1区の選手のうち、「スタート直後に飛び出す」の指示が付いている選手のid

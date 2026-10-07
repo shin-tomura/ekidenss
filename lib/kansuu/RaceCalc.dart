@@ -1010,7 +1010,7 @@ Future<void> RaceCalc({
   if (racebangou == 3 ||
       (((racebangou >= 0 && racebangou <= 2) || racebangou == 5) &&
           gh[0].nowracecalckukan == 0)) {
-    int maxkarisuma = -1;
+    double maxHipparuTen = -1.0; // 集団を引っ張る選手を決める点(カリスマ+その日の勢い。1.9.2)
     int pacemaker_senshu_id = -1;
     double kijuntime = 0.0;
     SenshuData? pacemakerSenshu; // 集団を引っ張った選手(1区のペースの結果用。1.9.2)
@@ -1027,9 +1027,14 @@ Future<void> RaceCalc({
 
     if (entryFilteredsenshudata.isNotEmpty) {
       // Find the pacemaker (highest charisma)
+      // 1.9.2から、カリスマにその日の勢い(0〜幅の乱数。幅は集団走設定)を足して、
+      // 一番高い選手が引っ張る(勢いが「なし」なら1.9.1までと同じく、カリスマが一番高い選手。
+      // 同じなら選手idの小さい選手。ikku_pace.dart)
+      final int ikioiHaba = shuudanIkioiHaba(kantoku);
       for (var senshu in entryFilteredsenshudata) {
-        if (senshu.karisuma > maxkarisuma) {
-          maxkarisuma = senshu.karisuma;
+        final double ten = shuudanHipparuTen(senshu.karisuma, ikioiHaba, random);
+        if (ten > maxHipparuTen) {
+          maxHipparuTen = ten;
           kijuntime = senshu.time_taikai_total;
           pacemaker_senshu_id = senshu
               .hashCode; // Use hashCode as a unique identifier for comparison

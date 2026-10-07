@@ -9,6 +9,7 @@ import 'package:ekiden/kansuu/nouryoku_eikyodo.dart';
 import 'package:ekiden/kansuu/mokuhyou_hosei.dart';
 import 'package:ekiden/kansuu/custom_seigen.dart'; // カスタム駅伝の出場制限(1.9.1)
 import 'package:ekiden/kansuu/gin_tokkun_menu.dart'; // 銀特訓の形の切り替え(1.9.1)
+import 'package:ekiden/kansuu/ikku_pace.dart'; // 集団走設定(1.9.2)
 
 // ------------------------------------------------------------
 // ゲームの仕様の文(1.8.3で生成AI向けに作り、1.8.4から説明書と共通にした)
@@ -203,8 +204,9 @@ ShiyouSetsu shiyouNouryoku({bool setsumeisho = false}) {
       '・スパート力: フィニッシュ直前の走力です。高いと短い距離の方が得意になる傾向があります。',
     ]),
     '・カリスマ: 駅伝の1区と11月駅伝予選の全組で、走る選手の中で一番高い選手がペースメーカーになり、集団のペースを作ります。',
-    // 一番高い選手が複数いるとき(説明書だけ。生成AI向けでは集団走の見出しにあるので重ねない。1.8.4)
-    if (setsumeisho) _karisumaDouchiGyou,
+    // カリスマの近い選手・同じ選手がいるとき(説明書だけ。生成AI向けでは集団走の見出しにあるので重ねない。
+    // 1.8.4。1.9.2でその日の勢いのことに書き換えた)
+    if (setsumeisho) _karisumaIkioiGyou(setsumeisho),
     ..._nouryokuGyou(kantoku, setsumeisho, nouryokuEikyodoNoboriIndex, '登り適性', [
       '・登り適性: 登り坂の走力です。コース情報の登り指数が大きい区間で効きます。登り1万・クロカン1万の持ちタイムにも関係します。',
     ]),
@@ -286,7 +288,7 @@ ShiyouSetsu shiyouShuudansou({bool setsumeisho = false}) {
   return ShiyouSetsu('集団走(駅伝の1区と11月駅伝予選)', [
     '・駅伝の1区と、11月駅伝予選の各組は、全大学の選手が1つの集団で走ります。',
     '・集団のペースは、その区間(組)を走る選手の中で、カリスマが一番高い選手が作ります。',
-    _karisumaDouchiGyou,
+    _karisumaIkioiGyou(setsumeisho),
     '・スタート直後に飛び出した選手は集団に入らず、集団のペースを作ることも、集団のペースの影響を受けることもありません。',
     '・集団のペースが自分の本来のペースより遅いとタイム損、少し速いとタイム得になります。',
     '・集団のペースが自分の本来のペースよりも速すぎると、後半に大失速して大きくタイム損をすることがあります。',
@@ -297,6 +299,7 @@ ShiyouSetsu shiyouShuudansou({bool setsumeisho = false}) {
     if (setsumeisho) ...[
       '・駅伝の直前順位予想・当日変更・目標順位の確認・1区の指示の画面で、1区の集団のペースの予想が見られます。',
       '　・集団を引っ張りそうな選手、予想ペース、自分の大学の選手が集団のペースに合いそうかが出ます。',
+      '　・カリスマの近い選手は「ほかに引っ張るかもしれない選手」として、引っ張ったときの見出しと一緒に出ます。',
       '　・直前順位予想では、当日の調子はまだ予想に入りません。',
       '　・当日変更の画面では、選んでいる交代が予想に入ります。',
       '　・当日変更の画面の「1区の候補を比べる」で、1区の選手と補欠のそれぞれを1区に置いたときの予想を比べられます。',
@@ -304,6 +307,8 @@ ShiyouSetsu shiyouShuudansou({bool setsumeisho = false}) {
       '　・1区の指示の画面では、選んだ指示に合わせて予想が変わります。',
       '　・他大学の選手の飛び出しは予想に入らないので、予想が外れることがあります。',
       '・駅伝の2区の指示の画面で、1区が実際にどんなペースだったかが、予想と比べて見られます。',
+      // 集団走設定(1.9.2。ikku_pace.dart)
+      '・その日の勢いの大きさは、設定タブの「集団走設定」で変えられます。',
     ],
   ]);
 }
@@ -706,10 +711,17 @@ const List<String> _shougatsuYosenSijiGyou = [
   '　・実力が飛び抜けた選手や大きく足りない選手は、別の集団にするかフリー走にすると良いかもしれません。',
 ];
 
-// カリスマが一番高い選手が複数いるとき(集団走と、説明書の選手の能力のカリスマで使う。
-// 計算では選手の内部の番号の小さい方になるので、同じ顔ぶれならいつも同じ選手になる)
-const String _karisumaDouchiGyou =
-    '　・一番高い選手が複数いるときは、そのうちの1人が作ります(同じ顔ぶれなら、いつも同じ選手)。';
+// カリスマの近い選手・同じ選手がいるとき(集団走と、説明書の選手の能力のカリスマで使う。1.9.2で書き換えた)
+// ・その日の勢いがあるとき(集団走設定が「なし」以外): カリスマの近い選手が作ることがある
+// ・「なし」のとき(仕組みがないので書き換える): 計算では選手の内部の番号の小さい方になるので、
+//   同じ顔ぶれならいつも同じ選手になる
+String _karisumaIkioiGyou(bool setsumeisho) {
+  final KantokuData? kantoku = _kantoku();
+  if (kantoku != null && shuudanIkioiHaba(kantoku) == 0) {
+    return '　・${_konoData(setsumeisho)}、いつも一番高い選手が作ります(複数いるときは、同じ顔ぶれならいつも同じ選手)。';
+  }
+  return '　・カリスマの近い選手がいると、その日の勢いで、別の選手が作ることがあります。';
+}
 
 // 駅伝予選には経験補正と調子がないこと(経験補正と、駅伝予選の決まりで使う)
 const String _keikenYosenGyou =

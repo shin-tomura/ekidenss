@@ -23,7 +23,10 @@ const Color _commentIro = Color(0xFF4FC3F7);
 
 /// 結果の記事の一覧を開く(結果画面から)
 void kijiKekkaHiraku(BuildContext context) {
-  _hiraku(context, kijiKekkaIchiran(), kekka: true);
+  final List<Kiji> list = kijiKekkaIchiran();
+  // 対校戦の記事は駅伝ではないので、サイト名の横を「陸上ニュース・対校戦」にする(1.9.2)
+  final bool taikousen = list.isNotEmpty && list.first.category == '対校戦';
+  _hiraku(context, list, kekka: true, sub: taikousen ? '陸上ニュース・対校戦' : null);
 }
 
 /// 展望の記事の一覧を開く(直前順位予想の画面から)

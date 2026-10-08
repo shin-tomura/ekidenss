@@ -1249,6 +1249,15 @@ class _Mode0700ContentState extends State<Mode0700Content> {
                                             _buildRaceTitle(
                                               currentGhensuu.hyojiracebangou,
                                             ),
+                                            // ニュース記事(箱庭スポーツ。対校戦の種目ごとの結果の記事。1.9.2)
+                                            KijiLinkCard(
+                                              key: ValueKey(
+                                                'kijiKekka_${currentGhensuu.year}_${currentGhensuu.hyojiracebangou}',
+                                              ),
+                                              namae: 'ニュース記事(箱庭スポーツ)',
+                                              tsukuru: kijiKekkaIchiran,
+                                              hiraku: kijiKekkaHiraku,
+                                            ),
                                             const Text(
                                               "個人順位",
                                               style: TextStyle(

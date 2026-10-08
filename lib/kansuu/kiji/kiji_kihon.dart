@@ -221,7 +221,8 @@ class KijiKankyou {
         Hive.box<SenshuData>('senshuBox').values.toList()
           ..sort((a, b) => a.id.compareTo(b.id));
     final int race = gh.hyojiracebangou;
-    if (race < 0 || race > 5) return null;
+    // 駅伝・駅伝予選(0〜5)と、対校戦の3種目(6: 5000m、7: 1万m、8: ハーフ。1.9.2)
+    if (race < 0 || race > 8) return null;
     if (gh.kukansuu_taikaigoto.length <= race) return null;
     return KijiKankyou._(gh, kantoku, univ, senshu, race);
   }
@@ -229,14 +230,17 @@ class KijiKankyou {
   /// 区間(組)の数
   int get kukansuu => gh.kukansuu_taikaigoto[race];
 
-  /// 大会の名前
-  String get raceMei => courseRaceTitle(race);
+  /// 大会の名前(対校戦は種目に分かれているが、大会の名前は「対校戦」)
+  String get raceMei => taikousen ? '対校戦' : courseRaceTitle(race);
 
   /// 「第○回正月駅伝」
   String get taikaiMei => '第${gh.year}回$raceMei';
 
   /// 駅伝(予選ではない)か
   bool get ekiden => race <= 2 || race == 5;
+
+  /// 対校戦(5000m・1万m・ハーフの3種目のどれか)か(1.9.2)
+  bool get taikousen => race >= 6 && race <= 8;
 
   /// 1年生だけのカスタム駅伝か(全員1年生なので、1年生を特別扱いする言い回しを出さない)
   bool get ichinenDake => race == customRaceBangou && customIchinenDake();

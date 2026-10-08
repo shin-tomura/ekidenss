@@ -48,6 +48,9 @@ enum CommentBamen {
 
   /// 展望(意気込み)
   ikigomi,
+
+  /// 対校戦の種目で個人優勝
+  taikousenKojinYuushou,
 }
 
 /// 監督のコメントの場面
@@ -71,6 +74,18 @@ enum KantokuBamen {
 
   /// 駅伝で、わずかの差で優勝を逃した(僅差の2位)
   kinsaJunyuushou,
+
+  /// 対校戦の総合優勝
+  taikousenYuushou,
+
+  /// 対校戦の総合で、目標の8位以内に入った(8位争いを制した)
+  taikousenHachii,
+
+  /// 対校戦の総合で、8位以内をわずかに逃した
+  taikousenHachiiNogasu,
+
+  /// 対校戦の総合で、目標順位に届かなかった
+  taikousenMitassei,
 }
 
 const Map<CommentBamen, List<String>> _senshuComment = {
@@ -149,6 +164,12 @@ const Map<CommentBamen, List<String>> _senshuComment = {
     'トップは狙っていた。最後まで集中を切らさずに走れた',
     'チームの順位につながる走りができてうれしい',
   ],
+  CommentBamen.taikousenKojinYuushou: [
+    'チームのポイントのために、1つでも前でゴールすることだけを考えた',
+    'ラストの勝負になると思っていた。最後まで脚が残っていてよかった',
+    '大学の名前を背負って走った。勝ててうれしい',
+    'この種目で勝つことを目標にしてきた。大きな自信になります',
+  ],
   CommentBamen.ikigomi: [
     'チームの目標のために、自分の区間で役割を果たしたい',
     '調子は上がってきている。自分の走りをするだけです',
@@ -213,6 +234,24 @@ const Map<KantokuBamen, List<String>> _kantokuComment = {
     'わずかの差だった。選手たちはよく戦ってくれたが、勝たせてあげられなかった',
     'あと少しが届かなかった。この差を埋めるのが、来年への宿題です',
     '最後まで優勝を争えたのは収穫。ただ、この負けは本当に悔しい',
+  ],
+  KantokuBamen.taikousenYuushou: [
+    '全員が1つでも前でゴールしようと粘ってくれた。総合力でつかんだ優勝です',
+    '5000mから最後のハーフまで、チーム全員で積み上げた結果だと思う',
+    '層の厚さを見せられた。選手たちを誇りに思う',
+  ],
+  KantokuBamen.taikousenHachii: [
+    '最後までどうなるか分からなかった。一人ひとりの1つの順位が効いた',
+    '8位以内は最低限の目標。まずはほっとしています',
+  ],
+  KantokuBamen.taikousenHachiiNogasu: [
+    '一人ひとりの順位の重みを思い知らされた。もう一度鍛え直したい',
+    'あと少しだった。この悔しさを夏の練習にぶつけたい',
+  ],
+  KantokuBamen.taikousenMitassei: [
+    '目標には届かなかった。チーム全体の底上げが課題です',
+    '上位の選手は頑張ったが、層の薄さが出た。夏に鍛え直したい',
+    '悔しい結果だが、課題ははっきりした。駅伝シーズンにつなげたい',
   ],
   KantokuBamen.tenbouSeed: [
     'まずはシード権を確実に取る。そこから一つでも上を目指したい',

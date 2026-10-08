@@ -3,6 +3,7 @@ import 'package:ekiden/kansuu/kiji/kiji_kihon.dart';
 import 'package:ekiden/kansuu/kiji/kiji_kekka.dart';
 import 'package:ekiden/kansuu/kiji/kiji_yosen.dart';
 import 'package:ekiden/kansuu/kiji/kiji_tenbou.dart';
+import 'package:ekiden/kansuu/kiji/kiji_taikousen.dart';
 
 export 'package:ekiden/kansuu/kiji/kiji_kihon.dart'
     show Kiji, KijiBlock, KijiBlockShurui, KijiHyou, kijiSiteMei;
@@ -10,7 +11,7 @@ export 'package:ekiden/kansuu/kiji/kiji_tenbou.dart' show KijiYosouJin;
 
 // ------------------------------------------------------------
 // ニュース記事(箱庭スポーツ)の入口(1.9.2)
-// ・結果の記事: 結果画面(駅伝・予選)の「ニュース記事」から開く
+// ・結果の記事: 結果画面(駅伝・予選・対校戦)の「ニュース記事」から開く
 // ・展望の記事: 直前順位予想の画面の「展望記事」から開く
 // ・スタート直前号: 目標順位の確認の画面の「スタート直前号」から開く(駅伝の1区のスタート前。
 //   当日変更のあとの、実際に走る選手で書く)
@@ -24,7 +25,9 @@ List<Kiji> kijiKekkaIchiran() {
   try {
     final KijiKankyou? k = KijiKankyou.yomu();
     if (k == null) return [];
-    final List<Kiji> list = k.ekiden ? ekidenKekkaKiji(k) : yosenKekkaKiji(k);
+    final List<Kiji> list = k.ekiden
+        ? ekidenKekkaKiji(k)
+        : (k.taikousen ? taikousenKekkaKiji(k) : yosenKekkaKiji(k));
     _log(list);
     return list;
   } catch (e, st) {
@@ -37,7 +40,8 @@ List<Kiji> kijiKekkaIchiran() {
 List<Kiji> kijiTenbouIchiran(List<KijiYosouJin> yosou) {
   try {
     final KijiKankyou? k = KijiKankyou.yomu();
-    if (k == null) return [];
+    // 対校戦には展望の記事がない
+    if (k == null || k.taikousen) return [];
     final List<Kiji> list = tenbouKiji(k, yosou);
     _log(list);
     return list;
@@ -76,7 +80,7 @@ void _log(List<Kiji> list) {
 String kijiIraibun(bool kekka) {
   if (kekka) {
     return '以下は、駅伝ゲーム「箱庭小駅伝SS」の大会結果をもとにした、架空のスポーツニュースサイト'
-        '「$kijiSiteMei」の記事です。あなたはスポーツ紙の駅伝担当のベテラン記者として、'
+        '「$kijiSiteMei」の記事です。あなたはスポーツ紙の駅伝・陸上担当のベテラン記者として、'
         'この記事をもとに、読みごたえのある記事に書き直してください。'
         '順位・タイム・選手名・大学名などの事実は変えないでください。'
         'コメントは記事の中のものだけを使い、新しい発言は作らないでください。\n\n';

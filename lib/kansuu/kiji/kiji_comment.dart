@@ -43,6 +43,9 @@ enum CommentBamen {
   /// 予選の個人トップ
   yosenKojinTop,
 
+  /// 予選で、わずかの差で通過を逃した(次点)
+  yosenJiten,
+
   /// 展望(意気込み)
   ikigomi,
 }
@@ -62,6 +65,9 @@ enum KantokuBamen {
 
   /// 展望(シード権争い)
   tenbouSeed,
+
+  /// 予選で、わずかの差で通過を逃した(次点)
+  yosenJiten,
 }
 
 const Map<CommentBamen, List<String>> _senshuComment = {
@@ -129,6 +135,12 @@ const Map<CommentBamen, List<String>> _senshuComment = {
     'あと一歩が届かなかった。この悔しさを忘れずに練習したい',
     '自分がもう少し粘れていれば。来年は必ず戻ってくる',
   ],
+  CommentBamen.yosenJiten: [
+    'あと1秒、自分が削れていれば。悔しくてたまらない',
+    '最後に粘り切れなかった。自分の1秒が足りなかった',
+    '一人ひとりがあと少しずつ速ければ届いた。この差は一生忘れない',
+    '結果を見て言葉が出なかった。来年は必ずこの悔しさを晴らす',
+  ],
   CommentBamen.yosenKojinTop: [
     '自分の役割は、チームのために一つでも前でゴールすること。それができてよかった',
     'トップは狙っていた。最後まで集中を切らさずに走れた',
@@ -188,6 +200,11 @@ const Map<KantokuBamen, List<String>> _kantokuComment = {
     '失うものは何もない。思い切ってぶつかっていきたい',
     'チャレンジャーとして、一つでも上の順位を目指す',
     '上位校の背中は見えている。選手たちを信じて送り出したい',
+  ],
+  KantokuBamen.yosenJiten: [
+    '1秒の重みを思い知らされた。選手たちに申し訳ない',
+    'これだけの僅差で届かないのは、私の力不足。来年、必ず取り返す',
+    '紙一重だった。この経験を、チーム全員で次につなげたい',
   ],
   KantokuBamen.tenbouSeed: [
     'まずはシード権を確実に取る。そこから一つでも上を目指したい',

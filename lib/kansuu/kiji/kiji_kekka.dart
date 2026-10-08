@@ -765,6 +765,19 @@ Kiji? _jibunKiji(EkidenKekka e) {
     } else if (!seedNow && seedMae) {
       lead.write('シード権を失い、来季は予選会からの出直しとなる。');
     }
+    // シード権ラインちょうどの2校のどちらかで、1人あたり5秒以内の差なら、その差も書く(1.9.2)
+    if (e.n > seed && (r == seed - 1 || r == seed)) {
+      final EkidenUnivKekka aite = r == seed - 1 ? e.jun[seed] : e.jun[seed - 1];
+      final int sa2 = r == seed - 1
+          ? saByou(aite.time, m.time)
+          : saByou(m.time, aite.time);
+      if (sa2 <= ks * 5) {
+        lead.write(
+          '${r == seed - 1 ? 'シード権を逃した' : 'シード権を取った'}${aite.mei}とは${kinsaMoji(sa2)}、'
+          '$ks人でつないで${hitoriAtariMoji(sa2, ks)}だった。',
+        );
+      }
+    }
   }
   if (kakoSaikou && r > 0) lead.write('大学としては過去最高の順位となった。');
 
@@ -1250,8 +1263,8 @@ Kiji? _seedKiji(EkidenKekka e) {
   String midashi;
   if (sa <= 10) {
     midashi = w.erabu([
-      'シード権争い、${nokori.mei}が${saMoji(sa)}差で滑り込み',
-      '${morashi.mei}、${saMoji(sa)}差でシード権逃す',
+      'シード権争い、${nokori.mei}が${kinsaMoji(sa)}で滑り込み',
+      '${morashi.mei}、${kinsaMoji(sa)}でシード権逃す',
     ]);
   } else if (togire != null && maeRenzoku(togire) >= 5) {
     midashi = maeRenzokuK(togire).kakutei
@@ -1275,8 +1288,15 @@ Kiji? _seedKiji(EkidenKekka e) {
         : '${k.taikaiMei}は、上位$seed校に与えられるシード権争いも注目を集めた。',
   );
   lead.write(
-    '${juniMoji(nokori.juni)}の${nokori.mei}と${juniMoji(morashi.juni)}の${morashi.mei}の差は${saMoji(sa)}。',
+    sa <= 0
+        ? '${juniMoji(nokori.juni)}の${nokori.mei}と${juniMoji(morashi.juni)}の${morashi.mei}は、'
+              '総合タイムが秒まで同じで、1秒に満たない差だった。'
+        : '${juniMoji(nokori.juni)}の${nokori.mei}と${juniMoji(morashi.juni)}の${morashi.mei}の差は${saMoji(sa)}。',
   );
+  // 1人あたり5秒以内の差なら、1人あたりの差も書く(1.9.2)
+  if (sa <= ks * 5) {
+    lead.write('$ks人でつないで、${hitoriAtariMoji(sa, ks)}だった。');
+  }
   if (nokoriGyakuten) {
     lead.write('${nokori.mei}は最終区でシード圏内に浮上し、来年のシード権を手にした。');
   } else if (morashiGyakuten) {

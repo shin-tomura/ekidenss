@@ -11,7 +11,9 @@ import 'package:ekiden/kansuu/kiji/kiji_comment.dart';
 //  1. トップ記事: 通過校の顔ぶれ。連続出場が途切れた大学・初の本戦・通過ラインの僅差・
 //     トップ通過などから、一番ニュース価値の高い切り口を見出しにする
 //  2. 自分の大学の記事: 通過か落選か、通過ラインとの差、組ごと(個人ごと)の走り
-//  3. 個人の記事: 11月駅伝予選は各組のトップ、正月駅伝予選は個人トップと日本人トップ
+//  3. 次点の記事: 通過ラインとの差が1人あたり3秒以内(11月駅伝予選)・5秒以内(正月駅伝予選)の
+//     ときだけ。何秒差で涙をのんだか、どこで差がついたか(組ごと・番手ごと)を書く(1.9.2)
+//  4. 個人の記事: 11月駅伝予選は各組のトップ、正月駅伝予選は個人トップと日本人トップ
 //
 // 予選のあとなので、本戦(11月駅伝・正月駅伝)の順位の記録の[0]は前回(去年)の本戦
 // ------------------------------------------------------------
@@ -156,6 +158,23 @@ class YosenKekka {
   /// 通過ラインの争いがあるか(出場校が通過校の数より多い)
   bool get borderAri => n > tsuukaSuu;
 
+  /// チームの合計に入る人数(11月駅伝予選は走る8人全員、正月駅伝予選は上位10人)
+  int get keisanNinzuu => k.race == 3 ? 8 : 10;
+
+  /// 最後の通過校と次点の差(秒。通過ラインの争いがなければnull)
+  int? get borderSaByou => borderAri
+      ? saByou(jun[tsuukaSuu].time, jun[tsuukaSuu - 1].time)
+      : null;
+
+  /// 次点の記事を立てる差の上限(秒。1人あたり11月駅伝予選は3秒、正月駅伝予選は5秒)
+  int get jitenSaJougen => keisanNinzuu * (k.race == 3 ? 3 : 5);
+
+  /// 次点の記事を立てるか
+  bool get jitenKijiAri {
+    final int? sa = borderSaByou;
+    return sa != null && sa <= jitenSaJougen;
+  }
+
   /// 自分の大学(出場していなければnull)
   YosenUnivKekka? get jibun {
     for (final YosenUnivKekka x in jun) {
@@ -244,6 +263,8 @@ List<Kiji> yosenKekkaKiji(KijiKankyou k) {
   final List<Kiji> list = [_yosenTopKiji(e)];
   final Kiji? jibun = _yosenJibunKiji(e);
   if (jibun != null) list.add(jibun);
+  final Kiji? jiten = _yosenJitenKiji(e);
+  if (jiten != null) list.add(jiten);
   final Kiji? kojin = _yosenKojinKiji(e);
   if (kojin != null) list.add(kojin);
   return list;
@@ -337,14 +358,14 @@ Kiji _yosenTopKiji(YosenKekka e) {
       '${togire.mei}が予選敗退　連続出場${renzokuHonsen(togire)}年で途切れる',
       '${togire.mei}、まさかの予選落ち　${renzokuHonsen(togire)}年続いた${e.honsenMei}出場途切れる',
     ]);
+  } else if (saigo != null && borderSa <= 10) {
+    midashi = '${saigo.mei}が${kinsaMoji(borderSa)}で滑り込み';
+    midashi += '　トップ通過は${top.mei}';
   } else if (hatsu.isNotEmpty) {
     midashi = w.erabu([
       '${hatsu.first.mei}が初の${e.honsenMei}切符',
       '${hatsu.first.mei}、悲願の${e.honsenMei}初出場決める',
     ]);
-    midashi += '　トップ通過は${top.mei}';
-  } else if (saigo != null && borderSa <= 10) {
-    midashi = '${saigo.mei}が${saMoji(borderSa)}差で滑り込み';
     midashi += '　トップ通過は${top.mei}';
   } else if (saigoGyakuten && saigo != null) {
     midashi = '${saigo.mei}が最終組で逆転通過';
@@ -375,7 +396,7 @@ Kiji _yosenTopKiji(YosenKekka e) {
   if (saigo != null && morashi != null) {
     lead.write(
       '最後の$ts枠目には${saigo.mei}が入り、${(ts + 1)}位の${morashi.mei}とは'
-      '${saMoji(borderSa)}差だった。',
+      '${borderSa <= 0 ? '合計タイムが秒まで同じで、1秒に満たない差' : '${saMoji(borderSa)}差'}だった。',
     );
   }
 
@@ -412,7 +433,7 @@ Kiji _yosenTopKiji(YosenKekka e) {
         if (nana != null && hachi != null) {
           sb.write(
             '通過圏の$ts位${nana.mei}と${ts + 1}位${hachi.mei}の差は'
-            '${saMoji(saByou(hachi.ruikei[kk], nana.ruikei[kk]))}。',
+            '${saByou(hachi.ruikei[kk], nana.ruikei[kk]) <= 0 ? '1秒に満たない' : saMoji(saByou(hachi.ruikei[kk], nana.ruikei[kk]))}。',
           );
         }
       } else if (saigo != null && morashi != null) {
@@ -462,12 +483,16 @@ Kiji _yosenTopKiji(YosenKekka e) {
     w.koMidashi('明暗');
     w.danraku(
       w.erabu([
-        '通過ラインの$ts位争いは、${saigo.mei}が${morashi.mei}を${saMoji(borderSa)}差でかわした。',
-        '${saigo.mei}と${morashi.mei}の明暗を分けたのは、わずか${saMoji(borderSa)}だった。',
+        '通過ラインの$ts位争いは、${saigo.mei}が${morashi.mei}を${kinsaMoji(borderSa)}でかわした。',
+        '${saigo.mei}と${morashi.mei}の明暗を分けたのは、'
+            '${borderSa <= 0 ? '1秒に満たない差' : 'わずか${saMoji(borderSa)}'}だった。',
       ]),
     );
-    // 落選した大学の選手と監督
-    if (morashi.senshu.isNotEmpty) {
+    // 次点の記事を立てるときは、選手と監督の話はそちらで書く
+    if (e.jitenKijiAri) {
+      w.danraku('${e.keisanNinzuu}人で走って、${hitoriAtariMoji(borderSa, e.keisanNinzuu)}だった。'
+          '涙をのんだ${morashi.mei}の戦いは、別稿で伝える。');
+    } else if (morashi.senshu.isNotEmpty) {
       final SenshuData s = morashi.senshu.first.s;
       w.danraku(
         '${morashi.mei}はチームトップの${w.senshu(s)}が'
@@ -478,9 +503,11 @@ Kiji _yosenTopKiji(YosenKekka e) {
         senshuComment(w, CommentBamen.yosenRakusen, myouji(s.name), kuyashii: true),
       );
     }
-    w.comment(
-      kantokuComment(w, KantokuBamen.yosenRakusen, morashi.u.id, kuyashii: true),
-    );
+    if (!e.jitenKijiAri) {
+      w.comment(
+        kantokuComment(w, KantokuBamen.yosenRakusen, morashi.u.id, kuyashii: true),
+      );
+    }
     w.comment(kantokuComment(w, KantokuBamen.yosenTsuuka, saigo.u.id));
   }
 
@@ -568,6 +595,11 @@ Kiji? _yosenJibunKiji(YosenKekka e) {
   }
   final String kaisuu = _honsenKaisuuMoji(e, m.u);
   final int mae = juniRace(m.u, race, 1);
+  // 通過ラインちょうどの2校(最後の通過校と次点)の差が小さいときは、1人あたりの差も書く
+  final bool kyousou =
+      aite != null &&
+      (m.juni == ts - 1 || m.juni == ts) &&
+      lineSa <= e.jitenSaJougen;
 
   // 見出し
   String midashi;
@@ -576,14 +608,16 @@ Kiji? _yosenJibunKiji(YosenKekka e) {
   } else if (ok && kaisuu == '初の') {
     midashi = '$mm、悲願の${e.honsenMei}初出場';
   } else if (ok && aite != null && lineSa <= 30) {
-    midashi = '$mmが${juniMoji(m.juni)}で通過　次点と${saMoji(lineSa)}差';
+    midashi = '$mmが${juniMoji(m.juni)}で通過　次点と${kinsaMoji(lineSa)}';
   } else if (ok) {
     midashi = w.erabu([
       '$mmが${juniMoji(m.juni)}で${e.honsenMei}へ',
       '$mm、${kaisuu}${e.honsenMei}出場決める',
     ]);
   } else if (aite != null && lineSa <= 30) {
-    midashi = '$mm、通過まで${saMoji(lineSa)}届かず';
+    midashi = lineSa <= 0
+        ? '$mm、1秒に満たない差で通過逃す'
+        : '$mm、通過まで${saMoji(lineSa)}届かず';
   } else {
     midashi = w.erabu(['$mmは${juniMoji(m.juni)}で予選敗退', '$mm、${e.honsenMei}出場ならず']);
   }
@@ -594,12 +628,18 @@ Kiji? _yosenJibunKiji(YosenKekka e) {
   if (ok) {
     lead.write('上位$ts校に入り、${kaisuu}${e.honsenMei}出場を決めた。');
     if (aite != null) {
-      lead.write('次点の${aite.mei}とは${saMoji(lineSa)}差だった。');
+      lead.write('次点の${aite.mei}とは${kinsaMoji(lineSa)}だった。');
+      if (kyousou) {
+        lead.write('${e.keisanNinzuu}人の合計で、${hitoriAtariMoji(lineSa, e.keisanNinzuu)}だった。');
+      }
     }
   } else if (aite != null) {
     lead.write(
-      '通過ラインの$ts位${aite.mei}とは${saMoji(lineSa)}差で、${e.honsenMei}への出場はかなわなかった。',
+      '通過ラインの$ts位${aite.mei}とは${kinsaMoji(lineSa)}で、${e.honsenMei}への出場はかなわなかった。',
     );
+    if (kyousou) {
+      lead.write('${e.keisanNinzuu}人が走って、${hitoriAtariMoji(lineSa, e.keisanNinzuu)}だった。');
+    }
   }
   if (shutsujouJuni(mae)) {
     if (mae > m.juni) {
@@ -732,7 +772,256 @@ Kiji? _yosenJibunKiji(YosenKekka e) {
 }
 
 // ------------------------------------------------------------
-// 3. 個人の記事
+// 3. 次点の記事(通過ラインとの差が1人あたり3秒以内(11月駅伝予選)・5秒以内(正月駅伝予選)のとき)
+// ------------------------------------------------------------
+
+/// 差の文(次点から見た遅れ。「+12秒」「-9秒」「0秒」)
+String _jitenSaMoji(int sa) =>
+    sa > 0 ? '+${saMoji(sa)}' : (sa < 0 ? '-${saMoji(-sa)}' : '0秒');
+
+Kiji? _yosenJitenKiji(YosenKekka e) {
+  if (!e.jitenKijiAri) return null;
+  final KijiKankyou k = e.k;
+  const int no = 4;
+  final KijiKakite w = KijiKakite(k, kijiTane(k.gh, k.race, no));
+  final int race = k.race;
+  final int ks = e.ks;
+  final int ts = e.tsuukaSuu;
+  final int nin = e.keisanNinzuu;
+  final YosenUnivKekka saigo = e.jun[ts - 1]; // 最後の通過校
+  final YosenUnivKekka morashi = e.jun[ts]; // 次点
+  final int sa = saByou(morashi.time, saigo.time);
+  final String hitori = hitoriAtariMoji(sa, nin);
+
+  // 事実を集める
+  final bool nenRenzokuJiten = juniRace(morashi.u, race, 1) == ts; // 前回も次点
+  final int maeHonsen = juniRace(morashi.u, e.honsen, 0); // 前回の本戦の順位
+  final bool hatsuNogashi =
+      !e.honsenMikaisai && shutsujouKaisuu(morashi.u, e.honsen) == 0;
+  // どこで差がついたか(正なら次点のほうが遅い)
+  // 11月駅伝予選は組ごとの2人の合計、正月駅伝予選は番手ごと(1番手同士、2番手同士…)
+  final List<int> kumiSa = [];
+  if (race == 3) {
+    for (int kk = 0; kk < ks; kk++) {
+      final double mt =
+          morashi.ruikei[kk] - (kk > 0 ? morashi.ruikei[kk - 1] : 0.0);
+      final double st = saigo.ruikei[kk] - (kk > 0 ? saigo.ruikei[kk - 1] : 0.0);
+      kumiSa.add((mt - st).round());
+    }
+  }
+  final List<int> banteSa = [];
+  if (race == 4) {
+    for (int i = 0;
+        i < nin && i < morashi.senshu.length && i < saigo.senshu.length;
+        i++) {
+      banteSa.add((morashi.senshu[i].time - saigo.senshu[i].time).round());
+    }
+  }
+
+  // 見出し
+  String midashi;
+  if (sa <= 0) {
+    midashi = w.erabu([
+      '${morashi.mei}、1秒に満たない差で涙',
+      '${morashi.mei}、秒まで同タイムで涙　${e.honsenMei}逃す',
+    ]);
+  } else {
+    midashi = w.erabu([
+      '${morashi.mei}、わずか${saMoji(sa)}差で涙',
+      '${morashi.mei}、${saMoji(sa)}差の次点　$hitori',
+    ]);
+  }
+  if (nenRenzokuJiten) midashi += '　2年連続の次点';
+
+  // リード
+  final StringBuffer lead = StringBuffer();
+  lead.write(
+    '${k.taikaiMei}で、${morashi.mei}は${juniMoji(morashi.juni)}に終わり、'
+    '${e.honsenMei}への出場をあと一歩で逃した。',
+  );
+  if (sa <= 0) {
+    lead.write(
+      '$nin人の合計タイムは、$ts位で通過した${saigo.mei}と秒まで同じ${jikanMoji(morashi.time)}。'
+      '1秒に満たない差で明暗が分かれた。',
+    );
+  } else {
+    lead.write(
+      '$nin人が走って、$ts位で通過した${saigo.mei}との差はわずか${saMoji(sa)}。$hitoriだった。',
+    );
+  }
+  if (nenRenzokuJiten) lead.write('前回に続く、2年連続の次点となった。');
+
+  // 本文: どこで差がついたか
+  w.koMidashi('差がついたところ');
+  YosenSenshuKekka? kotoba; // コメントをもらう選手
+  if (race == 3) {
+    int make = -1; // 一番離された組
+    int kachi = -1; // 一番詰めた組
+    for (int kk = 0; kk < kumiSa.length; kk++) {
+      if (kumiSa[kk] > 0 && (make < 0 || kumiSa[kk] > kumiSa[make])) make = kk;
+      if (kumiSa[kk] < 0 && (kachi < 0 || kumiSa[kk] < kumiSa[kachi])) {
+        kachi = kk;
+      }
+    }
+    final StringBuffer sb = StringBuffer('${saigo.mei}と組ごとに比べると、');
+    if (make >= 0 && kachi >= 0) {
+      sb.write(
+        '${make + 1}組で${saMoji(kumiSa[make])}離されたが、${kachi + 1}組では${saMoji(-kumiSa[kachi])}詰めた。',
+      );
+    } else if (make >= 0) {
+      sb.write('${make + 1}組で${saMoji(kumiSa[make])}の差がついた。');
+    } else {
+      sb.write('どの組の差もわずかだった。');
+    }
+    // 途中までは前にいた
+    int maeniIta = -1;
+    for (int kk = 0; kk < ks - 1; kk++) {
+      if (morashi.ruikei[kk] < saigo.ruikei[kk]) maeniIta = kk;
+    }
+    if (maeniIta >= 0) {
+      final int d = saByou(saigo.ruikei[maeniIta], morashi.ruikei[maeniIta]);
+      sb.write(
+        '${maeniIta + 1}組を終えた時点では、${morashi.mei}が${d > 0 ? '${saMoji(d)}' : 'わずかに'}前にいた。',
+      );
+    }
+    w.danraku(sb.toString());
+    // 一番離された組(なければ最終組)で、組の順位が悪かったほうの選手
+    final int kumi = make >= 0 ? make : ks - 1;
+    for (final YosenSenshuKekka y in morashi.senshu) {
+      if (y.kumi != kumi) continue;
+      if (kotoba == null || y.juni > kotoba.juni) kotoba = y;
+    }
+    if (kotoba != null) {
+      w.danraku('${kumi + 1}組の${w.senshu(kotoba.s)}は組${juniMoji(kotoba.juni)}だった。');
+    }
+  } else {
+    final int han = (nin + 1) ~/ 2; // 前半の人数(10人なら5人)
+    int mae = 0;
+    int ato = 0;
+    for (int i = 0; i < banteSa.length; i++) {
+      if (i < han) {
+        mae += banteSa[i];
+      } else {
+        ato += banteSa[i];
+      }
+    }
+    final StringBuffer sb = StringBuffer(
+      '${saigo.mei}と1番手同士、2番手同士…と比べると、',
+    );
+    if (mae < 0 && ato > 0) {
+      sb.write(
+        '上位$han人の合計では${morashi.mei}が${saMoji(-mae)}上回っていたが、'
+        '${han + 1}番手から$nin番手で${saMoji(ato)}の差をつけられた。',
+      );
+    } else if (mae > 0 && ato < 0) {
+      sb.write(
+        '${han + 1}番手から$nin番手では${morashi.mei}が${saMoji(-ato)}上回ったが、'
+        '上位$han人で${saMoji(mae)}の差をつけられた。',
+      );
+    } else {
+      sb.write(
+        '上位$han人で${_jitenSaMoji(mae)}、${han + 1}番手から$nin番手で${_jitenSaMoji(ato)}の差だった。',
+      );
+    }
+    w.danraku(sb.toString());
+    // 合計に入る最後の選手
+    if (morashi.senshu.length >= nin && saigo.senshu.length >= nin) {
+      final YosenSenshuKekka juu = morashi.senshu[nin - 1];
+      final YosenSenshuKekka sJuu = saigo.senshu[nin - 1];
+      final int d = saByou(juu.time, sJuu.time);
+      w.danraku(
+        '合計に入る最後の$nin番手は${w.senshu(juu.s)}で、個人${juniMoji(juu.juni)}。'
+        '${d > 0 ? '${saigo.mei}の$nin番手より${saMoji(d)}遅かった。' : (d < 0 ? '${saigo.mei}の$nin番手には${saMoji(-d)}先着していた。' : '${saigo.mei}の$nin番手とほぼ同じタイムだった。')}',
+      );
+      kotoba = juu;
+    }
+  }
+  if (kotoba != null) {
+    w.comment(
+      senshuComment(
+        w,
+        CommentBamen.yosenJiten,
+        myouji(kotoba.s.name),
+        kuyashii: true,
+      ),
+    );
+  }
+  w.comment(
+    kantokuComment(w, KantokuBamen.yosenJiten, morashi.u.id, kuyashii: true),
+  );
+
+  // 本文: 逃したもの
+  final StringBuffer nogashi = StringBuffer();
+  if (shutsujouJuni(maeHonsen)) {
+    final ({int kaisuu, bool kakutei}) rz = renzokuKakutei(
+      morashi.u,
+      e.honsen,
+      0,
+      shutsujouJuni,
+      shutsujouKaisuu(morashi.u, e.honsen),
+    );
+    nogashi.write(
+      '前回の${e.honsenMei}で${juniMoji(maeHonsen)}だった${morashi.mei}は、'
+      '${!rz.kakutei ? '長く続いた連続出場が途切れた。' : (rz.kaisuu >= 2 ? '連続出場が${rz.kaisuu}年で途切れた。' : '2年連続の出場はならなかった。')}',
+    );
+  } else if (hatsuNogashi) {
+    nogashi.write('初の${e.honsenMei}出場には、あと一歩届かなかった。');
+  }
+  nogashi.write(w.erabu(['この悔しさを、来年への力に変える。', 'わずかな差を埋める戦いが、ここから始まる。']));
+  w.danraku(nogashi.toString());
+  w.comment(kantokuComment(w, KantokuBamen.yosenTsuuka, saigo.u.id));
+
+  // 2校の比べの表(差は次点から見た遅れ)
+  final List<List<String>> gyou = [];
+  if (race == 3) {
+    for (int kk = 0; kk < ks; kk++) {
+      final double mt =
+          morashi.ruikei[kk] - (kk > 0 ? morashi.ruikei[kk - 1] : 0.0);
+      final double st = saigo.ruikei[kk] - (kk > 0 ? saigo.ruikei[kk - 1] : 0.0);
+      gyou.add([
+        '${kk + 1}組',
+        jikanMoji(mt),
+        jikanMoji(st),
+        _jitenSaMoji(kumiSa[kk]),
+      ]);
+    }
+  } else {
+    for (int i = 0; i < banteSa.length; i++) {
+      gyou.add([
+        '${i + 1}番手',
+        jikanMoji(morashi.senshu[i].time),
+        jikanMoji(saigo.senshu[i].time),
+        _jitenSaMoji(banteSa[i]),
+      ]);
+    }
+  }
+  gyou.add([
+    '合計',
+    jikanMoji(morashi.time),
+    jikanMoji(saigo.time),
+    sa <= 0 ? '1秒未満' : '+${saMoji(sa)}',
+  ]);
+  return _kansei(
+    k,
+    no,
+    w,
+    category: '駅伝予選・次点',
+    midashi: midashi,
+    lead: lead.toString(),
+    hyou: [
+      KijiHyou(
+        '${morashi.mei}と${saigo.mei}の比べ(差は${morashi.mei}の遅れ)',
+        [race == 3 ? '組' : '番手', morashi.mei, saigo.mei, '差'],
+        gyou,
+      ),
+    ],
+    jibun:
+        morashi.u.id == k.gh.MYunivid || saigo.u.id == k.gh.MYunivid,
+  );
+}
+
+// ------------------------------------------------------------
+// 4. 個人の記事
 // ------------------------------------------------------------
 
 Kiji? _yosenKojinKiji(YosenKekka e) {

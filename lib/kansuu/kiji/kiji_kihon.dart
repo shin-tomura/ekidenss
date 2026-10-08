@@ -385,6 +385,17 @@ String saMoji(int sa) {
   return '${s ~/ 60}分${(s % 60).toString().padLeft(2, '0')}秒';
 }
 
+/// 僅差の言い方(「3秒差」。0秒なら、画面では秒まで同じタイムなので「1秒に満たない差」。1.9.2)
+String kinsaMoji(int sa) => sa <= 0 ? '1秒に満たない差' : '${saMoji(sa)}差';
+
+/// 1人あたりの差の言い方(「1人あたり0.3秒」。[ninzuu]人の合計の差[sa]秒から。1.9.2)
+/// 0秒(1秒に満たない差)なら「1人あたりにすれば、まばたきほどの差」
+String hitoriAtariMoji(int sa, int ninzuu) {
+  if (ninzuu <= 0) return '';
+  if (sa <= 0) return '1人あたりにすれば、まばたきほどの差';
+  return '1人あたり${(sa / ninzuu).toStringAsFixed(1)}秒の差';
+}
+
 /// 2つのタイムの差の秒(画面と同じく、それぞれ切り捨ててから引く)
 int saByou(double osoi, double hayai) => byou(osoi) - byou(hayai);
 

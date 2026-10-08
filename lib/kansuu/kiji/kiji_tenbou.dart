@@ -1702,13 +1702,22 @@ Kiji? _toujitsuKekkaTenbou(Tenbou t) {
       '${fullMei(s.name)}(${s.gakunen}年・'
       '${_henkouMochiMoji(k, s, kukanKihonShumoku(k.gh, race, kk))})'
       '${jouiMoji(s) == null ? '' : '※'}';
-  final List<List<String>> gyou = [
+  // 載せるのは主な選手の変更だけ(入った選手か外れた選手が、持ちタイムの全体10番手以内)。
+  // 区間の順(1区が一番上)に並べ、同じ区間は前評判の順。目に入りやすいよう、入った選手を左に置く
+  final List<_Henkou> omoHenkou = [
     for (final _Henkou h in henkou)
+      if (omo.contains(h) || hazushi.contains(h)) h,
+  ]..sort((a, b) {
+      final int c = a.kk.compareTo(b.kk);
+      return c != 0 ? c : a.x.juni.compareTo(b.x.juni);
+    });
+  final List<List<String>> gyou = [
+    for (final _Henkou h in omoHenkou)
       [
-        h.x.mei,
         '${h.kk + 1}区',
-        hyouMei(h.deta, h.kk),
+        h.x.mei,
         h.haitta == null ? '-' : hyouMei(h.haitta!, h.kk),
+        hyouMei(h.deta, h.kk),
       ],
   ];
   return _kansei(
@@ -1720,11 +1729,12 @@ Kiji? _toujitsuKekkaTenbou(Tenbou t) {
     midashi: midashi,
     lead: lead.toString(),
     hyou: [
-      KijiHyou(
-        '当日変更の一覧(持ちタイムは区間の距離に合った種目。※は1万mかハーフで全体10番手以内)',
-        ['大学', '区間', '外れた選手', '入った選手'],
-        gyou,
-      ),
+      if (gyou.isNotEmpty)
+        KijiHyou(
+          '当日変更の主な選手(持ちタイムは区間の距離に合った種目。※は1万mかハーフで全体10番手以内)',
+          ['区間', '大学', '入った選手', '外れた選手'],
+          gyou,
+        ),
     ],
     jibun: daigaku.contains(k.gh.MYunivid),
   );

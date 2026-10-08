@@ -23,6 +23,7 @@ import 'package:ekiden/screens/Modal_GakurenKukan.dart';
 import 'package:ekiden/screens/gakuren_copy_button.dart';
 import 'package:ekiden/screens/ai_copy_matome.dart';
 import 'package:ekiden/screens/kiji_screen.dart'; // ニュース記事(1.9.2)
+import 'package:ekiden/kansuu/kiji/kiji.dart'; // ニュース記事のカードの見出しの予告(1.9.2)
 import 'package:ekiden/screens/Modal_kukanhaiti2.dart';
 import 'package:ekiden/screens/Modal_courseshoukai.dart';
 import 'package:ekiden/screens/Modal_tuukajunisuii.dart';
@@ -1360,27 +1361,17 @@ class _Mode0700ContentState extends State<Mode0700Content> {
                                                 kekkaGamen: true,
                                               ),
                                             // ニュース記事(箱庭スポーツ。大会の結果の記事。1.9.2)
+                                            // 目立つように、トップ記事の見出しを予告するカードにした
                                             if (currentGhensuu
                                                     .hyojiracebangou <=
                                                 5)
-                                              TextButton(
-                                                onPressed: () =>
-                                                    kijiKekkaHiraku(context),
-                                                child: const Text(
-                                                  "📰 ニュース記事(箱庭スポーツ)",
-                                                  style: TextStyle(
-                                                    color: Color.fromARGB(
-                                                      255,
-                                                      0,
-                                                      255,
-                                                      0,
-                                                    ),
-                                                    decoration: TextDecoration
-                                                        .underline,
-                                                    decorationColor:
-                                                        HENSUU.textcolor,
-                                                  ),
+                                              KijiLinkCard(
+                                                key: ValueKey(
+                                                  'kijiKekka_${currentGhensuu.year}_${currentGhensuu.hyojiracebangou}',
                                                 ),
+                                                namae: 'ニュース記事(箱庭スポーツ)',
+                                                tsukuru: kijiKekkaIchiran,
+                                                hiraku: kijiKekkaHiraku,
                                               ),
                                             if (currentGhensuu
                                                     .hyojiracebangou <=

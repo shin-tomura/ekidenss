@@ -65,6 +65,115 @@ void _hiraku(
   );
 }
 
+/// 記事の一覧を開くカード(結果画面・直前順位予想・目標順位の確認の画面に置く。1.9.2)
+/// ・ほかのリンクに紛れないよう、記事の画面と同じ黒地と赤い印のカードにして、
+///   一番上の記事の見出しを予告する
+/// ・記事は画面を出したあとで1回だけ作る(画面が出るのを遅らせず、描き直しのたびにも作らない)。
+///   大会が変わったら作り直すよう、置く側で大会ごとの key を付ける
+/// ・高さは文字に合わせて伸びる(文字を大きくしても横にはみ出さない)。見出しは2行まで
+class KijiLinkCard extends StatefulWidget {
+  /// 一番上の行の名前(「ニュース記事(箱庭スポーツ)」など。説明書の呼び方と合わせる)
+  final String namae;
+
+  /// 記事を作る(見出しの予告に使う)
+  final List<Kiji> Function() tsukuru;
+
+  /// 記事の一覧を開く
+  final void Function(BuildContext context) hiraku;
+
+  const KijiLinkCard({
+    super.key,
+    required this.namae,
+    required this.tsukuru,
+    required this.hiraku,
+  });
+
+  @override
+  State<KijiLinkCard> createState() => _KijiLinkCardState();
+}
+
+class _KijiLinkCardState extends State<KijiLinkCard> {
+  /// 一番上の記事の見出し(作る前や、記事がないときはnull)
+  String? _midashi;
+
+  /// 記事の本数(作る前は0)
+  int _honsuu = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final List<Kiji> list = widget.tsukuru();
+      if (!mounted) return;
+      setState(() {
+        _honsuu = list.length;
+        _midashi = list.isEmpty ? null : list.first.midashi;
+      });
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final String? midashi = _midashi;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: SizedBox(
+        width: double.infinity,
+        child: Material(
+          color: _waku,
+          child: InkWell(
+            onTap: () => widget.hiraku(context),
+            child: Container(
+              decoration: const BoxDecoration(
+                border: Border(
+                  left: BorderSide(color: _aka, width: 5),
+                  top: BorderSide(color: _sen),
+                  right: BorderSide(color: _sen),
+                  bottom: BorderSide(color: _sen),
+                ),
+              ),
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '📰 ${widget.namae}${_honsuu > 0 ? '・$_honsuu本' : ''}',
+                    style: const TextStyle(
+                      color: _aka,
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  if (midashi != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      midashi,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 4),
+                  const Text(
+                    '記事を読む ›',
+                    style: TextStyle(color: _usui, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// サイトの名前の帯(一覧と記事の画面の上に出す)
 class _SiteMei extends StatelessWidget {
   final String sub;

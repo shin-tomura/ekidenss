@@ -439,6 +439,27 @@ class Mode0330Content extends StatelessWidget {
                     allPredictions['otaro']!,
                     true,
                   );
+                  // 展望記事に使う予想陣の3人の予想(1.9.2)
+                  final List<KijiYosouJin> kijiYosou = [
+                    KijiYosouJin(
+                      'オッシー',
+                      '基本走力重視',
+                      [for (final p in osshiRanked) p.id],
+                      List<int>.of(kukanshou_id_osshi),
+                    ),
+                    KijiYosouJin(
+                      '父ちゃん',
+                      '総合評価',
+                      [for (final p in tochanRanked) p.id],
+                      List<int>.of(kukanshou_id_tochan),
+                    ),
+                    KijiYosouJin(
+                      '王太郎',
+                      '入学時の持ちタイム重視',
+                      [for (final p in otaroRanked) p.id],
+                      List<int>.of(kukanshou_id_otaro),
+                    ),
+                  ];
 
                   return Column(
                     children: [
@@ -518,6 +539,16 @@ class Mode0330Content extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 const SizedBox(height: 20),
+                                // 展望記事(箱庭スポーツ。予想陣の3人の予想も記事に使う。1.9.2)
+                                // 目立つように、優勝争いの記事の見出しを予告するカードにして、一番上に置いた
+                                KijiLinkCard(
+                                  key: ValueKey(
+                                    'kijiTenbou_${currentGhensuu.year}_${currentGhensuu.hyojiracebangou}',
+                                  ),
+                                  namae: '展望記事(箱庭スポーツ)',
+                                  tsukuru: () => kijiTenbouIchiran(kijiYosou),
+                                  hiraku: (c) => kijiTenbouHiraku(c, kijiYosou),
+                                ),
                                 TextButton(
                                   onPressed: () {
                                     showGeneralDialog(
@@ -567,39 +598,6 @@ class Mode0330Content extends StatelessWidget {
                                         255,
                                         0,
                                       ),
-                                      decoration: TextDecoration.underline,
-                                      decorationColor: HENSUU.textcolor,
-                                    ),
-                                  ),
-                                ),
-                                // 展望記事(箱庭スポーツ。予想陣の3人の予想も記事に使う。1.9.2)
-                                TextButton(
-                                  onPressed: () {
-                                    kijiTenbouHiraku(context, [
-                                      KijiYosouJin(
-                                        'オッシー',
-                                        '基本走力重視',
-                                        [for (final p in osshiRanked) p.id],
-                                        List<int>.of(kukanshou_id_osshi),
-                                      ),
-                                      KijiYosouJin(
-                                        '父ちゃん',
-                                        '総合評価',
-                                        [for (final p in tochanRanked) p.id],
-                                        List<int>.of(kukanshou_id_tochan),
-                                      ),
-                                      KijiYosouJin(
-                                        '王太郎',
-                                        '入学時の持ちタイム重視',
-                                        [for (final p in otaroRanked) p.id],
-                                        List<int>.of(kukanshou_id_otaro),
-                                      ),
-                                    ]);
-                                  },
-                                  child: const Text(
-                                    "📰 展望記事(箱庭スポーツ)",
-                                    style: TextStyle(
-                                      color: Color.fromARGB(255, 0, 255, 0),
                                       decoration: TextDecoration.underline,
                                       decorationColor: HENSUU.textcolor,
                                     ),

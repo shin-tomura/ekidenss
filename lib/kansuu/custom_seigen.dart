@@ -1,4 +1,5 @@
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:ekiden/constants.dart'; // 1学年の人数(1.9.2)
 import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/senshu_data.dart';
 import 'package:ekiden/univ_data.dart';
@@ -6,7 +7,7 @@ import 'package:ekiden/kansuu/konki_best.dart';
 
 // ------------------------------------------------------------
 // カスタム駅伝の出場制限(1.9.1)
-// ・KantokuData.yobiint2[78] 学年(0=全学年(初期値)・1=3年生以下・2=2年生以下)
+// ・KantokuData.yobiint2[78] 学年(0=全学年(初期値)・1=3年生以下・2=2年生以下・3=1年生だけ(1.9.2))
 // ・KantokuData.yobiint2[79] 留学生(0=制限なし(初期値)・1=出場できない)
 // ・設定は説明画面の設定タブの「カスタム駅伝設定」で変える。カスタム駅伝の日は、一次エントリーが
 //   始まると(モード110の後)その画面を開けないので、レースの途中で制限が変わることはない
@@ -36,16 +37,19 @@ int _yobi(int index) {
   return kantoku.yobiint2[index];
 }
 
-/// 学年の設定(0=全学年・1=3年生以下・2=2年生以下)
+/// 学年の設定(0=全学年・1=3年生以下・2=2年生以下・3=1年生だけ)
 int customGakunenSettei() {
   final int v = _yobi(78);
-  return (v == 1 || v == 2) ? v : 0;
+  return customGakunenAtaiTadashii(v) ? v : 0;
 }
+
+/// 学年の設定として正しい値か(0〜3。各種設定のQRコードの読み込みでも使う)
+bool customGakunenAtaiTadashii(int v) => v >= 0 && v <= 3;
 
 /// 留学生の設定(0=制限なし・1=出場できない)
 int customRyuugakuseiSettei() => _yobi(79) == 1 ? 1 : 0;
 
-/// カスタム駅伝に出場できる学年の上限(4=全学年・3=3年生以下・2=2年生以下)
+/// カスタム駅伝に出場できる学年の上限(4=全学年・3=3年生以下・2=2年生以下・1=1年生だけ)
 int customGakunenJougen() => 4 - customGakunenSettei();
 
 /// カスタム駅伝に留学生が出場できないか
@@ -55,18 +59,48 @@ bool customRyuugakuseiFuka() => customRyuugakuseiSettei() == 1;
 bool customSeigenAri() =>
     customGakunenSettei() != 0 || customRyuugakuseiFuka();
 
-/// 出場制限を保存する([gakunen]は0〜2、[ryuugakusei]は0〜1)
+/// 出場制限を保存する([gakunen]は0〜3、[ryuugakusei]は0〜1)
 Future<void> customSeigenHozon(int gakunen, int ryuugakusei) async {
   final KantokuData? kantoku = _kantoku();
   if (kantoku == null || kantoku.yobiint2.length <= 79) return;
-  kantoku.yobiint2[78] = (gakunen == 1 || gakunen == 2) ? gakunen : 0;
+  kantoku.yobiint2[78] = customGakunenAtaiTadashii(gakunen) ? gakunen : 0;
   kantoku.yobiint2[79] = ryuugakusei == 1 ? 1 : 0;
   await kantoku.save();
 }
 
-/// 学年の設定の名前
-String customGakunenMei(int settei) =>
-    settei == 1 ? '3年生以下' : (settei == 2 ? '2年生以下' : '全学年');
+/// 学年の設定の名前(設定画面の選択肢)
+String customGakunenMei(int settei) {
+  switch (settei) {
+    case 1:
+      return '3年生以下';
+    case 2:
+      return '2年生以下';
+    case 3:
+      return '1年生だけ';
+    default:
+      return '全学年';
+  }
+}
+
+/// 「出場できるのは〜です」の〜の部分(説明書と生成AI向けの仕様の文)
+String customGakunenBun(int settei) {
+  switch (settei) {
+    case 1:
+      return '3年生以下の選手';
+    case 2:
+      return '2年生以下の選手';
+    case 3:
+      return '1年生の選手だけ';
+    default:
+      return '全学年の選手';
+  }
+}
+
+/// カスタム駅伝が1年生だけの大会か(ニュース記事で、1年生を特別扱いする言い回しを出さないため)
+bool customIchinenDake() => customGakunenSettei() == 3;
+
+/// 1学年の人数(各大学。説明書と生成AI向けの仕様の文で使う)
+int customIchigakunenNinzuu() => TEISUU.NINZUU_1GAKUNEN_INUNIV;
 
 /// 選手[s]がカスタム駅伝の出場制限で出場できるか(制限をかけていなければいつもtrue)
 bool customShutsujouKa(SenshuData s) {
@@ -281,10 +315,25 @@ String customHojuuOshirase({int? myUnivid, bool ichijiEntry = false}) {
   final StringBuffer sb = StringBuffer();
   sb.writeln('【出場制限のお知らせ】');
   sb.writeln('出場制限で走る選手が区間数に足りないため、次の大学は出場制限に合わない選手で補いました。');
-  for (final s in hojuu) {
-    sb.writeln(
-      '・${univMei[s.univid]}大学 ${s.gakunen}年 ${s.name}${s.hirou == 1 ? '(留学生)' : ''}',
-    );
+  // 1大学1行にまとめる(「・東西大学 2年 山田・佐藤、3年 鈴木」。1.9.2)
+  // 行は画面の幅で折り返すので、文字を大きくしていてもはみ出さない
+  int i = 0;
+  while (i < hojuu.length) {
+    final int univid = hojuu[i].univid;
+    final List<String> gakunenGoto = [];
+    while (i < hojuu.length && hojuu[i].univid == univid) {
+      final int gakunen = hojuu[i].gakunen;
+      final List<String> namae = [];
+      while (i < hojuu.length &&
+          hojuu[i].univid == univid &&
+          hojuu[i].gakunen == gakunen) {
+        final SenshuData s = hojuu[i];
+        namae.add('${s.name}${s.hirou == 1 ? '(留学生)' : ''}');
+        i++;
+      }
+      gakunenGoto.add('$gakunen年 ${namae.join('・')}');
+    }
+    sb.writeln('・${univMei[univid]}大学 ${gakunenGoto.join('、')}');
   }
   if (ichijiEntry && myUnivid != null && hojuu.any((s) => s.univid == myUnivid)) {
     sb.writeln('※自分の大学で補う選手は、「補える」と出ている選手の中で入れ替えられます。');

@@ -372,6 +372,9 @@ Kiji _topKiji(EkidenKekka e) {
   if (hatsuKaisai) {
     lead.write('初めて開催された大会で、初代王者に輝いた。');
   }
+  if (k.ichinenDake) {
+    lead.write('今大会は、1年生だけが出場できる大会として行われた。');
+  }
   if (sankan) {
     lead.write(
       w.erabu([
@@ -848,6 +851,7 @@ Kiji? _jibunKiji(EkidenKekka e) {
   // 1年生
   for (int kk = 0; kk < ks; kk++) {
     final SenshuData? s = m.senshu[kk];
+    if (k.ichinenDake) break; // 1年生だけの大会では、1年生を特別扱いしない
     if (s == null || s.gakunen != 1) continue;
     if (m.kukanJuni[kk] <= 2 && !kukanshou.contains(kk)) {
       w.danraku('ルーキーの${w.senshu(s)}も${e.kukanMei(kk)}で区間${m.kukanJuni[kk] + 1}位と存在感を示した。');
@@ -1023,7 +1027,7 @@ Kiji? _kukanshouKiji(EkidenKekka e) {
     sb.write('${myouji(ms.name)}は前回も同じ区間で区間賞を獲得しており、2年連続の区間賞となった。');
   } else if (maeKj >= 0 && maeEntry >= 0) {
     sb.write('前回は${maeEntry + 1}区で区間${maeKj + 1}位だった${myouji(ms.name)}が、大きく成長した姿を見せた。');
-  } else if (ms.gakunen == 1) {
+  } else if (ms.gakunen == 1 && !k.ichinenDake) {
     sb.write('${myouji(ms.name)}はこれが初めての駅伝出場となる1年生だった。');
   }
   if (ms.hirou == 1) sb.write('留学生らしいダイナミックな走りで、他を寄せつけなかった。');
@@ -1057,7 +1061,7 @@ Kiji? _kukanshouKiji(EkidenKekka e) {
     }
     final int mKj = k.kukanJuniMae(s, k.race, 1) ?? -1;
     if (mKj == 0 && k.entryMae(s, k.race, 1) == kk) b.write('。2年連続の区間賞');
-    if (s.gakunen == 1) b.write('。1年生での快挙');
+    if (s.gakunen == 1 && !k.ichinenDake) b.write('。1年生での快挙');
     b.write('。');
     w.danraku(b.toString());
   }

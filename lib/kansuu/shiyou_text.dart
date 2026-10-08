@@ -163,12 +163,20 @@ List<String> _customSeigenGyou(bool setsumeisho) {
   final String mei = courseRaceTitle(customRaceBangou);
   final List<String> gyou = [];
   if (setsumeisho) {
-    gyou.add('・カスタム駅伝では、出場できる学年(3年生以下・2年生以下)と、留学生の出場を制限できます。');
+    gyou.add('・カスタム駅伝では、出場できる学年(3年生以下・2年生以下・1年生だけ)と、留学生の出場を制限できます。');
+    // 1年生だけにしていないときも、説明書には1学年の人数のことを書く(1.9.2)
+    if (!(ari && customGakunenSettei() == 3)) {
+      gyou.add('　・1年生は各大学${customIchigakunenNinzuu()}人なので、1年生だけにして区間数がそれより多いと、どの大学も上級生で補います。');
+    }
   }
   if (ari) {
     final int gakunen = customGakunenSettei();
     if (gakunen != 0) {
-      gyou.add('・$kd、カスタム駅伝($mei)に出場できるのは${customGakunenMei(gakunen)}の選手です。');
+      gyou.add('・$kd、カスタム駅伝($mei)に出場できるのは${customGakunenBun(gakunen)}です。');
+    }
+    // 1年生だけ(1.9.2)。1学年の人数は大学ごとに決まっているので、区間数が多いと補う
+    if (gakunen == 3) {
+      gyou.add('・1年生は各大学${customIchigakunenNinzuu()}人なので、区間数がそれより多いと、どの大学も上級生で補います。');
     }
     if (customRyuugakuseiFuka()) {
       gyou.add('・$kd、カスタム駅伝($mei)には留学生は出場できません。');
@@ -177,6 +185,8 @@ List<String> _customSeigenGyou(bool setsumeisho) {
   gyou.addAll([
     '・出場できない選手は、一次エントリーで選べません。',
     '・出場できる選手が一次エントリーの人数より少ない大学は、出場できる全員が一次エントリーになります。',
+    // 補欠がいなければ当日変更はできない(1.9.2で書き足した)
+    '・補欠がいない大学は、当日変更ができません。',
     '・走る選手が区間数に足りない大学は、足りない人数だけ上級生で補います。',
     '　・留学生が出場できないときは、上級生でも足りなければ留学生で補います。',
   ]);

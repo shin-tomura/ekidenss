@@ -26,7 +26,7 @@ class _ModalCustomEkidenSettingsState extends State<ModalCustomEkidenSettings> {
   late bool _isEkidenHeld;
 
   // 出場制限(1.9.1。custom_seigen.dart)
-  // 学年: 0=全学年・1=3年生以下・2=2年生以下、留学生: 0=制限なし・1=出場できない
+  // 学年: 0=全学年・1=3年生以下・2=2年生以下・3=1年生だけ(1.9.2)、留学生: 0=制限なし・1=出場できない
   int _gakunenSettei = 0;
   int _ryuugakuseiSettei = 0;
 
@@ -258,8 +258,9 @@ class _ModalCustomEkidenSettingsState extends State<ModalCustomEkidenSettings> {
                               const SizedBox(height: 8),
                               Wrap(
                                 spacing: 8,
+                                runSpacing: 4,
                                 children: [
-                                  for (int v = 0; v <= 2; v++)
+                                  for (int v = 0; v <= 3; v++)
                                     ChoiceChip(
                                       label: Text(customGakunenMei(v)),
                                       selected: _gakunenSettei == v,
@@ -317,7 +318,9 @@ class _ModalCustomEkidenSettingsState extends State<ModalCustomEkidenSettings> {
                                 Padding(
                                   padding: const EdgeInsets.only(top: 8),
                                   child: Text(
-                                    "※区間数が${kukansuuMeyasu}より多いと、走る選手が区間数に足りない大学が出ることがあります。そのときは、足りない人数だけ上級生${_ryuugakuseiSettei == 1 ? '(それでも足りなければ留学生)' : ''}で補います。",
+                                    _gakunenSettei == 3
+                                        ? "※1年生は各大学${TEISUU.NINZUU_1GAKUNEN_INUNIV}人なので、区間数が${TEISUU.NINZUU_1GAKUNEN_INUNIV}より多いと、どの大学も走る選手が区間数に足りなくなります${_ryuugakuseiSettei == 1 ? '(留学生が出場できないので、1年生に留学生がいる大学は、もっと少ない区間数でも足りなくなります)' : ''}。そのときは、足りない人数だけ上級生${_ryuugakuseiSettei == 1 ? '(それでも足りなければ留学生)' : ''}で補います。補欠がいない大学は、当日変更ができません。"
+                                        : "※区間数が${kukansuuMeyasu}より多いと、走る選手が区間数に足りない大学が出ることがあります。そのときは、足りない人数だけ上級生${_ryuugakuseiSettei == 1 ? '(それでも足りなければ留学生)' : ''}で補います。",
                                     style: const TextStyle(
                                       color: Colors.orangeAccent,
                                     ),

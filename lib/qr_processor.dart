@@ -17,6 +17,7 @@ import 'kansuu/meisei_rireki.dart'; // 名声の履歴(1.8.8)
 import 'kansuu/kingin_wariai.dart'; // 難易度ごとの金銀支給量の割合の確認(1.9.1)
 import 'kansuu/kukan_haichi.dart'; // 区間配置の方針の確認(1.9.1)
 import 'kansuu/ikku_pace.dart'; // 集団走設定の確認(1.9.2)
+import 'kansuu/custom_seigen.dart'; // カスタム駅伝の出場制限の確認(1.9.2)
 
 // 読み込み時に複数枚のデータを一時的に保持する状態管理クラス
 class QrReceiveState {
@@ -606,12 +607,12 @@ class SettingsQrProcessor {
         kantoku.yobiint2[75] = yobiint2_75;
       }
       // カスタム駅伝の出場制限(int) kantoku.yobiint2[78]・[79] (1.9.1)
-      //   [78]学年(0=全学年(初期値)・1=3年生以下・2=2年生以下)、[79]留学生(0=制限なし(初期値)・1=出場できない)
+      //   [78]学年(0=全学年(初期値)・1=3年生以下・2=2年生以下・3=1年生だけ(1.9.2))、[79]留学生(0=制限なし(初期値)・1=出場できない)
       final dynamic yobiint2_78_79 = dataMap['k_yobiint2_78_79'];
       if (yobiint2_78_79 is List && yobiint2_78_79.length == 2) {
         final dynamic gakunen = yobiint2_78_79[0];
         final dynamic ryuugakusei = yobiint2_78_79[1];
-        if (gakunen is int && gakunen >= 0 && gakunen <= 2) {
+        if (gakunen is int && customGakunenAtaiTadashii(gakunen)) {
           kantoku.yobiint2[78] = gakunen;
         }
         if (ryuugakusei is int && (ryuugakusei == 0 || ryuugakusei == 1)) {

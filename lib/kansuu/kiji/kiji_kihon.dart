@@ -7,6 +7,7 @@ import 'package:ekiden/senshu_r_data.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/kansuu/time_date.dart';
 import 'package:ekiden/screens/Modal_courseshoukai.dart'; // 大会の名前(courseRaceTitle)
+import 'package:ekiden/kansuu/custom_seigen.dart'; // カスタム駅伝の出場制限(1年生だけか)
 
 // ------------------------------------------------------------
 // ニュース記事(箱庭スポーツ)の共通の部品(1.9.2)
@@ -236,6 +237,9 @@ class KijiKankyou {
 
   /// 駅伝(予選ではない)か
   bool get ekiden => race <= 2 || race == 5;
+
+  /// 1年生だけのカスタム駅伝か(全員1年生なので、1年生を特別扱いする言い回しを出さない)
+  bool get ichinenDake => race == customRaceBangou && customIchinenDake();
 
   /// 趣味を書かないか(趣味非表示設定)
   bool get shumiNashi =>

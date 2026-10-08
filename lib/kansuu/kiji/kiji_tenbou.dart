@@ -529,6 +529,9 @@ Kiji _yuushouTenbou(Tenbou t, List<KijiYosouJin> yosou) {
   if (hatsuKaisai) {
     lead.write('今回が初めての開催で、${t.n}校が初代王者の座を争う。');
   }
+  if (k.ichinenDake) {
+    lead.write('今大会は、1年生だけが出場できる。');
+  }
   if (hon.heikinJuni == 0 && hon.kukanJuni == 0) {
     lead.write('1万mの平均タイム、区間ごとの持ちタイムのどちらでも出場校トップだ。');
   } else if (hon.heikinJuni == 0) {
@@ -1326,7 +1329,7 @@ Kiji? _jibunTenbou(Tenbou t, List<KijiYosouJin> yosou) {
     for (final SenshuData s in m.hashiru)
       if (s.gakunen == 1) s,
   ];
-  if (ichinen.isNotEmpty) {
+  if (ichinen.isNotEmpty && !k.ichinenDake) {
     w.danraku(
       ichinen.length >= 3
           ? '${ichinen.length}人の1年生がメンバー入りし、新しい力が台頭している。'

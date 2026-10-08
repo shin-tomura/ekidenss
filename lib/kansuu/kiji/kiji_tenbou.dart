@@ -1400,6 +1400,32 @@ List<_Henkou> _henkouIchiran(Tenbou t) {
   return l;
 }
 
+/// 当日変更の選手の持ちタイム([idx] 区間の距離に合った種目。記録がなければ近い種目。どれもなければnull)
+({int idx, double time})? _henkouMochi(KijiKankyou k, SenshuData s, int idx) {
+  final List<int> jun = idx == 0
+      ? const [0, 1, 2]
+      : (idx == 1 ? const [1, 0, 2] : const [2, 1, 0]);
+  for (final int c in jun) {
+    final double t = k.jikoBest(s, c);
+    if (t < TEISUU.DEFAULTTIME) return (idx: c, time: t);
+  }
+  return null;
+}
+
+/// 当日変更の選手の持ちタイムの文(「ハーフ1時間02分10秒」。記録がなければ「記録なし」)
+String _henkouMochiMoji(KijiKankyou k, SenshuData s, int idx) {
+  final ({int idx, double time})? m = _henkouMochi(k, s, idx);
+  if (m == null) return '記録なし';
+  return '${kijiShumokuMei[m.idx]}${jikanMoji(m.time)}';
+}
+
+/// 持ちタイムを添えた選手の呼び方
+/// (初めては「山田太郎(3年・ハーフ1時間02分10秒)」、2回目からは「山田(ハーフ1時間02分10秒)」)
+String _senshuMochi(KijiKakite w, SenshuData s, String mochi) {
+  if (w.deta('S${s.id}')) return '${w.senshu(s)}($mochi)';
+  return w.hito('S${s.id}', s.name, '${s.gakunen}年・$mochi', '');
+}
+
 Kiji? _toujitsuKekkaTenbou(Tenbou t) {
   final KijiKankyou k = t.k;
   const int no = 6;
@@ -1436,6 +1462,40 @@ Kiji? _toujitsuKekkaTenbou(Tenbou t) {
     for (final _Henkou h in henkou)
       if (h.haitta != null && jouiMoji(h.haitta!) != null) h,
   ];
+  // 持ちタイム上位の選手が外れた変更(入った選手も上位の変更は、上の omo で書く)
+  final List<_Henkou> hazushi = [
+    for (final _Henkou h in henkou)
+      if (jouiMoji(h.deta) != null && !omo.contains(h)) h,
+  ];
+  // 入った選手と外れた選手の持ちタイムを、区間の距離に合った種目で比べる文
+  // (2人とも名前を出したあとに使う。[suisoku] 外れた選手のほうが速いとき、起用の読みを添えるか)
+  String hikakuBun(_Henkou h, {bool suisoku = true}) {
+    final SenshuData? hs = h.haitta;
+    if (hs == null) return '';
+    final int idx = kukanKihonShumoku(k.gh, race, h.kk);
+    final ({int idx, double time})? mi = _henkouMochi(k, hs, idx);
+    final ({int idx, double time})? mo = _henkouMochi(k, h.deta, idx);
+    if (mi == null && mo == null) return '';
+    final String yi = w.senshu(hs);
+    final String yo = w.senshu(h.deta);
+    if (mi != null && mo != null && mi.idx == idx && mo.idx == idx) {
+      final String mei = kijiShumokuMei[idx];
+      // 正なら入った選手のほうが速い
+      final int sa = saByou(mo.time, mi.time);
+      if (sa > 0) {
+        return '$meiの持ちタイムは$yiが${jikanMoji(mi.time)}で、'
+            '$yoの${jikanMoji(mo.time)}を${saMoji(sa)}上回る。';
+      }
+      if (sa < 0) {
+        return '$meiの持ちタイムは$yiが${jikanMoji(mi.time)}で、'
+            '外れた$yoの${jikanMoji(mo.time)}のほうが${saMoji(sa)}速い。'
+            '${suisoku ? w.erabu(['当日の状態を見極めての起用か。', '調子を優先した起用とみられる。']) : ''}';
+      }
+      return '$meiの持ちタイムは、$yiと$yoがともに${jikanMoji(mi.time)}で並ぶ。';
+    }
+    return '持ちタイムは、$yiが${_henkouMochiMoji(k, hs, idx)}、'
+        '$yoが${_henkouMochiMoji(k, h.deta, idx)}。';
+  }
   // 持ちタイム上位なのに補欠のまま出番がなかった選手(自分の大学は除く)
   final List<({TenbouUniv x, SenshuData s})> demasezu = [];
   for (final TenbouUniv x in t.jun) {
@@ -1481,6 +1541,14 @@ Kiji? _toujitsuKekkaTenbou(Tenbou t) {
     ]);
   } else if (omo.length >= 2) {
     midashi = '持ちタイム上位の${omo.length}人が当日変更で出場へ';
+  } else if (hazushi.length == 1) {
+    final _Henkou h = hazushi.first;
+    midashi = w.erabu([
+      '${h.x.mei}、${jouiMoji(h.deta)}の${myouji(h.deta.name)}が外れる',
+      '${h.x.mei}、主力の${myouji(h.deta.name)}を${h.kk + 1}区から外す',
+    ]);
+  } else if (hazushi.length >= 2) {
+    midashi = '持ちタイム上位の${hazushi.length}人が当日変更で外れる';
   } else {
     midashi = '当日変更は${daigaku.length}校で計${henkou.length}人';
   }
@@ -1498,6 +1566,8 @@ Kiji? _toujitsuKekkaTenbou(Tenbou t) {
         '補欠に温存されていた実力者たちが、ついにベールを脱いだ。',
       ]),
     );
+  } else if (hazushi.isNotEmpty) {
+    lead.write('持ちタイム上位の主力が、オーダーから外れる動きもあった。');
   }
 
   // 本文: 投入された主力
@@ -1507,16 +1577,26 @@ Kiji? _toujitsuKekkaTenbou(Tenbou t) {
       for (int i = 0; i < omo.length; i++) {
         final _Henkou h = omo[i];
         final SenshuData hs = h.haitta!;
+        // 名前は出す順に作る(初めては学年つき、2回目からは名字)
         final String yobi = w.senshu(hs);
-        final String m1 = t.mochiMoji(hs, t.heikinShumoku);
-        w.danraku(
+        final String deta = w.senshu(h.deta);
+        final StringBuffer sb = StringBuffer(
           i == 0
-              ? '${_zenpyouMoji(t, h.x)}${h.x.mei}は、${jouiMoji(hs)}の持ちタイム'
-                    '${m1.isEmpty ? '' : '($m1)'}を持つ$yobiを${t.kukanMei(h.kk)}に起用した。'
-                    '区間エントリーで${h.kk + 1}区に入っていた${w.senshu(h.deta)}と入れ替えた。'
-              : '${h.x.mei}も、$yobi(${jouiMoji(hs)})を${t.kukanMei(h.kk)}に入れた。'
-                    '${w.erabu(['勝負の一手が、どう出るか。', '流れを変える起用となるか。'])}',
+              ? '${_zenpyouMoji(t, h.x)}${h.x.mei}は、持ちタイムが${jouiMoji(hs)}の$yobiを'
+                    '${t.kukanMei(h.kk)}に起用し、区間エントリーで入っていた$detaと入れ替えた。'
+              : '${h.x.mei}も、持ちタイムが${jouiMoji(hs)}の$yobiを'
+                    '${t.kukanMei(h.kk)}に入れ、$detaと入れ替えた。',
         );
+        sb.write(hikakuBun(h));
+        // 外れた選手も持ちタイム上位なら、主力同士の入れ替え
+        final String? detaJoui = jouiMoji(h.deta);
+        if (detaJoui != null) {
+          sb.write('${w.senshu(h.deta)}も持ちタイムが$detaJouiで、主力同士の入れ替えとなった。');
+        }
+        if (i > 0) {
+          sb.write(w.erabu(['勝負の一手が、どう出るか。', '流れを変える起用となるか。']));
+        }
+        w.danraku(sb.toString());
       }
     } else {
       final List<String> narabi = [
@@ -1529,14 +1609,55 @@ Kiji? _toujitsuKekkaTenbou(Tenbou t) {
       );
     }
   }
-  // 本文: 出番がなかった実力者
+  // 本文の小見出し: 主力の投入のあとに、外れた主力・補欠のままの主力を書くとき
+  if (omo.isNotEmpty && (hazushi.isNotEmpty || demasezu.isNotEmpty)) {
+    w.koMidashi(
+      demasezu.isEmpty
+          ? '外れた主力'
+          : (hazushi.isEmpty ? '補欠のままの主力' : '起用されなかった主力'),
+    );
+  }
+  // 本文: 外れた主力(入った選手は持ちタイム上位ではない)
+  if (hazushi.isNotEmpty) {
+    final StringBuffer sb = StringBuffer(omo.isEmpty ? '' : '一方、');
+    if (hazushi.length == 1) {
+      final _Henkou h = hazushi.first;
+      final SenshuData? hs = h.haitta;
+      final String deta = w.senshu(h.deta);
+      if (hs == null) {
+        sb.write('${h.x.mei}は、持ちタイムが${jouiMoji(h.deta)}の$detaを${h.kk + 1}区から外した。');
+      } else {
+        final String yobi = w.senshu(hs);
+        sb.write(
+          '${h.x.mei}は、持ちタイムが${jouiMoji(h.deta)}の$detaを${h.kk + 1}区から外し、'
+          '$yobiを起用した。',
+        );
+        sb.write(hikakuBun(h, suisoku: false));
+      }
+    } else {
+      final List<String> narabi = [
+        for (final _Henkou h in hazushi.take(3))
+          '${h.x.mei}の${w.senshu(h.deta)}(${jouiMoji(h.deta)}、${h.kk + 1}区)',
+      ];
+      sb.write(
+        '${narabi.join('、')}${hazushi.length > 3 ? 'ら${hazushi.length}人' : ''}は、'
+        '当日変更でオーダーから外れた。',
+      );
+    }
+    sb.write(w.erabu(['理由は明らかにされていない。', '状態を見ての判断か。']));
+    // 外れた選手は、正月駅伝の復路にも出られない
+    if (race == 2) sb.write('外れた選手は、復路にも出られない。');
+    w.danraku(sb.toString());
+  }
+  // 本文: 出番がなかった実力者(正月駅伝は、往路で使わなかった補欠を復路で使える)
   if (demasezu.isNotEmpty) {
     final List<String> narabi = [
       for (final d in demasezu.take(3))
         '${d.x.mei}の${w.senshu(d.s)}(${jouiMoji(d.s)})',
     ];
     w.danraku(
-      '一方、${narabi.join('、')}は補欠のままで、今回は出番がない。'
+      '${hazushi.isEmpty ? '一方、' : 'また、'}${narabi.join('、')}は'
+      '${race == 2 ? '往路は補欠のままで、復路での起用があるか注目される。' : '補欠のままで、今回は出番がない。'}'
       '${w.erabu(['故障なのか、温存なのか。', '理由は明らかにされていない。'])}',
     );
   }
@@ -1576,17 +1697,18 @@ Kiji? _toujitsuKekkaTenbou(Tenbou t) {
     w.danraku('最も多く入れ替えたのは${t.univMei(ooiId)}で、$ooiKazu人を変更した。');
   }
 
-  // 表
+  // 表(選手は「山田太郎(3年・ハーフ1時間02分10秒)」。持ちタイムは区間の距離に合った種目)
+  String hyouMei(SenshuData s, int kk) =>
+      '${fullMei(s.name)}(${s.gakunen}年・'
+      '${_henkouMochiMoji(k, s, kukanKihonShumoku(k.gh, race, kk))})'
+      '${jouiMoji(s) == null ? '' : '※'}';
   final List<List<String>> gyou = [
     for (final _Henkou h in henkou)
       [
         h.x.mei,
         '${h.kk + 1}区',
-        '${fullMei(h.deta.name)}(${h.deta.gakunen})',
-        h.haitta == null
-            ? '-'
-            : '${fullMei(h.haitta!.name)}(${h.haitta!.gakunen})'
-                  '${jouiMoji(h.haitta!) == null ? '' : '※'}',
+        hyouMei(h.deta, h.kk),
+        h.haitta == null ? '-' : hyouMei(h.haitta!, h.kk),
       ],
   ];
   return _kansei(
@@ -1599,7 +1721,7 @@ Kiji? _toujitsuKekkaTenbou(Tenbou t) {
     lead: lead.toString(),
     hyou: [
       KijiHyou(
-        '当日変更の一覧(※は1万mかハーフの持ちタイムが全体10番手以内)',
+        '当日変更の一覧(持ちタイムは区間の距離に合った種目。※は1万mかハーフで全体10番手以内)',
         ['大学', '区間', '外れた選手', '入った選手'],
         gyou,
       ),
@@ -1884,15 +2006,20 @@ Kiji? _jibunTenbou(Tenbou t, List<KijiYosouJin> yosou) {
     if (jibunHenkou.isEmpty) {
       w.danraku('当日変更はせず、区間エントリーどおりのオーダーで臨む。');
     } else {
+      // 選手には、区間の距離に合った種目の持ちタイムを添える
       final List<String> bun = [];
       for (final _Henkou h in jibunHenkou) {
         final SenshuData? haitta = h.haitta;
-        final String deta = w.senshu(h.deta);
-        bun.add(
-          haitta == null
-              ? '${h.kk + 1}区の$detaを外し'
-              : '${h.kk + 1}区に${w.senshu(haitta)}を起用して$detaを外し',
-        );
+        final int idx = kukanKihonShumoku(k.gh, race, h.kk);
+        if (haitta == null) {
+          final String deta = _senshuMochi(w, h.deta, _henkouMochiMoji(k, h.deta, idx));
+          bun.add('${h.kk + 1}区の$detaを外し');
+        } else {
+          // 名前は出す順に作る(入った選手が先)
+          final String hairu = _senshuMochi(w, haitta, _henkouMochiMoji(k, haitta, idx));
+          final String deta = _senshuMochi(w, h.deta, _henkouMochiMoji(k, h.deta, idx));
+          bun.add('${h.kk + 1}区に$hairuを起用して$detaを外し');
+        }
       }
       w.danraku('当日変更では、${bun.join('、')}た。');
     }

@@ -572,12 +572,18 @@ String kukanYobikata(Ghensuu gh, int race, int k, int kukansuu) {
   }
 }
 
+/// 区間の距離に合った持ちタイムの種目(7.5km以下は5000m、15km以下は1万m、それより長いとハーフ。1.9.2)
+int kukanKihonShumoku(Ghensuu gh, int race, int k) {
+  final double kyori = gh.kyori_taikai_kukangoto[race][k];
+  return kyori <= 7500 ? 0 : (kyori <= 15000 ? 1 : 2);
+}
+
 /// 区間で見る持ちタイムの種目(time_bestkiroku の番号。最初が一番大事な種目)
 /// 距離で決める基本(7.5km以下は5000m、15km以下は1万m、それより長いとハーフ)に、
 /// 山登り・山下り・アップダウンの区間は登り1万・下り1万・クロカン1万を先に足す
 List<int> kukanShumoku(Ghensuu gh, int race, int k) {
   final double kyori = gh.kyori_taikai_kukangoto[race][k];
-  final int kihon = kyori <= 7500 ? 0 : (kyori <= 15000 ? 1 : 2);
+  final int kihon = kukanKihonShumoku(gh, race, k);
   if (race == 3 || race == 4) return [kihon];
   switch (kukanTokuchou(gh, race, k)) {
     case KukanTokuchou.yamaNobori:

@@ -132,6 +132,14 @@ class EkidenKekka {
     return jun.first;
   }
 
+  /// 区間[kk]の終了時点で[juni]番目(0が1位)だった大学
+  EkidenUnivKekka tsuukaJuni(int kk, int juni) {
+    for (final EkidenUnivKekka x in jun) {
+      if (x.tuuka[kk] == juni) return x;
+    }
+    return jun.first;
+  }
+
   /// 首位が入れ替わった回数
   int shuiKoutai() {
     int c = 0;
@@ -272,6 +280,10 @@ Kiji _topKiji(EkidenKekka e) {
   final EkidenUnivKekka win = e.jun[0];
   final EkidenUnivKekka ni = e.jun[1];
   final int sa = saByou(ni.time, win.time);
+  // 1位と2位の差を、1人あたり(区間数で割った値)で見る(1.9.2)
+  // 僅差は1人あたり3秒以内、大差は1人あたり20秒以上
+  final bool kinsa = sa <= ks * 3;
+  final bool taisa = !kinsa && sa >= ks * 20;
 
   // 事実を集める
   final int kaisuu = juniKaisuu(win.u, race, 0);
@@ -368,9 +380,9 @@ Kiji _topKiji(EkidenKekka e) {
     midashi2 = '最大${saMoji(behind)}差を逆転';
   } else if (k0 == ks - 1 && ks >= 2) {
     midashi2 = w.erabu(['アンカー勝負で逆転', '最終区で逆転']);
-  } else if (sa < 10) {
-    midashi2 = '${saMoji(sa)}差の激戦制す';
-  } else if (sa >= 180) {
+  } else if (kinsa) {
+    midashi2 = '${kinsaMoji(sa)}の激戦制す';
+  } else if (taisa) {
     midashi2 = '2位に${saMoji(sa)}差の圧勝';
   } else if (kanzen && ks >= 3) {
     midashi2 = w.erabu(['1区から首位譲らず', '序盤から独走']);
@@ -423,12 +435,26 @@ Kiji _topKiji(EkidenKekka e) {
       );
     }
   }
-  lead.write(
-    w.erabu([
-      '2位の${ni.mei}とは${saMoji(sa)}差だった。',
-      '${ni.mei}が${saMoji(sa)}差の2位に入った。',
-    ]),
-  );
+  if (kinsa) {
+    lead.write(
+      ks >= 2
+          ? '2位の${ni.mei}とは${kinsaMoji(sa)}。$ks人でつないで、${hitoriAtariMoji(sa, ks)}という大接戦だった。'
+          : '2位の${ni.mei}とは${kinsaMoji(sa)}の大接戦だった。',
+    );
+  } else if (taisa) {
+    lead.write(
+      ks >= 2
+          ? '2位の${ni.mei}には${saMoji(sa)}差をつけた。$ks人でつないで${hitoriAtariMoji(sa, ks)}をつける圧勝だった。'
+          : '2位の${ni.mei}に${saMoji(sa)}差をつける圧勝だった。',
+    );
+  } else {
+    lead.write(
+      w.erabu([
+        '2位の${ni.mei}とは${saMoji(sa)}差だった。',
+        '${ni.mei}が${saMoji(sa)}差の2位に入った。',
+      ]),
+    );
+  }
 
   // 本文: 序盤(1区のペースと1区の区間賞)
   w.koMidashi('序盤');
@@ -467,7 +493,9 @@ Kiji _topKiji(EkidenKekka e) {
     final String yobi1 = w.senshu(s1, daigaku: true);
     joban.write(
       w.erabu([
-        '1区の区間賞は$yobi1で、2位に${saMoji(sa1)}差をつけた。',
+        sa1 <= 0
+            ? '1区の区間賞は$yobi1で、2位とは1秒に満たない差の競り合いだった。'
+            : '1区の区間賞は$yobi1で、2位に${saMoji(sa1)}差をつけた。',
         '1区は$yobi1が${jikanMoji(t1.kukanTime[0])}で区間賞を獲得した。',
       ]),
     );
@@ -551,16 +579,38 @@ Kiji _topKiji(EkidenKekka e) {
   }
   w.comment(kantokuComment(w, KantokuBamen.yuushou, win.u.id));
 
-  // 本文: 2位以下
-  w.koMidashi('2位以下');
-  final StringBuffer ika = StringBuffer();
-  ika.write('2位の${ni.mei}は');
-  if (ni.tuuka.contains(0)) {
-    ika.write('一時は首位に立ったが、最後は${saMoji(sa)}及ばなかった。');
-  } else {
-    ika.write('最後まで食い下がったが、${saMoji(sa)}届かなかった。');
+  // 本文: 1位と2位の差(僅差なら攻防、大差なら独走。1.9.2)
+  if (kinsa) {
+    _kinsaKoubou(e, w, sa, k0);
+  } else if (taisa) {
+    _dokusou(e, w, k0);
   }
-  if (e.n >= 3) {
+
+  // 本文: 2位以下
+  final StringBuffer ika = StringBuffer();
+  bool sanKakizumi = false;
+  if (kinsa) {
+    // 2位の大学は「◯秒差の攻防」で書いたので、ここでは書かない
+  } else if (taisa) {
+    ika.write('2位には${ni.mei}が入った。');
+    // 2位争いが僅差なら、その差も書く
+    if (e.n >= 3) {
+      final EkidenUnivKekka san = e.jun[2];
+      final int sa23 = saByou(san.time, ni.time);
+      if (sa23 <= ks * 3) {
+        ika.write('3位の${san.mei}とは${kinsaMoji(sa23)}で、2位争いは最後までもつれた。');
+        sanKakizumi = true;
+      }
+    }
+  } else {
+    ika.write('2位の${ni.mei}は');
+    if (ni.tuuka.contains(0)) {
+      ika.write('一時は首位に立ったが、最後は${saMoji(sa)}及ばなかった。');
+    } else {
+      ika.write('最後まで食い下がったが、${saMoji(sa)}届かなかった。');
+    }
+  }
+  if (e.n >= 3 && !sanKakizumi) {
     final EkidenUnivKekka san = e.jun[2];
     ika.write('3位には${san.mei}が入った。');
   }
@@ -595,7 +645,6 @@ Kiji _topKiji(EkidenKekka e) {
   if (!hatsuKaisai && hatsuShutsujou.isNotEmpty && hatsuShutsujou.length <= 3) {
     ika.write('初出場の${hatsuShutsujou.join('、')}も力走した。');
   }
-  w.danraku(ika.toString());
   // 区間新の数
   int kukanShin = 0;
   for (int kk = 0; kk < ks; kk++) {
@@ -604,6 +653,9 @@ Kiji _topKiji(EkidenKekka e) {
       kukanShin++;
     }
   }
+  // 書くことがあるときだけ小見出しを出す(僅差のときは2位の大学を上で書いたので、空になることがある)
+  if (ika.isNotEmpty || kukanShin >= 1) w.koMidashi('2位以下');
+  w.danraku(ika.toString());
   if (kukanShin >= 1) {
     w.danraku(
       kukanShin >= 3
@@ -619,8 +671,167 @@ Kiji _topKiji(EkidenKekka e) {
     category: '駅伝',
     midashi: midashi,
     lead: lead.toString(),
-    hyou: [_sougouHyou(e)],
+    hyou: [_sougouHyou(e), if (kinsa || taisa) _saSuiiHyou(e)],
     jibun: win.u.id == k.gh.MYunivid,
+  );
+}
+
+/// 優勝の記事の「◯秒差の攻防」(1位と2位の差が1人あたり3秒以内のとき。1.9.2)
+/// [sa] 1位と2位の差(秒)、[k0] 優勝校が最後に首位に立った区間
+void _kinsaKoubou(EkidenKekka e, KijiKakite w, int sa, int k0) {
+  final int ks = e.ks;
+  final EkidenUnivKekka win = e.jun[0];
+  final EkidenUnivKekka ni = e.jun[1];
+  w.koMidashi('${kinsaMoji(sa)}の攻防');
+
+  // アンカーにたすきが渡った時点の差と、最終区の攻防
+  // (勝負所で、2位の大学から最終区で首位を奪ったことを書いたときは書かない)
+  final StringBuffer sb = StringBuffer();
+  final bool kakizumi = ks >= 2 && k0 == ks - 1 && e.shui(ks - 2).u.id == ni.u.id;
+  final SenshuData? aw = win.senshu[ks - 1];
+  final SenshuData? an = ni.senshu[ks - 1];
+  if (ks >= 2 && !kakizumi && aw != null && an != null) {
+    // 正なら優勝校が先行
+    final int d = saByou(ni.ruikei[ks - 2], win.ruikei[ks - 2]);
+    // 正なら優勝校のアンカーが速い
+    final int ad = saByou(ni.kukanTime[ks - 1], win.kukanTime[ks - 1]);
+    if (d > 0) {
+      sb.write('アンカーにたすきが渡った時点で、${win.mei}は${ni.mei}に${saMoji(d)}先行していた。');
+      if (ad < 0) {
+        final String yn = w.senshu(an);
+        final String yw = w.senshu(aw);
+        sb.write('${ni.mei}の$ynが${saMoji(ad)}詰め寄ったが、$ywが逃げ切った。');
+      } else {
+        sb.write('アンカーの${w.senshu(aw)}は、そのリードを守り切ってゴールした。');
+      }
+    } else if (d < 0) {
+      sb.write('アンカーにたすきが渡った時点では、${ni.mei}が${saMoji(d)}先行していた。');
+      sb.write('${win.mei}の${w.senshu(aw)}が追い上げ、最終区で逆転した。');
+    } else {
+      sb.write('アンカーにたすきが渡った時点で、両校の差は1秒に満たなかった。');
+      sb.write('最終区の勝負を制したのは、${win.mei}の${w.senshu(aw)}だった。');
+    }
+  }
+  w.danraku(sb.toString());
+
+  // 区間ごとの勝ち負けと、差が最も開いた区間
+  int katchi = 0;
+  int make = 0;
+  int hiraki = -1;
+  int hirakiSa = 0;
+  for (int kk = 0; kk < ks; kk++) {
+    // 正なら優勝校が速い
+    final int s = saByou(ni.kukanTime[kk], win.kukanTime[kk]);
+    if (s > 0) katchi++;
+    if (s < 0) make++;
+    if (s > hirakiSa) {
+      hirakiSa = s;
+      hiraki = kk;
+    }
+  }
+  final StringBuffer sb2 = StringBuffer();
+  if (ks >= 3) {
+    sb2.write(
+      make > katchi
+          ? '区間ごとに比べると、${ni.mei}が速かったのは$make区間で、${win.mei}の$katchi区間を上回っていた。'
+                'それでも、総合ではわずかに及ばなかった。'
+          : '区間ごとに比べると、${win.mei}が速かったのは$katchi区間、${ni.mei}が速かったのは$make区間だった。',
+    );
+  }
+  if (hiraki >= 0) {
+    final SenshuData? sw = win.senshu[hiraki];
+    final SenshuData? sn = ni.senshu[hiraki];
+    if (sw != null && sn != null) {
+      final String yw = w.senshu(sw);
+      final String yn = w.senshu(sn);
+      sb2.write(
+        '2校の差が最も開いたのは${e.kukanMei(hiraki)}で、${win.mei}の$ywが区間${win.kukanJuni[hiraki] + 1}位、'
+        '${ni.mei}の$ynが区間${ni.kukanJuni[hiraki] + 1}位と、${saMoji(hirakiSa)}の差がついた。',
+      );
+      // その区間を互角に走っていれば、2位の大学が逆転していた
+      if (hirakiSa > sa) {
+        sb2.write('この区間を互角に走っていれば、${ni.mei}が逆転していた計算になる。');
+      }
+    }
+  }
+  w.danraku(sb2.toString());
+  w.comment(kantokuComment(w, KantokuBamen.kinsaJunyuushou, ni.u.id, kuyashii: true));
+}
+
+/// 優勝の記事の「独走」(1位と2位の差が1人あたり20秒以上のとき。1.9.2)
+/// [k0] 優勝校が最後に首位に立った区間(そこから最後まで首位)
+void _dokusou(EkidenKekka e, KijiKakite w, int k0) {
+  final int ks = e.ks;
+  final EkidenUnivKekka win = e.jun[0];
+  final EkidenUnivKekka ni = e.jun[1];
+  w.koMidashi('独走');
+  final StringBuffer sb = StringBuffer();
+  // 首位に立ってから、2番手との差が初めて1分を超えた区間(最終区は除く)
+  int k60 = -1;
+  int sa60 = 0;
+  for (int kk = k0; kk < ks - 1; kk++) {
+    final int d = saByou(e.tsuukaJuni(kk, 1).ruikei[kk], win.ruikei[kk]);
+    if (d >= 60) {
+      k60 = kk;
+      sa60 = d;
+      break;
+    }
+  }
+  if (k60 >= 0) {
+    sb.write('${win.mei}は${k60 + 1}区を終えた時点で2位に${saMoji(sa60)}差をつけ、独走態勢に入った。');
+    // そのあとも、区間ごとに差が広がり続けたか
+    bool hirogaru = true;
+    int mae = sa60;
+    for (int kk = k60 + 1; kk < ks; kk++) {
+      final int d = saByou(e.tsuukaJuni(kk, 1).ruikei[kk], win.ruikei[kk]);
+      if (d < mae) hirogaru = false;
+      mae = d;
+    }
+    sb.write(hirogaru ? 'その後も差は広がる一方だった。' : 'その後も後続を寄せつけなかった。');
+  }
+  // 2位の大学との差が最も開いた区間
+  int hiraki = -1;
+  int hirakiSa = 0;
+  for (int kk = 0; kk < ks; kk++) {
+    final int s = saByou(ni.kukanTime[kk], win.kukanTime[kk]);
+    if (s > hirakiSa) {
+      hirakiSa = s;
+      hiraki = kk;
+    }
+  }
+  if (hiraki >= 0) {
+    final SenshuData? sw = win.senshu[hiraki];
+    if (sw != null) {
+      sb.write(
+        '2位の${ni.mei}との差が最も開いたのは${e.kukanMei(hiraki)}で、'
+        '${w.senshu(sw)}が区間${win.kukanJuni[hiraki] + 1}位の走りで${saMoji(hirakiSa)}の差をつけた。',
+      );
+    }
+  }
+  w.danraku(sb.toString());
+}
+
+/// 1位と2位の差の推移の表(僅差・大差のとき。1.9.2)
+KijiHyou _saSuiiHyou(EkidenKekka e) {
+  final EkidenUnivKekka win = e.jun[0];
+  final EkidenUnivKekka ni = e.jun[1];
+  final List<List<String>> gyou = [];
+  for (int kk = 0; kk < e.ks; kk++) {
+    // 正なら優勝校が先行
+    final int d = saByou(ni.ruikei[kk], win.ruikei[kk]);
+    gyou.add([
+      '${kk + 1}区',
+      juniMoji(win.tuuka[kk]),
+      juniMoji(ni.tuuka[kk]),
+      d > 0
+          ? '${win.mei}が${saMoji(d)}先行'
+          : (d < 0 ? '${ni.mei}が${saMoji(d)}先行' : '1秒未満'),
+    ]);
+  }
+  return KijiHyou(
+    '1位と2位の差の推移(各区間の終了時点の順位と差)',
+    ['区間', win.mei, ni.mei, '2校の差'],
+    gyou,
   );
 }
 
@@ -741,7 +952,28 @@ Kiji? _jibunKiji(EkidenKekka e) {
   lead.write(
     '${k.taikaiMei}で、$mmは${jikanMoji(m.time)}の${juniMoji(r)}でゴールした。',
   );
-  if (r > 0) lead.write('トップの${e.jun[0].mei}とは${saMoji(saTop)}差だった。');
+  if (r > 0) lead.write('トップの${e.jun[0].mei}とは${kinsaMoji(saTop)}だった。');
+  // 1位か2位で、1位と2位の差が僅差(1人あたり3秒以内)か大差(1人あたり20秒以上)なら、
+  // 1人あたりの差も書く(1.9.2)
+  if (r <= 1 && e.n >= 2 && ks >= 2) {
+    final int sa12 = saByou(e.jun[1].time, e.jun[0].time);
+    final bool kinsa12 = sa12 <= ks * 3;
+    if (kinsa12 || sa12 >= ks * 20) {
+      if (r == 0) {
+        lead.write(
+          kinsa12
+              ? '2位の${e.jun[1].mei}とは${kinsaMoji(sa12)}、$ks人でつないで${hitoriAtariMoji(sa12, ks)}で競り勝った。'
+              : '2位の${e.jun[1].mei}には${saMoji(sa12)}差、$ks人でつないで${hitoriAtariMoji(sa12, ks)}をつけた。',
+        );
+      } else {
+        lead.write(
+          kinsa12
+              ? '$ks人でつないで${hitoriAtariMoji(sa12, ks)}で、優勝を逃した。'
+              : '$ks人でつないで${hitoriAtariMoji(sa12, ks)}をつけられた。',
+        );
+      }
+    }
+  }
   if (mokuhyouAri) {
     if (tassei) {
       lead.write(
@@ -1109,7 +1341,7 @@ Kiji? _kukanshouKiji(EkidenKekka e) {
     }
     final int sa = e.kukanshouSa(kk);
     if (sa <= 1) {
-      b.write('。2位とはわずか${saMoji(sa)}差の競り合いを制した');
+      b.write('。2位とはわずか${kinsaMoji(sa)}の競り合いを制した');
     } else if (sa >= 30) {
       b.write('。2位に${saMoji(sa)}差をつけた');
     }
@@ -1483,7 +1715,7 @@ Kiji? _ouroFukuroKiji(EkidenKekka e) {
   final StringBuffer lead = StringBuffer();
   lead.write(
     '${k.taikaiMei}の往路(1〜$ouroKs区)は${oW.mei}が${jikanMoji(oW.ruikei[ou])}で制し、'
-    '2位に${saMoji(ouroSa)}差をつけた。',
+    '${ouroSa <= 0 ? '2位とは1秒に満たない差だった' : '2位に${saMoji(ouroSa)}差をつけた'}。',
   );
   lead.write(
     '復路(${ouroKs + 1}〜$ks区)は${fW.mei}が${jikanMoji(fukuro(fW))}で最速だった。',
@@ -1503,7 +1735,8 @@ Kiji? _ouroFukuroKiji(EkidenKekka e) {
     if (s == null) continue;
     w.danraku(
       '${e.kukanMei(kk)}は${w.senshu(s, daigaku: true)}が${jikanMoji(x.kukanTime[kk])}で区間賞。'
-      '${t == KukanTokuchou.yamaNobori ? '険しい上り坂で' : '急な下り坂で'}${saMoji(e.kukanshouSa(kk))}の差をつけた。',
+      '${t == KukanTokuchou.yamaNobori ? '険しい上り坂で' : '急な下り坂で'}'
+      '${e.kukanshouSa(kk) <= 0 ? '、2位との1秒に満たない差の競り合いを制した。' : '${saMoji(e.kukanshouSa(kk))}の差をつけた。'}',
     );
   }
   // 復路の巻き返し
@@ -1517,7 +1750,7 @@ Kiji? _ouroFukuroKiji(EkidenKekka e) {
       '復路で大きく順位を上げたのは${x.mei}。往路${juniMoji(x.tuuka[ou])}から総合${juniMoji(x.juni)}まで巻き返した。',
     );
   }
-  w.danraku('復路の2位とは${saMoji(fukuroSa)}差だった。');
+  w.danraku('復路の2位とは${kinsaMoji(fukuroSa)}だった。');
 
   final List<List<String>> gyou = [];
   for (int i = 0; i < e.n; i++) {

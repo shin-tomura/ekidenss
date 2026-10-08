@@ -68,6 +68,9 @@ enum KantokuBamen {
 
   /// 予選で、わずかの差で通過を逃した(次点)
   yosenJiten,
+
+  /// 駅伝で、わずかの差で優勝を逃した(僅差の2位)
+  kinsaJunyuushou,
 }
 
 const Map<CommentBamen, List<String>> _senshuComment = {
@@ -205,6 +208,11 @@ const Map<KantokuBamen, List<String>> _kantokuComment = {
     '1秒の重みを思い知らされた。選手たちに申し訳ない',
     'これだけの僅差で届かないのは、私の力不足。来年、必ず取り返す',
     '紙一重だった。この経験を、チーム全員で次につなげたい',
+  ],
+  KantokuBamen.kinsaJunyuushou: [
+    'わずかの差だった。選手たちはよく戦ってくれたが、勝たせてあげられなかった',
+    'あと少しが届かなかった。この差を埋めるのが、来年への宿題です',
+    '最後まで優勝を争えたのは収穫。ただ、この負けは本当に悔しい',
   ],
   KantokuBamen.tenbouSeed: [
     'まずはシード権を確実に取る。そこから一つでも上を目指したい',

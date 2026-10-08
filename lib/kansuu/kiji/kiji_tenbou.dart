@@ -31,6 +31,11 @@ import 'package:ekiden/kansuu/kiji/kiji_comment.dart';
 //  駅伝: 1.優勝争い 2.自分の大学 3.区間の見どころ(1区のペース予想も)
 //        4.シード権争い(11月駅伝は上位8校、正月駅伝は上位10校) 5.当日変更の読み(全体の持ちタイム上位の選手が補欠のとき)
 //  予選: 1.通過争い 2.注目選手(組ごと・個人) 3.自分の大学
+//
+// スタート直前号(1.9.2。目標順位の確認の画面の「スタート直前号」。駅伝の1区のスタート前だけ)
+//  当日変更(コンピュータの大学の戦略的変更を含む)のあとの、実際に走る選手で書く。
+//  チームの平均は走る選手で出し、1区のペース予想には当日の調子を入れる。言い回しの乱数は展望と分ける
+//  記事: 1.当日変更の結果 2.優勝争い 3.自分の大学 4.区間の見どころ 5.シード権争い
 // ------------------------------------------------------------
 
 /// 予想陣(直前順位予想の画面の3人)の予想
@@ -179,6 +184,9 @@ class Tenbou {
   /// 5000m・1万m・ハーフの重み(区間の距離の合計の割合)
   final List<double> omomi;
 
+  /// スタート直前号か(当日変更のあと。実際に走る選手で書く)
+  final bool chokuzen;
+
   Tenbou._(
     this.k,
     this.jun,
@@ -187,9 +195,11 @@ class Tenbou {
     this.heikinNinzuu,
     this.heikinShumoku,
     this.omomi,
+    this.chokuzen,
   );
 
-  static Tenbou? tsukuru(KijiKankyou k) {
+  /// [chokuzen] スタート直前号(当日変更のあと)として作るか
+  static Tenbou? tsukuru(KijiKankyou k, {bool chokuzen = false}) {
     final int ks = k.kukansuu;
     if (ks <= 0) return null;
     final int race = k.race;
@@ -237,7 +247,10 @@ class Tenbou {
     }
 
     for (final TenbouUniv x in list) {
-      final List<SenshuData> taishou = k.ekiden ? x.ichiji : x.hashiru;
+      // 駅伝の展望は一次エントリーの上位(補欠に回った主力も入れる)、
+      // スタート直前号と予選は実際に走る選手
+      final List<SenshuData> taishou =
+          (k.ekiden && !chokuzen) ? x.ichiji : x.hashiru;
       x.heikin = heikinDasu(taishou, null);
       if (heikinShumoku != 1) x.sankouIchiman = heikinDasu(taishou, 1);
     }
@@ -324,6 +337,7 @@ class Tenbou {
       ninzuu,
       heikinShumoku,
       omomi,
+      chokuzen,
     );
   }
 
@@ -390,6 +404,10 @@ class Tenbou {
     if (t >= TEISUU.DEFAULTTIME) return '';
     return '${kijiShumokuMei[idx]}${jikanMoji(t)}';
   }
+
+  /// チームの平均を出した選手の言い方(「上位10人」。スタート直前号は「走る10人」)
+  String get heikinTaishouMoji =>
+      chokuzen ? '走る$heikinNinzuu人' : '上位$heikinNinzuu人';
 
   /// 重みが2つ以上の種目に分かれているか
   bool get omomiTsuki => omomi.where((v) => v > 0).length >= 2;
@@ -480,11 +498,26 @@ int? _soroiKukanshou(Tenbou t, List<KijiYosouJin> yosou, int kk) {
 // ------------------------------------------------------------
 
 /// 展望の記事の一覧(並べる順)。[yosou] 予想陣の予想(なければ空)
-List<Kiji> tenbouKiji(KijiKankyou k, List<KijiYosouJin> yosou) {
-  final Tenbou? t = Tenbou.tsukuru(k);
+/// [chokuzen] スタート直前号(当日変更のあと。駅伝だけ)
+List<Kiji> tenbouKiji(
+  KijiKankyou k,
+  List<KijiYosouJin> yosou, {
+  bool chokuzen = false,
+}) {
+  if (chokuzen && !k.ekiden) return [];
+  final Tenbou? t = Tenbou.tsukuru(k, chokuzen: chokuzen);
   if (t == null) return [];
   final List<Kiji> list = [];
-  if (k.ekiden) {
+  if (chokuzen) {
+    final Kiji? kekka = _toujitsuKekkaTenbou(t);
+    if (kekka != null) list.add(kekka);
+    list.add(_yuushouTenbou(t, yosou));
+    final Kiji? jibun = _jibunTenbou(t, yosou);
+    if (jibun != null) list.add(jibun);
+    list.add(_kukanTenbou(t, yosou));
+    final Kiji? seed = _seedTenbou(t, yosou);
+    if (seed != null) list.add(seed);
+  } else if (k.ekiden) {
     list.add(_yuushouTenbou(t, yosou));
     final Kiji? jibun = _jibunTenbou(t, yosou);
     if (jibun != null) list.add(jibun);
@@ -513,22 +546,35 @@ Kiji _kansei(
   required String lead,
   List<KijiHyou> hyou = const [],
   bool jibun = false,
+  bool chokuzen = false,
 }) {
+  final int bangou = no + (chokuzen ? 20 : 10);
   return Kiji(
-    category: category,
+    category: chokuzen ? category.replaceFirst('展望', '直前') : category,
     midashi: midashi,
     lead: lead,
     honbun: w.honbun,
     hyou: hyou,
-    haishin: k.haishinMei(no + 10, asa: true),
-    kisha: k.kishaMei(no + 10),
+    haishin: k.haishinMei(bangou, asa: true),
+    kisha: k.kishaMei(bangou),
     jibun: jibun,
     kekka: false,
   );
 }
 
-/// 大会の始まりの言い方
-String _gouhou(KijiKankyou k, KijiKakite w) {
+/// 記事の言い回しの乱数の番号(スタート直前号は展望と分ける)
+int _taneNo(Tenbou t, int no) => no + (t.chokuzen ? 20 : 10);
+
+/// 大会の始まりの言い方([chokuzen] スタート直前号)
+String _gouhou(KijiKankyou k, KijiKakite w, [bool chokuzen = false]) {
+  if (chokuzen) {
+    return k.race == 2
+        ? '${k.taikaiMei}は、まもなく往路の号砲が鳴る。'
+        : w.erabu([
+            '${k.taikaiMei}は、まもなく号砲が鳴る。',
+            '${k.taikaiMei}のスタートが迫った。',
+          ]);
+  }
   if (k.race == 2) {
     return w.erabu([
       '${k.taikaiMei}は、きょう往路の号砲が鳴る。',
@@ -560,10 +606,10 @@ KijiHyou _maeHyoubanHyou(Tenbou t, List<KijiYosouJin> yosou, {required bool ekid
   }
   return KijiHyou(
     t.omomiTsuki
-        ? '本紙の戦力分析(${t.heikinMei}平均は上位${t.heikinNinzuu}人。区間の距離の合計で'
+        ? '本紙の戦力分析(${t.heikinMei}平均は${t.heikinTaishouMoji}。区間の距離の合計で'
               '${t.omomiMoji}に重み付けし、${kijiShumokuMei[t.heikinShumoku]}にそろえた持ちタイム。'
               '記録がない種目は、ほかの種目の記録から換算)'
-        : '本紙の戦力分析(${t.heikinMei}平均は上位${t.heikinNinzuu}人。'
+        : '本紙の戦力分析(${t.heikinMei}平均は${t.heikinTaishouMoji}。'
               '${t.heikinMei}の記録がない選手は、ほかの種目の記録から換算)',
     [
       '前評判',
@@ -585,7 +631,7 @@ KijiHyou _maeHyoubanHyou(Tenbou t, List<KijiYosouJin> yosou, {required bool ekid
 Kiji _yuushouTenbou(Tenbou t, List<KijiYosouJin> yosou) {
   final KijiKankyou k = t.k;
   const int no = 1;
-  final KijiKakite w = KijiKakite(k, kijiTane(k.gh, k.race, no + 10));
+  final KijiKakite w = KijiKakite(k, kijiTane(k.gh, k.race, _taneNo(t, no)));
   final int race = k.race;
   final TenbouUniv hon = t.jun[0];
   final TenbouUniv tai = t.jun[1];
@@ -681,9 +727,11 @@ Kiji _yuushouTenbou(Tenbou t, List<KijiYosouJin> yosou) {
 
   // リード
   final StringBuffer lead = StringBuffer();
-  lead.write(_gouhou(k, w));
+  lead.write(_gouhou(k, w, t.chokuzen));
   lead.write(
-    '出場${t.n}校の区間エントリーが出そろい、本紙の戦力分析では${hon.mei}が優勝候補の筆頭に挙がった。',
+    t.chokuzen
+        ? '当日変更を終えて各校のオーダーが固まり、本紙の戦力分析では${hon.mei}が優勝候補の筆頭に挙がった。'
+        : '出場${t.n}校の区間エントリーが出そろい、本紙の戦力分析では${hon.mei}が優勝候補の筆頭に挙がった。',
   );
   if (hatsuKaisai) {
     lead.write('今回が初めての開催で、${t.n}校が初代王者の座を争う。');
@@ -694,7 +742,10 @@ Kiji _yuushouTenbou(Tenbou t, List<KijiYosouJin> yosou) {
   if (hon.heikinJuni == 0 && hon.kukanJuni == 0) {
     lead.write('${t.heikinMei}平均、区間ごとの持ちタイムのどちらでも出場校トップだ。');
   } else if (hon.heikinJuni == 0) {
-    lead.write('一次エントリー上位${t.heikinNinzuu}人の${t.heikinMei}平均は${t.heikinMoji(hon)}で出場校トップ。');
+    lead.write(
+      '${t.chokuzen ? t.heikinTaishouMoji : '一次エントリー上位${t.heikinNinzuu}人'}の'
+      '${t.heikinMei}平均は${t.heikinMoji(hon)}で出場校トップ。',
+    );
   } else if (hon.kukanJuni == 0) {
     lead.write('区間ごとの持ちタイムを比べると、多くの区間で他校を上回る。');
   }
@@ -835,6 +886,7 @@ Kiji _yuushouTenbou(Tenbou t, List<KijiYosouJin> yosou) {
     k,
     no,
     w,
+    chokuzen: t.chokuzen,
     category: '駅伝・展望',
     midashi: midashi,
     lead: lead.toString(),
@@ -850,7 +902,7 @@ Kiji _yuushouTenbou(Tenbou t, List<KijiYosouJin> yosou) {
 Kiji _kukanTenbou(Tenbou t, List<KijiYosouJin> yosou) {
   final KijiKankyou k = t.k;
   const int no = 2;
-  final KijiKakite w = KijiKakite(k, kijiTane(k.gh, k.race, no + 10));
+  final KijiKakite w = KijiKakite(k, kijiTane(k.gh, k.race, _taneNo(t, no)));
   final int race = k.race;
   final int ks = t.ks;
 
@@ -872,7 +924,8 @@ Kiji _kukanTenbou(Tenbou t, List<KijiYosouJin> yosou) {
           sortedSenshu: k.senshu,
           sortedUniv: k.univ,
           kantoku: k.kantoku,
-          chousiIreru: false,
+          // スタート直前号は、目標順位の確認の画面の予想と同じく当日の調子を入れる
+          chousiIreru: t.chokuzen,
         )
       : null;
 
@@ -900,7 +953,11 @@ Kiji _kukanTenbou(Tenbou t, List<KijiYosouJin> yosou) {
 
   // リード
   final StringBuffer lead = StringBuffer();
-  lead.write('${k.taikaiMei}の区間エントリーが発表された。');
+  lead.write(
+    t.chokuzen
+        ? '${k.taikaiMei}は当日変更を終え、各区間を走る選手が決まった。'
+        : '${k.taikaiMei}の区間エントリーが発表された。',
+  );
   lead.write(
     w.erabu([
       '各区間の持ちタイムから、見どころを探った。',
@@ -1010,6 +1067,7 @@ Kiji _kukanTenbou(Tenbou t, List<KijiYosouJin> yosou) {
     k,
     no,
     w,
+    chokuzen: t.chokuzen,
     category: '駅伝・展望',
     midashi: midashi,
     lead: lead.toString(),
@@ -1044,7 +1102,7 @@ Kiji? _seedTenbou(Tenbou t, List<KijiYosouJin> yosou) {
   final int? seed = race == 1 ? 8 : (race == 2 ? 10 : null);
   if (seed == null || t.n <= seed) return null;
   const int no = 5;
-  final KijiKakite w = KijiKakite(k, kijiTane(k.gh, race, no + 10));
+  final KijiKakite w = KijiKakite(k, kijiTane(k.gh, race, _taneNo(t, no)));
   final int yosenRace = race == 1 ? 3 : 4;
   final String yosenMei = race == 1 ? '11月駅伝予選' : '正月駅伝予選';
   final TenbouUniv saigo = t.jun[seed - 1]; // 前評判でシード権の最後の枠
@@ -1278,6 +1336,7 @@ Kiji? _seedTenbou(Tenbou t, List<KijiYosouJin> yosou) {
     k,
     no,
     w,
+    chokuzen: t.chokuzen,
     category: '駅伝・展望',
     midashi: midashi,
     lead: lead.toString(),
@@ -1289,6 +1348,263 @@ Kiji? _seedTenbou(Tenbou t, List<KijiYosouJin> yosou) {
       ),
     ],
     jibun: jibunKyoukai,
+  );
+}
+
+// ------------------------------------------------------------
+// スタート直前号 当日変更の結果(1.9.2)
+// ・外れた選手には区間の値に -(100+区間) の印が残るので、誰がどの区間で入れ替わったかが分かる
+// ・入った選手が出場全選手の中で1万mかハーフの持ちタイム10番手以内なら大きく取り上げ、
+//   補欠のまま出番がなかった持ちタイム上位の選手(自分の大学は除く)も書く
+// ・1区が入れ替わったときは、区間エントリーどおりの1区の予想と比べてペースの見出しの変化を書く
+// ------------------------------------------------------------
+
+/// 当日変更の1件
+class _Henkou {
+  final TenbouUniv x;
+
+  /// 外れた選手
+  final SenshuData deta;
+
+  /// 入った選手(見つからなければnull)
+  final SenshuData? haitta;
+
+  /// 区間(0が1区)
+  final int kk;
+
+  const _Henkou(this.x, this.deta, this.haitta, this.kk);
+}
+
+/// 当日変更の一覧(前評判の順、同じ大学の中は区間の順)
+List<_Henkou> _henkouIchiran(Tenbou t) {
+  final KijiKankyou k = t.k;
+  final List<_Henkou> l = [];
+  for (final TenbouUniv x in t.jun) {
+    for (final SenshuData s in k.senshu) {
+      if (s.univid != x.u.id) continue;
+      final int e = k.entry(s);
+      if (e > -100) continue;
+      final int kk = -e - 100;
+      if (kk < 0 || kk >= t.ks) continue;
+      SenshuData? haitta;
+      for (final SenshuData h in x.hashiru) {
+        if (k.entry(h) == kk) haitta = h;
+      }
+      l.add(_Henkou(x, s, haitta, kk));
+    }
+  }
+  l.sort((a, b) {
+    final int c = a.x.juni.compareTo(b.x.juni);
+    return c != 0 ? c : a.kk.compareTo(b.kk);
+  });
+  return l;
+}
+
+Kiji? _toujitsuKekkaTenbou(Tenbou t) {
+  final KijiKankyou k = t.k;
+  const int no = 6;
+  final List<_Henkou> henkou = _henkouIchiran(t);
+  if (henkou.isEmpty) return null;
+  final KijiKakite w = KijiKakite(k, kijiTane(k.gh, k.race, _taneNo(t, no)));
+  final int race = k.race;
+  final Set<int> daigaku = {for (final _Henkou h in henkou) h.x.u.id};
+
+  // 出場全選手(一次エントリー。補欠と外れた選手を含む)の、1万mとハーフの持ちタイムの順
+  final List<SenshuData> zenin = [
+    for (final TenbouUniv x in t.jun) ...x.ichiji,
+    for (final _Henkou h in henkou) h.deta,
+  ];
+  List<SenshuData> jun(int idx) => [
+    for (final SenshuData s in zenin)
+      if (k.jikoBest(s, idx) < TEISUU.DEFAULTTIME) s,
+  ]..sort((a, b) => k.jikoBest(a, idx).compareTo(k.jikoBest(b, idx)));
+  final List<SenshuData> junIchiman = jun(1);
+  final List<SenshuData> junHalf = jun(2);
+  // 全体の持ちタイム上位(10番手以内)なら「1万m全体3位」の言い方(そうでなければnull)
+  String? jouiMoji(SenshuData s) {
+    final int a = junIchiman.indexWhere((d) => d.id == s.id);
+    final int b = junHalf.indexWhere((d) => d.id == s.id);
+    final int ai = a < 0 ? 9999 : a;
+    final int bi = b < 0 ? 9999 : b;
+    final int best = ai <= bi ? ai : bi;
+    if (best >= _hoketsuJougenJuni) return null;
+    return '${ai <= bi ? '1万m' : 'ハーフ'}全体${best + 1}位';
+  }
+
+  // 持ちタイム上位の選手が入った変更
+  final List<_Henkou> omo = [
+    for (final _Henkou h in henkou)
+      if (h.haitta != null && jouiMoji(h.haitta!) != null) h,
+  ];
+  // 持ちタイム上位なのに補欠のまま出番がなかった選手(自分の大学は除く)
+  final List<({TenbouUniv x, SenshuData s})> demasezu = [];
+  for (final TenbouUniv x in t.jun) {
+    if (x.u.id == k.gh.MYunivid) continue;
+    for (final SenshuData s in x.ichiji) {
+      if (k.entry(s) == -1 && jouiMoji(s) != null) {
+        demasezu.add((x: x, s: s));
+      }
+    }
+  }
+  // 1区の変更があれば、区間エントリーどおりの予想と比べる
+  final Map<int, int> ikkuModoshi = {
+    for (final _Henkou h in henkou)
+      if (h.kk == 0 && h.haitta != null) h.haitta!.id: h.deta.id,
+  };
+  IkkuPaceYosou? paceAto;
+  IkkuPaceYosou? paceMae;
+  if (ikkuModoshi.isNotEmpty && ikkuPaceTaishou(race)) {
+    paceAto = ikkuPaceYosou(
+      gh: k.gh,
+      racebangou: race,
+      sortedSenshu: k.senshu,
+      sortedUniv: k.univ,
+      kantoku: k.kantoku,
+    );
+    paceMae = ikkuPaceYosou(
+      gh: k.gh,
+      racebangou: race,
+      sortedSenshu: k.senshu,
+      sortedUniv: k.univ,
+      kantoku: k.kantoku,
+      irekae: ikkuModoshi,
+    );
+  }
+
+  // 見出し
+  String midashi;
+  if (omo.length == 1) {
+    final _Henkou h = omo.first;
+    midashi = w.erabu([
+      '${h.x.mei}、${myouji(h.haitta!.name)}を${h.kk + 1}区に投入　${jouiMoji(h.haitta!)}',
+      '${jouiMoji(h.haitta!)}の${myouji(h.haitta!.name)}が${h.kk + 1}区へ　${h.x.mei}が当日変更',
+    ]);
+  } else if (omo.length >= 2) {
+    midashi = '持ちタイム上位の${omo.length}人が当日変更で出場へ';
+  } else {
+    midashi = '当日変更は${daigaku.length}校で計${henkou.length}人';
+  }
+
+  // リード
+  final StringBuffer lead = StringBuffer();
+  lead.write(
+    '${k.taikaiMei}は${race == 2 ? '往路の' : ''}当日変更が発表され、'
+    '${daigaku.length}校が計${henkou.length}人を入れ替えた。',
+  );
+  if (omo.isNotEmpty) {
+    lead.write(
+      w.erabu([
+        '区間エントリーで補欠に回っていた主力が、次々とオーダーに名を連ねた。',
+        '補欠に温存されていた実力者たちが、ついにベールを脱いだ。',
+      ]),
+    );
+  }
+
+  // 本文: 投入された主力
+  if (omo.isNotEmpty) {
+    w.koMidashi('投入された主力');
+    if (omo.length <= 2) {
+      for (int i = 0; i < omo.length; i++) {
+        final _Henkou h = omo[i];
+        final SenshuData hs = h.haitta!;
+        final String yobi = w.senshu(hs);
+        final String m1 = t.mochiMoji(hs, t.heikinShumoku);
+        w.danraku(
+          i == 0
+              ? '${_zenpyouMoji(t, h.x)}${h.x.mei}は、${jouiMoji(hs)}の持ちタイム'
+                    '${m1.isEmpty ? '' : '($m1)'}を持つ$yobiを${t.kukanMei(h.kk)}に起用した。'
+                    '区間エントリーで${h.kk + 1}区に入っていた${w.senshu(h.deta)}と入れ替えた。'
+              : '${h.x.mei}も、$yobi(${jouiMoji(hs)})を${t.kukanMei(h.kk)}に入れた。'
+                    '${w.erabu(['勝負の一手が、どう出るか。', '流れを変える起用となるか。'])}',
+        );
+      }
+    } else {
+      final List<String> narabi = [
+        for (final _Henkou h in omo)
+          '${h.x.mei}の${w.senshu(h.haitta!)}(${jouiMoji(h.haitta!)}、${h.kk + 1}区)',
+      ];
+      w.danraku(
+        '当日変更で起用された主な選手は、${narabi.join('、')}。'
+        '${w.erabu(['各校の切り札が、そろって表舞台に立つ。', '戦略的エントリーの答えが、ここで明らかになった。'])}',
+      );
+    }
+  }
+  // 本文: 出番がなかった実力者
+  if (demasezu.isNotEmpty) {
+    final List<String> narabi = [
+      for (final d in demasezu.take(3))
+        '${d.x.mei}の${w.senshu(d.s)}(${jouiMoji(d.s)})',
+    ];
+    w.danraku(
+      '一方、${narabi.join('、')}は補欠のままで、今回は出番がない。'
+      '${w.erabu(['故障なのか、温存なのか。', '理由は明らかにされていない。'])}',
+    );
+  }
+  // 本文: 1区の流れの変化
+  if (paceAto != null && paceMae != null) {
+    w.koMidashi('1区の流れ');
+    final IkkuPaceYosou ato = paceAto;
+    final IkkuPaceYosou mae = paceMae;
+    final StringBuffer sb = StringBuffer('1区でも当日変更があった。');
+    if (ato.midashi != mae.midashi) {
+      sb.write(
+        '区間エントリーどおりなら${ikkuPaceMidashiMoji[mae.midashi]}とみられていた集団のペースは、'
+        '${ikkuPaceMidashiMoji[ato.midashi]}になりそうだ。',
+      );
+    } else {
+      sb.write('集団のペースは、変わらず${ikkuPaceMidashiMoji[ato.midashi]}の予想だ。');
+    }
+    if (ato.pacemaker.id != mae.pacemaker.id) {
+      sb.write('集団を引っ張りそうなのは、${w.senshu(ato.pacemaker, daigaku: true)}に替わった。');
+    }
+    w.danraku(sb.toString());
+  }
+  // 本文: 変更の多かった大学
+  final Map<int, int> kazu = {};
+  for (final _Henkou h in henkou) {
+    kazu[h.x.u.id] = (kazu[h.x.u.id] ?? 0) + 1;
+  }
+  int ooiId = -1;
+  int ooiKazu = 0;
+  kazu.forEach((id, n) {
+    if (n > ooiKazu) {
+      ooiKazu = n;
+      ooiId = id;
+    }
+  });
+  if (ooiKazu >= 2 && daigaku.length >= 2) {
+    w.danraku('最も多く入れ替えたのは${t.univMei(ooiId)}で、$ooiKazu人を変更した。');
+  }
+
+  // 表
+  final List<List<String>> gyou = [
+    for (final _Henkou h in henkou)
+      [
+        h.x.mei,
+        '${h.kk + 1}区',
+        '${fullMei(h.deta.name)}(${h.deta.gakunen})',
+        h.haitta == null
+            ? '-'
+            : '${fullMei(h.haitta!.name)}(${h.haitta!.gakunen})'
+                  '${jouiMoji(h.haitta!) == null ? '' : '※'}',
+      ],
+  ];
+  return _kansei(
+    k,
+    no,
+    w,
+    chokuzen: t.chokuzen,
+    category: '駅伝・展望',
+    midashi: midashi,
+    lead: lead.toString(),
+    hyou: [
+      KijiHyou(
+        '当日変更の一覧(※は1万mかハーフの持ちタイムが全体10番手以内)',
+        ['大学', '区間', '外れた選手', '入った選手'],
+        gyou,
+      ),
+    ],
+    jibun: daigaku.contains(k.gh.MYunivid),
   );
 }
 
@@ -1378,7 +1694,7 @@ Kiji? _toujitsuTenbou(Tenbou t) {
     final int c = a.yoiJuni.compareTo(b.yoiJuni);
     return c != 0 ? c : a.x.juni.compareTo(b.x.juni);
   });
-  final KijiKakite w = KijiKakite(k, kijiTane(k.gh, k.race, no + 10));
+  final KijiKakite w = KijiKakite(k, kijiTane(k.gh, k.race, _taneNo(t, no)));
   final int kazu = hoketsu.length;
   final _HoketsuJitsuryokusha h0 = hoketsu.first;
 
@@ -1471,6 +1787,7 @@ Kiji? _toujitsuTenbou(Tenbou t) {
     k,
     no,
     w,
+    chokuzen: t.chokuzen,
     category: '駅伝・展望',
     midashi: midashi,
     lead: lead.toString(),
@@ -1493,7 +1810,7 @@ Kiji? _jibunTenbou(Tenbou t, List<KijiYosouJin> yosou) {
   if (m == null) return null;
   final KijiKankyou k = t.k;
   const int no = 4;
-  final KijiKakite w = KijiKakite(k, kijiTane(k.gh, k.race, no + 10));
+  final KijiKakite w = KijiKakite(k, kijiTane(k.gh, k.race, _taneNo(t, no)));
   final int race = k.race;
   final int ks = t.ks;
   final String mm = m.mei;
@@ -1530,7 +1847,11 @@ Kiji? _jibunTenbou(Tenbou t, List<KijiYosouJin> yosou) {
 
   // リード
   final StringBuffer lead = StringBuffer();
-  lead.write('${k.taikaiMei}に挑む$mmの${race == 4 ? 'エントリー' : '区間エントリー'}が決まった。');
+  lead.write(
+    t.chokuzen
+        ? '${k.taikaiMei}に挑む$mmは、当日変更を終えてオーダーが固まった。'
+        : '${k.taikaiMei}に挑む$mmの${race == 4 ? 'エントリー' : '区間エントリー'}が決まった。',
+  );
   lead.write('本紙の戦力分析では、出場${t.n}校中${r + 1}番手の評価だ。');
   if (maeAri) {
     lead.write('前回は${juniMoji(mae)}だった。');
@@ -1554,6 +1875,28 @@ Kiji? _jibunTenbou(Tenbou t, List<KijiYosouJin> yosou) {
       '${race == 4 ? '' : (t.kukanNoJuni(a, kk) == 0 ? 'この${race == 3 ? '組' : '区間'}の持ちタイムでトップだ。' : '')}',
     );
   }
+  // スタート直前号: 自分の大学の当日変更
+  if (t.chokuzen) {
+    final List<_Henkou> jibunHenkou = [
+      for (final _Henkou h in _henkouIchiran(t))
+        if (h.x.u.id == m.u.id) h,
+    ];
+    if (jibunHenkou.isEmpty) {
+      w.danraku('当日変更はせず、区間エントリーどおりのオーダーで臨む。');
+    } else {
+      final List<String> bun = [];
+      for (final _Henkou h in jibunHenkou) {
+        final SenshuData? haitta = h.haitta;
+        final String deta = w.senshu(h.deta);
+        bun.add(
+          haitta == null
+              ? '${h.kk + 1}区の$detaを外し'
+              : '${h.kk + 1}区に${w.senshu(haitta)}を起用して$detaを外し',
+        );
+      }
+      w.danraku('当日変更では、${bun.join('、')}た。');
+    }
+  }
   // 1区のペース(駅伝)
   if (ikkuPaceTaishou(race)) {
     SenshuData? s1;
@@ -1566,7 +1909,7 @@ Kiji? _jibunTenbou(Tenbou t, List<KijiYosouJin> yosou) {
       sortedSenshu: k.senshu,
       sortedUniv: k.univ,
       kantoku: k.kantoku,
-      chousiIreru: false,
+      chousiIreru: t.chokuzen,
     );
     if (s1 != null && pace != null) {
       final IkkuAishou ai = pace.aishou(s1.id);
@@ -1629,7 +1972,9 @@ Kiji? _jibunTenbou(Tenbou t, List<KijiYosouJin> yosou) {
     for (int i = 0; i < jun.length && i < 3; i++) {
       if (k.entry(jun[i]) == -1) {
         w.danraku(
-          'チーム${i + 1}番手の${w.senshu(jun[i])}は補欠に入った。当日変更での起用があるかも注目される。',
+          t.chokuzen
+              ? 'チーム${i + 1}番手の${w.senshu(jun[i])}は補欠のままで、今回は出番がない。'
+              : 'チーム${i + 1}番手の${w.senshu(jun[i])}は補欠に入った。当日変更での起用があるかも注目される。',
         );
         break;
       }
@@ -1700,6 +2045,7 @@ Kiji? _jibunTenbou(Tenbou t, List<KijiYosouJin> yosou) {
     k,
     no,
     w,
+    chokuzen: t.chokuzen,
     category: '${k.ekiden ? '駅伝' : '駅伝予選'}・展望・$mm',
     midashi: midashi,
     lead: lead.toString(),
@@ -1727,7 +2073,7 @@ Kiji? _jibunTenbou(Tenbou t, List<KijiYosouJin> yosou) {
 Kiji _tsuukaTenbou(Tenbou t, List<KijiYosouJin> yosou) {
   final KijiKankyou k = t.k;
   const int no = 1;
-  final KijiKakite w = KijiKakite(k, kijiTane(k.gh, k.race, no + 10));
+  final KijiKakite w = KijiKakite(k, kijiTane(k.gh, k.race, _taneNo(t, no)));
   final int race = k.race;
   final int ts = race == 3 ? 7 : 10;
   final int honsen = race == 3 ? 1 : 2;
@@ -1793,7 +2139,7 @@ Kiji _tsuukaTenbou(Tenbou t, List<KijiYosouJin> yosou) {
 
   // リード
   final StringBuffer lead = StringBuffer();
-  lead.write(_gouhou(k, w));
+  lead.write(_gouhou(k, w, t.chokuzen));
   lead.write('上位$ts校に$honsenMeiの出場権が与えられる。');
   if (honsenMikaisai) {
     lead.write('$honsenMeiは今回が初めての開催で、どの大学も初出場を懸けて走る。');
@@ -1879,6 +2225,7 @@ Kiji _tsuukaTenbou(Tenbou t, List<KijiYosouJin> yosou) {
     k,
     no,
     w,
+    chokuzen: t.chokuzen,
     category: '駅伝予選・展望',
     midashi: midashi,
     lead: lead.toString(),
@@ -1894,7 +2241,7 @@ Kiji _tsuukaTenbou(Tenbou t, List<KijiYosouJin> yosou) {
 Kiji? _chuumokuTenbou(Tenbou t, List<KijiYosouJin> yosou) {
   final KijiKankyou k = t.k;
   const int no = 2;
-  final KijiKakite w = KijiKakite(k, kijiTane(k.gh, k.race, no + 10));
+  final KijiKakite w = KijiKakite(k, kijiTane(k.gh, k.race, _taneNo(t, no)));
   final int race = k.race;
   final int ks = t.ks;
   if (t.kukanJun.isEmpty || t.kukanJun[0].isEmpty) return null;
@@ -1960,6 +2307,7 @@ Kiji? _chuumokuTenbou(Tenbou t, List<KijiYosouJin> yosou) {
       k,
       no,
       w,
+      chokuzen: t.chokuzen,
       category: '駅伝予選・展望',
       midashi: midashi,
       lead: lead.toString(),
@@ -2031,6 +2379,7 @@ Kiji? _chuumokuTenbou(Tenbou t, List<KijiYosouJin> yosou) {
     k,
     no,
     w,
+    chokuzen: t.chokuzen,
     category: '駅伝予選・展望',
     midashi: midashi,
     lead: lead.toString(),

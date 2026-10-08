@@ -18,6 +18,7 @@ import 'package:ekiden/kansuu/mokuhyou_kingin.dart'; // 目標達成時の金銀
 import 'package:ekiden/screens/ai_copy_matome.dart'; // 生成AIに渡すテキスト(1.8.3)
 import 'package:ekiden/kansuu/ikku_pace.dart'; // 1区の集団のペース(1.9.2)
 import 'package:ekiden/screens/ikku_pace_box.dart'; // 1区のペース予想の枠(1.9.2)
+import 'package:ekiden/screens/kiji_screen.dart'; // スタート直前号(1.9.2)
 
 class Mode0280Content extends StatefulWidget {
   final Ghensuu ghensuu;
@@ -427,6 +428,21 @@ class _Mode0280Content extends State<Mode0280Content> {
                     // 生成AIに渡すテキストのまとめボタン(目標順位の相談用。1.8.3。
                     // 当日変更のあとの画面なので、全大学の区間配置が分かるものも出してよい)
                     const AiCopyMatomeButton(mokuhyouGamen: true),
+                    // スタート直前号(箱庭スポーツ。当日変更のあとの、実際に走る選手での展望。
+                    // 駅伝の1区のスタート前だけ。1.9.2)
+                    if (widget.ghensuu.nowracecalckukan == 0 &&
+                        ikkuPaceTaishou(raceIdx))
+                      TextButton(
+                        onPressed: () => kijiChokuzenHiraku(context),
+                        child: const Text(
+                          "📰 スタート直前号(箱庭スポーツ)",
+                          style: TextStyle(
+                            color: Color.fromARGB(255, 0, 255, 0),
+                            decoration: TextDecoration.underline,
+                            decorationColor: HENSUU.textcolor,
+                          ),
+                        ),
+                      ),
                     // 1区の集団のペースの予想(当日変更のあとなので、実際に走る選手で予想する。
                     // 他大学の1区の当日変更も添える。1.9.2)
                     if (widget.ghensuu.nowracecalckukan == 0 &&

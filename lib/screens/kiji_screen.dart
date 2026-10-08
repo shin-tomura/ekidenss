@@ -31,7 +31,22 @@ void kijiTenbouHiraku(BuildContext context, List<KijiYosouJin> yosou) {
   _hiraku(context, kijiTenbouIchiran(yosou), kekka: false);
 }
 
-void _hiraku(BuildContext context, List<Kiji> list, {required bool kekka}) {
+/// スタート直前号の一覧を開く(目標順位の確認の画面から。1.9.2)
+void kijiChokuzenHiraku(BuildContext context) {
+  _hiraku(
+    context,
+    kijiChokuzenIchiran(),
+    kekka: false,
+    sub: '駅伝ニュース・スタート直前号',
+  );
+}
+
+void _hiraku(
+  BuildContext context,
+  List<Kiji> list, {
+  required bool kekka,
+  String? sub,
+}) {
   showGeneralDialog(
     context: context,
     barrierColor: Colors.black.withOpacity(0.8),
@@ -39,7 +54,7 @@ void _hiraku(BuildContext context, List<Kiji> list, {required bool kekka}) {
     barrierLabel: kijiSiteMei,
     transitionDuration: const Duration(milliseconds: 300),
     pageBuilder: (context, animation, secondaryAnimation) {
-      return KijiIchiranGamen(list: list, kekka: kekka);
+      return KijiIchiranGamen(list: list, kekka: kekka, sub: sub);
     },
     transitionBuilder: (context, animation, secondaryAnimation, child) {
       return FadeTransition(
@@ -153,7 +168,15 @@ class KijiIchiranGamen extends StatelessWidget {
   /// 結果の記事か(false なら展望の記事)
   final bool kekka;
 
-  const KijiIchiranGamen({super.key, required this.list, required this.kekka});
+  /// サイト名の横に出す文(なければ「駅伝ニュース」「駅伝ニュース・展望」)
+  final String? sub;
+
+  const KijiIchiranGamen({
+    super.key,
+    required this.list,
+    required this.kekka,
+    this.sub,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -180,7 +203,9 @@ class KijiIchiranGamen extends StatelessWidget {
           : ListView(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
               children: [
-                _SiteMei(sub: kekka ? '駅伝ニュース' : '駅伝ニュース・展望'),
+                _SiteMei(
+                  sub: sub ?? (kekka ? '駅伝ニュース' : '駅伝ニュース・展望'),
+                ),
                 const SizedBox(height: 12),
                 const Divider(color: _sen, height: 1),
                 const SizedBox(height: 16),

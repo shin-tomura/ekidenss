@@ -12,6 +12,8 @@ export 'package:ekiden/kansuu/kiji/kiji_tenbou.dart' show KijiYosouJin;
 // ニュース記事(箱庭スポーツ)の入口(1.9.2)
 // ・結果の記事: 結果画面(駅伝・予選)の「ニュース記事」から開く
 // ・展望の記事: 直前順位予想の画面の「展望記事」から開く
+// ・スタート直前号: 目標順位の確認の画面の「スタート直前号」から開く(駅伝の1区のスタート前。
+//   当日変更のあとの、実際に走る選手で書く)
 // 記事は開くたびに今のデータから作る(保存はしない。年・大会で決まる乱数を使うので、
 // 同じ場面なら何度開いても同じ記事になる)
 // 記事づくりで思わぬデータに当たっても画面が止まらないよう、失敗したら記事なしにする
@@ -41,6 +43,20 @@ List<Kiji> kijiTenbouIchiran(List<KijiYosouJin> yosou) {
     return list;
   } catch (e, st) {
     debugPrint('[ニュース記事] 展望の記事を作れませんでした: $e\n$st');
+    return [];
+  }
+}
+
+/// 表示中の大会のスタート直前号(当日変更のあと。駅伝だけ)
+List<Kiji> kijiChokuzenIchiran() {
+  try {
+    final KijiKankyou? k = KijiKankyou.yomu();
+    if (k == null || !k.ekiden) return [];
+    final List<Kiji> list = tenbouKiji(k, const [], chokuzen: true);
+    _log(list);
+    return list;
+  } catch (e, st) {
+    debugPrint('[ニュース記事] スタート直前号を作れませんでした: $e\n$st');
     return [];
   }
 }

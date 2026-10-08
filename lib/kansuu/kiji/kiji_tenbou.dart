@@ -29,7 +29,7 @@ import 'package:ekiden/kansuu/kiji/kiji_comment.dart';
 //
 // 記事(出せるものだけ並べる)
 //  駅伝: 1.優勝争い 2.自分の大学 3.区間の見どころ(1区のペース予想も)
-//        4.シード権争い(11月駅伝は上位8校、正月駅伝は上位10校) 5.当日変更の読み(主力が補欠の大学)
+//        4.シード権争い(11月駅伝は上位8校、正月駅伝は上位10校) 5.当日変更の読み(全体の持ちタイム上位の選手が補欠のとき)
 //  予選: 1.通過争い 2.注目選手(組ごと・個人) 3.自分の大学
 // ------------------------------------------------------------
 
@@ -1293,51 +1293,119 @@ Kiji? _seedTenbou(Tenbou t, List<KijiYosouJin> yosou) {
 }
 
 // ------------------------------------------------------------
-// 駅伝 3. 当日変更の読み(主力が補欠に回った大学。自分の大学は除く)
+// 駅伝 当日変更の読み(1.9.2で、全体の持ちタイム上位の選手が補欠のときだけにした)
+// ・一次エントリーに入っている全大学の選手(補欠を含む)の中で、1万mかハーフの持ちタイム
+//   (実際の記録。換算はしない)が全体10番手以内の選手が補欠に入っていたら取り上げる
+//   (自分の大学は除く。自分の大学の記事で書く)。該当がいなければ記事を出さない
+// ・1〜2人なら1人ずつ言い回しを変えて書き、3人以上なら1段落にまとめて表に任せる
 // ------------------------------------------------------------
+
+/// 全体の持ちタイム上位で補欠に入った選手
+class _HoketsuJitsuryokusha {
+  final TenbouUniv x;
+  final SenshuData s;
+
+  /// 1万mの全体の順位(0が1位。記録がなければnull)
+  final int? juniIchiman;
+
+  /// ハーフの全体の順位(0が1位。記録がなければnull)
+  final int? juniHalf;
+
+  const _HoketsuJitsuryokusha(this.x, this.s, this.juniIchiman, this.juniHalf);
+
+  /// よいほうの順位
+  int get yoiJuni {
+    final int a = juniIchiman ?? 9999;
+    final int b = juniHalf ?? 9999;
+    return a <= b ? a : b;
+  }
+
+  /// よいほうの種目(1=1万m・2=ハーフ)
+  int get yoiShumoku =>
+      (juniIchiman ?? 9999) <= (juniHalf ?? 9999) ? 1 : 2;
+}
+
+/// 全体の持ちタイム上位として取り上げる順位(この順位より上。10なら10番手以内)
+const int _hoketsuJougenJuni = 10;
+
+/// 大学の前評判の言い方(「優勝候補筆頭の」「シード権を争う」など)
+String _zenpyouMoji(Tenbou t, TenbouUniv x) {
+  final int race = t.k.race;
+  final int? seed = race == 1 ? 8 : (race == 2 ? 10 : null);
+  if (x.juni == 0) return '優勝候補筆頭の';
+  if (x.juni <= 2) return '上位をうかがう';
+  if (seed != null && x.juni >= seed - 2 && x.juni <= seed + 1) {
+    return 'シード権を争う';
+  }
+  return '前評判${x.juni + 1}番手の';
+}
 
 Kiji? _toujitsuTenbou(Tenbou t) {
   final KijiKankyou k = t.k;
   const int no = 3;
-  // 大学ごとの、区間の距離に合わせた持ちタイムでチーム内上位3人に入っているのに補欠の選手
-  final List<({TenbouUniv x, SenshuData s, int naiJuni})> hoketsu = [];
+  // 出場全選手(一次エントリー。補欠を含む)の、1万mとハーフの持ちタイムの順
+  final List<SenshuData> zenin = [
+    for (final TenbouUniv x in t.jun) ...x.ichiji,
+  ];
+  List<SenshuData> jun(int idx) => [
+    for (final SenshuData s in zenin)
+      if (k.jikoBest(s, idx) < TEISUU.DEFAULTTIME) s,
+  ]..sort((a, b) => k.jikoBest(a, idx).compareTo(k.jikoBest(b, idx)));
+  final List<SenshuData> junIchiman = jun(1);
+  final List<SenshuData> junHalf = jun(2);
+  int? juniDe(List<SenshuData> l, SenshuData s) {
+    final int i = l.indexWhere((d) => d.id == s.id);
+    return i < 0 ? null : i;
+  }
+
+  // 全体10番手以内で補欠の選手(自分の大学は除く)
+  final List<_HoketsuJitsuryokusha> hoketsu = [];
   for (final TenbouUniv x in t.jun) {
     if (x.u.id == k.gh.MYunivid) continue;
-    final List<SenshuData> jun = List<SenshuData>.of(x.ichiji)
-      ..sort((a, b) {
-        final double ta = t.sougou(a) ?? TEISUU.DEFAULTTIME;
-        final double tb = t.sougou(b) ?? TEISUU.DEFAULTTIME;
-        return ta.compareTo(tb);
-      });
-    for (int i = 0; i < jun.length && i < 3; i++) {
-      if (k.entry(jun[i]) == -1 && t.sougou(jun[i]) != null) {
-        hoketsu.add((x: x, s: jun[i], naiJuni: i));
-      }
+    for (final SenshuData s in x.ichiji) {
+      if (k.entry(s) != -1) continue;
+      final _HoketsuJitsuryokusha h = _HoketsuJitsuryokusha(
+        x,
+        s,
+        juniDe(junIchiman, s),
+        juniDe(junHalf, s),
+      );
+      if (h.yoiJuni < _hoketsuJougenJuni) hoketsu.add(h);
     }
   }
   if (hoketsu.isEmpty) return null;
-  final KijiKakite w = KijiKakite(k, kijiTane(k.gh, k.race, no + 10));
-  final Set<int> daigaku = {for (final h in hoketsu) h.x.u.id};
-  // 一番目立つのは、前評判の高い大学の、チーム内で一番速い選手
   hoketsu.sort((a, b) {
-    final int c = a.x.juni.compareTo(b.x.juni);
-    return c != 0 ? c : a.naiJuni.compareTo(b.naiJuni);
+    final int c = a.yoiJuni.compareTo(b.yoiJuni);
+    return c != 0 ? c : a.x.juni.compareTo(b.x.juni);
   });
-  final h0 = hoketsu.first;
+  final KijiKakite w = KijiKakite(k, kijiTane(k.gh, k.race, no + 10));
+  final int kazu = hoketsu.length;
+  final _HoketsuJitsuryokusha h0 = hoketsu.first;
 
+  // 「1万m全体3位」の言い方と、持ちタイムを添えた言い方
+  String juniMei(_HoketsuJitsuryokusha h) =>
+      '${kijiShumokuMei[h.yoiShumoku]}全体${h.yoiJuni + 1}位';
+  String mochiTsuki(_HoketsuJitsuryokusha h) =>
+      '${juniMei(h)}の持ちタイム(${jikanMoji(k.jikoBest(h.s, h.yoiShumoku))})';
+
+  // 見出し
   String midashi;
-  if (daigaku.length >= 3) {
-    midashi = '${daigaku.length}校が主力を補欠に　当日変更の駆け引き';
-  } else {
+  if (kazu == 1) {
     midashi = w.erabu([
-      '${h0.x.mei}、${h0.naiJuni == 0 ? 'エース' : '主力'}${myouji(h0.s.name)}を補欠に',
-      '${h0.x.mei}の${myouji(h0.s.name)}が補欠　当日変更に注目',
+      '${h0.x.mei}、${myouji(h0.s.name)}を補欠に　${juniMei(h0)}',
+      '${juniMei(h0)}の${myouji(h0.s.name)}(${h0.x.mei})が補欠',
     ]);
+  } else if (kazu == 2) {
+    midashi = '持ちタイム上位の2人が補欠に　当日変更に注目';
+  } else {
+    midashi = '$kazu人の実力者が補欠に　当日変更の駆け引き';
   }
+
+  // リード
   final StringBuffer lead = StringBuffer();
   lead.write(
-    '${k.taikaiMei}の区間エントリーで、${daigaku.length == 1 ? h0.x.mei : '${daigaku.length}校'}が'
-    '持ちタイムでチーム上位の選手を補欠に回した。',
+    '${k.taikaiMei}の区間エントリーで、出場全選手の中で1万mかハーフの持ちタイムが'
+    '$_hoketsuJougenJuni番手以内の選手${kazu == 1 ? 'が' : 'のうち$kazu人が'}補欠に回った。',
   );
   lead.write(
     w.erabu([
@@ -1347,34 +1415,56 @@ Kiji? _toujitsuTenbou(Tenbou t) {
   );
   lead.write('当日変更を前提にした、いわゆる戦略的エントリーとの見方もある。');
 
-  for (final TenbouUniv x in t.jun) {
-    if (!daigaku.contains(x.u.id)) continue;
-    final List<String> hito = [
-      for (final h in hoketsu)
-        if (h.x.u.id == x.u.id)
-          '${h.naiJuni == 0 ? 'エース' : 'チーム${h.naiJuni + 1}番手'}の'
-              '${w.senshu(h.s)}'
-              '${t.mochiMoji(h.s, t.heikinShumoku).isEmpty ? '' : '(${t.mochiMoji(h.s, t.heikinShumoku)})'}',
+  // 本文
+  if (kazu <= 2) {
+    for (int i = 0; i < kazu; i++) {
+      final _HoketsuJitsuryokusha h = hoketsu[i];
+      final String yobi = w.senshu(h.s);
+      if (i == 0) {
+        w.danraku(
+          '${_zenpyouMoji(t, h.x)}${h.x.mei}は、${mochiTsuki(h)}を持つ$yobiを補欠に置いた。'
+          '${w.erabu(['どの区間に入るかで、レースの流れが変わりそうだ。', '起用される区間が、勝負の分かれ目になりそうだ。'])}',
+        );
+      } else {
+        w.danraku(
+          '${_zenpyouMoji(t, h.x)}${h.x.mei}の$yobiも、${mochiTsuki(h)}を持ちながら補欠に入った。'
+          '${w.erabu(['当日の起用があれば、一気に流れを変えうる存在だ。', 'こちらも当日変更での起用があるか注目される。'])}',
+        );
+      }
+    }
+  } else {
+    final List<String> narabi = [
+      for (final _HoketsuJitsuryokusha h in hoketsu)
+        '${h.x.mei}の${w.senshu(h.s)}(${juniMei(h)})',
     ];
     w.danraku(
-      '前評判${x.juni + 1}番手の${x.mei}は、${hito.join('、')}が補欠に入った。'
-      '${w.erabu(['どの区間に入るかで、レースの流れが変わりそうだ。', '当日の起用があれば、一気に上位をうかがう。', '起用される区間が、勝負の分かれ目になりそうだ。'])}',
+      '補欠に入ったのは、${narabi.join('、')}。'
+      '${w.erabu(['各校の当日変更の一手が、レースの流れを大きく左右しそうだ。', 'どの大学が、どの区間で切り札を切るのか。駆け引きは当日の朝まで続く。'])}',
     );
   }
   w.danraku('当日変更は、レース当日の朝に発表される。');
 
+  // 表
+  String timeMoji(SenshuData s, int idx) {
+    final double v = k.jikoBest(s, idx);
+    return v >= TEISUU.DEFAULTTIME ? '-' : jikanMoji(v);
+  }
+
+  String juniMoji2(_HoketsuJitsuryokusha h) => [
+    if (h.juniIchiman != null && h.juniIchiman! < _hoketsuJougenJuni)
+      '1万m${h.juniIchiman! + 1}位',
+    if (h.juniHalf != null && h.juniHalf! < _hoketsuJougenJuni)
+      'ハーフ${h.juniHalf! + 1}位',
+  ].join('・');
+
   final List<List<String>> gyou = [
-    for (final h in hoketsu)
+    for (final _HoketsuJitsuryokusha h in hoketsu)
       [
         h.x.mei,
         '${fullMei(h.s.name)}(${h.s.gakunen})',
-        t.mochiMoji(h.s, t.heikinShumoku).isEmpty
-            ? '-'
-            : t.mochiMoji(h.s, t.heikinShumoku).replaceFirst(
-                kijiShumokuMei[t.heikinShumoku],
-                '',
-              ),
-        '${h.naiJuni + 1}番手',
+        timeMoji(h.s, 1),
+        timeMoji(h.s, 2),
+        juniMoji2(h),
       ],
   ];
   return _kansei(
@@ -1386,8 +1476,8 @@ Kiji? _toujitsuTenbou(Tenbou t) {
     lead: lead.toString(),
     hyou: [
       KijiHyou(
-        '補欠に入った主力',
-        ['大学', '選手', kijiShumokuMei[t.heikinShumoku], 'チーム内'],
+        '補欠に入った持ちタイム上位の選手',
+        ['大学', '選手', '1万m', 'ハーフ', '全体順位'],
         gyou,
       ),
     ],

@@ -624,6 +624,15 @@ Kiji _topKiji(EkidenKekka e) {
   );
 }
 
+/// 区間[kk]の従来の学内区間記録(秒。エントリーの時点で控えたもの。なければnull)
+int? _juraiGakunaiKukan(KijiKankyou k, int kk) {
+  final int i = kk + 10;
+  if (kk < 0 || kk >= 10 || k.kantoku.yobiint4.length <= i) return null;
+  final int t = k.kantoku.yobiint4[i];
+  if (t <= 0 || t >= 360000) return null;
+  return t;
+}
+
 /// 区間[kk]の従来の区間記録(秒。エントリーの時点で控えたもの。なければnull)
 int? _juraiKukan(KijiKankyou k, int kk) {
   if (kk < 0 || kk >= 10 || k.kantoku.yobiint4.length <= kk) return null;
@@ -842,7 +851,10 @@ Kiji? _jibunKiji(EkidenKekka e) {
   final List<String> gakunaiShin = [];
   for (int kk = 0; kk < ks; kk++) {
     final SenshuData? s = m.senshu[kk];
-    if (s != null && s.chokuzentaikai_univkukansinflag == 1) {
+    // 従来の学内区間記録がない(その区間を初めて走った)ときは、新記録と書かない(1.9.2)
+    if (s != null &&
+        s.chokuzentaikai_univkukansinflag == 1 &&
+        _juraiGakunaiKukan(k, kk) != null) {
       gakunaiShin.add('${kk + 1}区の${w.senshu(s)}');
     }
   }

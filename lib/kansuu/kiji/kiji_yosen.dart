@@ -169,6 +169,14 @@ class YosenKekka {
   /// 次点の記事を立てる差の上限(秒。1人あたり11月駅伝予選は3秒、正月駅伝予選は5秒)
   int get jitenSaJougen => keisanNinzuu * (k.race == 3 ? 3 : 5);
 
+  /// 新記録と書いてよいか(予選は従来の記録を控えていないので、初めての開催では、
+  /// 全員が「記録なし」より速く新記録の印が付く。そのときは新記録と書かない。1.9.2)
+  bool get shinkirokuKa => !hatsuKaisaiKekka(k, k.race);
+
+  /// 選手が新記録(11月駅伝予選は組の新記録、正月駅伝予選は大会新記録)を出したか
+  bool shinkiroku(SenshuData s) =>
+      shinkirokuKa && s.chokuzentaikai_zentaikukansinflag == 1;
+
   /// 次点の記事を立てるか
   bool get jitenKijiAri {
     final int? sa = borderSaByou;
@@ -1041,7 +1049,7 @@ Kiji? _yosenKojinKiji(YosenKekka e) {
       final double? niTime = e.kumiTime(kk, 1);
       if (t == null || niTime == null) continue;
       final int sa = saByou(niTime, t.time);
-      final int ten = (t.s.chokuzentaikai_zentaikukansinflag == 1 ? 1000 : 0) + sa;
+      final int ten = (e.shinkiroku(t.s) ? 1000 : 0) + sa;
       if (ten > mvpTen) {
         mvpTen = ten;
         mvp = t;
@@ -1050,7 +1058,7 @@ Kiji? _yosenKojinKiji(YosenKekka e) {
     if (mvp == null) return null;
     final double mvpNi = e.kumiTime(mvp.kumi, 1) ?? mvp.time;
     final int mvpSa = saByou(mvpNi, mvp.time);
-    final bool mvpShin = mvp.s.chokuzentaikai_zentaikukansinflag == 1;
+    final bool mvpShin = e.shinkiroku(mvp.s);
     final String um = e.univMei(mvp.s.univid);
     final String midashi = mvpShin
         ? '${myouji(mvp.s.name)}($um)が${e.kumiMei(mvp.kumi)}で組の新記録'
@@ -1085,7 +1093,7 @@ Kiji? _yosenKojinKiji(YosenKekka e) {
       final int sa = niTime == null ? 0 : saByou(niTime, t.time);
       w.danraku(
         '${e.kumiMei(kk)}は${w.senshu(t.s, daigaku: true)}が${jikanMoji(t.time)}でトップ'
-        '${t.s.chokuzentaikai_zentaikukansinflag == 1 ? '(組の新記録)' : ''}。'
+        '${e.shinkiroku(t.s) ? '(組の新記録)' : ''}。'
         '${sa <= 1 ? '2位とはわずか${saMoji(sa)}差だった。' : '2位に${saMoji(sa)}差をつけた。'}',
       );
     }
@@ -1120,7 +1128,7 @@ Kiji? _yosenKojinKiji(YosenKekka e) {
   // 正月駅伝予選: 個人トップと日本人トップ
   final YosenSenshuKekka t = e.kojin[0];
   final int sa = saByou(e.kojin[1].time, t.time);
-  final bool shin = t.s.chokuzentaikai_zentaikukansinflag == 1;
+  final bool shin = e.shinkiroku(t.s);
   YosenSenshuKekka? nihon;
   if (t.s.hirou == 1) {
     for (final YosenSenshuKekka y in e.kojin) {

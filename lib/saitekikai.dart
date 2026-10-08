@@ -154,26 +154,34 @@ class _ModalComputerTeamProbState extends State<ModalComputerTeamProb> {
                                   activeColor: Colors.purple, // 色を変更
                                   inactiveColor: Colors.grey.withOpacity(0.5),
                                 ),
+                                // 左端・右端の説明(1.9.2で0%の説明を実際の動きに合わせて直した。
+                                // 文字を大きくしていても横にはみ出さないよう、左右に半分ずつの幅を
+                                // 割り当てて、入りきらなければ折り返す)
                                 Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(
-                                      '0% (ランダム配置)', // 左端: 0%
-                                      style: TextStyle(
-                                        color: HENSUU.textcolor.withOpacity(
-                                          0.7,
+                                    Expanded(
+                                      child: Text(
+                                        '0% (区間配置の方針どおり)', // 左端: 0%
+                                        style: TextStyle(
+                                          color: HENSUU.textcolor.withOpacity(
+                                            0.7,
+                                          ),
+                                          fontSize: 12,
                                         ),
-                                        fontSize: 12,
                                       ),
                                     ),
-                                    Text(
-                                      '100% (最適解配置)', // 右端: 100%
-                                      style: TextStyle(
-                                        color: HENSUU.textcolor.withOpacity(
-                                          0.7,
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        '100% (最適解配置)', // 右端: 100%
+                                        textAlign: TextAlign.right,
+                                        style: TextStyle(
+                                          color: HENSUU.textcolor.withOpacity(
+                                            0.7,
+                                          ),
+                                          fontSize: 12,
                                         ),
-                                        fontSize: 12,
                                       ),
                                     ),
                                   ],

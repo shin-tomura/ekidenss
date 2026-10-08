@@ -65,6 +65,7 @@ import 'package:ekiden/screens/9003FreshHoushutu.dart';
 //import 'package:ekiden/save_load_screen.dart';
 import 'package:ekiden/kansuu/ChartPanelSenshu.dart';
 import 'package:ekiden/kansuu/ChartPanelUniv.dart';
+import 'package:ekiden/kansuu/seichou_type.dart'; // 新入生の成長タイプの割合の移行処理(1.9.3)
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 // ★ここに buildAppTheme() 関数を記述する★
@@ -1002,13 +1003,30 @@ Future<void> main() async {
       }
     }
 
+    {
+      //バージョンアップに伴い付け足す処理を書く
+      //1.9.3で新入生の成長タイプの割合の初期値を変えた(1年で伸びきる型を減らした。seichou_type.dart)ので、
+      //今までのセーブデータも一度だけ新しい初期値にする(1.9.2までは設定がなく、みな以前の割合だったため。
+      //そのあと設定タブの「成長タイプ設定」で以前の割合にも戻せる)。在学中の選手の型は変えない
+      //save_load_screenの中の _importFromSlot の中にもあるので、そちらも変更すること！
+      final checkversionValue = int.tryParse(sortedUnivData[7].name_tanshuku);
+      if (checkversionValue == null ||
+          checkversionValue < 21930 ||
+          checkversionValue > 999999999) {
+        final Ghensuu? gh = ghensuuBox.getAt(0);
+        if (gh != null) {
+          await seichouTypeWariaiHozon(gh, seichouTypeShokiti);
+        }
+      }
+    }
+
     //1.4.3からバージョン番号保存することにした(この処理は一連の処理の中で1番最後にすること)
     //save_load_screenの中の _importFromSlot の中にもあるので、そちらも変更すること！
     final versionValue = int.tryParse(sortedUnivData[7].name_tanshuku);
     if (versionValue == null ||
-        versionValue < 21920 ||
+        versionValue < 21930 ||
         versionValue > 999999999) {
-      sortedUnivData[7].name_tanshuku = "21920"; //バージョン番号
+      sortedUnivData[7].name_tanshuku = "21930"; //バージョン番号
       await sortedUnivData[7].save();
     }
 

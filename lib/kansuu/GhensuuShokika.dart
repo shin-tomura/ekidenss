@@ -3,6 +3,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ekiden/ghensuu.dart';
 import 'package:ekiden/kiroku.dart';
 import 'package:ekiden/kansuu/rekidai_kiroku.dart'; // 歴代10位までの記録(1.8.8)
+import 'package:ekiden/kansuu/seichou_type.dart'; // 新入生の成長タイプの割合(1.9.3)
 
 Future<void> GhensuuShokika(Box<Ghensuu> ghensuuBox) async {
   //ここでKirokuも初期化しちゃう
@@ -208,61 +209,53 @@ Future<void> GhensuuShokika(Box<Ghensuu> ghensuuBox) async {
   ghensuu.kyoriwariaikudari_taikai_kukangoto[4][0] = 0.0;
   ghensuu.noborikudarikirikaekaisuu_taikai_kukangoto[4][0] = 0;
 
-  ghensuu.seichouryoku_type_sentakuritu[0] = 1;
   ghensuu.seichouryoku_type_gakunen[0][0] = 100;
   ghensuu.seichouryoku_type_gakunen[0][1] = 100;
   ghensuu.seichouryoku_type_gakunen[0][2] = 100;
   ghensuu.seichouryoku_type_gakunen[0][3] = 100;
-  ghensuu.seichouryoku_type_sentakuritu[1] = 75;
   ghensuu.seichouryoku_type_gakunen[1][0] = 310;
   ghensuu.seichouryoku_type_gakunen[1][1] = 30;
   ghensuu.seichouryoku_type_gakunen[1][2] = 30;
   ghensuu.seichouryoku_type_gakunen[1][3] = 30;
-  ghensuu.seichouryoku_type_sentakuritu[2] = 7;
   ghensuu.seichouryoku_type_gakunen[2][0] = 30;
   ghensuu.seichouryoku_type_gakunen[2][1] = 310;
   ghensuu.seichouryoku_type_gakunen[2][2] = 30;
   ghensuu.seichouryoku_type_gakunen[2][3] = 30;
-  ghensuu.seichouryoku_type_sentakuritu[3] = 1;
   ghensuu.seichouryoku_type_gakunen[3][0] = 30;
   ghensuu.seichouryoku_type_gakunen[3][1] = 30;
   ghensuu.seichouryoku_type_gakunen[3][2] = 310;
   ghensuu.seichouryoku_type_gakunen[3][3] = 30;
-  ghensuu.seichouryoku_type_sentakuritu[4] = 1;
   ghensuu.seichouryoku_type_gakunen[4][0] = 30;
   ghensuu.seichouryoku_type_gakunen[4][1] = 30;
   ghensuu.seichouryoku_type_gakunen[4][2] = 30;
   ghensuu.seichouryoku_type_gakunen[4][3] = 310;
-  ghensuu.seichouryoku_type_sentakuritu[5] = 10;
   ghensuu.seichouryoku_type_gakunen[5][0] = 170;
   ghensuu.seichouryoku_type_gakunen[5][1] = 170;
   ghensuu.seichouryoku_type_gakunen[5][2] = 30;
   ghensuu.seichouryoku_type_gakunen[5][3] = 30;
-  ghensuu.seichouryoku_type_sentakuritu[6] = 1;
   ghensuu.seichouryoku_type_gakunen[6][0] = 30;
   ghensuu.seichouryoku_type_gakunen[6][1] = 170;
   ghensuu.seichouryoku_type_gakunen[6][2] = 170;
   ghensuu.seichouryoku_type_gakunen[6][3] = 30;
-  ghensuu.seichouryoku_type_sentakuritu[7] = 1;
   ghensuu.seichouryoku_type_gakunen[7][0] = 30;
   ghensuu.seichouryoku_type_gakunen[7][1] = 30;
   ghensuu.seichouryoku_type_gakunen[7][2] = 170;
   ghensuu.seichouryoku_type_gakunen[7][3] = 170;
-  ghensuu.seichouryoku_type_sentakuritu[8] = 1;
   ghensuu.seichouryoku_type_gakunen[8][0] = 170;
   ghensuu.seichouryoku_type_gakunen[8][1] = 30;
   ghensuu.seichouryoku_type_gakunen[8][2] = 170;
   ghensuu.seichouryoku_type_gakunen[8][3] = 30;
-  ghensuu.seichouryoku_type_sentakuritu[9] = 1;
   ghensuu.seichouryoku_type_gakunen[9][0] = 170;
   ghensuu.seichouryoku_type_gakunen[9][1] = 30;
   ghensuu.seichouryoku_type_gakunen[9][2] = 30;
   ghensuu.seichouryoku_type_gakunen[9][3] = 170;
-  ghensuu.seichouryoku_type_sentakuritu[10] = 1;
   ghensuu.seichouryoku_type_gakunen[10][0] = 30;
   ghensuu.seichouryoku_type_gakunen[10][1] = 170;
   ghensuu.seichouryoku_type_gakunen[10][2] = 30;
   ghensuu.seichouryoku_type_gakunen[10][3] = 170;
+  // 新入生の成長タイプの割合(1.9.3から初期値を変えた。1年で伸びきる型を減らした。中身は seichou_type.dart)
+  // (1.9.2までは 0:1・1:75・2:7・3:1・4:1・5:10・6:1・7:1・8:1・9:1・10:1 だった)
+  seichouTypeWariaiIreru(ghensuu, seichouTypeShokiti);
   for (int i = 0; i < TEISUU.SUU_MAXRACESUU_1YEAR; i++) {
     for (int ii = 0; ii < TEISUU.SUU_BESTKIROKUHOZONJUNISUU; ii++) {
       ghensuu.time_zentaitaikaikiroku[i][ii] = TEISUU.DEFAULTTIME;

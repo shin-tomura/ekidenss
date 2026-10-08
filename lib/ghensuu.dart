@@ -65,6 +65,7 @@ class Ghensuu extends HiveObject {
     TEISUU.SEICHOUTYPESUU,
     (_) => List.filled(TEISUU.GAKUNENSUU, 0),
   );
+  // 新入生の成長タイプの割合(合計100)。1.9.3から設定タブの「成長タイプ設定」で変えられる(kansuu/seichou_type.dart)
   @HiveField(27)
   List<int> seichouryoku_type_sentakuritu = List.filled(
     TEISUU.SEICHOUTYPESUU,

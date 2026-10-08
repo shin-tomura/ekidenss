@@ -10,6 +10,7 @@ import 'package:ekiden/kansuu/mokuhyou_hosei.dart';
 import 'package:ekiden/kansuu/custom_seigen.dart'; // カスタム駅伝の出場制限(1.9.1)
 import 'package:ekiden/kansuu/gin_tokkun_menu.dart'; // 銀特訓の形の切り替え(1.9.1)
 import 'package:ekiden/kansuu/ikku_pace.dart'; // 集団走設定(1.9.2)
+import 'package:ekiden/kansuu/seichou_type.dart'; // 成長タイプ設定(1.9.3)
 
 // ------------------------------------------------------------
 // ゲームの仕様の文(1.8.3で生成AI向けに作り、1.8.4から説明書と共通にした)
@@ -448,6 +449,7 @@ ShiyouSetsu shiyouIkusei({bool setsumeisho = false}) {
     '・入学時の5000mの記録が良い選手ほど、基本走力が最終的に高くなりやすい傾向があります。',
     // 限界突破(Ikusei_Com.dart)。急に伸びた選手を説明できるように書く。回数や大きさの数字は書かない(1.8.8)
     '・伸び悩んでいるように見える選手も、限界突破で再び伸びることがあります。',
+    ..._seichouTypeGyou(setsumeisho),
   ];
   // 年間強化練習(効果が0のときは、効果がないことを書く)
   if (_kyoukaKyoudo(kantoku) == 0) {
@@ -520,11 +522,35 @@ ShiyouSetsu shiyouIkusei({bool setsumeisho = false}) {
       // 難易度ごとの割合(1.9.1。kingin_wariai.dart)
       '　・「金銀支給量設定」では、難易度ごとに支給量の割合(10%〜500%)も変えられます。',
       '・年間強化練習の効果の大きさは、設定タブの「年間強化練習効果設定」で変えられます。',
+      // 成長タイプ設定(1.9.3。seichou_type.dart)
+      '・新入生の成長タイプの割合は、設定タブの「成長タイプ設定」で変えられます。',
       '・コンピュータの大学の金銀の使い方は、大学画面の「コンピュータ金銀使用」で設定できます。',
       '　・大学ごとの支給レベルと銀の使い道は、大学画面の「大学の個性」でも変えられます。',
     ]);
   }
   return ShiyouSetsu('育成(年間強化練習と金銀)', gyou);
+}
+
+/// 成長タイプの行(1.9.3で割合の設定を作ったので書く。seichou_type.dart)
+/// 倍率や割合の数字は書かない。新入生の成長タイプが1つだけになる設定のときは、そのことを書く
+List<String> _seichouTypeGyou(bool setsumeisho) {
+  final Ghensuu? gh = Hive.box<Ghensuu>('ghensuuBox').getAt(0);
+  final List<int> wariai = gh == null
+      ? seichouTypeShokiti
+      : seichouTypeWariai(gh);
+  final List<int> aruType = [
+    for (int t = 0; t < wariai.length; t++)
+      if (wariai[t] > 0) t,
+  ];
+  return [
+    '・選手には成長タイプがあり、基本走力が大きく伸びる学年が、選手ごとに違います。',
+    if (aruType.length == 1)
+      '　・${_konoData(setsumeisho)}、新入生の成長タイプは、すべて「${seichouTypeMei[aruType[0]]}」(${seichouTypeSetsumei[aruType[0]]})です。'
+    else
+      '　・1年に大きく伸びるタイプや、2年以降に大きく伸びるタイプがあります。',
+    '・成長タイプは、画面には出ません。',
+    '・入学時の記録が良い選手は、どの成長タイプでも、1年のうちに大きく伸びることが多いです。',
+  ];
 }
 
 /// 名声

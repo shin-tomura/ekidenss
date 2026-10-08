@@ -20,6 +20,7 @@ import 'package:ekiden/screens/Modal_racejiki.dart';
 import 'package:ekiden/screens/Modal_shumihihyouji.dart';
 import 'package:ekiden/screens/konki_best_parts.dart'; // 持ちタイムの表示設定(1.9.1)
 import 'package:ekiden/screens/shuudan_settei.dart'; // 集団走設定(1.9.2)
+import 'package:ekiden/screens/seichou_type_settei.dart'; // 成長タイプ設定(1.9.3)
 import 'package:ekiden/screens/Modal_TrainingEffect.dart';
 import 'package:ekiden/screens/Modal_TimeChousei.dart';
 import 'package:ekiden/settings_qr_page.dart';
@@ -780,6 +781,42 @@ class _SettingScreenState extends State<SettingScreen>
               ),
             ),
           ),
+          const SizedBox(height: 20),
+          // 成長タイプ設定(新入生の成長タイプの割合。1.9.3)
+          TextButton(
+            onPressed: () {
+              showGeneralDialog(
+                context: context,
+                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                barrierDismissible: true, // 背景タップで閉じられるようにする
+                barrierLabel: '成長タイプ設定', // アクセシビリティ用ラベル
+                transitionDuration: const Duration(
+                  milliseconds: 300,
+                ), // アニメーション時間
+                pageBuilder: (context, animation, secondaryAnimation) {
+                  return const ModalSeichouTypeSettei();
+                },
+                transitionBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                      return FadeTransition(
+                        opacity: CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOut,
+                        ),
+                        child: child,
+                      );
+                    },
+              );
+            },
+            child: Text(
+              "成長タイプ設定",
+              style: TextStyle(
+                color: const Color.fromARGB(255, 0, 255, 0),
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+              ),
+            ),
+          ),
 
           const SizedBox(height: 20),
           TextButton(
@@ -1132,7 +1169,7 @@ class _SettingScreenState extends State<SettingScreen>
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           const Text(
-            "SS 1.9.2 (21920)",
+            "SS 1.9.3 (21930)",
             style: TextStyle(color: Colors.white),
           ),
           // 変更履歴(ToDo.txtの箱庭小駅伝SSの部分を表示)
@@ -1194,7 +1231,7 @@ class _SettingScreenState extends State<SettingScreen>
                 // 実際のライセンス画面の表示部分
                 child: const LicensePage(
                   applicationName: '箱庭小駅伝SS',
-                  applicationVersion: '1.9.2',
+                  applicationVersion: '1.9.3',
                   // applicationIcon: Image.asset('lib/assets/icon/icon_ss1024.png', width: 48, height: 48),
                 ),
               ),

@@ -23,6 +23,7 @@ import 'package:ekiden/kansuu/NameListKoushin.dart';
 import 'package:ekiden/kansuu/goldsilver_com.dart';
 import 'package:ekiden/kansuu/scout_com.dart';
 import 'package:ekiden/kansuu/gakuren_kantoku.dart'; // 学連選抜の監督の移行処理(1.8.2)
+import 'package:ekiden/kansuu/seichou_type.dart'; // 新入生の成長タイプの割合の移行処理(1.9.3)
 //import 'dart:io';
 //import 'package:path_provider/path_provider.dart';
 
@@ -820,13 +821,29 @@ class _SaveLoadScreenState extends State<SaveLoadScreen> {
         }
       }
 
+      {
+        //バージョンアップに伴い付け足す処理を書く
+        //1.9.3で新入生の成長タイプの割合の初期値を変えたので、今までのセーブデータも一度だけ
+        //新しい初期値にする(mainの中の同じ処理の説明を参照)
+        //mainの中にもあるので、そちらも変更すること！
+        final checkversionValue = int.tryParse(sortedUnivData[7].name_tanshuku);
+        if (checkversionValue == null ||
+            checkversionValue < 21930 ||
+            checkversionValue > 999999999) {
+          final Ghensuu? gh = Hive.box<Ghensuu>('ghensuuBox').getAt(0);
+          if (gh != null) {
+            await seichouTypeWariaiHozon(gh, seichouTypeShokiti);
+          }
+        }
+      }
+
       //1.4.3からバージョン番号保存することにした(この処理は一連の処理の中で1番最後にすること)
       //mainの中にもあるので、そちらも変更すること！
       final versionValue = int.tryParse(sortedUnivData[7].name_tanshuku);
       if (versionValue == null ||
-          versionValue < 21920 ||
+          versionValue < 21930 ||
           versionValue > 999999999) {
-        sortedUnivData[7].name_tanshuku = "21920"; //バージョン番号
+        sortedUnivData[7].name_tanshuku = "21930"; //バージョン番号
         await sortedUnivData[7].save();
       }
 

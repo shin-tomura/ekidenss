@@ -14,11 +14,15 @@ import 'package:ekiden/kansuu/kiji/kiji_comment.dart';
 //
 // 戦力の見方(本紙の戦力分析)
 //  ・チームの平均: 駅伝は一次エントリーの上位(区間の数の人数)、11月駅伝予選は走る8人、
-//    正月駅伝予選は上位10人の、持ちタイムの平均。比べる種目は、駅伝は1万m、予選は大会の
-//    距離で決める(7.5km以下は5000m、15km以下は1万m、それより長いとハーフ。今のコースなら
-//    11月駅伝予選は1万m、正月駅伝予選はハーフ。1.9.2で正月駅伝予選をハーフにした)。
-//    その種目の記録がない選手は、距離の近いほかの種目の記録から換算する(tenbouMochiTime)。
-//    予選で1万m以外を比べるときは、参考に1万m平均も表に出す
+//    正月駅伝予選は上位10人の、区間の距離に合わせた持ちタイムの平均(1.9.2)
+//    ・区間を距離で分け(7.5km以下は5000m、15km以下は1万m、それより長いとハーフ)、
+//      区間の距離の合計で3つの種目の重みを出す(tenbouOmomi)
+//    ・選手ごとに、3つの種目の持ちタイムを重みが一番大きい種目(主な種目)に換算して、
+//      重みで平均する(tenbouSougouTime)。記録がない種目は、距離の近いほかの種目の記録から換算する
+//      (tenbouMochiTime。換算は区間配置の見積もりと同じく距離の比の1.06乗)
+//    ・重みが1つの種目だけなら「ハーフ平均」、混ざっていれば「1万m換算平均」のように書く。
+//      今のコースなら11月駅伝予選は1万m、正月駅伝予選はハーフだけになる
+//    ・主な種目が1万m以外のときは、参考に1万m平均も表に出す
 //  ・区間ごとの持ちタイム(駅伝): 区間ごとに、距離と特徴に合った種目(kukanShumoku)の
 //    持ちタイムで、その区間を走る選手を並べた順位の合計
 //  ・前評判: 駅伝は2つの順位の合計、予選はチームの平均の順
@@ -62,7 +66,7 @@ class TenbouUniv {
   /// チームの平均の順位(0が1位)
   int heikinJuni = 0;
 
-  /// 参考の1万m平均(予選で1万m以外を比べるときだけ。出せないときは TEISUU.DEFAULTTIME)
+  /// 参考の1万m平均(主な種目が1万m以外のときだけ。出せないときは TEISUU.DEFAULTTIME)
   double sankouIchiman = TEISUU.DEFAULTTIME;
 
   /// 区間ごとの持ちタイムの順位の合計(駅伝)
@@ -106,9 +110,52 @@ double? tenbouMochiTime(KijiKankyou k, SenshuData s, int idx) {
   return null;
 }
 
-/// 選手の1万mの持ちタイム(記録がなければほかの種目から換算。どれもなければnull)
-double? tenbouIchiman(KijiKankyou k, SenshuData s) =>
-    tenbouMochiTime(k, s, 1);
+/// 大会の区間の距離から出した、5000m・1万m・ハーフの重み(合計1。1.9.2)
+/// 区間を距離で分け(7.5km以下は5000m、15km以下は1万m、それより長いとハーフ)、
+/// それぞれの区間の距離の合計の割合にする
+List<double> tenbouOmomi(KijiKankyou k) {
+  final List<double> w = [0.0, 0.0, 0.0];
+  double goukei = 0.0;
+  for (int kk = 0; kk < k.kukansuu; kk++) {
+    final double kyori = k.gh.kyori_taikai_kukangoto[k.race][kk];
+    if (kyori <= 0) continue;
+    final int c = kyori <= 7500 ? 0 : (kyori <= 15000 ? 1 : 2);
+    w[c] += kyori;
+    goukei += kyori;
+  }
+  if (goukei <= 0) return [0.0, 1.0, 0.0];
+  return [for (final double v in w) v / goukei];
+}
+
+/// 重みが一番大きい種目(主な種目。同じなら距離の長い種目)
+int tenbouOmoNaShumoku(List<double> omomi) {
+  int m = 1;
+  for (int c = 0; c < 3; c++) {
+    if (omomi[c] > omomi[m] || (omomi[c] == omomi[m] && c > m)) m = c;
+  }
+  return m;
+}
+
+/// 選手の、区間の距離に合わせた持ちタイム(主な種目[omo]のタイムにそろえた値。1.9.2)
+/// 3つの種目の持ちタイム(記録がなければほかの種目から換算)を主な種目に換算し、重み[omomi]で
+/// 平均する。どの種目の記録もなければnull
+double? tenbouSougouTime(
+  KijiKankyou k,
+  SenshuData s,
+  List<double> omomi,
+  int omo,
+) {
+  double v = 0.0;
+  for (int c = 0; c < 3; c++) {
+    if (omomi[c] <= 0) continue;
+    final double? t = tenbouMochiTime(k, s, c);
+    if (t == null) return null;
+    v += omomi[c] *
+        t *
+        math.pow(_shumokuKyori[omo] / _shumokuKyori[c], 1.06).toDouble();
+  }
+  return v;
+}
 
 /// 展望のための戦力のまとめ
 class Tenbou {
@@ -126,8 +173,11 @@ class Tenbou {
   /// チームの平均を出す人数
   final int heikinNinzuu;
 
-  /// チームの平均を出す種目(time_bestkiroku の番号。駅伝は1万m、予選は大会の距離で決める)
+  /// チームの平均をそろえた種目(主な種目。time_bestkiroku の番号)
   final int heikinShumoku;
+
+  /// 5000m・1万m・ハーフの重み(区間の距離の合計の割合)
+  final List<double> omomi;
 
   Tenbou._(
     this.k,
@@ -136,6 +186,7 @@ class Tenbou {
     this.kukanJun,
     this.heikinNinzuu,
     this.heikinShumoku,
+    this.omomi,
   );
 
   static Tenbou? tsukuru(KijiKankyou k) {
@@ -161,18 +212,18 @@ class Tenbou {
     list.removeWhere((x) => x.hashiru.isEmpty);
     if (list.length < 2) return null;
 
-    // チームの平均(駅伝は1万m。予選は大会の距離で種目を決める。1組目の距離で見る)
+    // チームの平均(区間の距離の合計で5000m・1万m・ハーフを重み付けし、主な種目にそろえる)
     final int ninzuu = race == 3 ? 8 : (race == 4 ? 10 : ks);
-    int heikinShumoku = 1;
-    if (!k.ekiden) {
-      final double kyori = k.gh.kyori_taikai_kukangoto[race][0];
-      heikinShumoku = kyori <= 7500 ? 0 : (kyori <= 15000 ? 1 : 2);
-    }
-    // 上位[ninzuu]人の種目[idx]の平均(半分の人数も記録がなければ出さない)
-    double heikinDasu(List<SenshuData> senshu, int idx) {
+    final List<double> omomi = tenbouOmomi(k);
+    final int heikinShumoku = tenbouOmoNaShumoku(omomi);
+    // 上位[ninzuu]人の平均([idx]が null なら区間の距離に合わせた値、そうでなければ種目[idx]。
+    // 半分の人数も記録がなければ出さない)
+    double heikinDasu(List<SenshuData> senshu, int? idx) {
       final List<double> t = [];
       for (final SenshuData s in senshu) {
-        final double? m = tenbouMochiTime(k, s, idx);
+        final double? m = idx == null
+            ? tenbouSougouTime(k, s, omomi, heikinShumoku)
+            : tenbouMochiTime(k, s, idx);
         if (m != null) t.add(m);
       }
       t.sort();
@@ -187,7 +238,7 @@ class Tenbou {
 
     for (final TenbouUniv x in list) {
       final List<SenshuData> taishou = k.ekiden ? x.ichiji : x.hashiru;
-      x.heikin = heikinDasu(taishou, heikinShumoku);
+      x.heikin = heikinDasu(taishou, null);
       if (heikinShumoku != 1) x.sankouIchiman = heikinDasu(taishou, 1);
     }
     final List<TenbouUniv> heikinJun = List<TenbouUniv>.of(list)
@@ -265,7 +316,15 @@ class Tenbou {
     for (int i = 0; i < list.length; i++) {
       list[i].juni = i;
     }
-    return Tenbou._(k, list, shumoku, kukanJun, ninzuu, heikinShumoku);
+    return Tenbou._(
+      k,
+      list,
+      shumoku,
+      kukanJun,
+      ninzuu,
+      heikinShumoku,
+      omomi,
+    );
   }
 
   int get ks => k.kukansuu;
@@ -304,12 +363,16 @@ class Tenbou {
     return -1;
   }
 
-  /// 大学のエース(走る予定の選手で、チームの平均と同じ種目の持ちタイムが一番いい選手)
+  /// 選手の、区間の距離に合わせた持ちタイム(チームの平均と同じ値。記録がなければnull)
+  double? sougou(SenshuData s) =>
+      tenbouSougouTime(k, s, omomi, heikinShumoku);
+
+  /// 大学のエース(走る予定の選手で、区間の距離に合わせた持ちタイムが一番いい選手)
   SenshuData? ace(TenbouUniv x) {
     SenshuData? best;
     double bt = TEISUU.DEFAULTTIME;
     for (final SenshuData s in x.hashiru) {
-      final double? t = tenbouMochiTime(k, s, heikinShumoku);
+      final double? t = sougou(s);
       if (t != null && t < bt) {
         bt = t;
         best = s;
@@ -328,8 +391,19 @@ class Tenbou {
     return '${kijiShumokuMei[idx]}${jikanMoji(t)}';
   }
 
-  /// チームの平均を出した種目の名前(「1万m」「ハーフ」)
-  String get heikinMei => kijiShumokuMei[heikinShumoku];
+  /// 重みが2つ以上の種目に分かれているか
+  bool get omomiTsuki => omomi.where((v) => v > 0).length >= 2;
+
+  /// チームの平均の名前(「ハーフ」。重みが混ざっていれば「1万m換算」。後ろに「平均」を付けて使う)
+  String get heikinMei => omomiTsuki
+      ? '${kijiShumokuMei[heikinShumoku]}換算'
+      : kijiShumokuMei[heikinShumoku];
+
+  /// 重みの文(「5000m20%・1万m45%・ハーフ35%」。重みのない種目は書かない)
+  String get omomiMoji => [
+    for (int c = 0; c < 3; c++)
+      if (omomi[c] > 0) '${kijiShumokuMei[c]}${(omomi[c] * 100).round()}%',
+  ].join('・');
 
   /// チームの平均の文
   String heikinMoji(TenbouUniv x) =>
@@ -485,8 +559,12 @@ KijiHyou _maeHyoubanHyou(Tenbou t, List<KijiYosouJin> yosou, {required bool ekid
     ]);
   }
   return KijiHyou(
-    '本紙の戦力分析(${t.heikinMei}平均は上位${t.heikinNinzuu}人。'
-    '${t.heikinMei}の記録がない選手は、ほかの種目の記録から換算)',
+    t.omomiTsuki
+        ? '本紙の戦力分析(${t.heikinMei}平均は上位${t.heikinNinzuu}人。区間の距離の合計で'
+              '${t.omomiMoji}に重み付けし、${kijiShumokuMei[t.heikinShumoku]}にそろえた持ちタイム。'
+              '記録がない種目は、ほかの種目の記録から換算)'
+        : '本紙の戦力分析(${t.heikinMei}平均は上位${t.heikinNinzuu}人。'
+              '${t.heikinMei}の記録がない選手は、ほかの種目の記録から換算)',
     [
       '前評判',
       '大学',
@@ -614,9 +692,9 @@ Kiji _yuushouTenbou(Tenbou t, List<KijiYosouJin> yosou) {
     lead.write('今大会は、1年生だけが出場できる。');
   }
   if (hon.heikinJuni == 0 && hon.kukanJuni == 0) {
-    lead.write('1万mの平均タイム、区間ごとの持ちタイムのどちらでも出場校トップだ。');
+    lead.write('${t.heikinMei}平均、区間ごとの持ちタイムのどちらでも出場校トップだ。');
   } else if (hon.heikinJuni == 0) {
-    lead.write('一次エントリー上位${t.heikinNinzuu}人の1万m平均は${t.heikinMoji(hon)}で出場校トップ。');
+    lead.write('一次エントリー上位${t.heikinNinzuu}人の${t.heikinMei}平均は${t.heikinMoji(hon)}で出場校トップ。');
   } else if (hon.kukanJuni == 0) {
     lead.write('区間ごとの持ちタイムを比べると、多くの区間で他校を上回る。');
   }
@@ -673,7 +751,7 @@ Kiji _yuushouTenbou(Tenbou t, List<KijiYosouJin> yosou) {
     final SenshuData? a = t.ace(tai);
     sb.write('対抗は${tai.mei}。');
     if (tai.heikinJuni < hon.heikinJuni) {
-      sb.write('1万m平均では${hon.mei}を上回り、');
+      sb.write('${t.heikinMei}平均では${hon.mei}を上回り、');
     } else if (tai.kukanJuni < hon.kukanJuni) {
       sb.write('区間ごとの持ちタイムでは${hon.mei}を上回り、');
     }
@@ -685,7 +763,7 @@ Kiji _yuushouTenbou(Tenbou t, List<KijiYosouJin> yosou) {
     w.danraku(sb.toString());
     w.comment(kantokuComment(w, KantokuBamen.tenbouChousen, tai.u.id));
   }
-  // ダークホース(区間ごとの持ちタイムが、1万m平均より大きく良い大学)
+  // ダークホース(区間ごとの持ちタイムの順位が、チームの平均の順位より大きく良い大学)
   TenbouUniv? ana;
   for (final TenbouUniv x in t.jun) {
     if (x.juni < 2 || x.juni > 6) continue;
@@ -696,7 +774,7 @@ Kiji _yuushouTenbou(Tenbou t, List<KijiYosouJin> yosou) {
   }
   if (ana != null) {
     w.danraku(
-      '不気味なのは${ana.mei}だ。1万m平均は${ana.heikinJuni + 1}番手にとどまるが、'
+      '不気味なのは${ana.mei}だ。${t.heikinMei}平均は${ana.heikinJuni + 1}番手にとどまるが、'
       '区間ごとの持ちタイムでは${ana.kukanJuni + 1}番手。適材適所の配置がはまれば、上位をかき回す。',
     );
   } else if (t.n >= 3) {
@@ -1022,16 +1100,16 @@ Kiji? _seedTenbou(Tenbou t, List<KijiYosouJin> yosou) {
     final double b = _maeSougouTime(maeSoto, race);
     if (a < TEISUU.DEFAULTTIME && b < TEISUU.DEFAULTTIME) maeSa = saByou(b, a);
   }
-  // 境目の2校の1万m平均の比べ
+  // 境目の2校のチームの平均の比べ
   String heikinHikaku = '';
   if (saigo.heikin < TEISUU.DEFAULTTIME && soto.heikin < TEISUU.DEFAULTTIME) {
     final int d = saByou(soto.heikin, saigo.heikin);
     if (d > 0) {
-      heikinHikaku = '1万m平均の差は${saMoji(d)}しかない。';
+      heikinHikaku = '${t.heikinMei}平均の差は${saMoji(d)}しかない。';
     } else if (d < 0) {
-      heikinHikaku = '1万m平均では、むしろ${soto.mei}が${saMoji(d)}上回る。';
+      heikinHikaku = '${t.heikinMei}平均では、むしろ${soto.mei}が${saMoji(d)}上回る。';
     } else {
-      heikinHikaku = '1万m平均はほぼ同じだ。';
+      heikinHikaku = '${t.heikinMei}平均はほぼ同じだ。';
     }
   }
   final TenbouUniv? jibun = t.jibun;
@@ -1206,7 +1284,7 @@ Kiji? _seedTenbou(Tenbou t, List<KijiYosouJin> yosou) {
     hyou: [
       KijiHyou(
         'シード権ライン付近の前評判(上位$seed校がシード権)',
-        ['前評判', '大学', '1万m平均', '区間別', '前回', '今季の出場'],
+        ['前評判', '大学', '${t.heikinMei}平均', '区間別', '前回', '今季の出場'],
         gyou,
       ),
     ],
@@ -1221,18 +1299,18 @@ Kiji? _seedTenbou(Tenbou t, List<KijiYosouJin> yosou) {
 Kiji? _toujitsuTenbou(Tenbou t) {
   final KijiKankyou k = t.k;
   const int no = 3;
-  // 大学ごとの、1万mのチーム内上位3人に入っているのに補欠の選手
+  // 大学ごとの、区間の距離に合わせた持ちタイムでチーム内上位3人に入っているのに補欠の選手
   final List<({TenbouUniv x, SenshuData s, int naiJuni})> hoketsu = [];
   for (final TenbouUniv x in t.jun) {
     if (x.u.id == k.gh.MYunivid) continue;
     final List<SenshuData> jun = List<SenshuData>.of(x.ichiji)
       ..sort((a, b) {
-        final double ta = tenbouIchiman(k, a) ?? TEISUU.DEFAULTTIME;
-        final double tb = tenbouIchiman(k, b) ?? TEISUU.DEFAULTTIME;
+        final double ta = t.sougou(a) ?? TEISUU.DEFAULTTIME;
+        final double tb = t.sougou(b) ?? TEISUU.DEFAULTTIME;
         return ta.compareTo(tb);
       });
     for (int i = 0; i < jun.length && i < 3; i++) {
-      if (k.entry(jun[i]) == -1 && k.jikoBest(jun[i], 1) < TEISUU.DEFAULTTIME) {
+      if (k.entry(jun[i]) == -1 && t.sougou(jun[i]) != null) {
         hoketsu.add((x: x, s: jun[i], naiJuni: i));
       }
     }
@@ -1259,7 +1337,7 @@ Kiji? _toujitsuTenbou(Tenbou t) {
   final StringBuffer lead = StringBuffer();
   lead.write(
     '${k.taikaiMei}の区間エントリーで、${daigaku.length == 1 ? h0.x.mei : '${daigaku.length}校'}が'
-    '1万mの持ちタイムでチーム上位の選手を補欠に回した。',
+    '持ちタイムでチーム上位の選手を補欠に回した。',
   );
   lead.write(
     w.erabu([
@@ -1275,7 +1353,8 @@ Kiji? _toujitsuTenbou(Tenbou t) {
       for (final h in hoketsu)
         if (h.x.u.id == x.u.id)
           '${h.naiJuni == 0 ? 'エース' : 'チーム${h.naiJuni + 1}番手'}の'
-              '${w.senshu(h.s)}(${t.mochiMoji(h.s, 1)})',
+              '${w.senshu(h.s)}'
+              '${t.mochiMoji(h.s, t.heikinShumoku).isEmpty ? '' : '(${t.mochiMoji(h.s, t.heikinShumoku)})'}',
     ];
     w.danraku(
       '前評判${x.juni + 1}番手の${x.mei}は、${hito.join('、')}が補欠に入った。'
@@ -1289,7 +1368,12 @@ Kiji? _toujitsuTenbou(Tenbou t) {
       [
         h.x.mei,
         '${fullMei(h.s.name)}(${h.s.gakunen})',
-        t.mochiMoji(h.s, 1).replaceFirst('1万m', ''),
+        t.mochiMoji(h.s, t.heikinShumoku).isEmpty
+            ? '-'
+            : t.mochiMoji(h.s, t.heikinShumoku).replaceFirst(
+                kijiShumokuMei[t.heikinShumoku],
+                '',
+              ),
         '${h.naiJuni + 1}番手',
       ],
   ];
@@ -1301,7 +1385,11 @@ Kiji? _toujitsuTenbou(Tenbou t) {
     midashi: midashi,
     lead: lead.toString(),
     hyou: [
-      KijiHyou('補欠に入った主力', ['大学', '選手', '1万m', 'チーム内'], gyou),
+      KijiHyou(
+        '補欠に入った主力',
+        ['大学', '選手', kijiShumokuMei[t.heikinShumoku], 'チーム内'],
+        gyou,
+      ),
     ],
   );
 }
@@ -1444,8 +1532,8 @@ Kiji? _jibunTenbou(Tenbou t, List<KijiYosouJin> yosou) {
   if (k.ekiden) {
     final List<SenshuData> jun = List<SenshuData>.of(m.ichiji)
       ..sort((x, y) {
-        final double tx = tenbouIchiman(k, x) ?? TEISUU.DEFAULTTIME;
-        final double ty = tenbouIchiman(k, y) ?? TEISUU.DEFAULTTIME;
+        final double tx = t.sougou(x) ?? TEISUU.DEFAULTTIME;
+        final double ty = t.sougou(y) ?? TEISUU.DEFAULTTIME;
         return tx.compareTo(ty);
       });
     for (int i = 0; i < jun.length && i < 3; i++) {

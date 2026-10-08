@@ -1,6 +1,7 @@
 import 'dart:math'; // log・exp・Randomを使うため
 import 'package:ekiden/constants.dart'; // TEISUUクラスをインポート
 import 'package:ekiden/senshu_data.dart'; // 隠れた逸材(itsuzaiNiSuru)で使う
+import 'package:ekiden/kantoku_data.dart'; // 13分台の新入生の限界突破の優遇の設定(1.9.3)
 
 // ------------------------------------------------------------
 // 基本走力の上限(1.8.5)
@@ -115,29 +116,52 @@ void itsuzaiNiSuru(SenshuData senshu, Random random) {
 }
 
 // ------------------------------------------------------------
-// 13分台の新入生の限界突破(1.9.3)
+// 13分台の新入生の限界突破の優遇(1.9.3。成長タイプ設定で選ぶ。初期値はなし)
 // 入学時5000mが13分台の選手は上限の近くから始まり、1回の育成で伸びる量も大きいので、
 // どの成長タイプでも1年のうちに上限に届き、2年以降は限界突破でしか伸びない。
-// そのため、遅れて伸びる選手に追いつかれて、学年が上がるほど学年内の順位が下がりやすかった
+// そのため、遅れて伸びる選手に追いつかれて、学年が上がるほど学年内の順位が下がりやすい
 // (シミュレーションで、13分台の平均順位が2年秋30位→4年秋39位、1年秋→4年秋の伸びは1万mで31秒)。
-// 4回目以降の限界突破の確率(Ikusei_Com.dart。ふつうは10%)を、13分台の選手だけ13%にする
+// 説明画面の設定タブの「成長タイプ設定」で「あり」にすると、4回目以降の限界突破の確率
+// (Ikusei_Com.dart。ふつうは10%)を、13分台の選手だけ13%にする
 // (平均順位は2年秋30位→4年秋32位くらい、伸びは36秒くらいになる。
 // 学年1位の速さは1万mで7秒くらい速くなり、記録が少し出やすくなる)。
 // ・最初の3回(33%)は今まで通り
 // ・入学時5000mの記録で決めるので、留学生(記録なし)と、隠れた逸材(記録は14分台・15分台)は今まで通り
 // ・在学中の選手にも、次の育成から効く
+// ・保存先は KantokuData.yobiint2[85](0=なし(初期値)・1=あり)。各種設定のQRコードにも含める
 // ------------------------------------------------------------
+
+/// 13分台の新入生の限界突破の優遇の保存先(KantokuData.yobiint2の番号)
+const int genkaitoppaYuuguuIndex = 85;
 
 /// 13分台かどうかを決める入学時5000mの記録(秒)。これより速ければ13分台(14分00秒)
 const double genkaitoppaJuusanpundaiKijun = 840.0;
 
-/// 4回目以降の限界突破の確率(%)(ふつう・13分台の選手)(1.9.3)
+/// 4回目以降の限界突破の確率(%)(ふつう・優遇ありのときの13分台の選手)
 const int genkaitoppaKakuritsuFutsuu = 10;
 const int genkaitoppaKakuritsuJuusanpundai = 13;
 
-/// 4回目以降の限界突破の確率(%)(1.9.3)
-/// 入学時5000mの記録が13分台の選手だけ高くする(記録が0や記録なしの選手は、ふつうの確率)
-int genkaitoppaKakuritsu4kaimeIkou(SenshuData senshu) {
+/// 13分台の新入生の限界突破の優遇の値として正しいか(QRコードの読み込みでも使う)
+bool genkaitoppaYuuguuAtaiTadashii(int v) => v == 0 || v == 1;
+
+/// 今の13分台の新入生の限界突破の優遇(0=なし・1=あり。保存されていない・範囲外なら0)
+int genkaitoppaYuuguuSettei(KantokuData kantoku) {
+  if (kantoku.yobiint2.length <= genkaitoppaYuuguuIndex) return 0;
+  final int v = kantoku.yobiint2[genkaitoppaYuuguuIndex];
+  return genkaitoppaYuuguuAtaiTadashii(v) ? v : 0;
+}
+
+/// 13分台の新入生の限界突破の優遇を入れる(保存は呼び出し側で行う)
+void genkaitoppaYuuguuIreru(KantokuData kantoku, int v) {
+  if (kantoku.yobiint2.length <= genkaitoppaYuuguuIndex) return;
+  if (!genkaitoppaYuuguuAtaiTadashii(v)) return;
+  kantoku.yobiint2[genkaitoppaYuuguuIndex] = v;
+}
+
+/// 4回目以降の限界突破の確率(%)
+/// 優遇ありのときだけ、入学時5000mの記録が13分台の選手を高くする(記録が0や記録なしの選手は、ふつうの確率)
+int genkaitoppaKakuritsu4kaimeIkou(SenshuData senshu, {required bool yuuguu}) {
+  if (!yuuguu) return genkaitoppaKakuritsuFutsuu;
   final double kiroku = senshu.kiroku_nyuugakuji_5000;
   if (kiroku > 0.0 && kiroku < genkaitoppaJuusanpundaiKijun) {
     return genkaitoppaKakuritsuJuusanpundai;

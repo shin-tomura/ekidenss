@@ -4,7 +4,9 @@ import 'package:ekiden/ghensuu.dart'; // Ghensuuクラスのインポート
 import 'package:ekiden/univ_data.dart'; // UnivDataクラスのインポート
 import 'package:ekiden/senshu_data.dart'; // SenshuDataクラスのインポート
 import 'package:ekiden/constants.dart'; // TEISUUクラスをインポート
-import 'package:ekiden/kansuu/joukai.dart'; // 13分台の選手の限界突破の確率(1.9.3)
+import 'package:hive_flutter/hive_flutter.dart'; // 成長タイプ設定を読むため(1.9.3)
+import 'package:ekiden/kantoku_data.dart'; // 成長タイプ設定を読むため(1.9.3)
+import 'package:ekiden/kansuu/joukai.dart'; // 13分台の新入生の限界突破の優遇(1.9.3)
 // 必要に応じて他のモデルや定数ファイルのインポートを追加してください
 
 /// 選手の育成（成長）処理を行う関数
@@ -65,6 +67,12 @@ Future<void> Ikusei_Com({
   int temp_seichou = 0;
 
   final _random = Random(); // 乱数ジェネレータのインスタンス
+  // 13分台の新入生の限界突破の優遇(1.9.3。成長タイプ設定で選ぶ。初期値はなし。joukai.dart)
+  final KantokuData? kantoku = Hive.box<KantokuData>(
+    'kantokuBox',
+  ).get('KantokuData');
+  final bool genkaitoppaYuuguu =
+      kantoku != null && genkaitoppaYuuguuSettei(kantoku) == 1;
 
   // 全選手をループ
   for (int senshuid = 0; senshuid < TEISUU.SENSHUSUU_TOTAL; senshuid++) {
@@ -312,9 +320,13 @@ Future<void> Ikusei_Com({
                     (sortedsenshudata[senshuid].hirou == 1 &&
                         sortedsenshudata[senshuid].genkaitoppakaisuu < 12)) {}*/
                 // 限界突破回数が3回以上の場合のロジック
-                // (1.9.3から、入学時5000mが13分台の選手だけ13%。ほかは今まで通り10%。joukai.dart)
+                // (1.9.3から、成長タイプ設定で優遇ありのときは、入学時5000mが13分台の選手だけ13%。
+                // ほかは今まで通り10%。joukai.dart)
                 if (_random.nextInt(100) <
-                    genkaitoppaKakuritsu4kaimeIkou(sortedsenshudata[senshuid])) {
+                    genkaitoppaKakuritsu4kaimeIkou(
+                      sortedsenshudata[senshuid],
+                      yuuguu: genkaitoppaYuuguu,
+                    )) {
                   // 0から99までの乱数が確率未満
                   // 突破する前の上限(1.8.5。下の a_min_int の計算で使う)
                   final double maeMagicnumber =

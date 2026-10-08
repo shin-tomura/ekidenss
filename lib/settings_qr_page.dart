@@ -240,7 +240,7 @@ class _SettingsQrPageState extends State<SettingsQrPage> {
             '・学連選抜の監督をするかどうか\n'
             '・区間配置の方針(大学ごと。最適解区間配置の使い方を含む)\n'
             '・集団走設定\n'
-            '・成長タイプ設定\n',
+            '・成長タイプ設定(13分台の新入生の限界突破を含む)\n',
 
             style: TextStyle(color: Colors.white70, fontSize: 14),
           ),

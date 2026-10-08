@@ -3,6 +3,8 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ekiden/constants.dart';
 import 'package:ekiden/ghensuu.dart';
 import 'package:ekiden/kansuu/seichou_type.dart';
+import 'package:ekiden/kantoku_data.dart';
+import 'package:ekiden/kansuu/joukai.dart'; // 13分台の新入生の限界突破の優遇
 
 // ------------------------------------------------------------
 // 説明画面の設定タブの「成長タイプ設定」(1.9.3)
@@ -12,6 +14,8 @@ import 'package:ekiden/kansuu/seichou_type.dart';
 // ・「初期値に戻す」「以前の割合にする」は、画面の値を入れ替えるだけで、保存ボタンで確定する
 // ・保存していない変更があるまま閉じようとしたら、確認を出す
 // ・スマホの文字を大きくしていてもはみ出さないように、型ごとに名前・説明・割合を縦に積む
+// ・割合の下で、13分台の新入生の限界突破の優遇(なし(初期値)・あり。保存先と決まりは lib/kansuu/joukai.dart)も選ぶ。
+//   割合と同じ保存ボタンでまとめて保存し、初期化ボタンはどちらも「なし」にする(1.9.2までも優遇はなかったため)
 // ------------------------------------------------------------
 
 class ModalSeichouTypeSettei extends StatefulWidget {
@@ -26,6 +30,9 @@ class _ModalSeichouTypeSetteiState extends State<ModalSeichouTypeSettei> {
   List<int> _hozonZumi = List<int>.from(seichouTypeShokiti);
   // 画面で選んでいる割合
   List<int> _wariai = List<int>.from(seichouTypeShokiti);
+  // 13分台の新入生の限界突破の優遇(0=なし・1=あり)。保存されている値と、画面で選んでいる値
+  int _yuuguuHozonZumi = 0;
+  int _yuuguu = 0;
 
   @override
   void initState() {
@@ -35,6 +42,13 @@ class _ModalSeichouTypeSetteiState extends State<ModalSeichouTypeSettei> {
       _hozonZumi = seichouTypeWariai(gh);
       // プルダウンの項目にない値にならないように、0〜100にしておく(ふつうは範囲内)
       _wariai = [for (final int v in _hozonZumi) v.clamp(0, 100)];
+    }
+    final KantokuData? kantoku = Hive.box<KantokuData>(
+      'kantokuBox',
+    ).get('KantokuData');
+    if (kantoku != null) {
+      _yuuguuHozonZumi = genkaitoppaYuuguuSettei(kantoku);
+      _yuuguu = _yuuguuHozonZumi;
     }
   }
 
@@ -47,20 +61,30 @@ class _ModalSeichouTypeSetteiState extends State<ModalSeichouTypeSettei> {
   );
 
   // 保存していない変更があるか
-  bool get _henkouAri => !seichouTypeWariaiOnaji(_wariai, _hozonZumi);
+  bool get _henkouAri =>
+      !seichouTypeWariaiOnaji(_wariai, _hozonZumi) ||
+      _yuuguu != _yuuguuHozonZumi;
 
   int get _goukei => seichouTypeGoukei(_wariai);
 
   Future<void> _hozon() async {
     final Ghensuu? gh = Hive.box<Ghensuu>('ghensuuBox').getAt(0);
-    if (gh == null || !seichouTypeWariaiTadashii(_wariai)) return;
+    final KantokuData? kantoku = Hive.box<KantokuData>(
+      'kantokuBox',
+    ).get('KantokuData');
+    if (gh == null || kantoku == null || !seichouTypeWariaiTadashii(_wariai)) {
+      return;
+    }
     await seichouTypeWariaiHozon(gh, _wariai);
+    genkaitoppaYuuguuIreru(kantoku, _yuuguu);
+    await kantoku.save();
     if (!mounted) return;
     setState(() {
       _hozonZumi = List<int>.from(_wariai);
+      _yuuguuHozonZumi = genkaitoppaYuuguuSettei(kantoku);
     });
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('成長タイプの割合を保存しました')),
+      const SnackBar(content: Text('成長タイプ設定を保存しました')),
     );
   }
 
@@ -144,7 +168,8 @@ class _ModalSeichouTypeSetteiState extends State<ModalSeichouTypeSettei> {
     );
   }
 
-  // 初期化ボタン(画面の値を入れ替えるだけ。保存は保存ボタンで)
+  // 初期化ボタン(画面の値を入れ替えるだけ。保存は保存ボタンで。
+  // 13分台の新入生の限界突破の優遇は、どちらのボタンでも「なし」にする)
   Widget _shokikaButton(String mei, String setsumei, List<int> atai) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12.0),
@@ -155,6 +180,7 @@ class _ModalSeichouTypeSetteiState extends State<ModalSeichouTypeSettei> {
             onPressed: () {
               setState(() {
                 _wariai = List<int>.from(atai);
+                _yuuguu = 0;
               });
             },
             style: OutlinedButton.styleFrom(
@@ -221,6 +247,64 @@ class _ModalSeichouTypeSetteiState extends State<ModalSeichouTypeSettei> {
     );
   }
 
+  // 13分台の新入生の限界突破の優遇の欄
+  Widget _yuuguuRan() {
+    Widget chip(int atai, String mei) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: ChoiceChip(
+          label: Text(mei),
+          selected: _yuuguu == atai,
+          onSelected: (selected) {
+            if (!selected) return;
+            setState(() {
+              _yuuguu = atai;
+            });
+          },
+          selectedColor: Colors.orange.shade700,
+          backgroundColor: Colors.grey.shade800,
+          labelStyle: const TextStyle(color: Colors.white),
+        ),
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 8.0),
+      padding: const EdgeInsets.all(10.0),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.shade700),
+        borderRadius: BorderRadius.circular(8.0),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '13分台の新入生の限界突破',
+            style: _honbun.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '入学時の5000mが13分台の選手は、どの型でも1年のうちに伸びきることが多く、'
+            '学年が上がると、遅れて伸びる選手に追いつかれやすくなります。',
+            style: _honbun,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '「あり」にすると、13分台の選手が上級生になってからも、限界突破で伸びやすくなります'
+            '(記録も少し出やすくなります)。在学中の選手にも、次の育成から効きます。',
+            style: _honbun,
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            runSpacing: 4,
+            children: [chip(0, 'なし(初期値)'), chip(1, 'あり')],
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -268,7 +352,8 @@ class _ModalSeichouTypeSetteiState extends State<ModalSeichouTypeSettei> {
                           '入学時の記録が良い選手は、どの型でも1年のうちに大きく伸びることが多いです。\n\n'
                           '変えた割合は、次の4月の新入生から使います(新規ゲームの1年生を含む)。'
                           '在学中の選手の成長タイプは変わりません。留学生は、この割合を使いません。\n\n'
-                          '合計が100%のときに、上の「保存」で保存できます。',
+                          '合計が100%のときに、上の「保存」で保存できます。'
+                          '一番下の「13分台の新入生の限界突破」も、同じ「保存」で保存します。',
                           style: TextStyle(
                             color: HENSUU.textcolor,
                             fontSize: HENSUU.fontsize_honbun,
@@ -278,16 +363,17 @@ class _ModalSeichouTypeSetteiState extends State<ModalSeichouTypeSettei> {
                       ),
                       _shokikaButton(
                         '初期値に戻す',
-                        '1年で伸びきる選手が約4割で、残りは2年以降のどこかで伸びます。',
+                        '1年で伸びきる選手が約4割で、残りは2年以降のどこかで伸びます(13分台の限界突破の優遇はなし)。',
                         seichouTypeShokiti,
                       ),
                       _shokikaButton(
                         '以前の割合にする',
-                        '1年で伸びきる選手が約9割です(1.9.2までの割合)。',
+                        '1年で伸びきる選手が約9割です(1.9.2までの割合。13分台の限界突破の優遇はなし)。',
                         seichouTypeIzen,
                       ),
                       const SizedBox(height: 8),
                       for (final int type in seichouTypeNarabi) _typeRan(type),
+                      _yuuguuRan(),
                       const SizedBox(height: 24),
                       Center(
                         child: ElevatedButton(

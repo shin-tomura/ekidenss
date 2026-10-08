@@ -19,6 +19,7 @@ import 'kansuu/kukan_haichi.dart'; // 区間配置の方針の確認(1.9.1)
 import 'kansuu/ikku_pace.dart'; // 集団走設定の確認(1.9.2)
 import 'kansuu/custom_seigen.dart'; // カスタム駅伝の出場制限の確認(1.9.2)
 import 'kansuu/seichou_type.dart'; // 成長タイプ設定の確認(1.9.3)
+import 'kansuu/joukai.dart'; // 13分台の新入生の限界突破の優遇の確認(1.9.3)
 
 // 読み込み時に複数枚のデータを一時的に保持する状態管理クラス
 class QrReceiveState {
@@ -190,6 +191,8 @@ class SettingsQrProcessor {
       data['k_yobiint2_84'] = shuudanIkioiSettei(kantoku);
       // 成長タイプ設定(新入生の成長タイプの割合。型0〜10の11個、合計100)(int) (1.9.3で追加。seichou_type.dart)
       data['cg_seichou_type_wariai'] = seichouTypeWariai(currentGhensuu);
+      // 13分台の新入生の限界突破の優遇(int) [85] (1.9.3で追加。成長タイプ設定の画面にある設定。joukai.dart)
+      data['k_yobiint2_85'] = genkaitoppaYuuguuSettei(kantoku);
     } else if (department == SettingsDepartment.octoberTime) {
       //区間ごとタイム調整(int)
       data['k_yobiint5_30_39_time'] = kantoku.yobiint5.sublist(30, 40);
@@ -663,6 +666,12 @@ class SettingsQrProcessor {
           currentGhensuu,
           seichouTypeWariaiQr.cast<int>().toList(),
         );
+      }
+      // 13分台の新入生の限界突破の優遇(int) kantoku.yobiint2[85] (1.9.3)
+      //   0なし(初期値)・1あり(古いQRコードには含まれていないので、そのときは今の設定のまま)
+      final dynamic yobiint2_85 = dataMap['k_yobiint2_85'];
+      if (yobiint2_85 is int && genkaitoppaYuuguuAtaiTadashii(yobiint2_85)) {
+        genkaitoppaYuuguuIreru(kantoku, yobiint2_85);
       }
       // 金銀支給量設定の難易度ごとの割合(int) kantoku.yobiint3[70]〜[73] (1.9.1)
       //   鬼・難しい・普通・易しいの順。0なら100%(初期値)、1〜50なら値×10%

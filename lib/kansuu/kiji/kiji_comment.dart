@@ -59,6 +59,9 @@ enum KantokuBamen {
   yosenRakusen,
   tenbouHonmei,
   tenbouChousen,
+
+  /// 展望(シード権争い)
+  tenbouSeed,
 }
 
 const Map<CommentBamen, List<String>> _senshuComment = {
@@ -185,6 +188,12 @@ const Map<KantokuBamen, List<String>> _kantokuComment = {
     '失うものは何もない。思い切ってぶつかっていきたい',
     'チャレンジャーとして、一つでも上の順位を目指す',
     '上位校の背中は見えている。選手たちを信じて送り出したい',
+  ],
+  KantokuBamen.tenbouSeed: [
+    'まずはシード権を確実に取る。そこから一つでも上を目指したい',
+    'シード権争いは毎年最後までもつれる。1秒を削り出す走りをしてほしい',
+    '来年を予選会から始めるかどうかが決まる大事なレース。選手もよく分かっている',
+    'シード権は来年のチームへの最高の贈り物になる。全員で取りにいく',
   ],
 };
 

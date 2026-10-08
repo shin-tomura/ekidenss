@@ -20,8 +20,8 @@ import 'package:ekiden/kansuu/kiji/kiji_comment.dart';
 //  ・前評判: 駅伝は2つの順位の合計、予選は1万m平均の順
 //
 // 記事(出せるものだけ並べる)
-//  駅伝: 1.優勝争い 2.区間の見どころ(1区のペース予想も) 3.当日変更の読み(主力が補欠の大学)
-//        4.自分の大学
+//  駅伝: 1.優勝争い 2.自分の大学 3.区間の見どころ(1区のペース予想も)
+//        4.シード権争い(11月駅伝は上位8校、正月駅伝は上位10校) 5.当日変更の読み(主力が補欠の大学)
 //  予選: 1.通過争い 2.注目選手(組ごと・個人) 3.自分の大学
 // ------------------------------------------------------------
 
@@ -354,6 +354,8 @@ List<Kiji> tenbouKiji(KijiKankyou k, List<KijiYosouJin> yosou) {
     final Kiji? jibun = _jibunTenbou(t, yosou);
     if (jibun != null) list.add(jibun);
     list.add(_kukanTenbou(t, yosou));
+    final Kiji? seed = _seedTenbou(t, yosou);
+    if (seed != null) list.add(seed);
     final Kiji? henkou = _toujitsuTenbou(t);
     if (henkou != null) list.add(henkou);
   } else {
@@ -635,26 +637,10 @@ Kiji _yuushouTenbou(Tenbou t, List<KijiYosouJin> yosou) {
     }
   }
 
-  // 本文: シード権争い
+  // シード権争いは、別の記事(_seedTenbou)に書く
   final int? seed = race == 1 ? 8 : (race == 2 ? 10 : null);
-  if (seed != null && t.n > seed + 1) {
-    w.koMidashi('シード権争い');
-    final List<String> kyoukai = [
-      for (final TenbouUniv x in t.jun)
-        if (x.juni >= seed - 2 && x.juni <= seed + 1) x.mei,
-    ];
-    final StringBuffer sb = StringBuffer(
-      '上位$seed校に与えられるシード権争いも見逃せない。前評判で当落線上にいるのは${kyoukai.join('、')}。',
-    );
-    // 前回シード権を持っていて、前評判で圏外の大学
-    for (final TenbouUniv x in t.jun) {
-      final int mae = juniRace(x.u, race, 0);
-      if (shutsujouJuni(mae) && mae < seed && x.juni >= seed) {
-        sb.write('前回${juniMoji(mae)}の${x.mei}は前評判${x.juni + 1}番手で、シード権を守れるかが焦点だ。');
-        break;
-      }
-    }
-    w.danraku(sb.toString());
+  if (seed != null && t.n > seed) {
+    w.danraku('上位$seed校に与えられるシード権の争いは、別稿で詳しく展望する。');
   }
 
   // 本文: 出場校の話題
@@ -860,6 +846,265 @@ Kiji _kukanTenbou(Tenbou t, List<KijiYosouJin> yosou) {
         gyou,
       ),
     ],
+  );
+}
+
+// ------------------------------------------------------------
+// 駅伝 シード権争い(11月駅伝は上位8校、正月駅伝は上位10校)
+// 展望は本戦の前なので、本戦の記録の[0]は前回の本戦。今年の予選(11月駅伝予選・
+// 正月駅伝予選)はもう終わっているので、予選の記録の[0]は今年の予選
+// ------------------------------------------------------------
+
+/// 大学の前回の本戦の総合タイム(なければ TEISUU.DEFAULTTIME)
+double _maeSougouTime(UnivData u, int race) {
+  if (u.time_race.length <= race || u.time_race[race].isEmpty) {
+    return TEISUU.DEFAULTTIME;
+  }
+  final double t = u.time_race[race][0];
+  return t > 0 ? t : TEISUU.DEFAULTTIME;
+}
+
+Kiji? _seedTenbou(Tenbou t, List<KijiYosouJin> yosou) {
+  final KijiKankyou k = t.k;
+  final int race = k.race;
+  final int? seed = race == 1 ? 8 : (race == 2 ? 10 : null);
+  if (seed == null || t.n <= seed) return null;
+  const int no = 5;
+  final KijiKakite w = KijiKakite(k, kijiTane(k.gh, race, no + 10));
+  final int yosenRace = race == 1 ? 3 : 4;
+  final String yosenMei = race == 1 ? '11月駅伝予選' : '正月駅伝予選';
+  final TenbouUniv saigo = t.jun[seed - 1]; // 前評判でシード権の最後の枠
+  final TenbouUniv soto = t.jun[seed]; // 前評判でシード権の1つ外
+
+  // 事実を集める
+  // 当落線上(前評判でシード権の最後の枠の上下3校ずつ)
+  final List<TenbouUniv> kyoukai = [
+    for (final TenbouUniv x in t.jun)
+      if (x.juni >= seed - 3 && x.juni <= seed + 2) x,
+  ];
+  // 前回までの連続シード(今回の前まで)
+  int renzokuSeed(TenbouUniv x) =>
+      renzokuKaisuu(x.u, race, 0, (j) => j < seed);
+  // 前回シード権を取っていて、前評判でシード権の外にいる大学(連続シードの長い順)
+  final List<TenbouUniv> kiken = [
+    for (final TenbouUniv x in t.jun)
+      if (juniRace(x.u, race, 0) < seed && x.juni >= seed) x,
+  ]..sort((a, b) => renzokuSeed(b).compareTo(renzokuSeed(a)));
+  final TenbouUniv? kiken0 = kiken.isEmpty ? null : kiken.first;
+  // 今年の予選を勝ち上がってきた大学(前評判の順)
+  final List<TenbouUniv> yosenGumi = [
+    for (final TenbouUniv x in t.jun)
+      if (shutsujouJuni(juniRace(x.u, yosenRace, 0))) x,
+  ];
+  final List<TenbouUniv> yosenSeedKen = [
+    for (final TenbouUniv x in yosenGumi)
+      if (x.juni < seed) x,
+  ];
+  TenbouUniv? yosenTop; // 今年の予選のトップ通過
+  for (final TenbouUniv x in yosenGumi) {
+    if (juniRace(x.u, yosenRace, 0) == 0) yosenTop = x;
+  }
+  // 前回のシード権ライン(前回の最後のシード校と、最初に逃した大学)
+  UnivData? maeSaigo;
+  UnivData? maeSoto;
+  for (final UnivData u in k.univ) {
+    final int j = juniRace(u, race, 0);
+    if (j == seed - 1) maeSaigo = u;
+    if (j == seed) maeSoto = u;
+  }
+  int? maeSa;
+  if (maeSaigo != null && maeSoto != null) {
+    final double a = _maeSougouTime(maeSaigo, race);
+    final double b = _maeSougouTime(maeSoto, race);
+    if (a < TEISUU.DEFAULTTIME && b < TEISUU.DEFAULTTIME) maeSa = saByou(b, a);
+  }
+  // 境目の2校の1万m平均の比べ
+  String heikinHikaku = '';
+  if (saigo.heikin < TEISUU.DEFAULTTIME && soto.heikin < TEISUU.DEFAULTTIME) {
+    final int d = saByou(soto.heikin, saigo.heikin);
+    if (d > 0) {
+      heikinHikaku = '1万m平均の差は${saMoji(d)}しかない。';
+    } else if (d < 0) {
+      heikinHikaku = '1万m平均では、むしろ${soto.mei}が${saMoji(d)}上回る。';
+    } else {
+      heikinHikaku = '1万m平均はほぼ同じだ。';
+    }
+  }
+  final TenbouUniv? jibun = t.jibun;
+  final bool jibunKyoukai = jibun != null && kyoukai.contains(jibun);
+
+  // 見出し
+  String midashi;
+  if (kiken0 != null && renzokuSeed(kiken0) >= 3) {
+    midashi =
+        '${kiken0.mei}、${renzokuSeed(kiken0) + 1}年連続シードへ正念場　前評判${kiken0.juni + 1}番手';
+  } else if (kiken0 != null) {
+    midashi = w.erabu([
+      '前回シードの${kiken0.mei}に黄信号　前評判${kiken0.juni + 1}番手',
+      '${kiken0.mei}、シード権死守なるか　前評判${kiken0.juni + 1}番手',
+    ]);
+  } else if (yosenSeedKen.isNotEmpty) {
+    midashi = '予選組の${yosenSeedKen.first.mei}、シード圏内の評価';
+  } else {
+    midashi = w.erabu([
+      'シード権争い　ボーダーは${saigo.mei}と${soto.mei}',
+      '$seed枠目を巡る争い　${saigo.mei}・${soto.mei}が当落線上',
+    ]);
+  }
+
+  // リード
+  final StringBuffer lead = StringBuffer();
+  lead.write(
+    '${k.taikaiMei}では、上位$seed校に来年のシード権が与えられる。'
+    'シード権を逃せば、来年は$yosenMeiからの出直しとなる。',
+  );
+  lead.write(
+    '本紙の戦力分析では、$seed番手の${saigo.mei}と${seed + 1}番手の${soto.mei}が'
+    'ちょうど境目にいる。$heikinHikaku',
+  );
+  if (kiken0 != null) {
+    final int r = renzokuSeed(kiken0);
+    lead.write(
+      '前回${juniMoji(juniRace(kiken0.u, race, 0))}の${kiken0.mei}は'
+      '${r >= 2 ? '$r年連続でシード権を守ってきたが、' : ''}前評判では${kiken0.juni + 1}番手にとどまる。',
+    );
+  }
+
+  // 本文: 当落線上
+  final Set<int> commentZumi = {};
+  w.koMidashi('当落線上');
+  w.danraku(
+    '前評判${kyoukai.first.juni + 1}番手から${kyoukai.last.juni + 1}番手までの'
+    '${kyoukai.map((x) => x.mei).join('、')}が、シード権を争う構図だ。'
+    '${w.erabu(['数秒の差で順位が入れ替わる、厳しい争いになりそうだ。', 'どこが抜け出すか、最後まで目が離せない。'])}',
+  );
+  for (final TenbouUniv x in [saigo, soto]) {
+    final StringBuffer sb = StringBuffer();
+    sb.write('${x.mei}は');
+    final int mae = juniRace(x.u, race, 0);
+    final int yosen = juniRace(x.u, yosenRace, 0);
+    if (shutsujouJuni(yosen)) {
+      sb.write('$yosenMeiを${juniMoji(yosen)}で通過して本戦に臨む。');
+    } else if (shutsujouJuni(mae)) {
+      sb.write('前回${juniMoji(mae)}。');
+    } else if (shutsujouKaisuu(x.u, race) == 0) {
+      sb.write('初出場。');
+    }
+    final SenshuData? a = t.ace(x);
+    if (a != null) {
+      final String m1 = t.mochiMoji(a, 1);
+      sb.write(
+        'エースの${w.senshu(a)}${m1.isEmpty ? '' : '($m1)'}を${t.kukanMei(k.entry(a))}に置いた。',
+      );
+    }
+    if (x.u.id == saigo.u.id) {
+      sb.write(w.erabu(['逃げ切れるか。', '大きな失敗をしなければ、圏内に踏みとどまれる。']));
+    } else {
+      sb.write(w.erabu(['逆転でのシード権獲得を狙う。', '一つ前の大学をとらえられるか。']));
+    }
+    w.danraku(sb.toString());
+  }
+  w.comment(kantokuComment(w, KantokuBamen.tenbouSeed, soto.u.id));
+  commentZumi.add(soto.u.id);
+  if (jibun != null &&
+      jibunKyoukai &&
+      jibun.u.id != saigo.u.id &&
+      jibun.u.id != soto.u.id) {
+    w.danraku('${jibun.mei}も前評判${jibun.juni + 1}番手で、シード権争いの渦中にいる。');
+  }
+
+  // 本文: 前回のシード校
+  if (kiken.isNotEmpty) {
+    w.koMidashi('前回のシード校');
+    for (final TenbouUniv x in kiken.take(2)) {
+      final int r = renzokuSeed(x);
+      w.danraku(
+        '前回${juniMoji(juniRace(x.u, race, 0))}の${x.mei}は前評判${x.juni + 1}番手。'
+        '${r >= 2 ? '続けてきた$r年連続のシード権が途切れる恐れもある。' : 'シード権を守れるかが焦点だ。'}',
+      );
+    }
+    final TenbouUniv k0 = kiken.first;
+    if (!commentZumi.contains(k0.u.id)) {
+      w.comment(kantokuComment(w, KantokuBamen.tenbouSeed, k0.u.id));
+      commentZumi.add(k0.u.id);
+    }
+  }
+
+  // 本文: 予選組
+  if (yosenGumi.isNotEmpty) {
+    w.koMidashi('予選組');
+    final StringBuffer sb = StringBuffer();
+    sb.write('$yosenMeiを勝ち上がった${yosenGumi.length}校のうち、');
+    if (yosenSeedKen.isEmpty) {
+      sb.write('前評判でシード圏内に入った大学はない。');
+      sb.write('最上位の評価は${yosenGumi.first.mei}(前評判${yosenGumi.first.juni + 1}番手)だ。');
+    } else {
+      sb.write(
+        '前評判でシード圏内にいるのは'
+        '${yosenSeedKen.map((x) => '${x.mei}(${x.juni + 1}番手)').join('、')}。',
+      );
+    }
+    if (yosenTop != null) {
+      sb.write('予選トップ通過の${yosenTop.mei}は、前評判${yosenTop.juni + 1}番手だ。');
+    }
+    sb.write(w.erabu(['予選の勢いを本戦につなげられるか。', '予選からの連戦をどう乗り切るかも鍵になる。']));
+    w.danraku(sb.toString());
+  }
+
+  // 本文: 予想陣と前回のシード権ライン
+  final List<String> yosouBun = [
+    for (final KijiYosouJin y in yosou)
+      if (y.univJun.length > seed)
+        '${y.mei}は${t.univMei(y.univJun[seed - 1])}',
+  ];
+  if (yosouBun.isNotEmpty || maeSa != null) {
+    w.koMidashi('見立て');
+    if (yosouBun.isNotEmpty) {
+      w.danraku('予想陣が$seed位、つまり最後のシード校に挙げたのは、${yosouBun.join('、')}。');
+    }
+    if (maeSaigo != null && maeSoto != null && maeSa != null) {
+      w.danraku(
+        '前回は${daigakuMei(maeSaigo)}が$seed位に滑り込み、${seed + 1}位の${daigakuMei(maeSoto)}との差は'
+        '${saMoji(maeSa)}だった。'
+        '${w.erabu(['今回も、わずかな差が明暗を分けそうだ。', '一人ひとりの1秒が、来年の戦い方を変える。'])}',
+      );
+    }
+  }
+
+  // シード権ライン付近の前評判の表(シード権ラインの区切りの行を入れる)
+  final List<List<String>> gyou = [];
+  for (final TenbouUniv x in kyoukai) {
+    final int mae = juniRace(x.u, race, 0);
+    final int yosen = juniRace(x.u, yosenRace, 0);
+    gyou.add([
+      '${x.juni + 1}',
+      x.mei,
+      t.heikinMoji(x),
+      '${x.kukanJuni + 1}',
+      shutsujouJuni(mae) ? juniMoji(mae) : '-',
+      shutsujouJuni(yosen)
+          ? '予選${juniMoji(yosen)}'
+          : (shutsujouJuni(mae) && mae < seed ? 'シード' : '-'),
+    ]);
+    if (x.juni == seed - 1) {
+      gyou.add(['', '― シード権ライン ―', '', '', '', '']);
+    }
+  }
+  return _kansei(
+    k,
+    no,
+    w,
+    category: '駅伝・展望',
+    midashi: midashi,
+    lead: lead.toString(),
+    hyou: [
+      KijiHyou(
+        'シード権ライン付近の前評判(上位$seed校がシード権)',
+        ['前評判', '大学', '1万m平均', '区間別', '前回', '今季の出場'],
+        gyou,
+      ),
+    ],
+    jibun: jibunKyoukai,
   );
 }
 

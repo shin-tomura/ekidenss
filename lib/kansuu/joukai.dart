@@ -113,3 +113,34 @@ void itsuzaiNiSuru(SenshuData senshu, Random random) {
   // 上限は、本当の入学時5000mの記録で決める
   senshu.magicnumber = joukaiMagicnumberFromNyuugakuji5000(kirokuHontou);
 }
+
+// ------------------------------------------------------------
+// 13分台の新入生の限界突破(1.9.3)
+// 入学時5000mが13分台の選手は上限の近くから始まり、1回の育成で伸びる量も大きいので、
+// どの成長タイプでも1年のうちに上限に届き、2年以降は限界突破でしか伸びない。
+// そのため、遅れて伸びる選手に追いつかれて、学年が上がるほど学年内の順位が下がりやすかった
+// (シミュレーションで、13分台の平均順位が2年秋30位→4年秋39位、1年秋→4年秋の伸びは1万mで31秒)。
+// 4回目以降の限界突破の確率(Ikusei_Com.dart。ふつうは10%)を、13分台の選手だけ13%にする
+// (平均順位は2年秋30位→4年秋32位くらい、伸びは36秒くらいになる。
+// 学年1位の速さは1万mで7秒くらい速くなり、記録が少し出やすくなる)。
+// ・最初の3回(33%)は今まで通り
+// ・入学時5000mの記録で決めるので、留学生(記録なし)と、隠れた逸材(記録は14分台・15分台)は今まで通り
+// ・在学中の選手にも、次の育成から効く
+// ------------------------------------------------------------
+
+/// 13分台かどうかを決める入学時5000mの記録(秒)。これより速ければ13分台(14分00秒)
+const double genkaitoppaJuusanpundaiKijun = 840.0;
+
+/// 4回目以降の限界突破の確率(%)(ふつう・13分台の選手)(1.9.3)
+const int genkaitoppaKakuritsuFutsuu = 10;
+const int genkaitoppaKakuritsuJuusanpundai = 13;
+
+/// 4回目以降の限界突破の確率(%)(1.9.3)
+/// 入学時5000mの記録が13分台の選手だけ高くする(記録が0や記録なしの選手は、ふつうの確率)
+int genkaitoppaKakuritsu4kaimeIkou(SenshuData senshu) {
+  final double kiroku = senshu.kiroku_nyuugakuji_5000;
+  if (kiroku > 0.0 && kiroku < genkaitoppaJuusanpundaiKijun) {
+    return genkaitoppaKakuritsuJuusanpundai;
+  }
+  return genkaitoppaKakuritsuFutsuu;
+}

@@ -4,6 +4,7 @@ import 'package:ekiden/ghensuu.dart'; // Ghensuuクラスのインポート
 import 'package:ekiden/univ_data.dart'; // UnivDataクラスのインポート
 import 'package:ekiden/senshu_data.dart'; // SenshuDataクラスのインポート
 import 'package:ekiden/constants.dart'; // TEISUUクラスをインポート
+import 'package:ekiden/kansuu/joukai.dart'; // 13分台の選手の限界突破の確率(1.9.3)
 // 必要に応じて他のモデルや定数ファイルのインポートを追加してください
 
 /// 選手の育成（成長）処理を行う関数
@@ -311,8 +312,10 @@ Future<void> Ikusei_Com({
                     (sortedsenshudata[senshuid].hirou == 1 &&
                         sortedsenshudata[senshuid].genkaitoppakaisuu < 12)) {}*/
                 // 限界突破回数が3回以上の場合のロジック
-                if (_random.nextInt(100) < 10) {
-                  // 0から99までの乱数が10未満 (10%の確率)
+                // (1.9.3から、入学時5000mが13分台の選手だけ13%。ほかは今まで通り10%。joukai.dart)
+                if (_random.nextInt(100) <
+                    genkaitoppaKakuritsu4kaimeIkou(sortedsenshudata[senshuid])) {
+                  // 0から99までの乱数が確率未満
                   // 突破する前の上限(1.8.5。下の a_min_int の計算で使う)
                   final double maeMagicnumber =
                       sortedsenshudata[senshuid].magicnumber;

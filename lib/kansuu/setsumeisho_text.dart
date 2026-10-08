@@ -76,6 +76,7 @@ List<SetsumeishoGroup> setsumeishoGroupList() {
       ),
     ]),
     const SetsumeishoGroup('', [SetsumeishoKoumoku(_seiseiAI)]),
+    const SetsumeishoGroup('', [SetsumeishoKoumoku(_newsKiji)]),
     const SetsumeishoGroup('その他', [
       SetsumeishoKoumoku(_gakunaiKiroku),
       SetsumeishoKoumoku(_kantokuCoach),
@@ -103,6 +104,19 @@ const ShiyouSetsu _seiseiAI = ShiyouSetsu('生成AIと遊ぶ(テキストのコ�
   '・コピーしたテキストを生成AIのチャット欄に貼り付けると、区間配置や指示の相談、レースの実況プレイなどを楽しめます。',
   '・作者がとても熱中している遊び方です。',
   '・会話の最初に「ゲームの仕様(生成AI向け)」を一度貼り付けておくと、相談の精度が上がります。',
+]);
+
+// ニュース記事(箱庭スポーツ。1.9.2。lib/kansuu/kiji/)
+const ShiyouSetsu _newsKiji = ShiyouSetsu('ニュース記事(箱庭スポーツ)', [
+  '・駅伝と駅伝予選の結果画面の「ニュース記事」で、大会の記事を読めます。',
+  '・直前順位予想の画面の「展望記事」で、レース前の展望記事を読めます。',
+  '・記事は、優勝争い・自分の大学・区間賞・通過争いなど、大会ごとに数本あります。',
+  '・記事は、開いたときのゲームのデータから作ります。',
+  '・前の大会の記事を、あとから読むことはできません。',
+  '・同じ場面なら、何度開いても同じ記事になります。',
+  '・コメントは選手と大学の監督のもので、総監督(あなた)のコメントはありません。',
+  '・記事の最後のボタンで、記事を依頼文つきでコピーできます。',
+  '・生成AIに貼り付けると、記者になりきって記事を書き直してもらえます。',
 ]);
 
 const ShiyouSetsu _gakunaiKiroku = ShiyouSetsu('記録・学内順位', [

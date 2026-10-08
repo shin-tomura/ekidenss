@@ -8,6 +8,8 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ekiden/screens/ModalAverageTimeRankingView.dart';
 import 'package:ekiden/kansuu/ikku_pace.dart'; // 1区の集団のペース(1.9.2)
 import 'package:ekiden/screens/ikku_pace_box.dart'; // 1区のペース予想の枠(1.9.2)
+import 'package:ekiden/kansuu/kiji/kiji.dart'; // 展望記事(1.9.2)
+import 'package:ekiden/screens/kiji_screen.dart'; // 展望記事の画面(1.9.2)
 
 // 予想結果を保持するためのクラス
 class Prediction {
@@ -565,6 +567,39 @@ class Mode0330Content extends StatelessWidget {
                                         255,
                                         0,
                                       ),
+                                      decoration: TextDecoration.underline,
+                                      decorationColor: HENSUU.textcolor,
+                                    ),
+                                  ),
+                                ),
+                                // 展望記事(箱庭スポーツ。予想陣の3人の予想も記事に使う。1.9.2)
+                                TextButton(
+                                  onPressed: () {
+                                    kijiTenbouHiraku(context, [
+                                      KijiYosouJin(
+                                        'オッシー',
+                                        '基本走力重視',
+                                        [for (final p in osshiRanked) p.id],
+                                        List<int>.of(kukanshou_id_osshi),
+                                      ),
+                                      KijiYosouJin(
+                                        '父ちゃん',
+                                        '総合評価',
+                                        [for (final p in tochanRanked) p.id],
+                                        List<int>.of(kukanshou_id_tochan),
+                                      ),
+                                      KijiYosouJin(
+                                        '王太郎',
+                                        '入学時の持ちタイム重視',
+                                        [for (final p in otaroRanked) p.id],
+                                        List<int>.of(kukanshou_id_otaro),
+                                      ),
+                                    ]);
+                                  },
+                                  child: const Text(
+                                    "📰 展望記事(箱庭スポーツ)",
+                                    style: TextStyle(
+                                      color: Color.fromARGB(255, 0, 255, 0),
                                       decoration: TextDecoration.underline,
                                       decorationColor: HENSUU.textcolor,
                                     ),

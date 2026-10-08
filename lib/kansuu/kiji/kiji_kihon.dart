@@ -448,6 +448,32 @@ int renzokuKaisuu(
   return c;
 }
 
+/// 続けて条件[jouken]に合った回数と、その数を言い切れるか(1.9.2)
+/// 大学の順位の記録は直近 TEISUU.KIROKUHOZONNENSUU 回分しか残らないので、残っている記録が
+/// [hajime]回前から全部条件に合っていたときは、もっと前から続いているかもしれない。
+/// そのときは、全期間で条件に合った回数[tsuusan]([hajime]回前までの分)が数えた回数と同じなら
+/// (それより前に条件に合ったことがないので)言い切れる。言い切れないときは、記事で数を出さない
+({int kaisuu, bool kakutei}) renzokuKakutei(
+  UnivData u,
+  int race,
+  int hajime,
+  bool Function(int juni) jouken,
+  int tsuusan,
+) {
+  final int c = renzokuKaisuu(u, race, hajime, jouken);
+  if (c < TEISUU.KIROKUHOZONNENSUU - hajime) return (kaisuu: c, kakutei: true);
+  return (kaisuu: c, kakutei: tsuusan <= c);
+}
+
+/// 全期間で大会[race]の順位が[seed]位より上(シード権)だった回数
+int seedKaisuu(UnivData u, int race, int seed) {
+  int n = 0;
+  for (int j = 0; j < seed; j++) {
+    n += juniKaisuu(u, race, j);
+  }
+  return n;
+}
+
 /// [hajime]回前より前で、最後に条件[jouken]に合ったのは何回前か(なければnull)
 int? saigoNoKai(
   UnivData u,

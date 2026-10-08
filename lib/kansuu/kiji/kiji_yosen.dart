@@ -206,7 +206,17 @@ String _honsenKaisuuMoji(YosenKekka e, UnivData u) {
   if (e.honsenMikaisai) return '';
   final int kaisuu = shutsujouKaisuu(u, e.honsen) + 1;
   if (kaisuu <= 1) return '初の';
-  final int renzoku = renzokuKaisuu(u, e.honsen, 0, shutsujouJuni) + 1;
+  // 連続出場の数を言い切れないとき(残っている記録が全部出場で、それより前にも出場がある)は、
+  // 連続の数を出さず、全期間の回数だけにする
+  final ({int kaisuu, bool kakutei}) rz = renzokuKakutei(
+    u,
+    e.honsen,
+    0,
+    shutsujouJuni,
+    shutsujouKaisuu(u, e.honsen),
+  );
+  if (!rz.kakutei) return '$kaisuu度目の';
+  final int renzoku = rz.kaisuu + 1;
   final int? mae = saigoNoKai(u, e.honsen, 0, shutsujouJuni);
   return renzokuMoji(
     renzoku: renzoku,
@@ -298,6 +308,14 @@ Kiji _yosenTopKiji(YosenKekka e) {
   ];
   int renzokuHonsen(YosenUnivKekka x) =>
       renzokuKaisuu(x.u, e.honsen, 0, shutsujouJuni);
+  // 連続出場の数を言い切れるか(言い切れないときは数を出さない)
+  bool renzokuHonsenKakutei(YosenUnivKekka x) => renzokuKakutei(
+    x.u,
+    e.honsen,
+    0,
+    shutsujouJuni,
+    shutsujouKaisuu(x.u, e.honsen),
+  ).kakutei;
   togireta.sort((a, b) => renzokuHonsen(b).compareTo(renzokuHonsen(a)));
   final YosenUnivKekka? togire = togireta.isEmpty ? null : togireta.first;
   final bool topRenzoku = juniRace(top.u, race, 1) == 0;
@@ -307,7 +325,14 @@ Kiji _yosenTopKiji(YosenKekka e) {
 
   // 見出し
   String midashi;
-  if (togire != null && renzokuHonsen(togire) >= 5) {
+  if (togire != null &&
+      renzokuHonsen(togire) >= 5 &&
+      !renzokuHonsenKakutei(togire)) {
+    midashi = w.erabu([
+      '${togire.mei}が予選敗退　長く続いた${e.honsenMei}出場途切れる',
+      '${togire.mei}、まさかの予選落ち　長く続いた連続出場が途切れる',
+    ]);
+  } else if (togire != null && renzokuHonsen(togire) >= 5) {
     midashi = w.erabu([
       '${togire.mei}が予選敗退　連続出場${renzokuHonsen(togire)}年で途切れる',
       '${togire.mei}、まさかの予選落ち　${renzokuHonsen(togire)}年続いた${e.honsenMei}出場途切れる',
@@ -483,7 +508,7 @@ Kiji _yosenTopKiji(YosenKekka e) {
     final int mae = juniRace(x.u, e.honsen, 0);
     w.danraku(
       '前回${e.honsenMei}で${juniMoji(mae)}だった${x.mei}は${juniMoji(x.juni)}で予選敗退。'
-      '${r >= 2 ? '連続出場は$r年で途切れた。' : '2年連続の出場はならなかった。'}',
+      '${!renzokuHonsenKakutei(x) ? '長く続いた連続出場が途切れた。' : (r >= 2 ? '連続出場は$r年で途切れた。' : '2年連続の出場はならなかった。')}',
     );
   }
   if (race == 4) {

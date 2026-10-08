@@ -274,8 +274,17 @@ Kiji _topKiji(EkidenKekka e) {
   final int sa = saByou(ni.time, win.time);
 
   // 事実を集める
-  final int renzoku = renzokuKaisuu(win.u, race, 0, (j) => j == 0);
   final int kaisuu = juniKaisuu(win.u, race, 0);
+  final ({int kaisuu, bool kakutei}) rz = renzokuKakutei(
+    win.u,
+    race,
+    0,
+    (j) => j == 0,
+    kaisuu,
+  );
+  final int renzoku = rz.kaisuu;
+  // 連覇の数を言い切れないとき(残っている記録が全部優勝で、それより前にも優勝がある)は数を出さない
+  final bool renzokuFumei = !rz.kakutei;
   final int? maeYuushou = saigoNoKai(win.u, race, 1, (j) => j == 0);
   final bool hatsu = kaisuu <= 1;
   // 今回が初めての開催(ゲームを始めた年など)なら、全校が初出場なので「初代王者」として書く
@@ -283,6 +292,8 @@ Kiji _topKiji(EkidenKekka e) {
   final String yuushouGo = race == 2 ? '総合優勝' : '優勝';
   final String kaisuuGo = hatsuKaisai
       ? yuushouGo
+      : renzokuFumei
+      ? '$kaisuu度目の$yuushouGo'
       : (hatsu
             ? (race == 2 ? '初の総合優勝' : '初優勝')
             : '${renzokuMoji(renzoku: renzoku, buri: maeYuushou, kaisuu: kaisuu)}$yuushouGo');
@@ -332,6 +343,11 @@ Kiji _topKiji(EkidenKekka e) {
       '${win.mei}、悲願の初V',
       '${win.mei}が初の頂点',
     ]);
+  } else if (renzokuFumei) {
+    midashi1 = w.erabu([
+      '${win.mei}、連覇続く$kaisuu度目V',
+      '連覇を続ける${win.mei}が$kaisuu度目のV',
+    ]);
   } else if (renzoku >= 2) {
     midashi1 = w.erabu([
       '${win.mei}が$renzoku連覇',
@@ -371,6 +387,9 @@ Kiji _topKiji(EkidenKekka e) {
   lead.write('${win.mei}が${jikanMoji(win.time)}で$kaisuuGoを果たした。');
   if (hatsuKaisai) {
     lead.write('初めて開催された大会で、初代王者に輝いた。');
+  }
+  if (renzokuFumei) {
+    lead.write('長く続く連覇を、さらに伸ばした。');
   }
   if (k.ichinenDake) {
     lead.write('今大会は、1年生だけが出場できる大会として行われた。');
@@ -549,9 +568,19 @@ Kiji _topKiji(EkidenKekka e) {
   for (final EkidenUnivKekka x in e.jun) {
     if (x.juni == 0) continue;
     if (juniRace(x.u, race, 1) == 0) {
-      final int maeRenzoku = renzokuKaisuu(x.u, race, 1, (j) => j == 0);
+      // 今回は優勝していないので、全期間の優勝回数は前回までの分
+      final ({int kaisuu, bool kakutei}) mr = renzokuKakutei(
+        x.u,
+        race,
+        1,
+        (j) => j == 0,
+        juniKaisuu(x.u, race, 0),
+      );
+      final int maeRenzoku = mr.kaisuu;
       ika.write(
-        maeRenzoku >= 2
+        !mr.kakutei
+            ? '前回王者の${x.mei}は${juniMoji(x.juni)}に終わり、長く続いた連覇が止まった。'
+            : maeRenzoku >= 2
             ? '${maeRenzoku + 1}連覇を狙った前回王者の${x.mei}は${juniMoji(x.juni)}に終わった。'
             : '前回王者の${x.mei}は${juniMoji(x.juni)}で、連覇を逃した。',
       );
@@ -1141,10 +1170,24 @@ Kiji? _seedKiji(EkidenKekka e) {
     if (!maeSeed && imaSeed) kakutoku.add(x);
   }
   // 前回までの連続シード(今回の前まで)と、今回を含めた連続シード
-  int maeRenzoku(EkidenUnivKekka x) =>
-      renzokuKaisuu(x.u, race, 1, (j) => j < seed);
-  int imaRenzoku(EkidenUnivKekka x) =>
-      renzokuKaisuu(x.u, race, 0, (j) => j < seed);
+  // 数を言い切れないとき(残っている記録が全部シードで、それより前にもシードがある)は数を出さない
+  // (前回までの連続シードは、今回シード権を逃した大学に使うので、全期間のシードの回数は前回までの分)
+  ({int kaisuu, bool kakutei}) maeRenzokuK(EkidenUnivKekka x) => renzokuKakutei(
+    x.u,
+    race,
+    1,
+    (j) => j < seed,
+    seedKaisuu(x.u, race, seed),
+  );
+  ({int kaisuu, bool kakutei}) imaRenzokuK(EkidenUnivKekka x) => renzokuKakutei(
+    x.u,
+    race,
+    0,
+    (j) => j < seed,
+    seedKaisuu(x.u, race, seed),
+  );
+  int maeRenzoku(EkidenUnivKekka x) => maeRenzokuK(x).kaisuu;
+  int imaRenzoku(EkidenUnivKekka x) => imaRenzokuK(x).kaisuu;
   ushinatta.sort((a, b) => maeRenzoku(b).compareTo(maeRenzoku(a)));
   // 今年の予選を勝ち上がってきた大学と、その中でシード権を取った大学
   final List<EkidenUnivKekka> yosenGumi = [
@@ -1211,8 +1254,9 @@ Kiji? _seedKiji(EkidenKekka e) {
       '${morashi.mei}、${saMoji(sa)}差でシード権逃す',
     ]);
   } else if (togire != null && maeRenzoku(togire) >= 5) {
-    midashi =
-        '${togire.mei}、連続シード${maeRenzoku(togire)}年で途切れる　${juniMoji(togire.juni)}';
+    midashi = maeRenzokuK(togire).kakutei
+        ? '${togire.mei}、連続シード${maeRenzoku(togire)}年で途切れる　${juniMoji(togire.juni)}'
+        : '${togire.mei}、長く続いた連続シードが途切れる　${juniMoji(togire.juni)}';
   } else if (nokoriGyakuten) {
     midashi = '${nokori.mei}が最終区で逆転シード';
   } else if (togire != null) {
@@ -1291,7 +1335,11 @@ Kiji? _seedKiji(EkidenKekka e) {
       'シード権を失った。',
     );
     if (togire != null && maeRenzoku(togire) >= 2) {
-      sb.write('${togire.mei}の連続シードは${maeRenzoku(togire)}年で途切れた。');
+      sb.write(
+        maeRenzokuK(togire).kakutei
+            ? '${togire.mei}の連続シードは${maeRenzoku(togire)}年で途切れた。'
+            : '${togire.mei}の長く続いた連続シードが途切れた。',
+      );
     }
     w.danraku(sb.toString());
   }
@@ -1321,7 +1369,11 @@ Kiji? _seedKiji(EkidenKekka e) {
     );
   }
   if (nagai != null && nagaiNen >= 5) {
-    w.danraku('${nagai.mei}は$nagaiNen年連続のシード権確保となった。');
+    w.danraku(
+      imaRenzokuK(nagai).kakutei
+          ? '${nagai.mei}は$nagaiNen年連続のシード権確保となった。'
+          : '${nagai.mei}は、長く続く連続シードをさらに伸ばした。',
+    );
   }
 
   // シード権ライン前後の表(シード権ラインの区切りの行を入れる)

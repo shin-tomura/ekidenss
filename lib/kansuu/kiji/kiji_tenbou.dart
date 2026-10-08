@@ -453,9 +453,19 @@ Kiji _yuushouTenbou(Tenbou t, List<KijiYosouJin> yosou) {
   for (final TenbouUniv x in t.jun) {
     if (juniRace(x.u, race, 0) == 0) ouja = x;
   }
-  final int oujaRenzoku = ouja == null
-      ? 0
-      : renzokuKaisuu(ouja.u, race, 0, (j) => j == 0);
+  // 前回までの連覇(大会の前なので、全期間の優勝回数は前回までの分)。
+  // 数を言い切れないとき(残っている記録が全部優勝で、それより前にも優勝がある)は数を出さない
+  final ({int kaisuu, bool kakutei})? oujaRz = ouja == null
+      ? null
+      : renzokuKakutei(
+          ouja.u,
+          race,
+          0,
+          (j) => j == 0,
+          juniKaisuu(ouja.u, race, 0),
+        );
+  final int oujaRenzoku = oujaRz?.kaisuu ?? 0;
+  final bool oujaFumei = oujaRz != null && !oujaRz.kakutei;
   // 三冠・二冠がかかる大学
   TenbouUniv? sankan;
   TenbouUniv? nikan;
@@ -499,10 +509,17 @@ Kiji _yuushouTenbou(Tenbou t, List<KijiYosouJin> yosou) {
       '三冠かかる${sankan.mei}',
     ]);
     midashi += sankan.u.id == hon.u.id ? '　戦力も一枚上' : '　${hon.mei}が阻むか';
+  } else if (ouja != null && ouja.u.id == hon.u.id && oujaFumei) {
+    midashi = w.erabu([
+      '${ouja.mei}が本命　連覇をさらに伸ばすか',
+      '連覇を続ける${ouja.mei}が本命',
+    ]);
   } else if (ouja != null && ouja.u.id == hon.u.id) {
     midashi = oujaRenzoku >= 2
         ? '${ouja.mei}、${oujaRenzoku + 1}連覇へ本命'
         : w.erabu(['${ouja.mei}が連覇へ本命', '前回王者${ouja.mei}、連覇へ視界良好']);
+  } else if (ouja != null && oujaFumei) {
+    midashi = '${hon.mei}が本命　連覇を続ける${ouja.mei}は記録を伸ばせるか';
   } else if (ouja != null) {
     midashi = '${hon.mei}が本命　前回王者${ouja.mei}は${oujaRenzoku >= 2 ? '${oujaRenzoku + 1}連覇' : '連覇'}なるか';
   } else if (nikan != null && nikan.u.id == hon.u.id) {
@@ -543,7 +560,9 @@ Kiji _yuushouTenbou(Tenbou t, List<KijiYosouJin> yosou) {
     lead.write('10月駅伝、11月駅伝を制した${sankan.mei}は、史上まれな三冠に挑む。');
   } else if (ouja != null) {
     lead.write(
-      oujaRenzoku >= 2
+      oujaFumei
+          ? '連覇を続ける前回王者の${ouja.mei}は、さらに記録を伸ばせるか。'
+          : oujaRenzoku >= 2
           ? '前回王者の${ouja.mei}は${oujaRenzoku + 1}連覇がかかる。'
           : '前回王者の${ouja.mei}は連覇を狙う。',
     );
@@ -898,6 +917,14 @@ Kiji? _seedTenbou(Tenbou t, List<KijiYosouJin> yosou) {
   // 前回までの連続シード(今回の前まで)
   int renzokuSeed(TenbouUniv x) =>
       renzokuKaisuu(x.u, race, 0, (j) => j < seed);
+  // 連続シードの数を言い切れるか(言い切れないときは数を出さない。全期間のシードの回数は前回までの分)
+  bool renzokuSeedKakutei(TenbouUniv x) => renzokuKakutei(
+    x.u,
+    race,
+    0,
+    (j) => j < seed,
+    seedKaisuu(x.u, race, seed),
+  ).kakutei;
   // 前回シード権を取っていて、前評判でシード権の外にいる大学(連続シードの長い順)
   final List<TenbouUniv> kiken = [
     for (final TenbouUniv x in t.jun)
@@ -949,8 +976,9 @@ Kiji? _seedTenbou(Tenbou t, List<KijiYosouJin> yosou) {
   // 見出し
   String midashi;
   if (kiken0 != null && renzokuSeed(kiken0) >= 3) {
-    midashi =
-        '${kiken0.mei}、${renzokuSeed(kiken0) + 1}年連続シードへ正念場　前評判${kiken0.juni + 1}番手';
+    midashi = renzokuSeedKakutei(kiken0)
+        ? '${kiken0.mei}、${renzokuSeed(kiken0) + 1}年連続シードへ正念場　前評判${kiken0.juni + 1}番手'
+        : '${kiken0.mei}、長く続く連続シードへ正念場　前評判${kiken0.juni + 1}番手';
   } else if (kiken0 != null) {
     midashi = w.erabu([
       '前回シードの${kiken0.mei}に黄信号　前評判${kiken0.juni + 1}番手',
@@ -979,7 +1007,8 @@ Kiji? _seedTenbou(Tenbou t, List<KijiYosouJin> yosou) {
     final int r = renzokuSeed(kiken0);
     lead.write(
       '前回${juniMoji(juniRace(kiken0.u, race, 0))}の${kiken0.mei}は'
-      '${r >= 2 ? '$r年連続でシード権を守ってきたが、' : ''}前評判では${kiken0.juni + 1}番手にとどまる。',
+      '${!renzokuSeedKakutei(kiken0) ? '長くシード権を守ってきたが、' : (r >= 2 ? '$r年連続でシード権を守ってきたが、' : '')}'
+      '前評判では${kiken0.juni + 1}番手にとどまる。',
     );
   }
 
@@ -1033,7 +1062,7 @@ Kiji? _seedTenbou(Tenbou t, List<KijiYosouJin> yosou) {
       final int r = renzokuSeed(x);
       w.danraku(
         '前回${juniMoji(juniRace(x.u, race, 0))}の${x.mei}は前評判${x.juni + 1}番手。'
-        '${r >= 2 ? '続けてきた$r年連続のシード権が途切れる恐れもある。' : 'シード権を守れるかが焦点だ。'}',
+        '${!renzokuSeedKakutei(x) ? '長く続く連続シードが途切れる恐れもある。' : (r >= 2 ? '続けてきた$r年連続のシード権が途切れる恐れもある。' : 'シード権を守れるかが焦点だ。')}',
       );
     }
     final TenbouUniv k0 = kiken.first;

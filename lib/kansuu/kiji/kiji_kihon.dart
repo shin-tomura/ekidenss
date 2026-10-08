@@ -460,6 +460,25 @@ int? saigoNoKai(
 /// 出場していた順位か
 bool shutsujouJuni(int juni) => juni >= 0 && juni < TEISUU.DEFAULTJUNI;
 
+/// 大会[race]がまだ一度も行われていないか(どの大学も出場したことがない。ゲームを始めた年など)
+/// 大会の前(展望)と、予選の結果の記事での本戦に使う。全校が「初出場」になるので、
+/// 初出場を並べたり見出しにしたりせず、初めての開催として書く
+bool mikaisai(KijiKankyou k, int race) {
+  for (final UnivData u in k.univ) {
+    if (shutsujouKaisuu(u, race) > 0) return false;
+  }
+  return true;
+}
+
+/// 今回が大会[race]の初めての開催だったか(結果の記事。今回の出場はもう数えてあるので、
+/// どの大学も出場が1回以下なら初めての開催)
+bool hatsuKaisaiKekka(KijiKankyou k, int race) {
+  for (final UnivData u in k.univ) {
+    if (shutsujouKaisuu(u, race) > 1) return false;
+  }
+  return true;
+}
+
 // ------------------------------------------------------------
 // 区間の特徴(展望・結果の記事で、区間の呼び方と見る種目を決める)
 // ------------------------------------------------------------

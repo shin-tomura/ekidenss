@@ -278,10 +278,14 @@ Kiji _topKiji(EkidenKekka e) {
   final int kaisuu = juniKaisuu(win.u, race, 0);
   final int? maeYuushou = saigoNoKai(win.u, race, 1, (j) => j == 0);
   final bool hatsu = kaisuu <= 1;
+  // 今回が初めての開催(ゲームを始めた年など)なら、全校が初出場なので「初代王者」として書く
+  final bool hatsuKaisai = hatsuKaisaiKekka(k, race);
   final String yuushouGo = race == 2 ? '総合優勝' : '優勝';
-  final String kaisuuGo = hatsu
-      ? (race == 2 ? '初の総合優勝' : '初優勝')
-      : '${renzokuMoji(renzoku: renzoku, buri: maeYuushou, kaisuu: kaisuu)}$yuushouGo';
+  final String kaisuuGo = hatsuKaisai
+      ? yuushouGo
+      : (hatsu
+            ? (race == 2 ? '初の総合優勝' : '初優勝')
+            : '${renzokuMoji(renzoku: renzoku, buri: maeYuushou, kaisuu: kaisuu)}$yuushouGo');
   final int juraiTaikai = k.kantoku.yobiint4.length > 20
       ? k.kantoku.yobiint4[20]
       : 0;
@@ -316,6 +320,11 @@ Kiji _topKiji(EkidenKekka e) {
       '${win.mei}が三冠達成',
       '${win.mei}、三大駅伝完全制覇',
       if (win.u.sankankaisuu >= 2) '${win.mei}、${win.u.sankankaisuu}度目の三冠',
+    ]);
+  } else if (hatsuKaisai) {
+    midashi1 = w.erabu([
+      '${win.mei}が初代王者に',
+      '初開催の${k.raceMei}、${win.mei}が制す',
     ]);
   } else if (hatsu) {
     midashi1 = w.erabu([
@@ -360,6 +369,9 @@ Kiji _topKiji(EkidenKekka e) {
     race == 2 ? '${k.taikaiMei}は復路が行われ、' : '${k.taikaiMei}が行われ、',
   );
   lead.write('${win.mei}が${jikanMoji(win.time)}で$kaisuuGoを果たした。');
+  if (hatsuKaisai) {
+    lead.write('初めて開催された大会で、初代王者に輝いた。');
+  }
   if (sankan) {
     lead.write(
       w.erabu([
@@ -548,7 +560,7 @@ Kiji _topKiji(EkidenKekka e) {
     for (final EkidenUnivKekka x in e.jun)
       if (shutsujouKaisuu(x.u, race) == 1) '${x.mei}(${juniMoji(x.juni)})',
   ];
-  if (hatsuShutsujou.isNotEmpty && hatsuShutsujou.length <= 3) {
+  if (!hatsuKaisai && hatsuShutsujou.isNotEmpty && hatsuShutsujou.length <= 3) {
     ika.write('初出場の${hatsuShutsujou.join('、')}も力走した。');
   }
   w.danraku(ika.toString());
@@ -612,6 +624,8 @@ Kiji? _jibunKiji(EkidenKekka e) {
   final bool seedNow = seed != null && r < seed;
   final bool seedMae = seed != null && maeAri && mae < seed;
   final bool hatsuShutsujou = shutsujouKaisuu(m.u, race) <= 1;
+  // 今回が初めての開催なら、全校が初出場なので「初出場」とは書かない
+  final bool hatsuKaisai = hatsuKaisaiKekka(k, race);
   bool kakoSaikou = !hatsuShutsujou && juniKaisuu(m.u, race, r) == 1;
   for (int j = 0; j < r && kakoSaikou; j++) {
     if (juniKaisuu(m.u, race, j) > 0) kakoSaikou = false;
@@ -648,7 +662,9 @@ Kiji? _jibunKiji(EkidenKekka e) {
   String midashi;
   if (r == 0) {
     final int kaisuu = juniKaisuu(m.u, race, 0);
-    midashi = kaisuu <= 1
+    midashi = hatsuKaisai
+        ? w.erabu(['$mmが初代王者に', '$mm、初開催の大会を制す'])
+        : kaisuu <= 1
         ? w.erabu(['$mm、悲願の初優勝', '$mmが初の頂点に'])
         : w.erabu(['$mmが優勝　${kaisuu}度目の頂点', '$mm、栄冠つかむ']);
   } else if (kakoSaikou && r <= 4) {
@@ -696,7 +712,9 @@ Kiji? _jibunKiji(EkidenKekka e) {
       lead.write('目標の${juniMoji(mokuhyou)}には${r - mokuhyou}つ届かなかった。');
     }
   }
-  if (hatsuShutsujou) {
+  if (hatsuKaisai) {
+    if (r == 0) lead.write('初めて開催された大会で、初代王者に輝いた。');
+  } else if (hatsuShutsujou) {
     lead.write('初出場で${juniMoji(r)}と健闘した。');
   } else if (maeAri) {
     if (mae > r) {
@@ -1277,7 +1295,10 @@ Kiji? _seedKiji(EkidenKekka e) {
     for (final EkidenUnivKekka x in kakutoku)
       if (x.juni != 0) x,
   ];
-  if (atarashii.isNotEmpty) {
+  if (hatsuKaisaiKekka(k, race)) {
+    // 初めての開催では、シード校は全部「新たに」なので並べない
+    w.danraku('今回が初めての開催で、上位$seed校が初めてのシード権を手にした。');
+  } else if (atarashii.isNotEmpty) {
     String naiyou(EkidenUnivKekka x) {
       final int yj = juniRace(x.u, yosenRace, 0);
       return shutsujouJuni(yj)

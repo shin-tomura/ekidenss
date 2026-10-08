@@ -476,10 +476,12 @@ Kiji _yuushouTenbou(Tenbou t, List<KijiYosouJin> yosou) {
       honmeiYosou.length >= 2 && honmeiYosou.every((id) => id == honmeiYosou.first);
   final bool yosouWareru =
       honmeiYosou.length >= 3 && honmeiYosou.toSet().length == honmeiYosou.length;
+  // 今回が初めての開催か(ゲームを始めた年など。全校が初出場なので、初出場を並べない)
+  final bool hatsuKaisai = mikaisai(k, race);
   // 初出場・久しぶりの出場
   final List<TenbouUniv> hatsu = [
     for (final TenbouUniv x in t.jun)
-      if (shutsujouKaisuu(x.u, race) == 0) x,
+      if (!hatsuKaisai && shutsujouKaisuu(x.u, race) == 0) x,
   ];
   final List<String> hisashiburi = [];
   for (final TenbouUniv x in t.jun) {
@@ -505,6 +507,11 @@ Kiji _yuushouTenbou(Tenbou t, List<KijiYosouJin> yosou) {
     midashi = '${hon.mei}が本命　前回王者${ouja.mei}は${oujaRenzoku >= 2 ? '${oujaRenzoku + 1}連覇' : '連覇'}なるか';
   } else if (nikan != null && nikan.u.id == hon.u.id) {
     midashi = '${nikan.mei}、今季二冠へ本命';
+  } else if (hatsuKaisai) {
+    midashi = w.erabu([
+      '初代王者へ、${hon.mei}が本命',
+      '初開催の${k.raceMei}、${hon.mei}が優勝候補筆頭',
+    ]);
   } else {
     midashi = w.erabu([
       '${hon.mei}が優勝候補筆頭　${tai.mei}が追う',
@@ -519,6 +526,9 @@ Kiji _yuushouTenbou(Tenbou t, List<KijiYosouJin> yosou) {
   lead.write(
     '出場${t.n}校の区間エントリーが出そろい、本紙の戦力分析では${hon.mei}が優勝候補の筆頭に挙がった。',
   );
+  if (hatsuKaisai) {
+    lead.write('今回が初めての開催で、${t.n}校が初代王者の座を争う。');
+  }
   if (hon.heikinJuni == 0 && hon.kukanJuni == 0) {
     lead.write('1万mの平均タイム、区間ごとの持ちタイムのどちらでも出場校トップだ。');
   } else if (hon.heikinJuni == 0) {
@@ -552,7 +562,7 @@ Kiji _yuushouTenbou(Tenbou t, List<KijiYosouJin> yosou) {
     final int mae = juniRace(hon.u, race, 0);
     if (shutsujouJuni(mae)) {
       sb.write('前回${juniMoji(mae)}。');
-    } else if (shutsujouKaisuu(hon.u, race) == 0) {
+    } else if (!hatsuKaisai && shutsujouKaisuu(hon.u, race) == 0) {
       sb.write('初出場ながら、');
     }
     if (a != null) {
@@ -987,7 +997,7 @@ Kiji? _seedTenbou(Tenbou t, List<KijiYosouJin> yosou) {
       sb.write('$yosenMeiを${juniMoji(yosen)}で通過して本戦に臨む。');
     } else if (shutsujouJuni(mae)) {
       sb.write('前回${juniMoji(mae)}。');
-    } else if (shutsujouKaisuu(x.u, race) == 0) {
+    } else if (!mikaisai(k, race) && shutsujouKaisuu(x.u, race) == 0) {
       sb.write('初出場。');
     }
     final SenshuData? a = t.ace(x);
@@ -1251,7 +1261,7 @@ Kiji? _jibunTenbou(Tenbou t, List<KijiYosouJin> yosou) {
   if (maeAri) {
     lead.write('前回は${juniMoji(mae)}だった。');
   } else if (shutsujouKaisuu(m.u, race) == 0) {
-    lead.write('今回が初めての出場となる。');
+    lead.write(mikaisai(k, race) ? '今回が初めての開催となる。' : '今回が初めての出場となる。');
   }
   if (ts != null) {
     lead.write('上位$ts校が手にする本戦への切符を目指す。');
@@ -1449,6 +1459,8 @@ Kiji _tsuukaTenbou(Tenbou t, List<KijiYosouJin> yosou) {
   final int honsen = race == 3 ? 1 : 2;
   final String honsenMei = race == 3 ? '11月駅伝' : '正月駅伝';
   final TenbouUniv hon = t.jun[0];
+  // 本戦がまだ一度も行われていないか(ゲームを始めた年など)
+  final bool honsenMikaisai = mikaisai(k, honsen);
 
   // 前回の本戦に出ていた大学(予選の前なので、本戦の記録の[0]が前回)
   final List<TenbouUniv> maeHonsen = [
@@ -1458,7 +1470,10 @@ Kiji _tsuukaTenbou(Tenbou t, List<KijiYosouJin> yosou) {
   // 本戦に出たことがなく、前評判で通過圏の大学
   final List<TenbouUniv> hatsuNerau = [
     for (final TenbouUniv x in t.jun)
-      if (x.juni < ts && shutsujouKaisuu(x.u, honsen) == 0) x,
+      if (!honsenMikaisai &&
+          x.juni < ts &&
+          shutsujouKaisuu(x.u, honsen) == 0)
+        x,
   ];
   // 前回の予選でトップ通過
   TenbouUniv? maeTop;
@@ -1506,6 +1521,9 @@ Kiji _tsuukaTenbou(Tenbou t, List<KijiYosouJin> yosou) {
   final StringBuffer lead = StringBuffer();
   lead.write(_gouhou(k, w));
   lead.write('上位$ts校に$honsenMeiの出場権が与えられる。');
+  if (honsenMikaisai) {
+    lead.write('$honsenMeiは今回が初めての開催で、どの大学も初出場を懸けて走る。');
+  }
   lead.write(
     '出場${t.n}校のエントリーをもとにした本紙の戦力分析では、${hon.mei}が'
     '${race == 3 ? '走る8人' : '上位10人'}の1万m平均${t.heikinMoji(hon)}でトップに立つ。',

@@ -149,6 +149,10 @@ class YosenKekka {
   /// 通過したか
   bool tsuuka(YosenUnivKekka x) => x.juni < tsuukaSuu;
 
+  /// 本戦がまだ一度も行われていないか(ゲームを始めた年など。通過校は全部初出場になるので、
+  /// 初出場を並べたり見出しにしたりしない)
+  bool get honsenMikaisai => mikaisai(k, honsen);
+
   /// 通過ラインの争いがあるか(出場校が通過校の数より多い)
   bool get borderAri => n > tsuukaSuu;
 
@@ -197,7 +201,9 @@ double? _kojinTime(KijiKankyou k, SenshuData s) {
 
 /// 本戦の出場の言い方(「3年連続5度目の」「2年ぶり4度目の」「初の」)
 /// 予選のあとなので、本戦の記録の[0]が前回(去年)の本戦
+/// (本戦がまだ一度も行われていないときは空)
 String _honsenKaisuuMoji(YosenKekka e, UnivData u) {
+  if (e.honsenMikaisai) return '';
   final int kaisuu = shutsujouKaisuu(u, e.honsen) + 1;
   if (kaisuu <= 1) return '初の';
   final int renzoku = renzokuKaisuu(u, e.honsen, 0, shutsujouJuni) + 1;
@@ -212,6 +218,7 @@ String _honsenKaisuuMoji(YosenKekka e, UnivData u) {
 /// 本戦の出場の短い言い方(表や並びで使う。「3年連続5度目」「初出場」)
 String _honsenKaisuuMijikai(YosenKekka e, UnivData u) {
   final String m = _honsenKaisuuMoji(e, u);
+  if (m.isEmpty) return '';
   if (m == '初の') return '初出場';
   return m.endsWith('の') ? m.substring(0, m.length - 1) : m;
 }
@@ -279,7 +286,10 @@ Kiji _yosenTopKiji(YosenKekka e) {
   // 事実を集める
   final List<YosenUnivKekka> hatsu = [
     for (final YosenUnivKekka x in e.jun)
-      if (e.tsuuka(x) && shutsujouKaisuu(x.u, e.honsen) == 0) x,
+      if (!e.honsenMikaisai &&
+          e.tsuuka(x) &&
+          shutsujouKaisuu(x.u, e.honsen) == 0)
+        x,
   ];
   // 前回の本戦に出ていて落選した大学(連続出場の長い順)
   final List<YosenUnivKekka> togireta = [
@@ -453,9 +463,15 @@ Kiji _yosenTopKiji(YosenKekka e) {
   w.koMidashi('通過校');
   final List<String> kaisuu = [
     for (final YosenUnivKekka x in e.jun)
-      if (e.tsuuka(x)) '${x.mei}(${_honsenKaisuuMijikai(e, x.u)})',
+      if (e.tsuuka(x))
+        _honsenKaisuuMijikai(e, x.u).isEmpty
+            ? x.mei
+            : '${x.mei}(${_honsenKaisuuMijikai(e, x.u)})',
   ];
   w.danraku('${e.honsenMei}への出場を決めたのは、${kaisuu.join('、')}。');
+  if (e.honsenMikaisai) {
+    w.danraku('${e.honsenMei}は今回が初めての開催となる。初代王者の座を懸けた戦いが待っている。');
+  }
   if (hatsu.isNotEmpty) {
     w.danraku(
       '${hatsu.map((x) => x.mei).join('、')}は初めて${e.honsenMei}の舞台に立つ。'

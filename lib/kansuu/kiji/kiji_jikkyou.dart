@@ -14,7 +14,9 @@ import 'package:ekiden/kansuu/kiji/kiji_kihon.dart';
 // ・実況アナと解説者の掛け合い。実況は「〜です！」の話し言葉の段落、解説はコメントの枠(左に線)。
 //   解説者は大会ごとに1人(名前から記者の型が決まり、数字で語る・情景で語る・辛口の違いがある)
 // ・書くのは、その時点で画面で見えていることだけ
-//   ・たすきを受けた順位と差、抜いた相手、首位交代、区間賞、1区の集団のペースと飛び出し、
+//   ・たすきを受けた順位と差、抜いた相手、首位交代、区間賞、1区の集団のペースと飛び出し
+//     (飛び出した選手は他大学も名前を出し、最初の段落でクローズアップする。成否は補正の説明の印、
+//     逃げ切ったか飲み込まれたかは区間タイムと集団のペースの比べ)、
 //     自分の大学の指示とその成否、目標順位を下回っての焦り・ほっと一息、学連選抜、因縁
 //   ・能力は、選手ごとの補正の説明(string_racesetumei。見抜く力のついた能力だけ書かれている)に
 //     出ている分だけ、数字なしで触れる。隠れている能力は見ない(解説も知らない体にする)
@@ -306,6 +308,17 @@ Kiji? _kukanJikkyou(
   final bool mokuhyouAri = my != null && mokuhyou >= 0 && mokuhyou < n;
   // 解説のコメント(左に線の枠で出す)
   void kai(String bun) => w.comment('解説・$kaisetsu「$bun」');
+  // 1区でスタート直後に飛び出した選手(区間順位の良い順。他大学の選手も、区間順位の画面の説明に
+  // 「スタート直後飛び出し補正」が出ているので名前を出せる)と、1区の集団のペースの結果
+  final List<_Koma> tobidashi = kk == 0
+      ? ([
+          for (final _Koma x in jun)
+            if (x.s != null && x.s!.startchokugotobidasiflag == 1) x,
+        ]..sort((a, b) => a.kukanJuni.compareTo(b.kukanJuni)))
+      : <_Koma>[];
+  final IkkuPaceKekka? pace = kk == 0 ? ikkuPaceKekkaYomu(k.kantoku, k.gh) : null;
+  // 集団のペース(1区のタイムに換算した秒。引っ張った選手がいなければnull)
+  final double? shuudanPace = (pace != null && pace.pacemakerId != null && pace.pace > 0) ? pace.pace : null;
 
   // 見出し
   String midashi;
@@ -320,6 +333,10 @@ Kiji? _kukanJikkyou(
     midashi = '${kk + 1}区で首位交代　${shui.mei}が${shuiMae.mei}をかわす';
   } else if (ue != null && ueKazu >= 3 && ue.s != null) {
     midashi = '${kk + 1}区　${shui.mei}が首位守る　${ue.mei}・${myouji(ue.s!.name)}が$ueKazu人抜き';
+  } else if (kk == 0 && tobidashi.isNotEmpty && tobidashi.first.tuuka == 0) {
+    // 飛び出した選手が先頭でたすきを渡した(1区は区間順位と通過順位が同じ)
+    final _Koma t = tobidashi.first;
+    midashi = '1区　${t.mei}・${myouji(t.s!.name)}が飛び出して逃げ切る　2位と${kinsaMoji(sa12)}';
   } else if (kukanshou.s != null) {
     midashi = '${kk + 1}区　${shui.mei}が首位　区間トップは${kukanshou.mei}・${myouji(kukanshou.s!.name)}';
   } else {
@@ -335,13 +352,18 @@ Kiji? _kukanJikkyou(
         'さあ、${k.taikaiMei}の号砲です！ $n校の1区が走り出しました！',
       ]),
     );
-    final IkkuPaceKekka? pace = ikkuPaceKekkaYomu(k.kantoku, k.gh);
+    // 飛び出した選手は、人数ではなく名前で(テレビで一番目立つ場面なので、先に伝える)
+    if (tobidashi.isNotEmpty) {
+      lead.write('スタート直後、${_yobi(w, tobidashi.first)}が集団から飛び出しました！');
+      if (tobidashi.length >= 2) lead.write('${_yobi(w, tobidashi[1])}も続きます。');
+      if (tobidashi.length >= 3) lead.write('飛び出したのは全部で${tobidashi.length}人です。');
+    }
     if (pace != null && pace.pacemakerId != null && pace.pacemakerId! >= 0 && pace.pacemakerId! < k.senshu.length) {
       final SenshuData pm = k.senshu[pace.pacemakerId!];
       final String pmDaigaku = (pm.univid >= 0 && pm.univid < k.univ.length) ? '${daigakuMeiMoji(k.univ[pm.univid].name)}・' : '';
       lead.write('集団を引っ張るのは$pmDaigaku${w.senshu(pm)}。${ikkuPaceMidashiMoji[pace.midashi]}の展開です。');
-      final int tobidashi = pace.kazu.length > 4 ? pace.kazu[4] : 0;
-      if (tobidashi >= 1) lead.write('スタート直後から$tobidashi人が飛び出しました！');
+      final int tobidashiKazu = pace.kazu.length > 4 ? pace.kazu[4] : 0;
+      if (tobidashi.isEmpty && tobidashiKazu >= 1) lead.write('スタート直後から$tobidashiKazu人が飛び出しました！');
     }
   } else {
     lead.write('$kukanMei、$kyoriです。');
@@ -358,6 +380,77 @@ Kiji? _kukanJikkyou(
     }
     if (saigo && nokori != null && morashi != null && (saSeed <= ks * 3 || saSeed <= 30)) {
       lead.write('優勝争いと並んで、上位$seedSuu校のシード権の最後の1枠も、${nokori.mei}と${morashi.mei}の${kinsaMoji(saSeed)}の争いになりました。');
+    }
+  }
+
+  // 本文: スタート直後の飛び出し(1区。勇気を持って前に出た選手を、最初にクローズアップする)
+  if (kk == 0 && tobidashi.isNotEmpty) {
+    w.koMidashi('スタート直後の飛び出し');
+    final StringBuffer tbb = StringBuffer();
+    final int kazu = tobidashi.length;
+    tbb.write(kazu == 1 ? '集団の安心を捨てて、1人が前に出ました。' : '集団の安心を捨てて、$kazu人が前に出ました。');
+    // 飛び出した選手ごと(最大3人。成否は補正の説明に出ている印、逃げ切りは集団のペースとの比べ)
+    int kaita = 0;
+    for (final _Koma x in tobidashi) {
+      if (kaita >= 3) break;
+      final SenshuData s = x.s!;
+      final bool seikou = s.startchokugotobidasiseikouflag == 1;
+      final bool? nige = shuudanPace == null ? null : x.kukanTime < shuudanPace;
+      final List<Innen> xi = senshuInnen(k, s, 0, kj: x.kukanJuni, kekka: owatta);
+      final String ku = (xi.isNotEmpty && xi.first.ten >= 45) ? xi.first.midashiKu : '';
+      tbb.write(kaita == 0 ? '$ku${_yobi(w, x)}が、勇気を持って飛び出しました。' : '$ku${_yobi(w, x)}も続きました。');
+      if (nige == null) {
+        tbb.write(seikou ? '狙いどおりの展開に持ち込みました。' : '後半に代償を払いました。');
+      } else if (seikou && nige) {
+        tbb.write('集団を最後まで寄せ付けず、逃げ切りました！');
+      } else if (seikou) {
+        tbb.write('飛び出しそのものは決まりましたが、集団のペースが速く、後半に飲み込まれました。');
+      } else if (nige) {
+        tbb.write('後半に代償を払いましたが、集団には捕まりませんでした。');
+      } else {
+        tbb.write('勇気ある飛び出しは実らず、後半に集団に飲み込まれました。');
+      }
+      tbb.write(
+        x.tuuka == 0
+            ? '区間賞、そのまま先頭でたすきを渡しました！'
+            : '区間${juniMoji(x.kukanJuni)}、${juniMoji(x.tuuka)}でたすきリレー。トップとは${kinsaMoji(saByou(x.ruikei, shui.ruikei))}です。',
+      );
+      kaita++;
+    }
+    if (kazu > kaita) tbb.write('ほかに${kazu - kaita}人が飛び出しています。');
+    w.danraku(tbb.toString());
+    // 解説(一番良かった飛び出しの選手について、型ごと)
+    final _Koma t = tobidashi.first;
+    final SenshuData ts = t.s!;
+    final bool tSeikou = ts.startchokugotobidasiseikouflag == 1;
+    final bool tNige = shuudanPace == null || t.kukanTime < shuudanPace;
+    final List<Innen> ti = senshuInnen(k, ts, 0, kj: t.kukanJuni, kekka: owatta);
+    switch (kata) {
+      case KishaKata.suuji:
+        if (shuudanPace != null) {
+          final int sa = saByou(t.kukanTime, shuudanPace);
+          kai(
+            sa < 0
+                ? '${myouji(ts.name)}の区間タイムは、集団のペースより${saMoji(sa)}速い。飛び出した分が、そのまま数字に出ています'
+                : '${myouji(ts.name)}の区間タイムは、集団のペースより${saMoji(sa)}遅い。飛び出しの代償が数字に出てしまいました',
+          );
+        } else {
+          kai('飛び出しは、決まればタイムが縮み、外れれば後半に跳ね返ってきます。今日は${tSeikou ? '前者' : '後者'}でした');
+        }
+      case KishaKata.joukei:
+        kai(
+          ti.isNotEmpty && ti.first.ten >= 45
+              ? '${myouji(ts.name)}、${ti.first.kotoba}。その思いが、スタート直後の一歩に出ましたね'
+              : '集団の安心を捨てて前に出るのは、勇気のいることです。${tSeikou ? 'その勇気が報われました' : '結果は出ませんでしたが、あの一歩は忘れられません'}',
+        );
+      case KishaKata.karakuchi:
+        if (tSeikou && tNige) {
+          kai('飛び出して逃げ切るのは、力がなければできません。${myouji(ts.name)}は今日、それを証明しました');
+        } else if (tSeikou) {
+          kai('飛び出しは決まりましたが、集団のほうが速かった。飛び出すなら、逃げ切る力まで要ります');
+        } else {
+          kai('勝負に出た以上、結果は受け止めるしかありません。ただ、飛び出さなければ見えなかった景色もあったはずです');
+        }
     }
   }
 
@@ -663,7 +756,8 @@ Kiji? _kukanJikkyou(
     // 指示
     if (kk == 0) {
       if (h.siji == 1 && h.seikou != null) {
-        mb.write(h.seikou! ? '$yobiはスタート直後に飛び出し、狙いどおりの展開に持ち込みました。' : '$yobiはスタート直後に飛び出しましたが、後半に苦しみました。');
+        // 飛び出しの様子は上の段落で書いたので、ここは指示と成否だけ
+        mb.write(h.seikou! ? '飛び出しの指示どおり前に出た$yobi、狙いは当たりました。' : '飛び出しの指示どおり前に出た$yobiでしたが、狙いは外れました。');
       } else if (h.shuudan.isNotEmpty) {
         if (h.shuudan.contains('速すぎた')) {
           mb.write('$yobiは速い集団のペースについていき、後半に大きく失速してしまいました。');
@@ -769,8 +863,13 @@ Kiji? _kukanJikkyou(
       final bool kantoku = k.jibunUniv != null && gakurenKantokuChuu(k.kantoku, k.jibunUniv!);
       w.koMidashi('学連選抜');
       final String gy = w.hito('G${g.senshu.id}', g.senshu.name, '${g.senshu.gakunen}年', '');
+      // 1区でスタート直後に飛び出していれば、そのことも
+      final String gTobidashi = (kk == 0 && g.senshu.startchokugotobidasiflag == 1)
+          ? (g.senshu.startchokugotobidasiseikouflag == 1 ? 'スタート直後に飛び出し、狙いどおりの展開に持ち込みました。' : 'スタート直後に飛び出しましたが、後半に苦しみました。')
+          : '';
       w.danraku(
         'オープン参加の学連選抜は$gy(${daigakuMeiMoji(g.shozoku)})が区間${juniMoji(g.kukanJuni)}相当。'
+        '$gTobidashi'
         '通過は${juniMoji(g.tuukaJuni)}相当です。'
         '${kantoku && g.kukanJuni == 0 ? '監督の采配が光りました！' : ''}',
       );

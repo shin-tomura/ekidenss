@@ -932,7 +932,8 @@ Kiji _toujitsu(KijiKankyou k, String site) {
       w.danraku('1区は${w.senshu(s1)}。チームの流れを作る大役を担う。');
       w.comment(senshuComment(w, _ikigomiBamen(k, s1), myouji(s1.name)));
     }
-    w.danraku('選手一人ひとりの紹介は、展望号の選手名鑑で読める。');
+    // 展望号(直前順位予想の画面)はもう読み返せないので、この記事に付けた表を案内する(1.9.3)
+    w.danraku('走る選手の区間と持ちタイムは、下の表のとおり。');
   }
   return _kansei(
     k,

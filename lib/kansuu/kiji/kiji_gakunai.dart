@@ -1,7 +1,6 @@
 import 'package:ekiden/constants.dart';
 import 'package:ekiden/senshu_data.dart';
 import 'package:ekiden/univ_data.dart';
-import 'package:ekiden/kansuu/konki_best.dart';
 import 'package:ekiden/screens/Modal_courseshoukai.dart'; // 大会の名前(courseRaceTitle)
 import 'package:ekiden/kansuu/kiji/kiji_kihon.dart';
 import 'package:ekiden/kansuu/kiji/kiji_comment.dart';
@@ -30,9 +29,8 @@ import 'package:ekiden/kansuu/kiji/kiji_taikousen.dart'
 //     「初めての駅伝」「駅伝デビュー」は今まで通り本戦(駅伝)だけで決める
 //  7. 対校戦の結果号(5000m・1万m・ハーフの種目ごとの結果画面): 8位以内の入賞者全員と、
 //     チーム内3位までの選手と、昨年の同じ種目から一番順位を上げた「伸び盛り」の選手を紹介する。
-//     ハーフのあとは、3種目を合わせた総合の記事も先に置く。自己ベストの更新は、前の記録が
-//     あったと確かめられる選手だけ書く(箱庭スポーツの対校戦の記事は自己ベストに触れないが、
-//     学内メディアは選手の成長を伝えたいので、確かめられるときだけ書く)
+//     ハーフのあとは、3種目を合わせた総合の記事も先に置く。成長は昨年の同じ種目との比べで伝え、
+//     昨年のない1年生は、5000mだけ入学時の記録と比べる
 //
 // 守る決まり(箱庭スポーツと同じ)
 //  ・能力値は書かない(見抜く力の仕組みを壊さないため)。成長タイプ・上限・サプライズも書かない
@@ -40,6 +38,9 @@ import 'package:ekiden/kansuu/kiji/kiji_taikousen.dart'
 //  ・総監督(プレイヤー)の言葉は作らない。当日変更の理由も書かない(決めたのは総監督なので)
 //  ・趣味は、趣味非表示設定のときは書かない
 //  ・文体は常体だが、学内メディアらしく選手に寄り添う温かい言い方にする(苦しんだ区間も前向きに書く)
+//  ・「自己ベストを更新した」「今季、自己ベストを更新している」とは書かない(選手は毎年伸びるので、
+//    ほとんどの選手に付いてしまい、特別なことに聞こえないため。1年生には初めての記録のこともある)。
+//    予選は自己ベストに数えないので、予選のタイムが自己ベストを上回ったときだけは書く
 // ------------------------------------------------------------
 
 /// 大学[u]の学内メディアの名前(「○○スポーツ」)
@@ -150,18 +151,6 @@ String? _kukanMochiTime(KijiKankyou k, SenshuData s, int kk) {
     if (m != null) return m;
   }
   return null;
-}
-
-/// 区間[kk]で見る主な種目の、今季に自己ベストを出したかどうかの一言(なければ空)
-String _konkiNoBun(KijiKankyou k, SenshuData s, int kk) {
-  final int idx = kukanShumoku(k.gh, k.race, kk).first;
-  final double jiko = k.jikoBest(s, idx);
-  final double konki = konkiBest(s, idx);
-  if (jiko >= TEISUU.DEFAULTTIME || konki >= TEISUU.DEFAULTTIME) return '';
-  if (byou(konki) <= byou(jiko)) {
-    return '今季、${kijiShumokuMei[idx]}の自己ベストを更新している。';
-  }
-  return '';
 }
 
 /// 自分の大学の選手で、大会のエントリーが[jouken]に合う選手(id順)
@@ -286,7 +275,6 @@ void _shoukai(KijiKakite w, SenshuData s, int kk) {
   final StringBuffer sb = StringBuffer();
   final String? mochi = _kukanMochiTime(k, s, kk);
   if (mochi != null) sb.write('持ちタイムは$mochi。');
-  sb.write(_konkiNoBun(k, s, kk));
   sb.write(_maeNoShussouBun(k, s, kk, yobi));
   if (s.gakunen == 4) {
     sb.write(
@@ -1582,7 +1570,6 @@ Kiji _yosenMeikan(
     final StringBuffer sb = StringBuffer();
     final String? mochi = _kukanMochiTime(k, s, kk);
     if (mochi != null) sb.write('持ちタイムは$mochi。');
-    sb.write(_konkiNoBun(k, s, kk));
     final List<_Shussou> zenbu = _shussouReki(k, s, imaNozoku: true, yosenMo: true);
     final int yosenKai = zenbu.where((x) => !_honsen(x.race)).length;
     final int honsenKai = zenbu.where((x) => _honsen(x.race)).length;
@@ -1739,29 +1726,15 @@ String _tensa(int sa) => sa <= 0 ? '同点' : '$sa点差';
 /// 順位をいくつ上げたかの数の言い方(9までは「3つ」、10からは「12」)
 String _tsu(int d) => d < 10 ? '$dつ' : '$d';
 
-/// 自己ベストを更新したときの一言(前の記録があったと確かめられるときだけ。なければ空)
-/// 対校戦のタイムは自己ベストにも数えるので、自己ベストが今回のタイムと同じなら、今回出したことになる。
-/// ただし、初めて記録が付いた種目なら「更新」とは言えない(ゲームを始めた年などは、前の記録が
-/// 分からない)ので、昨年の対校戦で同じ種目を走ったか、5000mで入学時の記録があるときだけ書く
-/// [kyonen] 昨年の対校戦の同じ種目のタイム(なければnull)
-String _taikousenBestBun(
-  KijiKankyou k,
-  SenshuData s,
-  int idx,
-  double time,
-  double? kyonen,
-) {
-  final double jiko = k.jikoBest(s, idx);
-  if (jiko >= TEISUU.DEFAULTTIME || (jiko - time).abs() >= 0.01) return '';
-  final String sm = kijiShumokuMei[idx];
-  if (kyonen != null) return '$smの自己ベストを更新する走りだった。';
-  if (idx != 0 || s.hirou == 1) return '';
+/// 1年生の5000mの、入学時の記録との比べの一言(入学時の記録より速いときだけ。なければ空)
+/// (昨年の対校戦がない1年生の、昨年との比べの代わり。留学生には入学時の記録がない)
+String _nyuugakuHikakuBun(SenshuData s, double time) {
+  if (s.gakunen != 1 || s.hirou == 1) return '';
   final double nyuugaku = s.kiroku_nyuugakuji_5000;
   if (nyuugaku <= 0 || nyuugaku >= TEISUU.DEFAULTTIME) return '';
-  if (s.gakunen == 1) {
-    return '入学時の記録(${jikanMoji(nyuugaku)})を更新する、5000mの自己ベストだった。';
-  }
-  return '5000mの自己ベストを更新する走りだった。';
+  final int d = saByou(nyuugaku, time);
+  if (d <= 0) return '';
+  return '入学時の記録(${jikanMoji(nyuugaku)})より${saMoji(d)}速いタイムだった。';
 }
 
 /// 小見出しに出す選手の名前(「山田太郎(2年)」)。本文では2回目からの呼び方(名字)で書けるように、
@@ -1959,7 +1932,6 @@ void _taikousenSenshuKaku(
       sb.write('チームトップの走りだった。');
     }
   }
-  sb.write(_taikousenBestBun(k, s, sh, x.time, kt));
   // 昨年の同じ種目との比べ
   if (kj != null) {
     if (kj > x.juni) {
@@ -1976,6 +1948,7 @@ void _taikousenSenshuKaku(
     }
   } else if (s.gakunen == 1) {
     sb.write('大学に入って初めての対校戦だった。');
+    if (sh == 0) sb.write(_nyuugakuHikakuBun(s, x.time));
   }
   if (s.gakunen == 4) sb.write('4年生にとっては、これが最後の対校戦だ。');
   w.danraku(sb.toString());

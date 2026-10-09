@@ -5,6 +5,7 @@ import 'package:ekiden/kansuu/gakuren_text.dart';
 import 'package:ekiden/kansuu/gakuren_kantoku.dart';
 import 'package:ekiden/kansuu/ikku_pace.dart';
 import 'package:ekiden/kansuu/kiji/kiji_kihon.dart';
+import 'package:ekiden/kansuu/kiji/kiji_comment.dart';
 
 // ------------------------------------------------------------
 // 駅伝の実況「箱庭スポーツ中継」(1.9.4。レース画面の「実況」のカードと、結果画面の記事の画面)
@@ -1014,11 +1015,14 @@ Kiji? _kukanJikkyou(
     w.koMidashi('ゴール');
     w.danraku(
       w.erabu([
-        '$n校がそれぞれの思いを乗せてゴールに飛び込みました。${k.taikaiMei}、全区間の中継を終わります。',
-        '全$ks区間、$n校のたすきが無事につながりました。中継は以上です。詳しい結果は、記事でお伝えします。',
+        '$n校がそれぞれの思いを乗せてゴールに飛び込みました。${k.taikaiMei}、全$ks区間のたすきがつながりました。',
+        '全$ks区間、$n校のたすきが無事につながりました。詳しい結果は、記事でお伝えします。',
       ]),
     );
     kai(kata == KishaKata.karakuchi ? '勝負の分かれ目は、派手な区間賞より、崩れなかった区間にありましたね' : '最後まで目が離せないレースでした。選手のみなさん、お疲れさまでした');
+    // 中継席が選ぶ三賞とヒーローインタビュー(1.9.4)
+    _sanshouToInterview(k, w, jun, my: my, kata: kata, owatta: owatta, kai: kai);
+    w.danraku('${k.taikaiMei}の中継は、以上です。');
   }
 
   // 表: 区間終了時点の順位(上位10校と自分の大学)
@@ -1066,4 +1070,264 @@ Kiji? _kukanJikkyou(
     kekka: true,
     site: jikkyouSiteMei,
   );
+}
+
+// ------------------------------------------------------------
+// 中継席が選ぶ三賞とヒーローインタビュー(最終区の実況の最後。1.9.4)
+// ・殊勲賞: 優勝校の選手の中で、最後に首位に立った区間の選手。1区から首位を守り切ったときは
+//   区間賞の選手、それもなければ2位との差を一番広げた区間の選手
+// ・敢闘賞: 人抜きの数が最多の選手(同点なら区間順位)。1区で飛び出して逃げ切った(粘り切った)選手と、
+//   急きょ区間に入って区間3位以内だった選手は加点して競わせる
+// ・技能賞: 区間賞の中で、2位との差が距離あたりで一番大きかった選手。際立った能力があれば加点
+// ・3人は別々の選手。学連選抜は対象外
+// ・ヒーローインタビューは殊勲賞の選手にQ&A形式で3問。自分の大学の選手が三賞のどれかを取ったときは、
+//   その選手にも2問(殊勲賞なら、ヒーローインタビューがその選手になる)
+// ------------------------------------------------------------
+
+/// 三賞の1つ
+class _Shou {
+  final String mei;
+
+  /// 受賞者(その区間の途中経過)
+  final _Koma x;
+
+  /// 走った区間(0が1区)
+  final int kukan;
+
+  /// 理由の文(「。」なし)
+  final String riyuu;
+
+  const _Shou(this.mei, this.x, this.kukan, this.riyuu);
+}
+
+void _sanshouToInterview(
+  KijiKankyou k,
+  KijiKakite w,
+  List<_Koma> jun, {
+  required _Koma? my,
+  required KishaKata kata,
+  required bool owatta,
+  required void Function(String) kai,
+}) {
+  final int ks = k.kukansuu;
+  if (ks < 2 || jun.isEmpty) return;
+  // 全区間の途中経過(最終区は渡されたもの)
+  final List<List<_Koma>> zen = [
+    for (int i = 0; i < ks; i++) i == ks - 1 ? jun : _kukanKoma(k, i),
+  ];
+  if (zen.any((l) => l.isEmpty)) return;
+  _Koma? koma(int i, int univId) {
+    for (final _Koma x in zen[i]) {
+      if (x.u.id == univId) return x;
+    }
+    return null;
+  }
+
+  final UnivData win = jun[0].u;
+  final Set<int> tsukatta = {}; // 受賞した選手のid
+
+  // ---- 殊勲賞 ----
+  _Shou? shukun;
+  int lastLead = -1; // 優勝校が最後に首位に立った区間(1区から首位なら0)
+  for (int i = 0; i < ks; i++) {
+    final bool ima = zen[i][0].u.id == win.id;
+    final bool mae = i > 0 && zen[i - 1][0].u.id == win.id;
+    if (ima && !mae) lastLead = i;
+  }
+  _Koma? leadMae; // 首位に立った区間で、その前まで首位だった大学
+  int saMaeHero = 0; // そのときの差
+  if (lastLead > 0) {
+    final _Koma? x = koma(lastLead, win.id);
+    for (final _Koma y in zen[lastLead]) {
+      if (y.tuukaMae == 0) leadMae = y;
+    }
+    if (x != null && x.s != null && leadMae != null) {
+      saMaeHero = saByou(x.u.time_taikai_total[lastLead - 1], leadMae.u.time_taikai_total[lastLead - 1]);
+      shukun = _Shou(
+        '殊勲賞',
+        x,
+        lastLead,
+        '${lastLead + 1}区で${juniMoji(x.tuukaMae)}から${leadMae.mei}をかわして首位に立ち、チームを優勝に導いた',
+      );
+    }
+  }
+  if (shukun == null) {
+    // 1区から首位を守り切った: 区間賞の選手 → 2位との差を一番広げた区間の選手
+    _Koma? kukanshou;
+    int kukanshouKukan = -1;
+    _Koma? hiroge;
+    int hirogeKukan = -1;
+    int hirogeSa = -1;
+    for (int i = 0; i < ks; i++) {
+      final _Koma? x = koma(i, win.id);
+      if (x == null || x.s == null) continue;
+      if (x.kukanJuni == 0 && kukanshou == null) {
+        kukanshou = x;
+        kukanshouKukan = i;
+      }
+      if (x.tuuka == 0 && (i == 0 || x.tuukaMae == 0) && zen[i].length >= 2) {
+        final int ato = saByou(zen[i][1].ruikei, x.ruikei);
+        int maeSa = 0;
+        if (i > 0) {
+          _Koma? niMae;
+          for (final _Koma y in zen[i]) {
+            if (y.tuukaMae == 1) niMae = y;
+          }
+          if (niMae != null) maeSa = saByou(niMae.u.time_taikai_total[i - 1], x.u.time_taikai_total[i - 1]);
+        }
+        if (ato - maeSa > hirogeSa) {
+          hirogeSa = ato - maeSa;
+          hiroge = x;
+          hirogeKukan = i;
+        }
+      }
+    }
+    if (kukanshou != null) {
+      shukun = _Shou('殊勲賞', kukanshou, kukanshouKukan, '首位を守り切った優勝校で、${kukanshouKukan + 1}区の区間賞');
+    } else if (hiroge != null && hirogeSa > 0) {
+      shukun = _Shou('殊勲賞', hiroge, hirogeKukan, '${hirogeKukan + 1}区で2位との差を${saMoji(hirogeSa)}広げ、優勝を引き寄せた');
+    }
+  }
+  if (shukun != null) tsukatta.add(shukun.x.s!.id);
+
+  // ---- 敢闘賞 ----
+  _Shou? kantou;
+  int kantouTen = 0;
+  for (final _Koma u0 in jun) {
+    final UnivData u = u0.u;
+    final List<SenshuData?> kukanSenshu = [for (int i = 0; i < ks; i++) koma(i, u.id)?.s];
+    final Map<int, ToujituJijou> jij = toujituJijou(k, u, kukanSenshu);
+    for (int i = 0; i < ks; i++) {
+      final _Koma? x = koma(i, u.id);
+      if (x == null || x.s == null || tsukatta.contains(x.s!.id)) continue;
+      final SenshuData s = x.s!;
+      int ten = 0;
+      String riyuu = '';
+      final int nuki = i == 0 ? 0 : x.tuukaMae - x.tuuka;
+      if (nuki >= 1) {
+        ten += nuki * 10;
+        riyuu = '${i + 1}区で$nuki人抜き、${juniMoji(x.tuukaMae)}から${juniMoji(x.tuuka)}に押し上げた';
+      }
+      if (i == 0 && s.startchokugotobidasiflag == 1 && s.startchokugotobidasiseikouflag == 1 && x.kukanJuni <= 2) {
+        ten += 25;
+        riyuu = '1区でスタート直後に飛び出し、${x.tuuka == 0 ? '逃げ切った' : '区間${juniMoji(x.kukanJuni)}で粘り切った'}';
+      }
+      final ToujituJijou? j = jij[i];
+      if (j != null && j.kyuukyo && j.hairi.id == s.id && x.kukanJuni <= 2) {
+        ten += 20;
+        riyuu = '${j.riyuu == HazuretaRiyuu.taichouFuryou ? '体調を崩した仲間の穴を埋めて' : '急きょ区間に入って'}${i + 1}区で区間${juniMoji(x.kukanJuni)}';
+      }
+      if (ten <= 0) continue;
+      // 同点なら区間順位の良いほう
+      final int hikaku = ten * 100 - x.kukanJuni;
+      if (hikaku > kantouTen) {
+        kantouTen = hikaku;
+        kantou = _Shou('敢闘賞', x, i, riyuu);
+      }
+    }
+  }
+  if (kantou != null) tsukatta.add(kantou.x.s!.id);
+
+  // ---- 技能賞 ----
+  _Shou? ginou;
+  double ginouTen = -1;
+  for (int i = 0; i < ks; i++) {
+    final List<_Koma> kj = List<_Koma>.of(zen[i])..sort((a, b) => a.kukanJuni.compareTo(b.kukanJuni));
+    if (kj.length < 2) continue;
+    final _Koma x = kj[0];
+    if (x.s == null || tsukatta.contains(x.s!.id)) continue;
+    final int sa = saByou(kj[1].kukanTime, x.kukanTime);
+    final double kyoriKm = k.gh.kyori_taikai_kukangoto[k.race].length > i ? k.gh.kyori_taikai_kukangoto[k.race][i] / 1000.0 : 0.0;
+    if (kyoriKm <= 0) continue;
+    final _Hashiri h = _hashiriYomu(x.s!, i);
+    final double ten = sa / kyoriKm + (h.kiwaYoi != null ? 1.0 : 0.0);
+    if (ten > ginouTen) {
+      ginouTen = ten;
+      ginou = _Shou(
+        '技能賞',
+        x,
+        i,
+        '${i + 1}区で2位に${kinsaMoji(sa)}をつける区間賞${h.kiwaYoi != null ? '。${h.kiwaYoi}が際立っていた' : ''}',
+      );
+    }
+  }
+  if (ginou != null) tsukatta.add(ginou.x.s!.id);
+
+  final List<_Shou> shou = [];
+  if (shukun != null) shou.add(shukun);
+  if (kantou != null) shou.add(kantou);
+  if (ginou != null) shou.add(ginou);
+  if (shou.isEmpty) return;
+
+  // ---- 三賞の発表 ----
+  w.koMidashi('中継席が選ぶ三賞');
+  w.danraku('中継席が選ぶ、今日の三賞です。');
+  final int myId = my?.u.id ?? -1;
+  _Shou? myShou;
+  for (final _Shou x in shou) {
+    w.danraku('${x.mei}は、${_yobi(w, x.x)}。${x.riyuu}。');
+    if (x.x.u.id == myId) myShou = x;
+  }
+  if (myShou != null) {
+    kai('${myShou.x.mei}の${myouji(myShou.x.s!.name)}が${myShou.mei}。監督にとっても、今日一番の収穫ではないでしょうか');
+  } else {
+    switch (kata) {
+      case KishaKata.suuji:
+        kai('三賞は、人抜きの数や2位との差の数字で選びました。数字は、走りの価値を正直に映しますね');
+      case KishaKata.joukei:
+        kai('3人とも、たすきを受けた瞬間の表情が違いました。賞は、その顔に贈られたものだと思います');
+      case KishaKata.karakuchi:
+        kai('賞は結果に対して出るものです。この3人は、気持ちではなく走りで選ばれました');
+    }
+  }
+
+  // ---- ヒーローインタビュー(殊勲賞の選手。いなければ三賞の最初の選手) ----
+  final _Shou hero = shukun ?? shou.first;
+  final SenshuData hs = hero.x.s!;
+  final String hy = myouji(hs.name);
+  w.koMidashi('ヒーローインタビュー');
+  w.danraku('${hero.mei}の${_yobi(w, hero.x)}に、ゴール地点で話を聞きました。');
+  w.danraku('――おめでとうございます。今の気持ちは？');
+  w.comment('$hy「${senshuKimochi(w, hero.x.u.id == win.id ? CommentBamen.yuushouKetteiSenshu : (hero.x.kukanJuni == 0 ? CommentBamen.kukanshou : CommentBamen.oinuki))}」');
+  // 2問目: その場面を振り返る
+  final List<Innen> hi = senshuInnen(k, hs, hero.kukan, kj: hero.x.kukanJuni, kekka: owatta);
+  if (hero.x.u.id == win.id && lastLead > 0 && leadMae != null) {
+    w.danraku('――${lastLead + 1}区、${leadMae.mei}を捉えた場面を振り返ってください。');
+    w.comment(
+      '$hy「${w.erabu([
+        '${juniMoji(hero.x.tuukaMae)}でたすきを受けたとき、前の背中は見えていました。${saMoji(saMaeHero)}差なら行けると、自分に言い聞かせました',
+        '監督からは、前だけを見ろと言われていました。${leadMae.mei}の選手に並んだときは、無心でした',
+        '区間${juniMoji(hero.x.kukanJuni)}の走りができたのは、仲間がいい位置でつないでくれたからです。追う展開は得意なので、迷いはありませんでした',
+      ])}」',
+    );
+  } else {
+    w.danraku('――${hero.kukan + 1}区の走りを振り返ってください。');
+    w.comment(
+      '$hy「${w.erabu([
+        '後ろは気にせず、自分のペースを守ることだけを考えました。区間${juniMoji(hero.x.kukanJuni)}は、結果としてついてきたものです',
+        'たすきを受けた瞬間に、今日は行けると感じました。前で渡すことだけを考えて走りました',
+        '苦しくなってからが勝負だと思っていました。最後まで脚が動いてくれて、よかったです',
+      ])}」',
+    );
+  }
+  // 3問目: 応援してくれた人へ(因縁があれば、その思いを添える)
+  w.danraku('――最後に、応援してくれた人たちへ。');
+  w.comment('$hy「${hi.isNotEmpty && hi.first.ten >= 45 ? '${hi.first.kotoba}。' : ''}${tsugiKotoba(w)}」');
+
+  // ---- 自分の大学の受賞者にも(殊勲賞なら上のインタビューがその選手) ----
+  if (myShou != null && myShou.x.s!.id != hs.id) {
+    final SenshuData ms = myShou.x.s!;
+    final String myy = myouji(ms.name);
+    w.danraku('${myShou.mei}の${_yobi(w, myShou.x)}にも、話を聞きました。');
+    w.danraku('――${myShou.mei}、おめでとうございます。');
+    w.comment('$myy「${senshuKimochi(w, myShou.mei == '技能賞' ? CommentBamen.kukanshou : CommentBamen.hyoushou)}」');
+    w.danraku('――監督には、どう報告しますか？');
+    w.comment(
+      '$myy「${w.erabu([
+        'まず、ありがとうございましたと伝えます。この区間に置いてくれたのは監督なので',
+        '賞よりも、チームの順位の話をされると思います。それでいいんです',
+        '次はもっと上の順位で、と言われるはずです。自分もそのつもりです',
+      ])}」',
+    );
+  }
 }

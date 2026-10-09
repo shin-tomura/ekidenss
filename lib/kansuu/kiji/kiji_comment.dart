@@ -95,6 +95,12 @@ enum CommentBamen {
 
   /// 学内・対校戦の種目で、昨年の同じ種目から大きく順位を上げた(伸び盛り)
   gakunaiNobi,
+
+  /// 表彰(駅伝の三賞・年間表彰)を受けた(1.9.4)
+  hyoushou,
+
+  /// 新人賞を受けた1年生(1.9.4)
+  shinjinshou,
 }
 
 /// 監督のコメントの場面
@@ -133,6 +139,9 @@ enum KantokuBamen {
 
   /// 学内・卒業する4年生への送る言葉(1.9.3)
   sotsugyou,
+
+  /// 年間最優秀チームに選ばれた(1.9.4)
+  nenkanBest,
 }
 
 const Map<CommentBamen, List<String>> _senshuComment = {
@@ -329,6 +338,19 @@ const Map<CommentBamen, List<String>> _senshuComment = {
     'この4年間は一生の宝物です。後輩たちには、もっと上の景色を見てほしい',
     '仲間と過ごした毎日が、一番の思い出です',
   ],
+  CommentBamen.hyoushou: [
+    'この賞は、一緒に走った仲間のものです',
+    '選んでもらえて光栄です。もっと強くなって、また呼ばれたい',
+    '自分の名前が呼ばれるとは思っていませんでした',
+    '評価してもらえたのはうれしい。でも、まだ通過点です',
+    '支えてくれた人たちに、まずこの賞を報告したい',
+  ],
+  CommentBamen.shinjinshou: [
+    '1年目でこんな賞をもらえるとは。先輩たちのおかげです',
+    '来年は賞ではなく、チームの結果で貢献したい',
+    '入学したときは、ここまで走れるとは思っていませんでした',
+    '先輩たちの背中を追いかけてきただけです。まだ何もつかんでいません',
+  ],
 };
 
 const Map<KantokuBamen, List<String>> _kantokuComment = {
@@ -416,6 +438,11 @@ const Map<KantokuBamen, List<String>> _kantokuComment = {
     'シード権争いは毎年最後までもつれる。1秒を削り出す走りをしてほしい',
     '来年を予選会から始めるかどうかが決まる大事なレース。選手もよく分かっている',
     'シード権は来年のチームへの最高の贈り物になる。全員で取りにいく',
+  ],
+  KantokuBamen.nenkanBest: [
+    '選手たちが1年間積み上げてきたものが評価された。私ではなく、彼らの賞です',
+    'この1年、チーム全員で戦えた。来季はさらに上を目指したい',
+    '苦しい時期もあったが、選手が前を向き続けてくれた。感謝しかない',
   ],
 };
 
@@ -553,6 +580,14 @@ String kantokuCommentJijitsu(
   final String kata = hajimete ? '$yobi監督(${kt.nenrei})' : '$yobi監督';
   return '「$naka」と$kataは${shime.substring(1)}。';
 }
+
+/// 気持ちの言葉だけ(かっこや締めの文なし。実況のインタビューの答えに使う。1.9.4)
+String senshuKimochi(KijiKakite w, CommentBamen bamen) =>
+    w.erabu(_senshuComment[bamen] ?? const ['よかった']);
+
+/// 次へ向かう言葉だけ(同上。1.9.4)
+String tsugiKotoba(KijiKakite w, {bool kuyashii = false}) =>
+    w.erabu(kuyashii ? _tsugiKuyashiKotoba : _tsugiKotoba);
 
 /// 選手のコメントの文(「「……」と山田は振り返った。」の形)
 /// [kuyashii] 悔しい場面なら、締めの言葉を悔しいほうにする

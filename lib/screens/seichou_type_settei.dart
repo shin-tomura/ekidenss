@@ -11,7 +11,8 @@ import 'package:ekiden/kansuu/joukai.dart'; // 13分台の新入生の限界突�
 // 新入生の成長タイプの割合(全大学共通)を、型ごとにプルダウンで決める
 // (保存先と決まりは lib/kansuu/seichou_type.dart)
 // ・合計が100%のときだけ保存できる。画面の上に、合計とあと何%かをいつも出す
-// ・「初期値に戻す」「以前の割合にする」は、画面の値を入れ替えるだけで、保存ボタンで確定する
+// ・「初期値に戻す」「以前の割合にする」は、画面の値を入れ替えるだけで、保存ボタンで確定する。
+//   誤タップで調整中の割合が消えないように、入れ替える前に確認を出す(画面がすでにその値なら何もしない)
 // ・保存していない変更があるまま閉じようとしたら、確認を出す
 // ・スマホの文字を大きくしていてもはみ出さないように、型ごとに名前・説明・割合を縦に積む
 // ・割合の下で、13分台の新入生の限界突破の優遇(なし(初期値)・あり。保存先と決まりは lib/kansuu/joukai.dart)も選ぶ。
@@ -86,6 +87,36 @@ class _ModalSeichouTypeSetteiState extends State<ModalSeichouTypeSettei> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('成長タイプ設定を保存しました')),
     );
+  }
+
+  // 初期化ボタンで画面の値を入れ替えてよいか(誤タップで調整中の割合が消えないように。1.9.3)
+  Future<bool> _shokikaKakunin(String midashi, String naiyou, String okMei) async {
+    final bool? yoi = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(midashi, style: const TextStyle(color: Colors.black)),
+          content: SingleChildScrollView(
+            child: Text(
+              '画面の割合と13分台の新入生の限界突破を、$naiyouにします。'
+              'まだ保存はされず、上の「保存」で確定します。',
+              style: const TextStyle(color: Colors.black),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('戻る'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text(okMei),
+            ),
+          ],
+        );
+      },
+    );
+    return yoi == true;
   }
 
   // 保存していない変更を捨てて閉じてよいか
@@ -170,14 +201,26 @@ class _ModalSeichouTypeSetteiState extends State<ModalSeichouTypeSettei> {
 
   // 初期化ボタン(画面の値を入れ替えるだけ。保存は保存ボタンで。
   // 13分台の新入生の限界突破の優遇は、どちらのボタンでも「なし」にする)
-  Widget _shokikaButton(String mei, String setsumei, List<int> atai) {
+  // [kakuninMidashi]・[naiyou]・[okMei] 確認画面の見出し・入れ替える値の説明・確定するボタンの文字
+  Widget _shokikaButton(
+    String mei,
+    String setsumei,
+    List<int> atai, {
+    required String kakuninMidashi,
+    required String naiyou,
+    required String okMei,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           OutlinedButton(
-            onPressed: () {
+            onPressed: () async {
+              // 画面がすでにその割合(優遇なし)なら、入れ替える必要がない
+              if (seichouTypeWariaiOnaji(_wariai, atai) && _yuuguu == 0) return;
+              final bool yoi = await _shokikaKakunin(kakuninMidashi, naiyou, okMei);
+              if (!yoi || !mounted) return;
               setState(() {
                 _wariai = List<int>.from(atai);
                 _yuuguu = 0;
@@ -365,11 +408,17 @@ class _ModalSeichouTypeSetteiState extends State<ModalSeichouTypeSettei> {
                         '初期値に戻す',
                         '1年で伸びきる選手が約4割で、残りは2年以降のどこかで伸びます(13分台の限界突破の優遇はなし)。',
                         seichouTypeShokiti,
+                        kakuninMidashi: '初期値に戻しますか?',
+                        naiyou: '初期値(1年で伸びきる選手が約4割、優遇なし)',
+                        okMei: '初期値にする',
                       ),
                       _shokikaButton(
                         '以前の割合にする',
                         '1年で伸びきる選手が約9割です(1.9.2までの割合。13分台の限界突破の優遇はなし)。',
                         seichouTypeIzen,
+                        kakuninMidashi: '以前の割合にしますか?',
+                        naiyou: '以前の割合(1年で伸びきる選手が約9割、優遇なし)',
+                        okMei: '以前の割合にする',
                       ),
                       const SizedBox(height: 8),
                       for (final int type in seichouTypeNarabi) _typeRan(type),

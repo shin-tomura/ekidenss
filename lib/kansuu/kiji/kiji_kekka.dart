@@ -1895,6 +1895,13 @@ Kiji? _gakurenKiji(EkidenKekka e) {
   }
   if (kantoku && k.jibunUniv != null) {
     lead.write('今回は${daigakuMei(k.jibunUniv!)}の総監督が指揮を執った。');
+    // 目標1位で総合1位相当に導いたときは、監督の大学の名声が大きく上がる(1.9.3から書く。量は書かない)
+    if (gakurenYuushouKantoku(k.gh, k.kantoku, k.jibunUniv!)) {
+      lead.write(
+        '目標に掲げた1位相当を見事に達成し、学連選抜を率いた総監督の手腕が評価されて、'
+        '${daigakuMei(k.jibunUniv!)}の名声も大きく高まった。',
+      );
+    }
   }
   if (best != null) {
     final String yobi = w.hito(

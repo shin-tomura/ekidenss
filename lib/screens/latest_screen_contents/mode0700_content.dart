@@ -3398,7 +3398,7 @@ class _Mode0700ContentState extends State<Mode0700Content> {
         gakurenKantokuChuu(kantoku, idJunUnivData[currentGhensuu.MYunivid]) &&
         gakurenunivdata.isNotEmpty;
     // 学連選抜を目標1位で総合1位相当に導いたときのお祝い(1.8.8。名声は KirokuKousin.dart で入れる。
-    // その場で条件を見て出すので、画面を開き直しても文が出るだけ。サプライズなので説明書には書かない)
+    // その場で条件を見て出すので、画面を開き直しても文が出るだけ。1.9.3からは説明書などにも書く)
     final bool gakurenYuushou =
         kantoku != null &&
         gakurenKantoku &&

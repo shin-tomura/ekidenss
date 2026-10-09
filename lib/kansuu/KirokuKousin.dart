@@ -2570,7 +2570,7 @@ Future<void> _gakurenMokuhyouHoushuu({
 
   // 目標1位で総合1位相当に導いたときは、監督の手腕が評価されて、監督の大学に名声(1.8.8)
   // (学連選抜にはスポンサーはいないので金銀は増やさない。結果画面にお祝いの文を出す(mode0700_content.dart)。
-  //  サプライズなので、説明書・生成AI向けの仕様・変更履歴には書かない)
+  //  1.9.3からサプライズをやめて、画面・説明書などに「名声が大きく上がる」と書く。具体的な量は書かない)
   if (gakurenYuushouKantoku(gh, kantoku, myUniv)) {
     final int ryou = gakurenYuushouKantokuMeisei(_shougatsuMeiseiBairitu());
     myUniv.meisei_yeargoto[0] += ryou;

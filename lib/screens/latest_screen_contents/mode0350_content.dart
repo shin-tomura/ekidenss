@@ -1336,6 +1336,15 @@ class _Mode0350ContentState extends State<Mode0350Content> {
                         fontSize: 12,
                       ),
                     ),
+                    // 目標1位で総合1位相当に導くと、監督の大学の名声が大きく上がる(1.9.3から書く。量は書かない。
+                    // 判定は最後に決めた目標順位なので、ここで目標を下げると対象外になる)
+                    Text(
+                      "目標1位のまま総合1位相当になると、${idjununivdata[currentGhensuu.MYunivid].name}大学の名声が大きく上がります(目標を下げると対象外です)",
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                      ),
+                    ),
                     // 文字が大きい設定でもはみ出さないよう、横幅いっぱいにして長いときは「...」にする
                     DropdownButton<int>(
                       value: mokuhyou.clamp(0, shutsujouSuu - 1).toInt(),

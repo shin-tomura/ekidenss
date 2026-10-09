@@ -10,6 +10,8 @@ import 'package:ekiden/kansuu/ikku_pace.dart'; // 1区の集団のペース(1.9.
 import 'package:ekiden/screens/ikku_pace_box.dart'; // 1区のペース予想の枠(1.9.2)
 import 'package:ekiden/kansuu/kiji/kiji.dart'; // 展望記事(1.9.2)
 import 'package:ekiden/screens/kiji_screen.dart'; // 展望記事の画面(1.9.2)
+import 'package:ekiden/kantoku_data.dart';
+import 'package:ekiden/kansuu/TrialTime.dart'; // オッシーの予想(基本走力だけの見込みタイム。1.9.4)
 
 // 予想結果を保持するためのクラス
 class Prediction {
@@ -20,9 +22,14 @@ class Prediction {
   Prediction(this.id, this.name, this.score);
 }
 
-List<int> kukanshou_bestscore_osshi = List.filled(
+// 予想陣の予想(1.9.4で、オッシーと王太郎の計算を区間ごとの見込みタイムに変えた)
+// ・オッシー(基本走力重視): 区間の距離を基本走力だけで走ったときの見込みタイム(試走の計算の、能力の補正の前)の合計
+// ・父ちゃん(総合評価): 区間の距離に合った種目の持ちタイムに、登り・下り・アップダウンの能力をコースで重み付けした点の合計(1.9.3まで通り)
+// ・王太郎(持ちタイム重視): 自己ベスト(区間の距離に合った種目。なければほかの種目から換算)を区間の距離に換算したタイムの合計
+//   (1.9.3までは入学時の5000mの合計だったが、成長を見ないので当たらなかった)
+List<double> kukanshou_bestscore_osshi = List.filled(
   TEISUU.SUU_MAXKUKANSUU,
-  999999999,
+  TEISUU.DEFAULTTIME,
 );
 List<int> kukanshou_id_osshi = List.filled(TEISUU.SUU_MAXKUKANSUU, 0);
 List<double> kukanshou_bestscore_tochan = List.filled(
@@ -35,9 +42,43 @@ List<double> kukanshou_bestscore_otaro = List.filled(
   TEISUU.DEFAULTTIME,
 );
 List<int> kukanshou_id_otaro = List.filled(TEISUU.SUU_MAXKUKANSUU, 0);
-int temp_osshi_score = 0;
+double temp_osshi_score = 0.0;
 double temp_tochan_score = 0.0;
 double temp_otaro_score = 0.0;
+
+/// 種目(time_bestkiroku の0〜2)の距離(m。持ちタイムの換算に使う。展望記事の戦力分析と同じ)
+const List<double> _shumokuKyori = [5000.0, 10000.0, 21097.5];
+
+/// 王太郎の予想に使う、選手の区間の見込みタイム(自己ベストから。1.9.4)
+/// 区間の距離に合った種目(7.5km以下は5000m、15km以下は1万m、それより長いとハーフ)の自己ベストを、
+/// 距離の比の1.06乗で区間の距離に換算する。その種目の記録がなければ、距離の近いほかの種目から換算する。
+/// どの種目の記録もなければ、入学時の5000mから換算し、それもなければnull
+double? _otaroMikomiTime(SenshuData s, double kyori) {
+  if (kyori <= 0) return null;
+  final int idx = kyori <= 7500 ? 0 : (kyori <= 15000 ? 1 : 2);
+  double? moto;
+  double motoKyori = _shumokuKyori[idx];
+  if (s.time_bestkiroku.length > idx && s.time_bestkiroku[idx] > 0 && s.time_bestkiroku[idx] < TEISUU.DEFAULTTIME) {
+    moto = s.time_bestkiroku[idx];
+  } else {
+    final List<int> kouho = [0, 1, 2]
+      ..remove(idx)
+      ..sort((a, b) => (_shumokuKyori[a] - _shumokuKyori[idx]).abs().compareTo((_shumokuKyori[b] - _shumokuKyori[idx]).abs()));
+    for (final int c in kouho) {
+      if (s.time_bestkiroku.length > c && s.time_bestkiroku[c] > 0 && s.time_bestkiroku[c] < TEISUU.DEFAULTTIME) {
+        moto = s.time_bestkiroku[c];
+        motoKyori = _shumokuKyori[c];
+        break;
+      }
+    }
+  }
+  if (moto == null && s.kiroku_nyuugakuji_5000 > 0 && s.kiroku_nyuugakuji_5000 < TEISUU.DEFAULTTIME) {
+    moto = s.kiroku_nyuugakuji_5000;
+    motoKyori = _shumokuKyori[0];
+  }
+  if (moto == null) return null;
+  return moto * pow(kyori / motoKyori, 1.06).toDouble();
+}
 
 class Mode0330Content extends StatelessWidget {
   final Ghensuu ghensuu;
@@ -100,8 +141,6 @@ class Mode0330Content extends StatelessWidget {
     List<UnivData> sortedUnivData,
     List<SenshuData> sortedSenshuData,
   ) {
-    // Randomインスタンスを作成
-    final random = Random();
     // 予想結果を格納するためのマップ
     final Map<String, List<Prediction>> allPredictions = {
       'osshi': [],
@@ -112,8 +151,10 @@ class Mode0330Content extends StatelessWidget {
     if (gh.isEmpty) {
       return allPredictions;
     }
+    // オッシーの予想(基本走力だけの見込みタイム)の計算に使う(1.9.4)
+    final KantokuData? kantoku = Hive.box<KantokuData>('kantokuBox').get('KantokuData');
     for (int i = 0; i < TEISUU.SUU_MAXKUKANSUU; i++) {
-      kukanshou_bestscore_osshi[i] = 999999999;
+      kukanshou_bestscore_osshi[i] = TEISUU.DEFAULTTIME;
       kukanshou_bestscore_otaro[i] = TEISUU.DEFAULTTIME;
       kukanshou_bestscore_tochan[i] = -999999999.0;
     }
@@ -126,23 +167,42 @@ class Mode0330Content extends StatelessWidget {
         double tochanScore = 0.0;
         double otaroScore = 0.0;
         int entryCount = 0;
-        int max1_osshiscore = -999999999;
-        int max2_osshiscore = -999999999;
+        double max1_osshiscore = -999999999.0;
+        double max2_osshiscore = -999999999.0;
         double max1_otaroscore = -999999999.0;
         double max2_otaroscore = -999999999.0;
         double min1_tochanscore = 999999999.0;
         double min2_tochanscore = 999999999.0;
 
-        // 出場選手を合計する
-        for (final senshu in sortedSenshuData) {
+        // 出場選手を合計する(iSenshu は id順の並びの番号。試走の計算に渡す)
+        for (int iSenshu = 0; iSenshu < sortedSenshuData.length; iSenshu++) {
+          final senshu = sortedSenshuData[iSenshu];
           if (senshu.univid == univ.id) {
             // entrykukan_raceが定義されており、かつレース番号に対応する区間情報があるかを確認
             if (senshu.entrykukan_race.length > raceNumber &&
                 senshu.entrykukan_race[raceNumber][senshu.gakunen - 1] >= 0) {
               entryCount++;
-              // オッシー：magicnumber（小さい方が良い）
-              //osshiScore += senshu.magicnumber;
-              temp_osshi_score = _NEWaintFromNewbint(1580, senshu);
+              final int osshiKukan = senshu.entrykukan_race[raceNumber][senshu.gakunen - 1];
+              final double osshiKyori =
+                  (gh[0].kyori_taikai_kukangoto.length > raceNumber && gh[0].kyori_taikai_kukangoto[raceNumber].length > osshiKukan)
+                  ? gh[0].kyori_taikai_kukangoto[raceNumber][osshiKukan]
+                  : 0.0;
+              // オッシー：区間の距離を基本走力だけで走ったときの見込みタイム(秒。小さい方が良い。1.9.4)
+              if (kantoku != null && osshiKyori > 0) {
+                temp_osshi_score = trialTimeKeisan(
+                  iSenshu,
+                  osshiKukan,
+                  gh[0],
+                  sortedSenshuData,
+                  sortedUnivData,
+                  kantoku,
+                  nigosu: false,
+                  racebangou: raceNumber,
+                  kihonDake: true,
+                );
+              } else {
+                temp_osshi_score = _NEWaintFromNewbint(1580, senshu).toDouble();
+              }
               osshiScore += temp_osshi_score;
               if (raceNumber == 4) {
                 if (temp_osshi_score > max1_osshiscore) {
@@ -162,24 +222,9 @@ class Mode0330Content extends StatelessWidget {
                         .entrykukan_race[raceNumber][senshu.gakunen - 1]] =
                     senshu.id;
               }
-              // 王太郎：入学時の持ちタイム（小さい方が良い）
-              if (senshu.kiroku_nyuugakuji_5000 == TEISUU.DEFAULTTIME) {
-                final double originalScore = 60.0 * 13.0; // 780.0
-                // ランダムな変動幅を計算 (0.1%)
-                final double variation =
-                    originalScore * 0.001; // 780.0 * 0.001 = 0.78
-                // -variation から +variation の範囲でランダムな値を生成
-                // nextDouble() は 0.0 以上 1.0 未満の値を返す
-                // 0.0 から 2.0 * variation の範囲の値を生成し、そこから variation を引くことで
-                // -variation から +variation の範囲にする
-                final double randomOffset =
-                    (random.nextDouble() * 2 * variation) - variation;
-                // 新しいスコアを計算
-                temp_otaro_score = originalScore + randomOffset;
-                //temp_otaro_score = 60.0 * 13.0;
-              } else {
-                temp_otaro_score = senshu.kiroku_nyuugakuji_5000;
-              }
+              // 王太郎：自己ベストを区間の距離に換算した見込みタイム(秒。小さい方が良い。1.9.4)
+              // (どの記録もない選手は、オッシーの見込みタイムで代用する)
+              temp_otaro_score = _otaroMikomiTime(senshu, osshiKyori) ?? temp_osshi_score;
               otaroScore += temp_otaro_score;
               if (raceNumber == 4) {
                 if (temp_otaro_score > max1_otaroscore) {
@@ -455,7 +500,7 @@ class Mode0330Content extends StatelessWidget {
                     ),
                     KijiYosouJin(
                       '王太郎',
-                      '入学時の持ちタイム重視',
+                      '持ちタイム重視',
                       [for (final p in otaroRanked) p.id],
                       List<int>.of(kukanshou_id_otaro),
                     ),
@@ -669,7 +714,7 @@ class Mode0330Content extends StatelessWidget {
 
                                 // 王太郎の予想
                                 const Text(
-                                  "■ 王太郎の予想 (入学時持ちタイム重視)",
+                                  "■ 王太郎の予想 (持ちタイム重視)",
                                   style: TextStyle(
                                     color: HENSUU.textcolor,
                                     fontWeight: FontWeight.bold,

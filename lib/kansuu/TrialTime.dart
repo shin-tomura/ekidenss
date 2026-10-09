@@ -57,6 +57,8 @@ Future<double> runTrialCalculation(
 }
 
 /// runTrialCalculation の中身(待ち合わせのない計算なので、画面の組み立ての中からそのまま呼べるようにした。1.8.8)
+/// [kihonDake] trueにすると、基本走力だけのタイム(留学生のタイム補正とタイム調整は入れ、
+///   登り・下りなどの能力の補正をかける前)を返す(直前順位予想のオッシーの予想用。1.9.4)
 double trialTimeKeisan(
   int senshuid,
   int i_kukan,
@@ -67,6 +69,7 @@ double trialTimeKeisan(
   bool nigosu = true,
   bool keikenHosei = false,
   int? racebangou,
+  bool kihonDake = false,
 }) {
   if (senshuid < 0 || senshuid >= sortedsenshudata.length) {
     senshuid = 0;
@@ -292,6 +295,9 @@ double trialTimeKeisan(
       );
     }
   }
+
+  // 基本走力だけのタイム(能力の補正をかける前)でよければ、ここで返す(1.9.4)
+  if (kihonDake) return returntime;
 
   //sortedsenshudata[senshuid].speed = tempkyori / returntime;
   double double_speed = tempkyori / returntime;

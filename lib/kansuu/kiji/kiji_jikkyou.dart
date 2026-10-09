@@ -399,14 +399,17 @@ Kiji? _kukanJikkyou(
       final List<Innen> xi = senshuInnen(k, s, 0, kj: x.kukanJuni, kekka: owatta);
       final String ku = (xi.isNotEmpty && xi.first.ten >= 45) ? xi.first.midashiKu : '';
       tbb.write(kaita == 0 ? '$ku${_yobi(w, x)}が、勇気を持って飛び出しました。' : '$ku${_yobi(w, x)}も続きました。');
+      // 集団のペースより速かったのに何人かに抜かれたときは、「粘った」の成功のニュアンスで書く
+      // (1区は通過順位と区間順位が同じなので、抜かれた人数は通過順位から分かる)
+      final bool sentou = x.tuuka == 0;
       if (nige == null) {
         tbb.write(seikou ? '狙いどおりの展開に持ち込みました。' : '後半に代償を払いました。');
       } else if (seikou && nige) {
-        tbb.write('集団を最後まで寄せ付けず、逃げ切りました！');
+        tbb.write(sentou ? '集団を最後まで寄せ付けず、逃げ切りました！' : '${x.tuuka}人に先を行かれましたが、集団のペースには飲み込まれず、粘り切りました。');
       } else if (seikou) {
         tbb.write('飛び出しそのものは決まりましたが、集団のペースが速く、後半に飲み込まれました。');
       } else if (nige) {
-        tbb.write('後半に代償を払いましたが、集団には捕まりませんでした。');
+        tbb.write(sentou ? '後半に苦しみながらも、逃げ切りました！' : '後半に代償を払いましたが、集団のペースには飲み込まれず、粘りました。');
       } else {
         tbb.write('勇気ある飛び出しは実らず、後半に集団に飲み込まれました。');
       }
@@ -445,7 +448,7 @@ Kiji? _kukanJikkyou(
         );
       case KishaKata.karakuchi:
         if (tSeikou && tNige) {
-          kai('飛び出して逃げ切るのは、力がなければできません。${myouji(ts.name)}は今日、それを証明しました');
+          kai('飛び出して${t.tuuka == 0 ? '逃げ切る' : '粘り切る'}のは、力がなければできません。${myouji(ts.name)}は今日、それを証明しました');
         } else if (tSeikou) {
           kai('飛び出しは決まりましたが、集団のほうが速かった。飛び出すなら、逃げ切る力まで要ります');
         } else {

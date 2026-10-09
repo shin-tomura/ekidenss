@@ -27,6 +27,10 @@ import 'package:ekiden/kansuu/custom_seigen.dart'; // カスタム駅伝の出�
 //    違う文末のものを選ぶ
 //  ・記者の型(KishaKata): 署名の記者名から「数字で語る」「情景で語る」「辛口」の型が決まり、
 //    リードの入り方と「記者の目」の欄に効く(同じ記者はいつも同じ型)
+//  ・当日変更の事情(ToujituJijou): 外れた選手の調子(0なら体調不良、100未満なら調子が上がらない)と、
+//    入った選手が温存していたエースか(コンピュータの大学の戦略的エントリーの印)、持ちタイムの比べから、
+//    「体調不良で外れた穴に急きょ入った」「温存していたエースを投入した」などの事情を書く。
+//    総監督(プレイヤー)の作戦の意図は書かない(調子に問題がない入れ替えは「入れ替えた」とだけ書く)
 //
 // 守る決まり
 //  ・能力値は書かない(見抜く力の仕組みを壊さないため)。勝因・敗因は、区間順位・タイム差・
@@ -1046,6 +1050,183 @@ List<int> kukanShumoku(Ghensuu gh, int race, int k) {
       if (k >= 1 && kyori > 15000) return [kihon, 6];
       return [kihon];
   }
+}
+
+// ------------------------------------------------------------
+// 当日変更の事情(1.9.4)。結果の記事で、当日変更で入った選手と外れた選手の事情を書く
+// ・外れた選手には区間の値に -(100+区間) の印が残り、調子は次の区間エントリーまで当日の値のまま
+// ・温存の印(SenshuData.kazetaisei の負の値)は、コンピュータの大学の戦略的エントリーで付き、
+//   次の区間エントリーまで残る(-1=1日開催・正月駅伝往路で使う、-2=正月駅伝復路で使う)
+// ------------------------------------------------------------
+
+/// 当日変更で外れた理由
+enum HazuretaRiyuu {
+  /// 体調不良(調子0)
+  taichouFuryou,
+
+  /// 調子が上がらなかった(調子1〜99)
+  chousi,
+
+  /// 調子には問題がなく、入れ替えた(理由は書かない)
+  irekae,
+}
+
+/// 区間1つ分の当日変更の事情
+class ToujituJijou {
+  final int kukan;
+
+  /// 入った選手
+  final SenshuData hairi;
+
+  /// 外れた選手
+  final SenshuData hazureta;
+
+  final HazuretaRiyuu riyuu;
+
+  /// 入った選手が、補欠に温存していたエースか(コンピュータの大学の戦略的エントリー)
+  final bool onzonAce;
+
+  /// 復路用に温存していたエースを往路で使ったか(正月駅伝。体調不良の穴を埋めるときだけ起きる)
+  final bool fukuroAceOuro;
+
+  /// 復路のスタート前の当日変更か(正月駅伝の6区以降)
+  final bool fukuro;
+
+  /// 区間の距離に合った種目の持ちタイムの差(秒。正なら入った選手が速い。比べられなければnull)
+  final int? mochiSa;
+
+  const ToujituJijou({
+    required this.kukan,
+    required this.hairi,
+    required this.hazureta,
+    required this.riyuu,
+    required this.onzonAce,
+    required this.fukuroAceOuro,
+    required this.fukuro,
+    required this.mochiSa,
+  });
+
+  /// 急きょの起用か(体調不良か調子が上がらなかった穴を埋めた)
+  bool get kyuukyo => riyuu != HazuretaRiyuu.irekae;
+}
+
+/// 大学[u]の、この大会の当日変更の事情(区間ごと。当日変更がなければ空)
+/// [kukanSenshu] 区間ごとに走った選手(EkidenUnivKekka.senshu)
+Map<int, ToujituJijou> toujituJijou(
+  KijiKankyou k,
+  UnivData u,
+  List<SenshuData?> kukanSenshu,
+) {
+  final Map<int, ToujituJijou> map = {};
+  for (final SenshuData t in k.senshu) {
+    if (t.univid != u.id) continue;
+    final int en = k.entry(t);
+    if (en > -100) continue;
+    final int kk = -en - 100;
+    if (kk < 0 || kk >= kukanSenshu.length) continue;
+    final SenshuData? h = kukanSenshu[kk];
+    if (h == null || h.id == t.id) continue;
+    final HazuretaRiyuu riyuu = t.chousi <= 0
+        ? HazuretaRiyuu.taichouFuryou
+        : (t.chousi < 100 ? HazuretaRiyuu.chousi : HazuretaRiyuu.irekae);
+    final bool onzon = h.kazetaisei < 0;
+    final int shumoku = kukanKihonShumoku(k.gh, k.race, kk);
+    final double th = k.jikoBest(h, shumoku);
+    final double tt = k.jikoBest(t, shumoku);
+    final int? mochiSa = (th < TEISUU.DEFAULTTIME && tt < TEISUU.DEFAULTTIME)
+        ? byou(tt) - byou(th)
+        : null;
+    map[kk] = ToujituJijou(
+      kukan: kk,
+      hairi: h,
+      hazureta: t,
+      riyuu: riyuu,
+      onzonAce: onzon,
+      fukuroAceOuro: k.race == 2 && onzon && h.kazetaisei == -2 && kk < 5,
+      fukuro: k.race == 2 && kk >= 5,
+      mochiSa: mochiSa,
+    );
+  }
+  return map;
+}
+
+/// 当日変更の事情の地の文(「当日の朝、4区を走る予定だった田中が体調不良で走れなくなり、
+/// 佐藤が急きょ区間に入った。」など。選手の呼び方は[w]で決める。[daigakuMei]は、
+/// 自分の大学以外のときに大学名を入れる(空なら入れない))
+String toujituJijouBun(ToujituJijou j, KijiKakite w, {String daigakuMei = ''}) {
+  final String asa = j.fukuro ? '復路のスタート前' : '当日の朝';
+  final String kukan = '${j.kukan + 1}区';
+  final String d = daigakuMei.isEmpty ? '' : '$daigakuMeiは';
+  final String out = w.senshu(j.hazureta);
+  final String inn = w.senshu(j.hairi);
+  final StringBuffer sb = StringBuffer();
+  switch (j.riyuu) {
+    case HazuretaRiyuu.taichouFuryou:
+      if (j.onzonAce) {
+        sb.write(
+          j.fukuroAceOuro
+              ? '$asa、$kukanを走る予定だった$outが体調不良で走れなくなり、$d復路に温存していたエース$innを往路に前倒しで投入した。'
+              : '$asa、$kukanを走る予定だった$outが体調不良で走れなくなり、$d補欠に温存していたエース$innを急きょその穴に投入した。',
+        );
+      } else {
+        sb.write(
+          w.erabu([
+            '$asa、$kukanを走る予定だった$outが体調不良で走れなくなり、$d$innが急きょ区間に入った。',
+            '$kukanは$asaに動いた。$outが体調不良で外れ、$d$innを急きょ起用した。',
+          ]),
+        );
+      }
+      break;
+    case HazuretaRiyuu.chousi:
+      sb.write(
+        j.onzonAce
+            ? '$asa、調子の上がらなかった$kukanの$outに代えて、$d補欠に温存していたエース$innを投入した。'
+            : '$asa、$d調子の上がらなかった$kukanの$outに代えて、$innを起用した。',
+      );
+      break;
+    case HazuretaRiyuu.irekae:
+      sb.write(
+        j.onzonAce
+            ? '$asa、$d補欠に温存していたエース$innを$kukanに投入し、$outが外れた。'
+            : '$asa、$d$kukanの$outに代えて$innを起用した。',
+      );
+      break;
+  }
+  final int? ms = j.mochiSa;
+  if (ms != null && !j.onzonAce) {
+    if (ms >= 10) {
+      sb.write('持ちタイムでは$innのほうが${saMoji(ms)}速い。');
+    } else if (ms <= -10) {
+      sb.write('持ちタイムでは$outに${saMoji(ms)}及ばない。');
+    }
+  }
+  return sb.toString();
+}
+
+/// 当日変更で入った選手の、事情を含めたひと言(コメントの事実の部分。「。」なし)
+String toujituJijouKotoba(ToujituJijou j, KijiRand r, {required bool yoi}) {
+  final String out = myouji(j.hazureta.name);
+  if (j.riyuu == HazuretaRiyuu.taichouFuryou) {
+    return r.erabu(
+      yoi
+          ? [
+              '朝に$outさんが走れないと聞いた。$outさんの分まで、と思って走った',
+              '朝に名前を呼ばれた。驚いたけど、準備はしてきたので落ち着いて入れた',
+            ]
+          : [
+              '朝に言われて準備が足りなかった、とは言いたくない。力が足りなかった',
+              '$outさんの穴を埋めるつもりだった。それができなかったのが悔しい',
+            ],
+    );
+  }
+  if (j.riyuu == HazuretaRiyuu.chousi) {
+    return yoi
+        ? '朝に起用を聞いた。チャンスをもらえた以上、結果で返したかった'
+        : '朝に起用を聞いて、気持ちは入っていた。体がついてこなかった';
+  }
+  return yoi
+      ? 'いつでも行けるように準備していた。チャンスをもらえてよかった'
+      : '起用してもらったのに応えられなかった。この悔しさは次で返したい';
 }
 
 // ------------------------------------------------------------

@@ -43,7 +43,9 @@ import 'package:ekiden/kansuu/kiji/kiji_taikousen.dart'
 // 守る決まり(箱庭スポーツと同じ)
 //  ・能力値は書かない(見抜く力の仕組みを壊さないため)。成長タイプ・上限・サプライズも書かない
 //    (伸びたことは、持ちタイムや区間順位など見えている事実からだけ書く)
-//  ・総監督(プレイヤー)の言葉は作らない。当日変更の理由も書かない(決めたのは総監督なので)
+//  ・総監督(プレイヤー)の言葉は作らない。当日変更の作戦の意図も書かない(決めたのは総監督なので)。
+//    ただし、外れた選手の体調不良や調子は画面に出ている事実なので、事情として書く
+//    (1.9.4。kiji_kihon.dart の ToujituJijou)
 //  ・趣味は、趣味非表示設定のときは書かない
 //  ・文体は常体だが、学内メディアらしく選手に寄り添う温かい言い方にする(苦しんだ区間も前向きに書く)
 //  ・「自己ベストを更新した」「今季、自己ベストを更新している」とは書かない(選手は毎年伸びるので、
@@ -542,6 +544,8 @@ Kiji _kekkaZenin(EkidenKekka e, EkidenUnivKekka m, String site) {
   final int race = k.race;
   final int ks = e.ks;
   final int n = e.n;
+  // 当日変更の事情(区間ごと。1.9.4)
+  final Map<int, ToujituJijou> jijou = toujituJijou(k, m.u, m.senshu);
 
   final String midashi = w.erabu([
     '全員の走りを振り返る　${k.raceMei}を駆けた$ks人',
@@ -558,7 +562,14 @@ Kiji _kekkaZenin(EkidenKekka e, EkidenUnivKekka m, String site) {
     final int kj = m.kukanJuni[kk];
     final int ima = m.tuuka[kk];
     final StringBuffer sb = StringBuffer();
-    sb.write('${e.kukanMei(kk)}を任された$yobiは、区間${kj + 1}位の${jikanMoji(m.kukanTime[kk])}で走った。');
+    final ToujituJijou? j = jijou[kk];
+    if (j != null) {
+      // 当日変更で入った選手は、その事情から書く(1.9.4)
+      sb.write(toujituJijouBun(j, w));
+      sb.write('$yobiは、区間${kj + 1}位の${jikanMoji(m.kukanTime[kk])}で走った。');
+    } else {
+      sb.write('${e.kukanMei(kk)}を任された$yobiは、区間${kj + 1}位の${jikanMoji(m.kukanTime[kk])}で走った。');
+    }
     if (kk == 0) {
       sb.write('${juniMoji(ima)}で2区へたすきを渡した。');
     } else {
@@ -600,13 +611,20 @@ Kiji _kekkaZenin(EkidenKekka e, EkidenUnivKekka m, String site) {
     if (s.gakunen == 4) {
       sb.write(race == 2 ? 'これが最後の正月駅伝だった。' : '4年生として最後の${k.raceMei}だった。');
     }
-    // 当日変更で入った選手
-    final bool iri = _hazuretaSenshu(k, kk) != null;
-    if (iri) {
-      sb.write(kj <= n ~/ 3 ? '当日変更での起用に、見事に応えた。' : '当日変更での起用だった。');
-    }
+    // 当日変更で入った選手(事情は上で書いた)
+    final bool iri = j != null;
     final bool kurushii = n >= 6 && kj >= (n * 3) ~/ 4;
-    if (kurushii) sb.write('苦しい走りになったが、最後までたすきを運び切った。');
+    if (j != null) {
+      sb.write(
+        kj <= n ~/ 3
+            ? '${j.kyuukyo ? '急な起用' : '当日変更での起用'}に、見事に応えた。'
+            : (kurushii
+                  ? (j.kyuukyo ? '準備の時間は少なかった。苦しんだが、たすきはしっかり運んだ。' : '起用に応えようと走ったが、苦しい走りになった。それでも最後までたすきを運び切った。')
+                  : '${j.kyuukyo ? '急な起用' : '当日変更での起用'}だったが、自分の役目を果たした。'),
+      );
+    } else if (kurushii) {
+      sb.write('苦しい走りになったが、最後までたすきを運び切った。');
+    }
     w.danraku(sb.toString());
     w.danraku(shusshinShumiBun(k, s, w.r, myouji(s.name)));
     // コメント
@@ -628,21 +646,49 @@ Kiji _kekkaZenin(EkidenKekka e, EkidenUnivKekka m, String site) {
     } else {
       bamen = CommentBamen.gakunaiKekka;
     }
-    w.comment(senshuComment(w, bamen, myouji(s.name), kuyashii: kuyashii));
+    final List<String> jijitsu = j == null
+        ? const []
+        : [toujituJijouKotoba(j, w.r, yoi: !kurushii)];
+    w.comment(
+      senshuCommentJijitsu(w, bamen, myouji(s.name), kuyashii: kuyashii, jijitsu: jijitsu),
+    );
   }
 
-  // 走れなかった仲間(補欠のままの選手と、当日変更で外れた選手)
-  final List<SenshuData> sasaeta = _jibunSenshu(k, (e) => e == -1 || e <= -100);
-  if (sasaeta.isNotEmpty) {
+  // 走れなかった仲間(体調不良で当日に外れた選手は分けて書く。1.9.4)
+  final List<SenshuData> taichou = [
+    for (final ToujituJijou j in jijou.values)
+      if (j.riyuu == HazuretaRiyuu.taichouFuryou) j.hazureta,
+  ];
+  final List<SenshuData> sasaeta = _jibunSenshu(k, (e) => e == -1 || e <= -100)
+      .where((s) => !taichou.any((t) => t.id == s.id))
+      .toList();
+  if (taichou.isNotEmpty || sasaeta.isNotEmpty) {
     w.koMidashi('支えた仲間たち');
-    final List<String> namae = [for (final SenshuData s in sasaeta) w.senshu(s)];
-    w.danraku(
-      '${namae.join('、')}は、エントリーされながら今回は出番がなかった。'
-      '給水や付き添いでチームを支え、レースを一緒に戦った。',
-    );
-    w.comment(
-      senshuComment(w, CommentBamen.gakunaiHoketsu, myouji(sasaeta.first.name)),
-    );
+    if (taichou.isNotEmpty) {
+      final List<String> namae = [for (final SenshuData s in taichou) w.senshu(s)];
+      w.danraku(
+        '${namae.join('、')}は、当日の朝に体調を崩し、走る予定だった区間を仲間に託した。'
+        '走れなかった悔しさを抱えながら、チームの戦いを見届けた。',
+      );
+      w.comment(
+        senshuComment(
+          w,
+          CommentBamen.gakunaiTaichouHazureta,
+          myouji(taichou.first.name),
+          kuyashii: true,
+        ),
+      );
+    }
+    if (sasaeta.isNotEmpty) {
+      final List<String> namae = [for (final SenshuData s in sasaeta) w.senshu(s)];
+      w.danraku(
+        '${namae.join('、')}は、エントリーされながら今回は出番がなかった。'
+        '給水や付き添いでチームを支え、レースを一緒に戦った。',
+      );
+      w.comment(
+        senshuComment(w, CommentBamen.gakunaiHoketsu, myouji(sasaeta.first.name)),
+      );
+    }
   }
 
   final List<List<String>> gyou = [];

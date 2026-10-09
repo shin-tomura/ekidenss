@@ -633,8 +633,11 @@ Kiji _topKiji(EkidenKekka e) {
     final SenshuData? r0 = win.senshu[k0];
     final EkidenUnivKekka maeShui = e.shui(k0 - 1);
     if (r0 != null) {
-      final String yobi = w.senshu(r0);
       final StringBuffer sb = StringBuffer();
+      // 当日変更で入った選手なら、その事情から書く(1.9.4)
+      final ToujituJijou? wj = toujituJijou(k, win.u, win.senshu)[k0];
+      if (wj != null) sb.write(toujituJijouBun(wj, w, daigakuMei: win.mei));
+      final String yobi = w.senshu(r0);
       sb.write(
         '勝負が動いたのは${e.kukanMei(k0)}だった。'
         '${maeShui.mei}から${saMoji(saByou(win.ruikei[k0 - 1], maeShui.ruikei[k0 - 1]))}差の'
@@ -658,6 +661,7 @@ Kiji _topKiji(EkidenKekka e) {
                     : CommentBamen.oinuki),
           myouji(r0.name),
           jijitsu: [
+            if (wj != null) toujituJijouKotoba(wj, w.r, yoi: true),
             if (r0Innen.isNotEmpty) r0Innen.first.kotoba,
             w.erabu([
               '${maeShui.mei}まで${saMoji(sa0)}と聞いて、追えると思った',
@@ -1112,13 +1116,8 @@ Kiji? _jibunKiji(EkidenKekka e) {
     for (int kk = 0; kk < ks; kk++)
       if (m.kukanJuni[kk] == 0) kk,
   ];
-  // 当日変更で起用した区間
-  final Set<int> kiyou = {};
-  for (final SenshuData t in k.senshu) {
-    if (t.univid != m.u.id) continue;
-    final int en = k.entry(t);
-    if (en <= -100) kiyou.add(-en - 100);
-  }
+  // 当日変更の事情(区間ごと。外れた理由と、入った選手。1.9.4)
+  final Map<int, ToujituJijou> jijou = toujituJijou(k, m.u, m.senshu);
   // 学内区間新の更新幅(秒。なければ0)
   int gakunaiShinSa(int kk) {
     final SenshuData? s = m.senshu[kk];
@@ -1176,7 +1175,7 @@ Kiji? _jibunKiji(EkidenKekka e) {
     if (kk == ks - 1 && ks >= 2 && m.tuuka[ks - 2] > r) {
       ten += 20 + (m.tuuka[ks - 2] - r) * 10;
     }
-    if (kiyou.contains(kk) && yoi) ten += 30;
+    if (jijou.containsKey(kk) && yoi) ten += jijou[kk]!.kyuukyo ? 40 : 30;
     if (innen[kk].isNotEmpty) {
       ten += yoi ? innen[kk].first.ten : innen[kk].first.ten ~/ 3;
     }
@@ -1447,8 +1446,11 @@ Kiji? _jibunKiji(EkidenKekka e) {
   final Set<int> kaita = {}; // 本文で段落を書いた区間(重ねて書かない)
   if (s1 != null) {
     final int kj1 = m.kukanJuni[0];
-    final String yobi1 = w.senshu(s1);
     final StringBuffer sb = StringBuffer();
+    // 当日変更で入った選手なら、その事情から(1.9.4)
+    final ToujituJijou? j1 = jijou[0];
+    if (j1 != null) sb.write(toujituJijouBun(j1, w));
+    final String yobi1 = w.senshu(s1);
     if (kj1 == 0) {
       sb.write(
         w.erabu([
@@ -1496,13 +1498,16 @@ Kiji? _jibunKiji(EkidenKekka e) {
     // 1区の選手が主役なら、因縁とコメントも
     if (shuyaku == 0) sb.write(innenBun(0));
     w.danraku(sb.toString());
-    if (shuyaku == 0 && innen[0].isNotEmpty) {
+    if (shuyaku == 0 && (innen[0].isNotEmpty || j1 != null)) {
       w.comment(
         senshuCommentJijitsu(
           w,
           kj1 == 0 ? CommentBamen.kukanshou : CommentBamen.gakunaiKekka,
           myouji(s1.name),
-          jijitsu: [innen[0].first.kotoba],
+          jijitsu: [
+            if (j1 != null) toujituJijouKotoba(j1, w.r, yoi: kj1 <= n ~/ 2),
+            if (innen[0].isNotEmpty) innen[0].first.kotoba,
+          ],
         ),
       );
     }
@@ -1512,11 +1517,14 @@ Kiji? _jibunKiji(EkidenKekka e) {
   if (jouKukan >= 1 && jouGain >= 3) {
     final SenshuData? s = m.senshu[jouKukan];
     if (s != null) {
+      final StringBuffer sb = StringBuffer();
+      // 当日変更で入った選手なら、その事情から(1.9.4)
+      final ToujituJijou? jj = jijou[jouKukan];
+      if (jj != null) sb.write(toujituJijouBun(jj, w));
       final String yobi = w.senshu(s);
       final int kj = m.kukanJuni[jouKukan];
       final List<EkidenUnivKekka> nk = nuita(jouKukan);
       final EkidenUnivKekka? sr = seriai(jouKukan);
-      final StringBuffer sb = StringBuffer();
       sb.write(
         w.erabu([
           '流れを変えたのは${e.kukanMei(jouKukan)}だった。',
@@ -1545,6 +1553,7 @@ Kiji? _jibunKiji(EkidenKekka e) {
           CommentBamen.oinuki,
           myouji(s.name),
           jijitsu: [
+            if (jj != null) toujituJijouKotoba(jj, w.r, yoi: true),
             if (innen[jouKukan].isNotEmpty) innen[jouKukan].first.kotoba,
             w.erabu([
               '${juniMoji(m.tuuka[jouKukan - 1] - 1)}の背中が見えてからは、一人ずつと決めていた',
@@ -1566,8 +1575,11 @@ Kiji? _jibunKiji(EkidenKekka e) {
     final bool shin =
         s.chokuzentaikai_zentaikukansinflag == 1 && _juraiKukan(k, kk) != null;
     final int sa = e.kukanshouSa(kk);
-    final String yobi = w.senshu(s);
     final StringBuffer sb = StringBuffer();
+    // 当日変更で入った選手なら、その事情から(1.9.4)
+    final ToujituJijou? jk = jijou[kk];
+    if (jk != null) sb.write(toujituJijouBun(jk, w));
+    final String yobi = w.senshu(s);
     sb.write(
       w.erabu([
         '${e.kukanMei(kk)}では$yobiが${jikanMoji(m.kukanTime[kk])}で区間賞を獲得した。',
@@ -1587,6 +1599,7 @@ Kiji? _jibunKiji(EkidenKekka e) {
         shin ? CommentBamen.kukanshin : CommentBamen.kukanshou,
         myouji(s.name),
         jijitsu: [
+          if (jk != null) toujituJijouKotoba(jk, w.r, yoi: true),
           if (innen[kk].isNotEmpty) innen[kk].first.kotoba,
           if (sa >= 10) '2位と${saMoji(sa)}差と聞いて、やっと実感が湧いた',
           if (sa < 10 && sa >= 0) '2位とは${kinsaMoji(sa)}。最後まで気は抜けなかった',
@@ -1613,36 +1626,78 @@ Kiji? _jibunKiji(EkidenKekka e) {
       w.danraku('チームとしても、学内の大会記録を${saMoji(jurai - byou(m.time))}更新した。');
     }
   }
-  // 当日変更で起用した選手
-  for (final int kk in kiyou.toList()..sort()) {
-    if (kaita.contains(kk)) continue;
-    final SenshuData? s = m.senshu[kk];
-    if (s == null) continue;
+  // 当日変更で起用した選手(事情つき。急きょの起用と、結果が良い・悪いの差が大きい区間を先に書き、
+  // 残りはまとめて1文にする。1.9.4)
+  final List<int> jijouJun = jijou.keys.where((kk) => !kaita.contains(kk)).toList()
+    ..sort((a, b) {
+      final int ka = jijou[a]!.kyuukyo ? 1 : 0;
+      final int kb = jijou[b]!.kyuukyo ? 1 : 0;
+      if (ka != kb) return kb.compareTo(ka);
+      final int da = (m.kukanJuni[a] - n ~/ 2).abs();
+      final int db = (m.kukanJuni[b] - n ~/ 2).abs();
+      if (da != db) return db.compareTo(da);
+      return a.compareTo(b);
+    });
+  if (jijouJun.isNotEmpty) {
+    final int kk = jijouJun.first;
+    final ToujituJijou j = jijou[kk]!;
+    final SenshuData s = j.hairi;
     final int kj = m.kukanJuni[kk];
-    final String yobi = w.senshu(s);
+    final bool yoi = kj <= n ~/ 3;
+    final bool warui = n >= 6 && kj >= (n * 3) ~/ 4;
     final StringBuffer sb = StringBuffer();
-    if (kj <= n ~/ 3) {
+    sb.write(toujituJijouBun(j, w));
+    final String yobi = w.senshu(s);
+    final String out = myouji(j.hazureta.name);
+    if (yoi) {
       sb.write(
         w.erabu([
-          '当日変更で${e.kukanMei(kk)}に起用された$yobiは区間${kj + 1}位と好走し、起用に応えた。',
-          '当日の朝に${e.kukanMei(kk)}へ入った$yobiが、区間${kj + 1}位。起用は当たった。',
+          '$yobiは区間${kj + 1}位と好走し、起用に応えた。',
+          '$yobiは区間${kj + 1}位。穴を埋める以上の走りだった。',
         ]),
       );
-      sb.write(innenBun(kk));
-      w.danraku(sb.toString());
-      w.comment(
-        senshuCommentJijitsu(
-          w,
-          CommentBamen.toujitsuKiyou,
-          myouji(s.name),
-          jijitsu: [if (innen[kk].isNotEmpty) innen[kk].first.kotoba],
-        ),
+    } else if (warui) {
+      sb.write(
+        j.kyuukyo
+            ? '準備の時間がない中で区間${kj + 1}位。苦しんだが、たすきは運んだ。'
+            : '起用は裏目に出た。$yobiは区間${kj + 1}位と苦しんだ。',
       );
     } else {
-      w.danraku('当日変更で${e.kukanMei(kk)}に起用された$yobiは区間${kj + 1}位だった。');
+      sb.write('$yobiは区間${kj + 1}位で、役目を果たした。');
     }
+    if (j.riyuu == HazuretaRiyuu.taichouFuryou) {
+      sb.write(
+        w.erabu([
+          '走る予定だった$outは、仲間の走りを見守るしかなかった。',
+          '$outの分まで、という思いがチームにはあった。',
+        ]),
+      );
+    }
+    sb.write(innenBun(kk));
+    w.danraku(sb.toString());
+    w.comment(
+      senshuCommentJijitsu(
+        w,
+        warui ? CommentBamen.brake : CommentBamen.toujitsuKiyou,
+        myouji(s.name),
+        kuyashii: warui,
+        jijitsu: [
+          toujituJijouKotoba(j, w.r, yoi: !warui),
+          if (innen[kk].isNotEmpty) innen[kk].first.kotoba,
+        ],
+      ),
+    );
     kaita.add(kk);
-    break;
+    // 残りの当日変更はまとめて
+    final List<String> hoka = [];
+    for (final int k2 in jijouJun.skip(1)) {
+      final ToujituJijou j2 = jijou[k2]!;
+      hoka.add('${k2 + 1}区に${w.senshu(j2.hairi)}(区間${m.kukanJuni[k2] + 1}位)');
+      kaita.add(k2);
+    }
+    if (hoka.isNotEmpty) {
+      w.danraku('当日変更ではほかに、${hoka.join('、')}が入った。');
+    }
   }
   // ブレーキ
   if (brake && brakeKukan >= 0 && !kaita.contains(brakeKukan)) {
@@ -1791,9 +1846,22 @@ Kiji? _jibunKiji(EkidenKekka e) {
           : '目標は${juniMoji(mokuhyou)}だった。${r - mokuhyou}つ足りなかったのは私の責任です',
     );
   }
+  // 体調不良で外れた選手がいれば、そのことも話す
+  final ToujituJijou? taichouJ = jijou.values
+      .where((j) => j.riyuu == HazuretaRiyuu.taichouFuryou)
+      .firstOrNull;
+  if (taichouJ != null) {
+    final String out = myouji(taichouJ.hazureta.name);
+    final String inn = myouji(taichouJ.hairi.name);
+    kantokuJijitsu.add(
+      m.kukanJuni[taichouJ.kukan] <= n ~/ 2
+          ? '$outが朝に体調を崩した。$innはよく走ってくれた'
+          : '$outが朝に体調を崩した。急に入った$innを責められない',
+    );
+  }
   if (jouKukan >= 1 && jouGain >= 3 && m.senshu[jouKukan] != null) {
     kantokuJijitsu.add('${jouKukan + 1}区の${myouji(m.senshu[jouKukan]!.name)}で流れが変わった');
-  } else if (brake && brakeKukan >= 0 && !tassei) {
+  } else if (brake && brakeKukan >= 0 && !tassei && !(jijou[brakeKukan]?.kyuukyo ?? false)) {
     kantokuJijitsu.add('${brakeKukan + 1}区で流れを失った。あそこは私の配置の問題でもある');
   }
   w.comment(kantokuCommentJijitsu(w, kb, m.u.id, jijitsu: kantokuJijitsu, kuyashii: kuyashii));
@@ -1825,7 +1893,12 @@ Kiji? _jibunKiji(EkidenKekka e) {
         if (s != null) me.write('${kk + 1}区の${myouji(s.name)}が引っ張り、');
       }
       if (brakeKukan >= 0 && brakeJuni >= n ~/ 2 && m.senshu[brakeKukan] != null) {
-        me.write('${brakeKukan + 1}区の区間${brakeJuni + 1}位が足を引っ張った構図だ。');
+        final ToujituJijou? bj = jijou[brakeKukan];
+        me.write(
+          bj != null && bj.kyuukyo
+              ? '${brakeKukan + 1}区の区間${brakeJuni + 1}位は、朝に${myouji(bj.hazureta.name)}を欠いた穴がそのまま出た形だ。'
+              : '${brakeKukan + 1}区の区間${brakeJuni + 1}位が足を引っ張った構図だ。',
+        );
       } else {
         me.write('大きく崩れた区間がなかったことが、この順位を支えた。');
       }
@@ -1860,7 +1933,13 @@ Kiji? _jibunKiji(EkidenKekka e) {
       break;
     case KishaKata.karakuchi:
       me.write('${juniMoji(r)}という結果より気になるのは、');
-      if (brakeKukan >= 0 && m.senshu[brakeKukan] != null && brakeJuni >= n ~/ 2) {
+      final ToujituJijou? bj = brakeKukan >= 0 ? jijou[brakeKukan] : null;
+      if (bj != null && bj.kyuukyo && brakeJuni >= n ~/ 2) {
+        me.write(
+          '${myouji(bj.hairi.name)}の区間${brakeJuni + 1}位ではない。${myouji(bj.hazureta.name)}を欠いただけで流れが止まる、層の薄さだ。',
+        );
+        me.write('ここを埋めない限り、目標の${juniMoji(mokuhyou)}は遠い。');
+      } else if (brakeKukan >= 0 && m.senshu[brakeKukan] != null && brakeJuni >= n ~/ 2) {
         me.write('${brakeKukan + 1}区だ。区間${brakeJuni + 1}位で流れを手放した。');
         me.write('ここを埋めない限り、目標の${juniMoji(mokuhyou)}は遠い。');
       } else if (kukanshou.isEmpty) {
@@ -1991,6 +2070,9 @@ Kiji? _kukanshouKiji(EkidenKekka e) {
   final List<Innen> mvpInnen = senshuInnen(k, ms, mvp, kj: 0);
   final int mvpSa = e.kukanshouSa(mvp);
   bool mvpInnenKaita = false; // 因縁の地の文を書いたか(「記者の目」で重ねない)
+  // 当日変更で入った選手なら、その事情から書く(1.9.4)
+  final ToujituJijou? mj = toujituJijou(k, mx.u, mx.senshu)[mvp];
+  if (mj != null) sb.write(toujituJijouBun(mj, w, daigakuMei: mx.mei));
   if (maeKj == 0 && maeEntry == mvp) {
     sb.write('${myouji(ms.name)}は前回も同じ区間で区間賞を獲得しており、2年連続の区間賞となった。');
   } else if (mvpInnen.isNotEmpty) {
@@ -2015,6 +2097,7 @@ Kiji? _kukanshouKiji(EkidenKekka e) {
       shin[mvp] ? CommentBamen.kukanshin : CommentBamen.kukanshou,
       myouji(ms.name),
       jijitsu: [
+        if (mj != null) toujituJijouKotoba(mj, w.r, yoi: true),
         if (mvpInnen.isNotEmpty) mvpInnen.first.kotoba,
         w.erabu([
           if (shin[mvp]) '従来の記録を${saMoji(shinSa[mvp])}更新したと聞いて、自分でも驚いた',
@@ -2035,7 +2118,9 @@ Kiji? _kukanshouKiji(EkidenKekka e) {
     final SenshuData? s = x.senshu[kk];
     if (s == null) continue;
     final StringBuffer b = StringBuffer();
-    b.write('${e.kukanMei(kk)}は${w.senshu(s, daigaku: true)}が${jikanMoji(x.kukanTime[kk])}で区間賞');
+    // 当日変更で入った選手なら、そのことも(1.9.4)
+    final bool xIri = toujituJijou(k, x.u, x.senshu).containsKey(kk);
+    b.write('${e.kukanMei(kk)}は${xIri ? '当日変更で入った' : ''}${w.senshu(s, daigaku: true)}が${jikanMoji(x.kukanTime[kk])}で区間賞');
     if (shin[kk]) {
       b.write('(区間新記録)');
     }

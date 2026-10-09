@@ -1222,6 +1222,111 @@ List<int> kukanShumoku(Ghensuu gh, int race, int k) {
   }
 }
 
+/// 選手[s]が、記事にする対校戦より前に対校戦(5000m・1万m・ハーフ)を走った回数
+/// (学年ごとに残る順位から数える。今の学年の分は数えない)
+int taikousenShussouKaisuu(SenshuData s) {
+  int kaisuu = 0;
+  for (int g = 1; g < s.gakunen; g++) {
+    for (int race = 6; race <= 8; race++) {
+      if (s.kukanjuni_race.length <= race) continue;
+      if (s.kukanjuni_race[race].length < g) continue;
+      final int j = s.kukanjuni_race[race][g - 1];
+      if (j >= 0 && j < TEISUU.DEFAULTJUNI) kaisuu++;
+    }
+  }
+  return kaisuu;
+}
+
+/// 対校戦(5000m・1万m・ハーフ)の選手[s]の因縁(点の高い順。1.9.4)
+/// [juni] この種目の全体の順位(0が1位)。[kekka] 結果の記事ならtrue(文の時制が変わる)
+List<Innen> taikousenInnen(KijiKankyou k, SenshuData s, {int? juni, bool kekka = true}) {
+  final List<Innen> list = [];
+  final int race = k.race;
+  if (race < 6 || race > 8) return list;
+  final String sm = kijiShumokuMei[race - 6];
+  // 昨年の同じ種目
+  final int? maeJ = k.kukanJuniMae(s, race, 1);
+  if (maeJ != null) {
+    if (juni != null && maeJ - juni >= 5) {
+      list.add(
+        Innen(
+          InnenShurui.juniUe,
+          70,
+          '昨年の$smは${juniMoji(maeJ)}。1年で${maeJ - juni}つ順位を上げた。',
+          '去年は${juniMoji(maeJ)}で終わっていた。1年間、この種目で上に行くことを考えてきた',
+          '昨年${juniMoji(maeJ)}からの',
+        ),
+      );
+    } else if (juni != null && juni - maeJ >= 5) {
+      list.add(
+        Innen(
+          InnenShurui.juniShita,
+          35,
+          '昨年の$smは${juniMoji(maeJ)}だったが、今年はその順位に届かなかった。',
+          '去年の自分を超えられなかった。それが一番悔しい',
+        ),
+      );
+    } else {
+      list.add(
+        Innen(
+          InnenShurui.juniUe,
+          30,
+          '昨年も$smを走り、${juniMoji(maeJ)}だった。',
+          kekka ? '去年もこの種目を走った。コースも展開も分かっていたのは大きかった' : '去年もこの種目を走った。展開は分かっている',
+        ),
+      );
+    }
+  }
+  // 駅伝の本戦の出走歴
+  final ({int kaisuu, int kukanshou}) reki = ekidenShussouKaisuu(k, s);
+  if (reki.kaisuu >= 1) {
+    list.add(
+      Innen(
+        InnenShurui.honsenKeiken,
+        35 + (reki.kukanshou >= 1 ? 10 : 0),
+        '駅伝では${reki.kaisuu}度の本戦出走${reki.kukanshou >= 1 ? '(区間賞${reki.kukanshou}度)' : ''}がある。',
+        kekka ? '駅伝とは違うトラックの勝負。個人の戦いも楽しめた' : '駅伝とは違う個人の勝負。楽しみたい',
+      ),
+    );
+  }
+  // 初めての対校戦
+  if (taikousenShussouKaisuu(s) == 0 && !k.ichinenDake) {
+    list.add(
+      s.gakunen == 1
+          ? Innen(
+              InnenShurui.debut,
+              40,
+              kekka ? 'これが初めての対校戦だった。' : 'これが初めての対校戦になる。',
+              kekka ? '初めての対校戦。上級生と一緒に走れて、自分の位置が分かった' : '初めての対校戦。怖がらずに上級生に挑みたい',
+              '初めての対校戦で',
+            )
+          : Innen(
+              InnenShurui.debut,
+              45,
+              kekka ? '${s.gakunen}年目で初めて走った対校戦だった。' : '${s.gakunen}年目で初めて走る対校戦になる。',
+              kekka ? '${s.gakunen}年目でやっと対校戦に出られた。走れたこと自体がうれしい' : '${s.gakunen}年目でやっと対校戦に出られる。全部出し切りたい',
+              '${s.gakunen}年目で初めての対校戦で',
+            ),
+    );
+  }
+  // 4年生の最後の対校戦
+  if (s.gakunen == 4) {
+    list.add(
+      Innen(
+        InnenShurui.saigo,
+        40,
+        kekka ? 'これが最後の対校戦だった。' : 'これが最後の対校戦になる。',
+        kekka ? '最後の対校戦。大学の名前を背負って走れるのも、あと少しだと感じた' : '最後の対校戦。大学の名前を背負って走れるうちに、いい走りをしたい',
+        '最後の対校戦で',
+      ),
+    );
+  }
+  final Innen? nobi = nyuugakuNobiInnen(k, s);
+  if (nobi != null) list.add(nobi);
+  list.sort((a, b) => b.ten.compareTo(a.ten));
+  return list;
+}
+
 // ------------------------------------------------------------
 // 当日変更の事情(1.9.4)。結果の記事で、当日変更で入った選手と外れた選手の事情を書く
 // ・外れた選手には区間の値に -(100+区間) の印が残り、調子は次の区間エントリーまで当日の値のまま

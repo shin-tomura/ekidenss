@@ -2289,10 +2289,18 @@ void _taikousenSenshuKaku(
     sb.write('大学に入って初めての対校戦だった。');
     if (sh == 0) sb.write(_nyuugakuHikakuBun(s, x.time));
   }
+  // 入学時の記録からの伸び(2年生以上。1年生は上で5000mだけ比べている。1.9.4)
+  final Innen? nobi = nyuugakuNobiInnen(k, s);
+  if (nobi != null) sb.write(nobi.bun);
+  // 駅伝の本戦の出走歴(1.9.4)
+  final ({int kaisuu, int kukanshou}) reki = ekidenShussouKaisuu(k, s);
+  if (reki.kaisuu >= 1 && reki.kukanshou >= 1) {
+    sb.write('駅伝では区間賞${reki.kukanshou}度の実績がある。');
+  }
   if (s.gakunen == 4) sb.write('4年生にとっては、これが最後の対校戦だ。');
   w.danraku(sb.toString());
   w.danraku(shusshinShumiBun(k, s, w.r, w.senshu(s)));
-  // コメント
+  // コメント(因縁と、その日の順位の事実入り。1.9.4)
   final CommentBamen bamen = x.juni == 0
       ? CommentBamen.taikousenKojinYuushou
       : (nyuushou
@@ -2300,7 +2308,20 @@ void _taikousenSenshuKaku(
             : (nobiSa != null
                   ? CommentBamen.gakunaiNobi
                   : CommentBamen.gakunaiTaikousen));
-  w.comment(senshuComment(w, bamen, w.senshu(s)));
+  final List<Innen> ti = taikousenInnen(k, s, juni: x.juni);
+  w.comment(
+    senshuCommentJijitsu(
+      w,
+      bamen,
+      w.senshu(s),
+      jijitsu: [
+        if (ti.isNotEmpty) ti.first.kotoba,
+        x.juni == 0
+            ? '優勝できたのは、チームのみんなが声をかけてくれたから'
+            : (nyuushou ? '全体${juniMoji(x.juni)}。チームのポイントに貢献できたのがうれしい' : '全体${juniMoji(x.juni)}。1つでも前でゴールするつもりだった'),
+      ],
+    ),
+  );
 }
 
 /// 対校戦の総合の記事(ハーフのあと)
@@ -2471,6 +2492,30 @@ Kiji _taikousenSougouKiji(
     '${tassei ? 'この結果を自信に' : 'この悔しさを胸に'}、チームは夏の鍛錬を経て、駅伝シーズンへ向かう。'
     'ハーフの入賞者やチーム内の上位の選手の走りは、別の記事で振り返る。',
   );
+
+  // 編集部の目(学生記者の型で見方が変わる。1.9.4)
+  final KishaKata kata = _gakunaiKata(k, site, no);
+  final StringBuffer me = StringBuffer();
+  if (kata == KishaKata.suuji) {
+    me.write('3種目の合計${m.goukei}点、総合${juniMoji(r)}。8位以内の入賞は延べ${nyuushou.length}人。');
+    me.write(
+      tassei
+          ? '入賞の数より、全員の順位の積み上げが目標の${juniMoji(mk)}以内に届かせた。'
+          : '目標の${juniMoji(mk)}との差は、出場した一人ひとりが順位を1つ上げれば縮まる大きさだ。夏の宿題は、はっきりしている。',
+    );
+  } else {
+    // 情景で語る: 一番上の順位で入賞した選手の因縁
+    if (nyuushou.isNotEmpty) {
+      final ({int ev, SenshuData s, int juni}) best = nyuushou.reduce((a, b) => a.juni <= b.juni ? a : b);
+      final List<Innen> bi = taikousenInnen(k, best.s, juni: best.juni);
+      me.write('この対校戦を一人で語るなら、${kijiShumokuMei[best.ev]}${best.juni == 0 ? '優勝' : juniMoji(best.juni)}の${myouji(best.s.name)}だ。');
+      me.write(bi.isNotEmpty ? bi.first.bun : '大学の名前を背負って、前で勝負した。');
+      me.write('その走りが、チームの夏を変える。');
+    } else {
+      me.write('入賞者はいなくても、3種目に出た全員の順位が、チームの総合${juniMoji(r)}を作った。一人ひとりの1つの順位が、確かに効いていた。');
+    }
+  }
+  w.kishaNoMe(me.toString(), midashi: '編集部の目');
 
   // 表
   final List<List<String>> gyou = [

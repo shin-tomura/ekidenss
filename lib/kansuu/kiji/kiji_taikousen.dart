@@ -26,6 +26,10 @@ import 'package:ekiden/kansuu/kiji/kiji_comment.dart';
 //
 // 記録(歴代記録・自己ベスト)には触れない。5000m・1万m・ハーフの記録は記録会などほかの大会と
 // 共通で、対校戦の前の記録も控えていないため(ゲームを始めたばかりのころに、誤って新記録と書かないように)
+//
+// 1.9.4: 対校戦用の因縁(kiji_kihon.dart の taikousenInnen。昨年の同じ種目との比べ・駅伝の本戦の出走歴・
+//  初めての対校戦・最後の対校戦・入学時の記録からの伸び)を、個人優勝の記事と自分の大学の記事に入れ、
+//  自分の大学の記事の最後に、記者の型で見方が変わる「記者の目」を付ける
 // ------------------------------------------------------------
 
 /// 対校戦の総合の記録の番号(UnivData.juni_race・taikaibetujunibetukaisuu の番号)
@@ -478,7 +482,28 @@ Kiji? _kojinKiji(TaikousenKekka e) {
     );
   }
   w.danraku(joui.toString());
-  w.comment(senshuComment(w, CommentBamen.taikousenKojinYuushou, w.senshu(a.s)));
+  // 優勝した選手の因縁(連覇のときは、昨年の順位の因縁は書かない。1.9.4)
+  final List<Innen> ai = [
+    for (final Innen i in taikousenInnen(k, a.s, juni: 0))
+      if (!(renpa >= 2 && i.shurui == InnenShurui.juniUe)) i,
+  ];
+  if (ai.isNotEmpty && ai.first.ten >= 40) {
+    w.danraku('${w.senshu(a.s)}。${ai.first.bun}');
+  }
+  w.comment(
+    senshuCommentJijitsu(
+      w,
+      CommentBamen.taikousenKojinYuushou,
+      w.senshu(a.s),
+      jijitsu: [
+        if (ai.isNotEmpty) ai.first.kotoba,
+        if (b != null && sa <= 1) '最後は並んでのゴール。勝てたのは気持ちの差だと思う',
+        if (b != null && sa >= dokusouSa[sh]) '途中から一人になった。自分との戦いだった',
+        if (b != null && sa > 1 && sa < dokusouSa[sh]) '2位と${saMoji(sa)}差。最後まで気は抜けなかった',
+        if (b == null) '一人でも集中を切らさずに走れた',
+      ],
+    ),
+  );
   w.danraku(shusshinShumiBun(k, a.s, w.r, myouji(a.s.name)));
 
   // 本文: 入賞と大学のポイント
@@ -897,6 +922,8 @@ Kiji? _jibunKiji(TaikousenKekka e) {
   ];
   final int shJ = e.shumokuJuni(m, sh);
   final int nyuushou = mine.where((x) => x.juni < _meiseiJuniSuu).length;
+  // 記者の型(1.9.4)
+  final KishaKata kata = k.kishaKata(no);
 
   // 見出し
   String midashi;
@@ -982,6 +1009,31 @@ Kiji? _jibunKiji(TaikousenKekka e) {
     sb.write('出場した${mine.length}人の平均順位は${heikin.toStringAsFixed(1)}位だった。');
   }
   w.danraku(sb.toString());
+  // 学内トップの因縁とコメント(1.9.4)
+  if (mine.isNotEmpty) {
+    final TaikousenSenshuKekka top = mine.first;
+    final List<Innen> ti = taikousenInnen(k, top.s, juni: top.juni);
+    if (ti.isNotEmpty && ti.first.ten >= 40) {
+      w.danraku('${w.senshu(top.s)}。${ti.first.bun}');
+    }
+    final bool nyuu = top.juni < _meiseiJuniSuu;
+    w.comment(
+      senshuCommentJijitsu(
+        w,
+        top.juni == 0
+            ? CommentBamen.taikousenKojinYuushou
+            : (nyuu ? CommentBamen.gakunaiNyuushou : CommentBamen.gakunaiTaikousen),
+        myouji(top.s.name),
+        jijitsu: [
+          if (ti.isNotEmpty) ti.first.kotoba,
+          nyuu
+              ? '全体${juniMoji(top.juni)}。チームのポイントに少しは貢献できたと思う'
+              : '全体${juniMoji(top.juni)}。8位以内に届かなかったのは悔しい',
+        ],
+      ),
+    );
+    w.danraku(shusshinShumiBun(k, top.s, w.r, myouji(top.s.name)));
+  }
 
   // 本文: 3種目を終えて(ハーフのあと)
   if (e.saigo) {
@@ -991,18 +1043,61 @@ Kiji? _jibunKiji(TaikousenKekka e) {
       '${[for (int ev = 0; ev < 3; ev++) '${kijiShumokuMei[ev]}が${m.point[ev]}点(${juniMoji(e.shumokuJuni(m, ev))})'].join('、')}。',
     );
     w.comment(
-      r == 0
-          ? kantokuComment(w, KantokuBamen.taikousenYuushou, m.u.id)
-          : (tassei
-                ? kantokuComment(w, KantokuBamen.mokuhyouTassei, m.u.id)
-                : kantokuComment(
-                    w,
-                    KantokuBamen.taikousenMitassei,
-                    m.u.id,
-                    kuyashii: true,
-                  )),
+      kantokuCommentJijitsu(
+        w,
+        r == 0
+            ? KantokuBamen.taikousenYuushou
+            : (tassei ? KantokuBamen.mokuhyouTassei : KantokuBamen.taikousenMitassei),
+        m.u.id,
+        kuyashii: r != 0 && !tassei,
+        jijitsu: [
+          tassei
+              ? '目標の${juniMoji(mk)}に対して総合${juniMoji(r)}。全員の順位が効いた'
+              : '目標の${juniMoji(mk)}に${r - mk}つ届かなかった。一人ひとりの順位の重みを思い知った',
+          if (nyuushou >= 1) '$smで$nyuushou人が8位以内に入ってくれた',
+        ],
+      ),
     );
   }
+
+  // 記者の目(記者の型で見方が変わる。自分の大学に辛口なのは、ハーフのあとで目標に届かなかったときだけ。1.9.4)
+  final StringBuffer me = StringBuffer();
+  KishaKata meKata = kata;
+  if (meKata == KishaKata.karakuchi && !(e.saigo && !tassei)) meKata = KishaKata.suuji;
+  switch (meKata) {
+    case KishaKata.suuji:
+      if (mine.isNotEmpty) {
+        final double heikin = mine.fold<int>(0, (t, x) => t + x.juni) / mine.length + 1;
+        me.write('$smは${mine.length}人が出場し、平均順位${heikin.toStringAsFixed(1)}位、8位以内は$nyuushou人。');
+      }
+      me.write(
+        e.saigo
+            ? (tassei ? '総合${juniMoji(r)}で目標の${juniMoji(mk)}以内。数字の上では、全員の順位の積み上げが届かせた。' : '総合${juniMoji(r)}。目標の${juniMoji(mk)}までの差は、一人ひとりが順位を1つ上げれば埋まる大きさだ。')
+            : '総合${juniMoji(r)}で次の種目へ。対校戦は全員の順位がポイントになるので、残りの種目で1つずつ順位を上げることが鍵になる。',
+      );
+      break;
+    case KishaKata.joukei:
+      if (mine.isNotEmpty) {
+        final TaikousenSenshuKekka top = mine.first;
+        final List<Innen> ti = taikousenInnen(k, top.s, juni: top.juni);
+        me.write('この種目を一人で語るなら、${myouji(top.s.name)}だ。');
+        me.write(ti.isNotEmpty ? ti.first.bun : '全体${juniMoji(top.juni)}の走りが、チームの流れを作った。');
+        me.write('その走りが、後ろを走る仲間の背中を押した。');
+      } else {
+        me.write('この種目に出場した選手はいなかった。残りの種目に、全員の力を注ぐ。');
+      }
+      break;
+    case KishaKata.karakuchi:
+      if (mine.isNotEmpty) {
+        final TaikousenSenshuKekka last = mine.last;
+        me.write('総合${juniMoji(r)}という結果より気になるのは、出場した${mine.length}人の中で一番後ろだった${myouji(last.s.name)}の全体${juniMoji(last.juni)}だ。');
+        me.write('対校戦は全員の順位で決まる。上位の1人より、後ろの1人を上げるほうが、目標の${juniMoji(mk)}には近い。');
+      } else {
+        me.write('目標の${juniMoji(mk)}に届かなかったのは、$smに誰も出せなかったことが響いた。層の薄さが、そのまま点差になった。');
+      }
+      break;
+  }
+  w.kishaNoMe(me.toString());
 
   // 表
   final List<List<String>> gyou = [

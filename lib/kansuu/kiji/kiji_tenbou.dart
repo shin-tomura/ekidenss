@@ -665,6 +665,16 @@ Kiji _yuushouTenbou(Tenbou t, List<KijiYosouJin> yosou) {
       nikan ??= x;
     }
   }
+  // 三大駅伝(1.9.3): 今季の優勝校と、三冠の連続(前の季まで)
+  final SandaiEkiden? sd = SandaiEkiden.tsukuru(k, kekka: false);
+  final UnivData? y10 = sd?.yuushou(0, 0);
+  final UnivData? y11 = sd?.yuushou(1, 0);
+  final ({int kaisuu, bool kakutei})? sankanRz = (sankan != null && sd != null)
+      ? sd.sankanRenzoku(sankan.u, 1)
+      : null;
+  // 三冠がかかる大学が、前の季から三冠を続けているか(言い切れるときだけ)
+  final int sankanTsuzuki =
+      (sankanRz != null && sankanRz.kakutei) ? sankanRz.kaisuu : 0;
   // 予想陣の本命
   final List<int> honmeiYosou = [
     for (final KijiYosouJin y in yosou)
@@ -692,10 +702,12 @@ Kiji _yuushouTenbou(Tenbou t, List<KijiYosouJin> yosou) {
   // 見出し
   String midashi;
   if (sankan != null) {
-    midashi = w.erabu([
-      '${sankan.mei}、三冠へ最後の戦い',
-      '三冠かかる${sankan.mei}',
-    ]);
+    midashi = sankanTsuzuki >= 1
+        ? '${sankan.mei}、${sankanTsuzuki + 1}年連続の三冠へ'
+        : w.erabu([
+            '${sankan.mei}、三冠へ最後の戦い',
+            '三冠かかる${sankan.mei}',
+          ]);
     midashi += sankan.u.id == hon.u.id ? '　戦力も一枚上' : '　${hon.mei}が阻むか';
   } else if (ouja != null && ouja.u.id == hon.u.id && oujaFumei) {
     midashi = w.erabu([
@@ -750,7 +762,15 @@ Kiji _yuushouTenbou(Tenbou t, List<KijiYosouJin> yosou) {
     lead.write('区間ごとの持ちタイムを比べると、多くの区間で他校を上回る。');
   }
   if (sankan != null) {
-    lead.write('10月駅伝、11月駅伝を制した${sankan.mei}は、史上まれな三冠に挑む。');
+    lead.write(
+      sankanTsuzuki >= 1
+          ? '10月駅伝、11月駅伝を制した${sankan.mei}は、${sankanTsuzuki + 1}年連続の三冠に挑む。'
+          : (sankanRz != null && !sankanRz.kakutei)
+          ? '10月駅伝、11月駅伝を制した${sankan.mei}は、続けてきた三冠をさらに伸ばせるか。'
+          // 三冠がまだ珍しいデータのときだけ「史上まれな」(全大学の通算が、達成すれば3回まで)
+          : '10月駅伝、11月駅伝を制した${sankan.mei}は、'
+                '${sd != null && sd.sankanGoukei <= 2 ? '史上まれな' : ''}三冠に挑む。',
+    );
   } else if (ouja != null) {
     lead.write(
       oujaFumei
@@ -760,7 +780,17 @@ Kiji _yuushouTenbou(Tenbou t, List<KijiYosouJin> yosou) {
           : '前回王者の${ouja.mei}は連覇を狙う。',
     );
   }
-  if (nikan != null && sankan == null) {
+  if (race == 2 && sankan == null && y10 != null && y11 != null && y10.id != y11.id) {
+    // 10月駅伝と11月駅伝の優勝校が違う(1.9.3。どちらも出場していれば、ともに二冠目を狙う)
+    final List<String> deru = [
+      for (final UnivData u in [y10, y11])
+        if (t.jun.any((x) => x.u.id == u.id)) daigakuMei(u),
+    ];
+    lead.write(
+      '今季の三大駅伝は、10月駅伝を${daigakuMei(y10)}、11月駅伝を${daigakuMei(y11)}が制した。'
+      '${deru.length == 2 ? '両校とも二冠目を狙う。' : (deru.length == 1 ? '${deru.first}が二冠目を狙う。' : '')}',
+    );
+  } else if (nikan != null && sankan == null) {
     lead.write(
       race == 1
           ? '10月駅伝を制した${nikan.mei}は、今季二冠目を狙う。'
@@ -890,7 +920,11 @@ Kiji _yuushouTenbou(Tenbou t, List<KijiYosouJin> yosou) {
     category: '駅伝・展望',
     midashi: midashi,
     lead: lead.toString(),
-    hyou: [_maeHyoubanHyou(t, yosou, ekiden: true)],
+    hyou: [
+      _maeHyoubanHyou(t, yosou, ekiden: true),
+      // 今季の三大駅伝の優勝校(11月駅伝・正月駅伝。1.9.3)
+      if (sd != null && race >= 1) sd.konkiHyou(),
+    ],
     jibun: hon.u.id == k.gh.MYunivid,
   );
 }

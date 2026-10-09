@@ -348,10 +348,25 @@ Kiji _kekkaTop(EkidenKekka e, EkidenUnivKekka m, String site) {
   final int? seed = e.seedSuu;
   final bool seedNow = seed != null && r < seed;
   final bool seedMae = seed != null && maeAri && mae < seed;
+  // 三大駅伝の二冠・三冠(1.9.3。11月駅伝・正月駅伝)
+  final SandaiEkiden? sd = race >= 1 ? SandaiEkiden.tsukuru(k, kekka: true) : null;
+  final UnivData? y10 = sd?.yuushou(0, 0);
+  final UnivData? y11 = sd?.yuushou(1, 0);
+  final bool juu = y10 != null && y10.id == m.u.id; // 今季の10月駅伝を制した
+  final bool juuichi = race == 2 && y11 != null && y11.id == m.u.id; // 今季の11月駅伝を制した
+  final bool sankan = r == 0 && race == 2 && juu && juuichi;
+  final bool nikan = r == 0 && !sankan && (juu || juuichi);
 
   // 見出し
   String midashi;
-  if (r == 0) {
+  if (sankan) {
+    midashi = w.erabu([
+      '三冠達成！　三大駅伝をすべて制す',
+      '歓喜の三冠　${k.taikaiMei}も制覇',
+    ]);
+  } else if (nikan) {
+    midashi = '${k.raceMei}制覇！　今季二冠目';
+  } else if (r == 0) {
     midashi = w.erabu([
       '${k.raceMei}制覇！　全員でつかんだ頂点',
       '歓喜の優勝　${k.taikaiMei}',
@@ -403,6 +418,24 @@ Kiji _kekkaTop(EkidenKekka e, EkidenUnivKekka m, String site) {
       lead.write('シード権も守った。');
     } else if (!seedNow && seedMae) {
       lead.write('シード権は失ったが、来季は予選会から再び挑む。');
+    }
+  }
+  // 三大駅伝の二冠・三冠と、逃した二冠・三冠(1.9.3)
+  if (sd != null) {
+    if (sankan) {
+      lead.write('10月駅伝、11月駅伝に続く優勝で、今季の三大駅伝をすべて制する三冠を成し遂げた。');
+      final ({int kaisuu, bool kakutei}) rz = sd.sankanRenzoku(m.u, 0);
+      if (rz.kakutei && rz.kaisuu >= 2) {
+        lead.write('三冠は${rz.kaisuu}年連続だ。');
+      } else if (m.u.sankankaisuu >= 2) {
+        lead.write('${m.u.sankankaisuu}度目の三冠となった。');
+      }
+    } else if (nikan) {
+      lead.write('${juu ? '10月駅伝' : '11月駅伝'}に続く、今季二冠目の優勝だ。');
+    } else if (r > 0 && race == 2 && juu && y11 != null && y11.id == m.u.id) {
+      lead.write('10月駅伝、11月駅伝を制して挑んだ三冠はならなかったが、今季の二冠は胸を張れる勲章だ。');
+    } else if (r > 0 && race == 1 && juu) {
+      lead.write('10月駅伝に続く二冠はならなかったが、チームは正月駅伝へ向けて再び走り出す。');
     }
   }
 

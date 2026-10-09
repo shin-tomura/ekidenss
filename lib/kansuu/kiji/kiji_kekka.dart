@@ -19,6 +19,9 @@ import 'package:ekiden/kansuu/kiji/kiji_comment.dart';
 //  4. シード権争いの記事(11月駅伝・正月駅伝)
 //  5. 往路・復路の記事(正月駅伝)
 //  6. 学連選抜の記事(正月駅伝で学連選抜が走ったとき)
+//  7. 三大駅伝の振り返り(正月駅伝のあと。今季の三大駅伝と、過去5季の優勝校・三冠。1.9.3)
+// 三大駅伝(1.9.3): トップ記事で三冠の連続、三冠・二冠を阻んだこと、優勝校が分かれた季を書き、
+// 11月駅伝・正月駅伝のトップ記事には今季の三大駅伝の優勝校の表を付ける(kiji_kihon.dart の SandaiEkiden)
 // ------------------------------------------------------------
 
 /// 駅伝の結果の、大学1校分
@@ -213,6 +216,8 @@ List<Kiji> ekidenKekkaKiji(KijiKankyou k) {
   final Kiji? ouro = _ouroFukuroKiji(e);
   if (ouro != null) list.add(ouro);
   if (gakuren != null && !list.contains(gakuren)) list.add(gakuren);
+  final Kiji? sandai = _sandaiKiji(e);
+  if (sandai != null) list.add(sandai);
   return list;
 }
 
@@ -335,15 +340,41 @@ Kiji _topKiji(EkidenKekka e) {
     for (int kk = 0; kk < ks; kk++)
       if (win.kukanJuni[kk] == 0) kk,
   ].length;
+  // 三大駅伝(1.9.3): 三冠の連続、三冠・二冠を阻んだか、今季の優勝校
+  final SandaiEkiden? sd = SandaiEkiden.tsukuru(k, kekka: true);
+  final ({int kaisuu, bool kakutei})? sankanRz =
+      (sankan && sd != null) ? sd.sankanRenzoku(win.u, 0) : null;
+  final int sankanKai = win.u.sankankaisuu;
+  final UnivData? y10 = sd?.yuushou(0, 0);
+  final UnivData? y11 = sd?.yuushou(1, 0);
+  // 三冠を狙った大学(10月駅伝・11月駅伝を制して、正月駅伝で敗れた)
+  final UnivData? sankanNogashi =
+      (race == 2 && y10 != null && y11 != null && y10.id == y11.id && y10.id != win.u.id)
+      ? y10
+      : null;
+  // 二冠を狙った大学(10月駅伝を制して、11月駅伝で敗れた)
+  final UnivData? nikanNogashi =
+      (race == 1 && y10 != null && y10.id != win.u.id) ? y10 : null;
+  EkidenUnivKekka? kekkaOf(UnivData u) {
+    for (final EkidenUnivKekka x in e.jun) {
+      if (x.u.id == u.id) return x;
+    }
+    return null;
+  }
 
   // 見出し(一番ニュース価値の高い切り口)
   String midashi1;
   if (sankan) {
-    midashi1 = w.erabu([
-      '${win.mei}が三冠達成',
-      '${win.mei}、三大駅伝完全制覇',
-      if (win.u.sankankaisuu >= 2) '${win.mei}、${win.u.sankankaisuu}度目の三冠',
-    ]);
+    if (sankanRz != null && sankanRz.kakutei && sankanRz.kaisuu >= 2) {
+      midashi1 = w.erabu([
+        '${win.mei}が${sankanRz.kaisuu}年連続の三冠',
+        '${win.mei}、${sankanRz.kaisuu}年連続で三大駅伝制覇',
+      ]);
+    } else if (sankanKai >= 2) {
+      midashi1 = '${win.mei}、$sankanKai度目の三冠';
+    } else {
+      midashi1 = w.erabu(['${win.mei}が三冠達成', '${win.mei}、三大駅伝完全制覇']);
+    }
   } else if (hatsuKaisai) {
     midashi1 = w.erabu([
       '${win.mei}が初代王者に',
@@ -374,7 +405,9 @@ Kiji _topKiji(EkidenKekka e) {
     midashi1 = w.erabu(['${win.mei}が$kaisuu度目のV', '${win.mei}、$kaisuu度目の優勝']);
   }
   String midashi2 = '';
-  if (taikaiShin) {
+  if (sankanNogashi != null) {
+    midashi2 = '${daigakuMei(sankanNogashi)}の三冠阻む';
+  } else if (taikaiShin) {
     midashi2 = '大会新記録';
   } else if (behind >= 120) {
     midashi2 = '最大${saMoji(behind)}差を逆転';
@@ -407,14 +440,53 @@ Kiji _topKiji(EkidenKekka e) {
     lead.write('今大会は、1年生だけが出場できる大会として行われた。');
   }
   if (sankan) {
-    lead.write(
-      w.erabu([
-        '10月駅伝、11月駅伝に続き、今季の三大駅伝をすべて制した。',
-        '10月、11月に続く優勝で、史上まれな三冠を成し遂げた。',
-      ]),
-    );
+    lead.write('10月駅伝、11月駅伝に続き、今季の三大駅伝をすべて制した。');
+    if (sankanRz != null && sankanRz.kakutei && sankanRz.kaisuu >= 2) {
+      lead.write(
+        '三冠は${sankanRz.kaisuu}年連続${sankanKai > sankanRz.kaisuu ? 'で、通算$sankanKai度目' : ''}となった。',
+      );
+    } else if (sankanRz != null && !sankanRz.kakutei) {
+      lead.write('三冠の連続をさらに伸ばし、通算$sankanKai度目の三冠となった。');
+    } else if (sankanKai >= 2) {
+      lead.write('$sankanKai度目の三冠となった。');
+    }
+    // 三冠がまだ珍しいデータのときだけ(全大学の通算が今回を含めて3回まで)
+    if (sd != null && sd.sankanGoukei <= 3) lead.write('史上まれな偉業だ。');
   } else if (nikan) {
-    lead.write(race == 1 ? '10月駅伝に続く今季二冠目となった。' : '今季二冠目となった。');
+    if (race == 1) {
+      lead.write('10月駅伝に続く今季二冠目となった。');
+    } else {
+      // 正月駅伝: どちらの大会に続く二冠目か(もう1つの大会の優勝校も書く)
+      final bool juu = y10 != null && y10.id == win.u.id;
+      final UnivData? hoka = juu ? y11 : y10;
+      lead.write('${juu ? '10月駅伝' : '11月駅伝'}に続く今季二冠目となった。');
+      if (hoka != null) {
+        lead.write('${juu ? '11月駅伝' : '10月駅伝'}は${daigakuMei(hoka)}が制していた。');
+      }
+    }
+  } else if (race == 2 && sankanNogashi == null && y10 != null && y11 != null) {
+    // 10月駅伝と11月駅伝の優勝校が違い、どちらも正月駅伝で敗れた
+    lead.write(
+      '今季の三大駅伝は、10月駅伝を${daigakuMei(y10)}、11月駅伝を${daigakuMei(y11)}、'
+      '正月駅伝を${win.mei}が制し、3校が1つずつ分け合った。',
+    );
+  }
+  if (sankanNogashi != null) {
+    final EkidenUnivKekka? x = kekkaOf(sankanNogashi);
+    lead.write(
+      x != null
+          ? '10月駅伝、11月駅伝を制して三冠を狙った${daigakuMei(sankanNogashi)}は'
+                '${juniMoji(x.juni)}に終わり、三冠はならなかった。'
+          : '10月駅伝、11月駅伝を制した${daigakuMei(sankanNogashi)}の三冠はならなかった。',
+    );
+  } else if (nikanNogashi != null) {
+    final EkidenUnivKekka? x = kekkaOf(nikanNogashi);
+    lead.write(
+      x != null
+          ? '10月駅伝を制した${daigakuMei(nikanNogashi)}は${juniMoji(x.juni)}に終わり、'
+                '今季の三大駅伝は優勝校が分かれた。'
+          : '10月駅伝は${daigakuMei(nikanNogashi)}が制しており、今季の三大駅伝は優勝校が分かれた。',
+    );
   }
   if (taikaiShin) {
     lead.write('従来の大会記録を${saMoji(koushin)}更新する大会新記録だった。');
@@ -671,7 +743,12 @@ Kiji _topKiji(EkidenKekka e) {
     category: '駅伝',
     midashi: midashi,
     lead: lead.toString(),
-    hyou: [_sougouHyou(e), if (kinsa || taisa) _saSuiiHyou(e)],
+    hyou: [
+      _sougouHyou(e),
+      if (kinsa || taisa) _saSuiiHyou(e),
+      // 今季の三大駅伝の優勝校(11月駅伝・正月駅伝。1.9.3)
+      if (sd != null && race >= 1) sd.konkiHyou(),
+    ],
     jibun: win.u.id == k.gh.MYunivid,
   );
 }
@@ -1864,5 +1941,137 @@ Kiji? _gakurenKiji(EkidenKekka e) {
       KijiHyou('学連選抜の区間成績', ['選手', '所属', '区間', 'タイム', '通過'], gyou),
     ],
     jibun: kantoku,
+  );
+}
+
+// ------------------------------------------------------------
+// 7. 三大駅伝の振り返り(正月駅伝のあと。1.9.3)
+// 今季の三大駅伝の優勝校と、過去の季の優勝校・三冠の表。前の季の記録がないとき
+// (ゲームを始めた年など)は、今季の優勝校の表がトップ記事にあるので出さない
+// ------------------------------------------------------------
+
+/// 三大駅伝の歴代優勝校の表に出す季の数
+const int _sandaiRekidaiKisuu = 5;
+
+Kiji? _sandaiKiji(EkidenKekka e) {
+  final KijiKankyou k = e.k;
+  if (k.race != 2) return null;
+  final SandaiEkiden? sd = SandaiEkiden.tsukuru(k, kekka: true);
+  if (sd == null) return null;
+  final KijiHyou rekidai = sd.rekidaiHyou(_sandaiRekidaiKisuu);
+  if (rekidai.gyou.length < 2) return null;
+  const int no = 7;
+  final KijiKakite w = KijiKakite(k, kijiTane(k.gh, k.race, no));
+  final UnivData win = e.jun[0].u;
+  final UnivData? y10 = sd.yuushou(0, 0);
+  final UnivData? y11 = sd.yuushou(1, 0);
+  final bool sankanIma = sd.sankan(win, 0);
+  final bool wakeai = y10 != null &&
+      y11 != null &&
+      y10.id != y11.id &&
+      win.id != y10.id &&
+      win.id != y11.id;
+  // 表に出した季の、大学ごとの優勝回数と、三冠の季(表と同じ季を見る)
+  final Map<int, int> kazu = {};
+  final List<String> sankanKi = [];
+  int kisuu = 0;
+  for (int i = 0; i < _sandaiRekidaiKisuu; i++) {
+    if (sd.nendo(i) < 1) break;
+    bool ari = false;
+    for (final int race in sandaiEkidenRace) {
+      final UnivData? u = sd.yuushou(race, i);
+      if (u == null) continue;
+      ari = true;
+      kazu[u.id] = (kazu[u.id] ?? 0) + 1;
+    }
+    if (ari) kisuu++;
+    final UnivData? u0 = sd.yuushou(0, i);
+    if (u0 != null && sd.sankan(u0, i)) {
+      sankanKi.add('${sd.nendo(i)}年度の${daigakuMei(u0)}');
+    }
+  }
+  final int taikaisuu = kazu.values.fold<int>(0, (t, v) => t + v);
+  int saita = 0;
+  kazu.forEach((id, c) {
+    if (c > saita) saita = c;
+  });
+  final List<String> saitaMei = [
+    for (final MapEntry<int, int> x in kazu.entries)
+      if (x.value == saita && x.key >= 0 && x.key < k.univ.length)
+        daigakuMei(k.univ[x.key]),
+  ];
+
+  // 見出し
+  String midashi;
+  if (sankanIma) {
+    midashi = '${daigakuMei(win)}の三冠で幕　三大駅伝の歴代優勝校';
+  } else if (wakeai) {
+    midashi = '今季の三大駅伝は3校が分け合う　歴代優勝校を振り返る';
+  } else {
+    midashi = w.erabu([
+      '今季の三大駅伝を振り返る　歴代優勝校',
+      '三大駅伝の頂点はどこに　歴代優勝校を振り返る',
+    ]);
+  }
+
+  // リード
+  final StringBuffer lead = StringBuffer();
+  lead.write('${k.taikaiMei}が終わり、今季の三大駅伝が幕を閉じた。');
+  final List<String> konki = [
+    if (y10 != null) '10月駅伝は${daigakuMei(y10)}',
+    if (y11 != null) '11月駅伝は${daigakuMei(y11)}',
+    '正月駅伝は${daigakuMei(win)}',
+  ];
+  lead.write('${konki.join('、')}が制した。');
+  if (sankanIma) {
+    lead.write('${daigakuMei(win)}が三冠を果たした季となった。');
+  } else if (wakeai) {
+    lead.write('3つの大会を3校が1つずつ分け合った。');
+  }
+
+  // 本文: この○季の三大駅伝
+  w.koMidashi('直近$kisuu季の三大駅伝');
+  final StringBuffer sb = StringBuffer();
+  if (saitaMei.isNotEmpty && saita >= 2) {
+    sb.write(
+      '直近$kisuu季の三大駅伝($taikaisuu大会)で最も多く優勝したのは、'
+      '${saitaMei.take(3).join('、')}の$saita回だった。',
+    );
+  }
+  sb.write(
+    sankanKi.isEmpty
+        ? 'この間に三冠を達成した大学はなかった。'
+        : 'この間の三冠は、${sankanKi.join('、')}。',
+  );
+  w.danraku(sb.toString());
+
+  // 本文: 三冠の通算
+  final List<UnivData> sankanUniv =
+      [
+        for (final UnivData u in k.univ)
+          if (u.sankankaisuu > 0) u,
+      ]..sort((a, b) {
+        final int c = b.sankankaisuu.compareTo(a.sankankaisuu);
+        return c != 0 ? c : a.id.compareTo(b.id);
+      });
+  w.koMidashi('三冠の歴史');
+  w.danraku(
+    sankanUniv.isEmpty
+        ? '三大駅伝をすべて制する三冠を達成した大学は、まだない。'
+        : '三冠の通算回数は、'
+              '${[for (final UnivData u in sankanUniv.take(3)) '${daigakuMei(u)}が${u.sankankaisuu}回'].join('、')}'
+              '${sankanUniv.length > 3 ? 'などとなっている' : 'となっている'}。',
+  );
+
+  final int my = k.gh.MYunivid;
+  return _kansei(
+    k,
+    no,
+    w,
+    category: '駅伝',
+    midashi: midashi,
+    lead: lead.toString(),
+    hyou: [rekidai],
+    jibun: win.id == my || y10?.id == my || y11?.id == my,
   );
 }

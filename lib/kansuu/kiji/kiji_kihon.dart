@@ -540,6 +540,115 @@ bool hatsuKaisaiKekka(KijiKankyou k, int race) {
 }
 
 // ------------------------------------------------------------
+// 三大駅伝(10月駅伝・11月駅伝・正月駅伝)の優勝校と三冠(1.9.3)
+// ・10月駅伝から正月駅伝までを1つの季として見る。年は1月に変わるので、季は10月駅伝の年で
+//   「○年度」と呼ぶ(正月駅伝の「第○回」とは数が1つずれる)
+// ・大学の順位の記録の[0]は、その大会の直近の回。今の季にまだ行われていない大会は、[0]が前の季
+// ・三冠の通算回数は UnivData.sankankaisuu(正月駅伝の記録の更新で、その季の三大駅伝を
+//   すべて制した大学に1回足す。KirokuKousin.dart)
+// ------------------------------------------------------------
+
+/// 三大駅伝の大会の番号(10月駅伝・11月駅伝・正月駅伝)
+const List<int> sandaiEkidenRace = [0, 1, 2];
+
+/// 三大駅伝の優勝校を、季ごとに見る道具
+class SandaiEkiden {
+  final KijiKankyou k;
+
+  /// 今の季に行われた、最後の三大駅伝の番号(-1なら、今の季はまだどれも行われていない)
+  final int owari;
+
+  SandaiEkiden._(this.k, this.owari);
+
+  /// 記事にしている大会が三大駅伝でなければnull
+  /// [kekka] 結果の記事なら、記事にしている大会も行われたものとする(展望の記事なら、まだ)
+  static SandaiEkiden? tsukuru(KijiKankyou k, {required bool kekka}) {
+    if (k.race < 0 || k.race > 2) return null;
+    return SandaiEkiden._(k, kekka ? k.race : k.race - 1);
+  }
+
+  /// 今の季の大会[race]が、もう行われたか
+  bool owatta(int race) => race <= owari;
+
+  /// [kiMae]季前(0が今の季)の大会[race]の優勝校(まだ行われていない・記録がなければnull)
+  UnivData? yuushou(int race, int kiMae) {
+    final int idx = owatta(race) ? kiMae : kiMae - 1;
+    if (idx < 0 || idx >= TEISUU.KIROKUHOZONNENSUU) return null;
+    for (final UnivData u in k.univ) {
+      if (juniRace(u, race, idx) == 0) return u;
+    }
+    return null;
+  }
+
+  /// 大学[u]が、[kiMae]季前に三冠を達成したか(その季の三大駅伝がすべて終わっていないときはfalse)
+  bool sankan(UnivData u, int kiMae) {
+    for (final int race in sandaiEkidenRace) {
+      final UnivData? y = yuushou(race, kiMae);
+      if (y == null || y.id != u.id) return false;
+    }
+    return true;
+  }
+
+  /// 大学[u]が[hajime]季前から続けて三冠を達成した季の数と、その数を言い切れるか
+  /// (順位の記録は TEISUU.KIROKUHOZONNENSUU 回分しか残らないので、残っている季が全部三冠のときは、
+  /// 通算の三冠の回数と比べる。renzokuKakutei と同じ考え方)
+  ({int kaisuu, bool kakutei}) sankanRenzoku(UnivData u, int hajime) {
+    int c = 0;
+    for (int i = hajime; i < TEISUU.KIROKUHOZONNENSUU; i++) {
+      if (!sankan(u, i)) break;
+      c++;
+    }
+    final int saidai = TEISUU.KIROKUHOZONNENSUU - hajime;
+    return (kaisuu: c, kakutei: c < saidai || u.sankankaisuu <= c);
+  }
+
+  /// 全大学の三冠の通算回数
+  int get sankanGoukei => k.univ.fold<int>(0, (t, u) => t + u.sankankaisuu);
+
+  /// [kiMae]季前の季の年度(10月駅伝の年。1〜3月は、前の年の10月駅伝からの季)
+  int nendo(int kiMae) =>
+      (k.gh.month <= 3 ? k.gh.year - 1 : k.gh.year) - kiMae;
+
+  /// 今の季の三大駅伝の優勝校の表(まだ行われていない大会は「これから」)
+  KijiHyou konkiHyou() {
+    String mei(int race) {
+      if (!owatta(race)) return 'これから';
+      final UnivData? u = yuushou(race, 0);
+      return u == null ? '-' : daigakuMei(u);
+    }
+
+    return KijiHyou('今季の三大駅伝', ['大会', '優勝校'], [
+      for (final int race in sandaiEkidenRace) [courseRaceTitle(race), mei(race)],
+    ]);
+  }
+
+  /// 三大駅伝の歴代優勝校の表(今の季の三大駅伝がすべて終わっていれば今の季から、[kisuu]季分。
+  /// 記録のない季は出さない。三冠の季は、正月駅伝の欄に「(三冠)」を付ける)
+  KijiHyou rekidaiHyou(int kisuu) {
+    final int hajime = owari >= 2 ? 0 : 1;
+    final List<List<String>> gyou = [];
+    for (int i = hajime; i < hajime + kisuu; i++) {
+      if (nendo(i) < 1) break;
+      final List<UnivData?> y = [
+        for (final int race in sandaiEkidenRace) yuushou(race, i),
+      ];
+      if (y.every((u) => u == null)) continue;
+      final bool sk = y.every((u) => u != null && u.id == y[0]!.id);
+      gyou.add([
+        '${nendo(i)}年度',
+        for (int j = 0; j < y.length; j++)
+          (y[j] == null ? '-' : daigakuMei(y[j]!)) +
+              (sk && j == y.length - 1 ? '(三冠)' : ''),
+      ]);
+    }
+    return KijiHyou('三大駅伝の歴代優勝校', [
+      '年度',
+      for (final int race in sandaiEkidenRace) courseRaceTitle(race),
+    ], gyou);
+  }
+}
+
+// ------------------------------------------------------------
 // 区間の特徴(展望・結果の記事で、区間の呼び方と見る種目を決める)
 // ------------------------------------------------------------
 

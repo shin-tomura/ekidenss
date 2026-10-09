@@ -6,6 +6,8 @@ import 'package:ekiden/screens/Modal_courseshoukai.dart'; // 大会の名前(cou
 import 'package:ekiden/kansuu/kiji/kiji_kihon.dart';
 import 'package:ekiden/kansuu/kiji/kiji_comment.dart';
 import 'package:ekiden/kansuu/kiji/kiji_kekka.dart' show EkidenKekka, EkidenUnivKekka;
+import 'package:ekiden/kansuu/kiji/kiji_yosen.dart'
+    show YosenKekka, YosenUnivKekka, YosenSenshuKekka;
 
 // ------------------------------------------------------------
 // 学内メディア「○○スポーツ」の記事(1.9.3)
@@ -21,6 +23,9 @@ import 'package:ekiden/kansuu/kiji/kiji_kekka.dart' show EkidenKekka, EkidenUniv
 //  4. 復路スタート直前号(正月駅伝の6区のスタート前): 往路の振り返りと、復路を走る選手
 //  5. 卒業生特集(3月25日の最新画面): 自分の大学の4年生全員の4年間の歩み
 //     (卒業の処理のあとは卒業選手のデータが大学ごとに10人くらいしか残らないので、この日だけ)
+//  6. 駅伝予選(11月駅伝予選・正月駅伝予選)の結果号と展望号: 弱い大学は予選にしか出られない年も
+//     あるので、予選でも全員を紹介する。予選の出走歴も数える(選手名鑑・卒業生特集)が、
+//     「初めての駅伝」「駅伝デビュー」は今まで通り本戦(駅伝)だけで決める
 //
 // 守る決まり(箱庭スポーツと同じ)
 //  ・能力値は書かない(見抜く力の仕組みを壊さないため)。成長タイプ・上限・サプライズも書かない
@@ -49,8 +54,11 @@ String? gakunaiSiteMeiJibun(KijiKankyou k) {
 // 共通の部品
 // ------------------------------------------------------------
 
-/// 年度の中の駅伝の順(10月・11月・正月・カスタム)
-const List<int> _ekidenRaceJun = [0, 1, 2, 5];
+/// 年度の中の大会の順(11月駅伝予選6月・10月駅伝・正月駅伝予選10月・11月駅伝・正月駅伝・カスタム駅伝2月)
+const List<int> _raceJun = [3, 0, 4, 1, 2, 5];
+
+/// 駅伝の本戦(予選ではない)か
+bool _honsen(int race) => race == 0 || race == 1 || race == 2 || race == 5;
 
 /// 駅伝を1回走った記録
 class _Shussou {
@@ -66,16 +74,19 @@ class _Shussou {
 
 /// 選手[s]の駅伝の出走歴(古い順。区間を走った大会だけ)
 /// [imaNozoku] 今の学年の、記事にする大会とそれより後の大会を除く(レース前の記事)
+/// [yosenMo] 駅伝予選も入れる(入れないときは本戦だけ)
 List<_Shussou> _shussouReki(
   KijiKankyou k,
   SenshuData s, {
   required bool imaNozoku,
+  bool yosenMo = false,
 }) {
   final List<_Shussou> list = [];
-  final int imaJun = _ekidenRaceJun.indexOf(k.race);
+  final int imaJun = _raceJun.indexOf(k.race);
   for (int g = 1; g <= s.gakunen; g++) {
-    for (int ji = 0; ji < _ekidenRaceJun.length; ji++) {
-      final int race = _ekidenRaceJun[ji];
+    for (int ji = 0; ji < _raceJun.length; ji++) {
+      final int race = _raceJun[ji];
+      if (!yosenMo && !_honsen(race)) continue;
       if (imaNozoku && g == s.gakunen && imaJun >= 0 && ji >= imaJun) continue;
       if (s.entrykukan_race.length <= race) continue;
       if (s.entrykukan_race[race].length < g) continue;
@@ -92,10 +103,25 @@ List<_Shussou> _shussouReki(
   return list;
 }
 
-/// 出走1回の言い方(「2年の11月駅伝は3区(区間5位)」)
-String _shussouMoji(_Shussou x) =>
-    '${x.gakunen}年の${courseRaceTitle(x.race)}は${x.kukan + 1}区'
-    '${x.juni != null ? '(区間${x.juni! + 1}位)' : ''}';
+/// 出走1回の言い方(「2年の11月駅伝3区(区間5位)」「2年の11月駅伝予選2組(組5位)」
+/// 「2年の正月駅伝予選(全体35位)」)
+String _shussouMoji(_Shussou x) {
+  final String mei = '${x.gakunen}年の${courseRaceTitle(x.race)}';
+  final int? j = x.juni;
+  if (x.race == 4) return j == null ? mei : '$mei(全体${j + 1}位)';
+  if (x.race == 3) {
+    return '$mei${x.kukan + 1}組${j == null ? '' : '(組${j + 1}位)'}';
+  }
+  return '$mei${x.kukan + 1}区${j == null ? '' : '(区間${j + 1}位)'}';
+}
+
+/// 予選の出走の回数の一言(「予選も2度走っている。」。なければ空)
+String _yosenKaisuuBun(KijiKankyou k, SenshuData s, {required bool imaNozoku}) {
+  final int n = _shussouReki(k, s, imaNozoku: imaNozoku, yosenMo: true)
+      .where((x) => !_honsen(x.race))
+      .length;
+  return n > 0 ? '駅伝予選も$n度走っている。' : '';
+}
 
 /// 種目[idx]の持ちタイムの文(「1万m28分31秒(チーム内3位)」。記録がなければnull)
 String? _mochiTimeMoji(KijiKankyou k, SenshuData s, int idx) {
@@ -209,11 +235,13 @@ Kiji _kansei(
 /// [kk] 今回の区間
 String _maeNoShussouBun(KijiKankyou k, SenshuData s, int kk, String yobi) {
   final List<_Shussou> reki = _shussouReki(k, s, imaNozoku: true);
+  final String yosen = _yosenKaisuuBun(k, s, imaNozoku: true);
   if (reki.isEmpty) {
-    if (k.ichinenDake) return '';
-    return s.gakunen == 1
-        ? '$yobiにとって、これが大学駅伝デビュー戦となる。'
-        : '$yobiは${s.gakunen}年目で、初めての駅伝出走をつかんだ。';
+    if (k.ichinenDake) return yosen;
+    return (s.gakunen == 1
+            ? '$yobiにとって、これが大学駅伝デビュー戦となる。'
+            : '$yobiは${s.gakunen}年目で、初めての駅伝出走をつかんだ。') +
+        yosen;
   }
   final StringBuffer sb = StringBuffer();
   // 同じ大会の同じ区間を、何年続けて走るか
@@ -240,6 +268,7 @@ String _maeNoShussouBun(KijiKankyou k, SenshuData s, int kk, String yobi) {
   sb.write('駅伝は${reki.length + 1}度目の出走。');
   final int kukanshou = reki.where((x) => x.juni == 0).length;
   if (kukanshou > 0) sb.write('区間賞は$kukanshou度獲得している。');
+  sb.write(yosen);
   return sb.toString();
 }
 
@@ -281,8 +310,12 @@ int? _mokuhyou(KijiKankyou k, UnivData u, int n) {
 // 1. 駅伝の結果号
 // ------------------------------------------------------------
 
-/// 駅伝の結果号(自分の大学が出ていなければ空)
+/// 駅伝と駅伝予選の結果号(自分の大学が出ていなければ空)
 List<Kiji> gakunaiKekkaKiji(KijiKankyou k) {
+  if (k.race == 3 || k.race == 4) {
+    final String? site = gakunaiSiteMeiJibun(k);
+    return site == null ? [] : _yosenKekkaKiji(k, site);
+  }
   if (!k.ekiden) return [];
   final String? site = gakunaiSiteMeiJibun(k);
   if (site == null) return [];
@@ -605,12 +638,14 @@ Kiji _kekkaZenin(EkidenKekka e, EkidenUnivKekka m, String site) {
 // 2. 駅伝の展望号(選手名鑑と特集)
 // ------------------------------------------------------------
 
-/// 駅伝の展望号(自分の大学が出ていない・区間エントリーがまだのときは空)
+/// 駅伝と駅伝予選の展望号(自分の大学が出ていない・区間エントリーがまだのときは空)
 List<Kiji> gakunaiTenbouKiji(KijiKankyou k) {
-  if (!k.ekiden) return [];
+  final bool yosen = k.race == 3 || k.race == 4;
+  if (!k.ekiden && !yosen) return [];
   final String? site = gakunaiSiteMeiJibun(k);
   final UnivData? u = k.jibunUniv;
   if (site == null || u == null || !k.shutsujou(u)) return [];
+  if (yosen) return _yosenTenbouKiji(k, site, u);
   final int ks = k.kukansuu;
   final List<SenshuData?> hashiru = [
     for (int kk = 0; kk < ks; kk++) _kukanNoSenshu(k, kk),
@@ -1059,30 +1094,43 @@ List<Kiji> gakunaiSotsugyouKiji(KijiKankyou k) {
       if (chijime > 0) sb.write('5000mは入学時から${saMoji(chijime)}縮めた。');
     }
     w.danraku(sb.toString());
-    // 駅伝の出走歴
-    final List<_Shussou> reki = _shussouReki(k, s, imaNozoku: false);
-    if (reki.isEmpty) {
+    // 駅伝の出走歴(本戦と予選を分けて数える。1.9.3で予選も数えるようにした)
+    final List<_Shussou> zenbu = _shussouReki(k, s, imaNozoku: false, yosenMo: true);
+    final List<_Shussou> reki = [
+      for (final _Shussou x in zenbu)
+        if (_honsen(x.race)) x,
+    ];
+    final List<_Shussou> yosen = [
+      for (final _Shussou x in zenbu)
+        if (!_honsen(x.race)) x,
+    ];
+    if (reki.isEmpty && yosen.isEmpty) {
       w.danraku(
         '4年間、駅伝の舞台に立つことはかなわなかった。それでも、練習でもレースの日でも、'
         '$yobiはチームを支え続けた。',
+      );
+    } else if (reki.isEmpty) {
+      w.danraku(
+        '本戦の舞台に立つことはかなわなかったが、駅伝予選を${yosen.length}度走り、'
+        '本戦への切符を目指してチームのために力を尽くした。'
+        '最後の予選は、${_shussouMoji(yosen.last)}だった。',
       );
     } else {
       final StringBuffer sr = StringBuffer();
       final _Shussou hajime = reki.first;
       final _Shussou saigo = reki.last;
       if (reki.length == 1) {
-        sr.write('4年間でただ一度の駅伝は、${_shussouMoji(hajime)}。');
+        sr.write('4年間でただ一度の駅伝は、${_shussouMoji(hajime)}だった。');
       } else {
         sr.write(
           '${hajime.gakunen}年の${courseRaceTitle(hajime.race)}で、${hajime.kukan + 1}区を走って駅伝デビュー。',
         );
         sr.write('4年間で駅伝を${reki.length}度走った。');
-        sr.write(
-          '最後の駅伝となった${_shussouMoji(saigo)}だった。',
-        );
+        sr.write('最後の駅伝は、${_shussouMoji(saigo)}だった。');
       }
       final int kukanshou = reki.where((x) => x.juni == 0).length;
       if (kukanshou > 0) sr.write('区間賞は$kukanshou度獲得した。');
+      if (yosen.isNotEmpty) sr.write('駅伝予選も${yosen.length}度走った。');
       w.danraku(sr.toString());
     }
     w.danraku(shusshinShumiBun(k, s, w.r, yobi));
@@ -1090,13 +1138,15 @@ List<Kiji> gakunaiSotsugyouKiji(KijiKankyou k) {
     // 後輩のひと言(同じ区間を走った後輩、いなければ同じ出身地の後輩)
     SenshuData? kh;
     String? kukanMoji;
-    for (final _Shussou x in reki) {
+    // (本戦の区間と、11月駅伝予選の組。正月駅伝予選は全員が同じ1区間なので数えない)
+    for (final _Shussou x in zenbu) {
+      if (x.race == 4) continue;
       for (final SenshuData t in kouhai) {
         if (tsukattaKouhai.contains(t.id)) continue;
-        if (_shussouReki(k, t, imaNozoku: false)
+        if (_shussouReki(k, t, imaNozoku: false, yosenMo: true)
             .any((y) => y.race == x.race && y.kukan == x.kukan)) {
           kh = t;
-          kukanMoji = '${courseRaceTitle(x.race)}の${x.kukan + 1}区';
+          kukanMoji = '${courseRaceTitle(x.race)}の${x.kukan + 1}${x.race == 3 ? '組' : '区'}';
           break;
         }
       }
@@ -1139,6 +1189,7 @@ List<Kiji> gakunaiSotsugyouKiji(KijiKankyou k) {
       _mochiTimeMoji(k, s, 0)?.replaceFirst('5000m', '') ?? '-',
       _mochiTimeMoji(k, s, 1)?.replaceFirst('1万m', '') ?? '-',
       '${reki.length}回',
+      '${yosen.length}回',
       saikouKukan == null ? '-' : '区間${saikouKukan + 1}位',
     ]);
   }
@@ -1151,7 +1202,11 @@ List<Kiji> gakunaiSotsugyouKiji(KijiKankyou k) {
       lead: lead.toString(),
       honbun: w.honbun,
       hyou: [
-        KijiHyou('卒業する4年生', ['選手', '出身', '5000m', '1万m', '駅伝', '最高区間順位'], gyou),
+        KijiHyou(
+          '卒業する4年生',
+          ['選手', '出身', '5000m', '1万m', '駅伝', '駅伝予選', '最高区間順位'],
+          gyou,
+        ),
       ],
       haishin: k.haishinMei(no, asa: true),
       kisha: _kishaMei(k, site, no),
@@ -1161,4 +1216,477 @@ List<Kiji> gakunaiSotsugyouKiji(KijiKankyou k) {
       gakunai: true,
     ),
   ];
+}
+
+// ------------------------------------------------------------
+// 6. 駅伝予選(11月駅伝予選・正月駅伝予選)の結果号と展望号
+// ------------------------------------------------------------
+
+/// 選手[s]の、大会[race]の去年のタイム(なければnull)
+double? _kyonenTime(SenshuData s, int race) {
+  final int g = s.gakunen - 2;
+  if (g < 0 || s.kukantime_race.length <= race) return null;
+  if (s.kukantime_race[race].length <= g) return null;
+  final double t = s.kukantime_race[race][g];
+  return (t > 0 && t < TEISUU.DEFAULTTIME) ? t : null;
+}
+
+/// 予選で比べる持ちタイムの種目(11月駅伝予選は1万m、正月駅伝予選はハーフ)
+int _yosenShumoku(KijiKankyou k) => k.race == 3 ? 1 : 2;
+
+/// 予選の本戦の名前
+String _yosenHonsenMei(KijiKankyou k) => k.race == 3 ? '11月駅伝' : '正月駅伝';
+
+/// 通過する大学の数(kiji_yosen.dart の YosenKekka と同じ)
+int _yosenTsuukaSuu(KijiKankyou k) => k.race == 3 ? 7 : 10;
+
+/// 記事にする予選より前に、予選を走ったことがあるか
+bool _yosenKeiken(KijiKankyou k, SenshuData s) =>
+    _shussouReki(k, s, imaNozoku: true, yosenMo: true)
+        .any((x) => !_honsen(x.race));
+
+/// 予選の結果号(自分の大学が出ていなければ空)
+List<Kiji> _yosenKekkaKiji(KijiKankyou k, String site) {
+  final YosenKekka? e = YosenKekka.tsukuru(k);
+  if (e == null) return [];
+  final YosenUnivKekka? m = e.jibun;
+  if (m == null) return [];
+  return [_yosenTop(e, m, site), _yosenZenin(e, m, site)];
+}
+
+/// 通過ラインとの差(通過したときは次点との差、落選したときは最後の通過校との差。
+/// 通過ラインの争いがなければnull)
+({int sa, YosenUnivKekka aite})? _yosenSa(YosenKekka e, YosenUnivKekka m) {
+  if (!e.borderAri) return null;
+  final int ts = e.tsuukaSuu;
+  if (e.tsuuka(m)) {
+    final YosenUnivKekka aite = e.jun[ts];
+    return (sa: saByou(aite.time, m.time), aite: aite);
+  }
+  final YosenUnivKekka aite = e.jun[ts - 1];
+  return (sa: saByou(m.time, aite.time), aite: aite);
+}
+
+Kiji _yosenTop(YosenKekka e, YosenUnivKekka m, String site) {
+  final KijiKankyou k = e.k;
+  const int no = 151;
+  final KijiKakite w = KijiKakite(k, kijiTane(k.gh, k.race, no));
+  final int r = m.juni;
+  final int ts = e.tsuukaSuu;
+  final bool tsuuka = e.tsuuka(m);
+  final String honsen = e.honsenMei;
+  final int nin = e.keisanNinzuu;
+  final bool hatsuHonsen =
+      !e.honsenMikaisai && shutsujouKaisuu(m.u, e.honsen) == 0;
+  final ({int sa, YosenUnivKekka aite})? sa = _yosenSa(e, m);
+  final bool kinsa = sa != null && sa.sa <= e.jitenSaJougen;
+  final bool hatsuKaisai = hatsuKaisaiKekka(k, k.race);
+  final int mae = juniRace(m.u, k.race, 1);
+  final bool maeAri = !hatsuKaisai && shutsujouJuni(mae);
+
+  // 見出し
+  String midashi;
+  if (tsuuka) {
+    if (r == 0) {
+      midashi = '$honsen予選をトップ通過！';
+    } else if (hatsuHonsen) {
+      midashi = w.erabu([
+        '悲願の初出場！　$honsenへの切符をつかむ',
+        '$honsenに初出場決める　予選${juniMoji(r)}',
+      ]);
+    } else {
+      midashi = w.erabu([
+        '$honsenへの切符をつかんだ！　予選${juniMoji(r)}',
+        '予選突破！　$honsen出場決める',
+      ]);
+    }
+  } else if (sa != null && kinsa) {
+    midashi = '${kinsaMoji(sa.sa)}届かず　$honsen予選${juniMoji(r)}';
+  } else {
+    midashi = w.erabu([
+      '$honsen予選は${juniMoji(r)}　悔しさを来年へ',
+      '予選${juniMoji(r)}、本戦には届かず　それでも前へ',
+    ]);
+  }
+
+  // リード
+  final StringBuffer lead = StringBuffer();
+  lead.write('${k.taikaiMei}に挑んだ陸上競技部は、合計${jikanMoji(m.time)}の${juniMoji(r)}となり、');
+  lead.write(
+    tsuuka
+        ? '$honsenへの${hatsuHonsen ? '初めての' : ''}出場を決めた。'
+        : '上位$ts校に与えられる$honsenへの出場権には届かなかった。',
+  );
+  if (sa != null) {
+    if (tsuuka) {
+      lead.write(
+        '${r == ts - 1 ? 'ぎりぎりの通過で、' : ''}次点の${sa.aite.mei}とは${kinsaMoji(sa.sa)}だった。',
+      );
+    } else {
+      lead.write(
+        '通過ラインの${sa.aite.mei}とは${kinsaMoji(sa.sa)}。'
+        '合計に入る$nin人で割れば、${hitoriAtariMoji(sa.sa, nin)}だった。',
+      );
+    }
+  }
+  if (maeAri) {
+    if (mae > r) {
+      lead.write('前回の予選の${juniMoji(mae)}から${mae - r}つ順位を上げた。');
+    } else if (mae == r) {
+      lead.write('前回と同じ${juniMoji(r)}だった。');
+    } else {
+      lead.write('前回の予選は${juniMoji(mae)}だった。');
+    }
+  }
+
+  // 本文
+  w.koMidashi('レースを振り返って');
+  if (k.race == 3) {
+    final List<String> suii = [
+      for (int kk = 0; kk < e.ks; kk++) juniMoji(m.tuuka[kk]),
+    ];
+    w.danraku('組を終えるごとのチームの順位は、${suii.join('→')}と推移した。');
+    YosenSenshuKekka? best;
+    for (final YosenSenshuKekka y in m.senshu) {
+      if (best == null || y.juni < best.juni) best = y;
+    }
+    if (best != null) {
+      w.danraku('${best.kumi + 1}組の${w.senshu(best.s)}が組${best.juni + 1}位と、チームを引っ張った。');
+    }
+  } else if (m.senshu.isNotEmpty) {
+    final YosenSenshuKekka top = m.senshu.first;
+    w.danraku('${w.senshu(top.s)}が全体${top.juni + 1}位でチームトップだった。');
+    if (m.senshu.length >= nin) {
+      final YosenSenshuKekka s10 = m.senshu[nin - 1];
+      w.danraku('合計に入る$nin番手は${w.senshu(s10.s)}で、全体${s10.juni + 1}位だった。');
+    }
+  }
+  w.comment(
+    kantokuComment(
+      w,
+      tsuuka
+          ? KantokuBamen.yosenTsuuka
+          : (kinsa ? KantokuBamen.yosenJiten : KantokuBamen.yosenRakusen),
+      m.u.id,
+      kuyashii: !tsuuka,
+    ),
+  );
+  w.danraku('走った${m.senshu.length}人の一人ひとりの走りは、別の記事「全員の走り」で振り返る。');
+  w.danraku(
+    tsuuka
+        ? '本戦の$honsenでも、このチームの走りから目が離せない。'
+        : '悔しさを胸に、チームはまた一から積み上げる。',
+  );
+
+  final List<List<String>> gyou = [
+    ['順位', juniMoji(r)],
+    ['合計タイム', jikanMoji(m.time)],
+    if (sa != null) [tsuuka ? '次点との差' : '通過ラインとの差', saMoji(sa.sa)],
+    if (maeAri) ['前回の予選', juniMoji(mae)],
+  ];
+  return _kansei(
+    k,
+    site,
+    no,
+    w,
+    category: '駅伝予選',
+    midashi: midashi,
+    lead: lead.toString(),
+    kekka: true,
+    hyou: [KijiHyou('${k.taikaiMei}の結果', ['項目', '結果'], gyou)],
+  );
+}
+
+Kiji _yosenZenin(YosenKekka e, YosenUnivKekka m, String site) {
+  final KijiKankyou k = e.k;
+  const int no = 152;
+  final KijiKakite w = KijiKakite(k, kijiTane(k.gh, k.race, no));
+  final bool kumiAri = k.race == 3;
+  final bool tsuuka = e.tsuuka(m);
+  final ({int sa, YosenUnivKekka aite})? sa = _yosenSa(e, m);
+  final bool kinsa = sa != null && sa.sa <= e.jitenSaJougen;
+  final int nin = e.keisanNinzuu;
+  final int idx = _yosenShumoku(k);
+  // 11月駅伝予選は組の順(組の中はタイム順)、正月駅伝予選はチームの中の順
+  final List<YosenSenshuKekka> list = List<YosenSenshuKekka>.of(m.senshu);
+  if (kumiAri) {
+    list.sort((a, b) {
+      final int c = a.kumi.compareTo(b.kumi);
+      return c != 0 ? c : a.time.compareTo(b.time);
+    });
+  }
+  final int n = list.length;
+  final String midashi = kumiAri
+      ? w.erabu([
+          '組ごとに振り返る　${e.honsenMei}予選を走った$n人',
+          '$n人の走りを振り返る　${e.honsenMei}予選',
+        ])
+      : w.erabu([
+          '全員の走りを振り返る　正月駅伝予選を駆けた$n人',
+          '$n人の走りを振り返る　正月駅伝予選',
+        ]);
+  final String lead =
+      '${k.taikaiMei}を走った$n人の走りを、${kumiAri ? '1組から順に' : 'チームの中の順に'}振り返る。';
+
+  final List<List<String>> gyou = [];
+  for (final YosenSenshuKekka y in list) {
+    final SenshuData s = y.s;
+    if (kumiAri) {
+      w.koMidashi('${y.kumi + 1}組　${w.senshu(s)}');
+    } else {
+      w.koMidashi('${y.univJuni + 1}番手　${w.senshu(s)}');
+    }
+    final String yobi = w.senshu(s);
+    final StringBuffer sb = StringBuffer();
+    if (kumiAri) {
+      sb.write('$yobiは組${y.juni + 1}位、${jikanMoji(y.time)}で走った。');
+      if (y.juni == 0) sb.write('組トップの快走だった。');
+    } else {
+      sb.write('$yobiは全体${y.juni + 1}位、${jikanMoji(y.time)}でゴールした。');
+      if (y.juni == 0) sb.write('全体トップの快走だった。');
+      if (y.univJuni >= nin) sb.write('チームの合計には入らなかったが、最後まで走り抜いた。');
+    }
+    if (e.shinkiroku(s)) sb.write(kumiAri ? '組の新記録だった。' : '大会新記録だった。');
+    final double jiko = k.jikoBest(s, idx);
+    if (jiko < TEISUU.DEFAULTTIME && byou(y.time) < byou(jiko)) {
+      sb.write('${kijiShumokuMei[idx]}の自己ベスト(${jikanMoji(jiko)})を上回るタイムだった。');
+    }
+    final int maeE = k.entryMae(s, k.race, 1);
+    final double? kt = _kyonenTime(s, k.race);
+    if (maeE >= 0 && kt != null) {
+      final int d = saByou(kt, y.time);
+      if (d > 0) {
+        sb.write('昨年の予選より${saMoji(d)}速く、1年間の成長を示した。');
+      } else if (d == 0) {
+        sb.write('昨年の予選とほぼ同じタイムだった。');
+      } else {
+        sb.write('昨年の予選のタイムには届かなかったが、この経験は次につながる。');
+      }
+    } else if (!k.ichinenDake && !_yosenKeiken(k, s)) {
+      sb.write('これが初めての予選だった。');
+    }
+    if (s.gakunen == 4) {
+      if (kumiAri) {
+        sb.write('4年生として最後の11月駅伝予選だった。');
+      } else {
+        sb.write(
+          tsuuka
+              ? '最後の正月駅伝予選で、本戦への切符をつかんだ。'
+              : '本戦へのラストチャンスだった正月駅伝予選を、最後まで走り切った。',
+        );
+      }
+    }
+    w.danraku(sb.toString());
+    w.danraku(shusshinShumiBun(k, s, w.r, myouji(s.name)));
+    // コメント
+    CommentBamen bamen;
+    bool kuyashii = false;
+    if (y.juni == 0) {
+      bamen = CommentBamen.yosenKojinTop;
+    } else if (s.gakunen == 4) {
+      bamen = CommentBamen.yonenSaigo;
+    } else if (y.univJuni == 0) {
+      bamen = tsuuka
+          ? CommentBamen.yosenTsuuka
+          : (kinsa ? CommentBamen.yosenJiten : CommentBamen.yosenRakusen);
+      kuyashii = !tsuuka;
+    } else {
+      bamen = CommentBamen.gakunaiYosen;
+    }
+    w.comment(senshuComment(w, bamen, myouji(s.name), kuyashii: kuyashii));
+    gyou.add([
+      kumiAri ? '${y.kumi + 1}組' : '${y.univJuni + 1}',
+      '${fullMei(s.name)}(${s.gakunen})',
+      kumiAri ? '組${y.juni + 1}位' : '${y.juni + 1}位',
+      jikanMoji(y.time),
+      kt != null && maeE >= 0 ? jikanMoji(kt) : '-',
+    ]);
+  }
+  return _kansei(
+    k,
+    site,
+    no,
+    w,
+    category: '駅伝予選',
+    midashi: midashi,
+    lead: lead,
+    kekka: true,
+    hyou: [
+      KijiHyou(
+        '全員の成績',
+        [kumiAri ? '組' : '番手', '選手', kumiAri ? '組順位' : '全体順位', 'タイム', '昨年'],
+        gyou,
+      ),
+    ],
+  );
+}
+
+/// 予選の展望号(走る選手が決まっていなければ空)
+List<Kiji> _yosenTenbouKiji(KijiKankyou k, String site, UnivData u) {
+  final int ks = k.kukansuu;
+  final List<SenshuData> hashiru = _jibunSenshu(k, (e) => e >= 0 && e < ks);
+  if (hashiru.isEmpty) return [];
+  final int idx = _yosenShumoku(k);
+  // 11月駅伝予選は組の順、組の中と正月駅伝予選は持ちタイムの順(記録のない選手は後ろ)
+  hashiru.sort((a, b) {
+    final int c = k.race == 3 ? k.entry(a).compareTo(k.entry(b)) : 0;
+    return c != 0 ? c : k.jikoBest(a, idx).compareTo(k.jikoBest(b, idx));
+  });
+  final List<Kiji> list = [_yosenMeikan(k, site, u, hashiru)];
+  final Kiji? t = _yosenTokushuu(k, site, hashiru);
+  if (t != null) list.add(t);
+  return list;
+}
+
+Kiji _yosenMeikan(
+  KijiKankyou k,
+  String site,
+  UnivData u,
+  List<SenshuData> hashiru,
+) {
+  const int no = 161;
+  final KijiKakite w = KijiKakite(k, kijiTane(k.gh, k.race, no));
+  final bool kumiAri = k.race == 3;
+  final String honsen = _yosenHonsenMei(k);
+  final int idx = _yosenShumoku(k);
+  final int n = hashiru.length;
+  final String midashi = w.erabu([
+    '$honsen予選へ　$n人の選手名鑑',
+    '$honsenへの切符をかけて　予選を走る$n人',
+  ]);
+  final StringBuffer lead = StringBuffer();
+  lead.write('${k.taikaiMei}を走る$n人が決まった。$honsenへの切符をかけて走る$n人を紹介する。');
+  final int mae = juniRace(u, k.race, 0);
+  if (!mikaisai(k, k.race) && shutsujouJuni(mae)) {
+    lead.write(
+      mae < _yosenTsuukaSuu(k)
+          ? '前回の予選は${juniMoji(mae)}で通過している。'
+          : '前回の予選は${juniMoji(mae)}で、通過ラインに届かなかった。',
+    );
+  }
+  for (final SenshuData s in hashiru) {
+    final int kk = k.entry(s);
+    w.koMidashi(kumiAri ? '${kk + 1}組　${w.senshu(s)}' : w.senshu(s));
+    final String yobi = myouji(s.name);
+    final StringBuffer sb = StringBuffer();
+    final String? mochi = _kukanMochiTime(k, s, kk);
+    if (mochi != null) sb.write('持ちタイムは$mochi。');
+    sb.write(_konkiNoBun(k, s, kk));
+    final List<_Shussou> zenbu = _shussouReki(k, s, imaNozoku: true, yosenMo: true);
+    final int yosenKai = zenbu.where((x) => !_honsen(x.race)).length;
+    final int honsenKai = zenbu.where((x) => _honsen(x.race)).length;
+    final int maeE = k.entryMae(s, k.race, 1);
+    if (maeE >= 0) {
+      final _Shussou x = _Shussou(k.race, s.gakunen - 1, maeE, k.kukanJuniMae(s, k.race, 1));
+      final double? kt = _kyonenTime(s, k.race);
+      sb.write('昨年は${_shussouMoji(x)}を走った${kt == null ? '' : '(${jikanMoji(kt)})'}。');
+    }
+    if (yosenKai == 0) {
+      if (!k.ichinenDake) sb.write('$yobiにとって、これが初めての予選となる。');
+    } else {
+      sb.write('予選は${yosenKai + 1}度目。');
+    }
+    if (honsenKai > 0) sb.write('駅伝の本戦も$honsenKai度走っている。');
+    if (s.gakunen == 4) {
+      sb.write(
+        kumiAri ? '4年生にとっては、これが最後の11月駅伝予選だ。' : '最後の正月駅伝予選。本戦へのラストチャンスに挑む。',
+      );
+    }
+    w.danraku(sb.toString());
+    w.danraku(shusshinShumiBun(k, s, w.r, yobi));
+    w.comment(
+      senshuComment(
+        w,
+        s.gakunen == 4 ? CommentBamen.gakunaiYonenIkigomi : CommentBamen.gakunaiYosenIkigomi,
+        yobi,
+      ),
+    );
+  }
+  w.comment(kantokuComment(w, KantokuBamen.tenbouChousen, u.id));
+
+  final List<List<String>> gyou = [];
+  for (int i = 0; i < hashiru.length; i++) {
+    final SenshuData s = hashiru[i];
+    final int yosenKai = _shussouReki(k, s, imaNozoku: true, yosenMo: true)
+        .where((x) => !_honsen(x.race))
+        .length;
+    gyou.add([
+      kumiAri ? '${k.entry(s) + 1}組' : '${i + 1}',
+      '${fullMei(s.name)}(${s.gakunen})',
+      k.shusshin(s) ?? (s.hirou == 1 ? '留学生' : '-'),
+      _mochiTimeMoji(k, s, idx)?.replaceFirst(kijiShumokuMei[idx], '') ?? '-',
+      yosenKai == 0 ? '初' : '${yosenKai + 1}度目',
+    ]);
+  }
+  return _kansei(
+    k,
+    site,
+    no,
+    w,
+    category: '駅伝予選・展望',
+    midashi: midashi,
+    lead: lead.toString(),
+    kekka: false,
+    hyou: [
+      KijiHyou(
+        '選手名鑑',
+        [kumiAri ? '組' : '', '選手', '出身', kijiShumokuMei[idx], '予選'],
+        gyou,
+      ),
+    ],
+  );
+}
+
+/// 予選の、4年生と初めて予選を走る選手の特集(どちらもいなければnull)
+Kiji? _yosenTokushuu(KijiKankyou k, String site, List<SenshuData> hashiru) {
+  const int no = 162;
+  final KijiKakite w = KijiKakite(k, kijiTane(k.gh, k.race, no));
+  final bool kumiAri = k.race == 3;
+  final List<SenshuData> yonen = [
+    for (final SenshuData s in hashiru)
+      if (s.gakunen == 4) s,
+  ];
+  final List<SenshuData> hatsu = [
+    for (final SenshuData s in hashiru)
+      if (s.gakunen != 4 && !k.ichinenDake && !_yosenKeiken(k, s)) s,
+  ];
+  if (yonen.isEmpty && hatsu.isEmpty) return null;
+  String namae(SenshuData s) =>
+      kumiAri ? '${k.entry(s) + 1}組の${w.senshu(s)}' : w.senshu(s);
+  final String midashi = yonen.isNotEmpty
+      ? (kumiAri
+            ? '4年生${yonen.length}人、最後の11月駅伝予選へ'
+            : '本戦へのラストチャンス　4年生${yonen.length}人の思い')
+      : '初めての予選へ　${hatsu.length}人の挑戦';
+  final List<String> bu = [
+    if (yonen.isNotEmpty) '最後の予選に挑む4年生',
+    if (hatsu.isNotEmpty) '初めて予選を走る選手',
+  ];
+  final String lead = '${k.taikaiMei}に挑む選手のうち、${bu.join('と、')}を紹介する。';
+  if (yonen.isNotEmpty) {
+    w.koMidashi('4年生');
+    w.danraku(
+      '${[for (final SenshuData s in yonen) namae(s)].join('、')}は、'
+      '${kumiAri ? '最後の11月駅伝予選に挑む。' : '最後の正月駅伝予選に挑む。本戦の舞台に立てる、最後の機会だ。'}',
+    );
+    w.comment(senshuComment(w, CommentBamen.gakunaiYonenIkigomi, myouji(yonen.last.name)));
+  }
+  if (hatsu.isNotEmpty) {
+    w.koMidashi('初めての予選');
+    w.danraku(
+      '${[for (final SenshuData s in hatsu) namae(s)].join('、')}は、これが初めての予選になる。'
+      '新しい力が、チームの合計を押し上げる。',
+    );
+    w.comment(senshuComment(w, CommentBamen.gakunaiYosenIkigomi, myouji(hatsu.first.name)));
+  }
+  return _kansei(
+    k,
+    site,
+    no,
+    w,
+    category: '駅伝予選・展望',
+    midashi: midashi,
+    lead: lead,
+    kekka: false,
+  );
 }

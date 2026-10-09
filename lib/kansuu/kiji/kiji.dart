@@ -98,13 +98,14 @@ String? kijiGakunaiSiteMei() {
   }
 }
 
-/// 表示中の大会が、学内メディアの記事がある駅伝か(10月・11月・正月・カスタム駅伝)
-bool kijiGakunaiEkiden() {
+/// 表示中の大会が、学内メディアの記事がある大会か
+/// (10月・11月・正月・カスタム駅伝と、11月駅伝予選・正月駅伝予選。対校戦はない)
+bool kijiGakunaiTaikai() {
   try {
     final Ghensuu? gh = Hive.box<Ghensuu>('ghensuuBox').getAt(0);
     if (gh == null) return false;
     final int race = gh.hyojiracebangou;
-    return race == 0 || race == 1 || race == 2 || race == 5;
+    return race >= 0 && race <= 5;
   } catch (e) {
     return false;
   }
@@ -125,17 +126,17 @@ bool kijiGakunaiShutsujou() {
   }
 }
 
-/// 入口のカードに添える、学内メディアの案内(駅伝のときだけ。それ以外はnull)
+/// 入口のカードに添える、学内メディアの案内(駅伝と駅伝予選のときだけ。それ以外はnull)
 String? kijiGakunaiAnnai() {
-  if (!kijiGakunaiEkiden()) return null;
+  if (!kijiGakunaiTaikai()) return null;
   final String? site = kijiGakunaiSiteMei();
   return site == null ? null : '学内メディア「$site」の記事も、記事の画面の上で切り替えて読めます';
 }
 
-/// 学内メディアの、表示中の駅伝の結果号
+/// 学内メディアの、表示中の駅伝・駅伝予選の結果号
 List<Kiji> kijiGakunaiKekkaIchiran() => _gakunai('結果号', gakunaiKekkaKiji);
 
-/// 学内メディアの、表示中の駅伝の展望号
+/// 学内メディアの、表示中の駅伝・駅伝予選の展望号
 List<Kiji> kijiGakunaiTenbouIchiran() => _gakunai('展望号', gakunaiTenbouKiji);
 
 /// 学内メディアの、表示中の駅伝のスタート直前号(1区のスタート前は当日変更号、

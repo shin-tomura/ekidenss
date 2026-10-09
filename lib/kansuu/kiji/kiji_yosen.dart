@@ -13,7 +13,8 @@ import 'package:ekiden/kansuu/kiji/kiji_comment.dart';
 //  2. 自分の大学の記事: 通過か落選か、通過ラインとの差、組ごと(個人ごと)の走り
 //  3. 次点の記事: 通過ラインとの差が1人あたり3秒以内(11月駅伝予選)・5秒以内(正月駅伝予選)の
 //     ときだけ。何秒差で涙をのんだか、どこで差がついたか(組ごと・番手ごと)を書く(1.9.2)
-//  4. 個人の記事: 11月駅伝予選は各組のトップ、正月駅伝予選は個人トップと日本人トップ
+//  4. 個人の記事: 11月駅伝予選は各組のトップ(見出しは、各校のエースが集まる最終組のトップ。1.9.3)、
+//     正月駅伝予選は個人トップと日本人トップ
 //
 // 予選のあとなので、本戦(11月駅伝・正月駅伝)の順位の記録の[0]は前回(去年)の本戦
 // ------------------------------------------------------------
@@ -1041,34 +1042,55 @@ Kiji? _yosenKojinKiji(YosenKekka e) {
   final int ks = e.ks;
 
   if (race == 3) {
-    // 2位との差が一番大きい組のトップ(新記録があればそちらを先に)
-    YosenSenshuKekka? mvp;
-    int mvpTen = -1;
-    for (int kk = 0; kk < ks; kk++) {
-      final YosenSenshuKekka? t = e.kumiTop(kk);
-      final double? niTime = e.kumiTime(kk, 1);
-      if (t == null || niTime == null) continue;
-      final int sa = saByou(niTime, t.time);
-      final int ten = (e.shinkiroku(t.s) ? 1000 : 0) + sa;
-      if (ten > mvpTen) {
-        mvpTen = ten;
-        mvp = t;
-      }
-    }
+    // 見出しとリードは、最終組(4組)のトップにする(1.9.3)。コンピュータの大学は1万mの持ちタイムの
+    // 速い順に、最終組から2人ずつ振り分けるので、最終組は各校のエースが集まる組になる。
+    // ほかの組で組の新記録が出たときは、見出しの後半とリードで伝える。
+    // 最終組のトップが留学生なら、最終組の日本人トップもリードで伝える
+    final int saigoKumi = ks - 1;
+    final YosenSenshuKekka? mvp = e.kumiTop(saigoKumi);
     if (mvp == null) return null;
     final double mvpNi = e.kumiTime(mvp.kumi, 1) ?? mvp.time;
     final int mvpSa = saByou(mvpNi, mvp.time);
     final bool mvpShin = e.shinkiroku(mvp.s);
     final String um = e.univMei(mvp.s.univid);
-    final String midashi = mvpShin
-        ? '${myouji(mvp.s.name)}($um)が${e.kumiMei(mvp.kumi)}で組の新記録'
-        : w.erabu([
-            '${e.kumiMei(mvp.kumi)}は${myouji(mvp.s.name)}($um)が${saMoji(mvpSa)}差の独走',
-            '${myouji(mvp.s.name)}($um)、${e.kumiMei(mvp.kumi)}トップ',
-          ]);
+    final String km = e.kumiMei(saigoKumi);
+    final String mm = myouji(mvp.s.name);
+    // 最終組の日本人トップ(トップが留学生のとき)
+    YosenSenshuKekka? nihon;
+    if (mvp.s.hirou == 1) {
+      for (final YosenSenshuKekka y in e.kojin) {
+        if (y.kumi != saigoKumi || y.s.hirou == 1) continue;
+        if (nihon == null || y.juni < nihon.juni) nihon = y;
+      }
+    }
+    // ほかの組の、組の新記録(組の順)
+    final List<YosenSenshuKekka> hokaShin = [];
+    for (int kk = 0; kk < saigoKumi; kk++) {
+      final YosenSenshuKekka? t = e.kumiTop(kk);
+      if (t != null && e.shinkiroku(t.s)) hokaShin.add(t);
+    }
+    String midashi;
+    if (mvpShin) {
+      midashi = '$mm($um)が最終$kmで組の新記録';
+    } else if (mvpSa >= 5) {
+      midashi = w.erabu([
+        'エース対決の$kmは$mm($um)が${saMoji(mvpSa)}差の独走',
+        '$mm($um)、エース対決の$kmを制す',
+      ]);
+    } else if (mvpSa <= 1) {
+      midashi = 'エース対決の$km、$mm($um)が競り合い制す';
+    } else {
+      midashi = '$mm($um)がエース対決の$kmでトップ';
+    }
+    if (hokaShin.isNotEmpty) {
+      final YosenSenshuKekka h = hokaShin.first;
+      midashi += '　${e.kumiMei(h.kumi)}で${myouji(h.s.name)}が組の新記録';
+    } else if (nihon != null) {
+      midashi += '　日本人トップは${myouji(nihon.s.name)}(${e.univMei(nihon.s.univid)})';
+    }
     final StringBuffer lead = StringBuffer();
     lead.write(
-      '${k.taikaiMei}の${e.kumiMei(mvp.kumi)}は、${w.senshu(mvp.s, daigaku: true)}が'
+      '${k.taikaiMei}は、各校のエースが集まる最終の$kmで、${w.senshu(mvp.s, daigaku: true)}が'
       '${jikanMoji(mvp.time)}でトップを取った。',
     );
     if (mvpShin) {
@@ -1078,12 +1100,28 @@ Kiji? _yosenKojinKiji(YosenKekka e) {
     } else {
       lead.write('最後まで続いた競り合いを制した。');
     }
+    if (nihon != null) {
+      lead.write(
+        '日本人トップは組${juniMoji(nihon.juni)}の${w.senshu(nihon.s, daigaku: true)}で、'
+        '${jikanMoji(nihon.time)}だった。',
+      );
+    }
+    for (final YosenSenshuKekka h in hokaShin) {
+      lead.write(
+        '${e.kumiMei(h.kumi)}では、${w.senshu(h.s, daigaku: true)}が'
+        '${jikanMoji(h.time)}で組の新記録を出した。',
+      );
+    }
     final StringBuffer sb = StringBuffer();
-    if (mvp.s.hirou == 1) sb.write('留学生らしい力強い走りで、集団を引き離した。');
-    if (mvp.s.gakunen == 1) sb.write('1年生ながら、上級生を相手に堂々の走りだった。');
+    if (mvp.s.hirou == 1 && mvpSa >= 5) sb.write('留学生らしい力強い走りで、集団を引き離した。');
+    if (mvp.s.gakunen == 1) sb.write('1年生ながら、各校のエースを相手に堂々の走りだった。');
+    // 前回も最終組のトップか
+    if (k.entryMae(mvp.s, race, 1) == saigoKumi && k.kukanJuniMae(mvp.s, race, 1) == 0) {
+      sb.write('前回に続いて、最終組のトップに立った。');
+    }
     w.danraku(sb.toString());
-    w.comment(senshuComment(w, CommentBamen.yosenKojinTop, myouji(mvp.s.name)));
-    w.danraku(shusshinShumiBun(k, mvp.s, w.r, myouji(mvp.s.name)));
+    w.comment(senshuComment(w, CommentBamen.yosenKojinTop, mm));
+    w.danraku(shusshinShumiBun(k, mvp.s, w.r, mm));
     w.koMidashi('各組のトップ');
     for (int kk = 0; kk < ks; kk++) {
       if (kk == mvp.kumi) continue;
@@ -1121,7 +1159,8 @@ Kiji? _yosenKojinKiji(YosenKekka e) {
       hyou: [
         KijiHyou('各組の上位3人', ['組', '順位', '選手', '大学', 'タイム'], gyou),
       ],
-      jibun: mvp.s.univid == k.gh.MYunivid,
+      jibun: mvp.s.univid == k.gh.MYunivid ||
+          (nihon != null && nihon.s.univid == k.gh.MYunivid),
     );
   }
 

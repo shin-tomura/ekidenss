@@ -47,6 +47,16 @@ const int comToujituDoneIndex = 35;
 const int manualToujituCodeIndex = 36;
 const int manualToujituMaskIndex = 37;
 
+/// 戦略的エントリー確率(0〜100。0なら戦略的エントリーをしない。初期値は0)
+/// 設定タブの「戦略的エントリー確率設定」(screens/senryaku_entry_settei.dart)で変える。
+/// 説明書と生成AI向けの文(shiyou_text.dart・ai_copy_matome.dart)で、書くかどうかを決めるのに使う(1.9.4)
+int senryakuEntryKakuritu(KantokuData? kantoku) {
+  if (kantoku == null || kantoku.yobiint2.length <= senryakuKakurituIndex) {
+    return 0;
+  }
+  return kantoku.yobiint2[senryakuKakurituIndex].clamp(0, 100);
+}
+
 bool _isEkiden(int racebangou) =>
     (racebangou >= 0 && racebangou <= 2) || racebangou == 5;
 

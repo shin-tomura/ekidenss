@@ -20,6 +20,8 @@ import 'package:ekiden/kansuu/shiyou_text.dart'; // ゲームの仕様(1.8.3)
 import 'package:ekiden/kansuu/mokuhyou_kingin.dart'; // 目標達成時の金銀(1.8.3)
 import 'package:ekiden/kansuu/siji_sontoku_text.dart'; // 指示ごとの損得予測(1.8.8)
 import 'package:ekiden/kansuu/custom_seigen.dart'; // カスタム駅伝の出場制限(1.9.1)
+import 'package:ekiden/kansuu/ToujituHenkou_com.dart'
+    show senryakuEntryKakuritu; // 戦略的エントリー確率設定(1.9.4)
 
 // ------------------------------------------------------------
 // 生成AIに渡すテキストのまとめボタン(1.8.2)
@@ -234,10 +236,21 @@ String _toujitsuSoudanSet(Ghensuu gh, int race) {
   } else {
     sb.writeln('・外れた選手は、この大会ではもう走れない。');
   }
-  sb.writeln(
-    '・このあと、コンピュータの大学も当日変更をする(主力を補欠に温存し、当日変更で起用する「戦略的エントリー」もある)。'
-    'そのため、ほかの大学の区間配置は変わることがある。',
-  );
+  // 戦略的エントリーは、確率が0%(初期値)ならしないので書かない(1.9.4)
+  if (senryakuEntryKakuritu(
+        Hive.box<KantokuData>('kantokuBox').get('KantokuData'),
+      ) >
+      0) {
+    sb.writeln(
+      '・このあと、コンピュータの大学も当日変更をする(主力を補欠に温存し、当日変更で起用する「戦略的エントリー」もある)。'
+      'そのため、ほかの大学の区間配置は変わることがある。',
+    );
+  } else {
+    sb.writeln(
+      '・このあと、コンピュータの大学も当日変更をすることがある。'
+      'そのため、ほかの大学の区間配置は変わることがある。',
+    );
+  }
   sb.writeln(
     '・調子は当日の値(100が最高、0は体調不良)。経験補正は、同じ駅伝の同じ区間を前の学年までに走った回数で決まる(駅伝出場履歴で分かる)。',
   );

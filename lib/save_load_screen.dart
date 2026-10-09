@@ -841,9 +841,9 @@ class _SaveLoadScreenState extends State<SaveLoadScreen> {
       //mainの中にもあるので、そちらも変更すること！
       final versionValue = int.tryParse(sortedUnivData[7].name_tanshuku);
       if (versionValue == null ||
-          versionValue < 21930 ||
+          versionValue < 21940 ||
           versionValue > 999999999) {
-        sortedUnivData[7].name_tanshuku = "21930"; //バージョン番号
+        sortedUnivData[7].name_tanshuku = "21940"; //バージョン番号
         await sortedUnivData[7].save();
       }
 

@@ -157,7 +157,7 @@ class SettingsQrProcessor {
       data['k_yobiint2_33'] = kantoku.yobiint2[33];
       data['k_yobiint2_38_39'] = kantoku.yobiint2.sublist(38, 40);
       data['k_yobiint2_40_41'] = kantoku.yobiint2.sublist(40, 42);
-      // 戦略的エントリー確率(int) (調子関連設定の画面にある設定)
+      // 戦略的エントリー確率(int) (設定タブの「戦略的エントリー確率設定」。1.9.3までは調子関連設定の画面にあった)
       data['k_yobiint2_34'] = kantoku.yobiint2[34];
       // コンピュータスカウト設定(int) [58]ON/OFF・積極性・ラウンド回数、
       // [59]・[60]大学ごとのスカウト方針、[61]・[62]大学ごとの性格

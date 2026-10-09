@@ -21,6 +21,7 @@ import 'package:ekiden/screens/Modal_shumihihyouji.dart';
 import 'package:ekiden/screens/konki_best_parts.dart'; // 持ちタイムの表示設定(1.9.1)
 import 'package:ekiden/screens/shuudan_settei.dart'; // 集団走設定(1.9.2)
 import 'package:ekiden/screens/seichou_type_settei.dart'; // 成長タイプ設定(1.9.3)
+import 'package:ekiden/screens/senryaku_entry_settei.dart'; // 戦略的エントリー確率設定(1.9.4)
 import 'package:ekiden/screens/Modal_TrainingEffect.dart';
 import 'package:ekiden/screens/Modal_TimeChousei.dart';
 import 'package:ekiden/settings_qr_page.dart';
@@ -154,14 +155,15 @@ class _SettingScreenState extends State<SettingScreen>
   }
 
   // 設定タブ(各種設定・データ・コースなどの画面へのボタン)
-  // 慣れてからもよく使うので、折りたたまずに並べる
+  // 慣れてからもよく使うので、折りたたまずに並べる(1.9.4から見出しで分けた)
   Widget _setteiTab(BuildContext context, Ghensuu ghensuu) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0), // 全体にパディング
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start, // テキストを左寄せにする
         children: [
-          const SizedBox(height: 20),
+          // ボタンは見出しで分ける(大学画面の下のほうと同じ形。1.9.4)
+          _setteiMidashi('メモとデータ'),
           TextButton(
             onPressed: () async {
               // Navigator.push を使用して Senshu_R_Screen へ遷移
@@ -181,7 +183,7 @@ class _SettingScreenState extends State<SettingScreen>
               ),
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 8),
           TextButton(
             onPressed: () async {
               // Navigator.push を使用して Senshu_R_Screen へ遷移
@@ -204,7 +206,7 @@ class _SettingScreenState extends State<SettingScreen>
               ),
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 8),
           TextButton(
             onPressed: () async {
               // Navigator.push を使用して Senshu_R_Screen へ遷移
@@ -226,877 +228,7 @@ class _SettingScreenState extends State<SettingScreen>
               ),
             ),
           ),
-          const SizedBox(height: 20),
-          // 「夏TT開催大学変更」は1.8.8でなくした(夏の学内タイムトライアルはいつも全大学で行う)
-          TextButton(
-            onPressed: () {
-              showGeneralDialog(
-                context: context,
-                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
-                barrierDismissible: true, // 背景タップで閉じられるようにする
-                barrierLabel: '箱庭モード/通常モード切替', // アクセシビリティ用ラベル
-                transitionDuration: const Duration(
-                  milliseconds: 300,
-                ), // アニメーション時間
-                pageBuilder: (context, animation, secondaryAnimation) {
-                  // ここに表示したいモーダルのウィジェットを指定
-                  return const SimulationModeSelectScreen(); // const を追加
-                },
-                transitionBuilder:
-                    (context, animation, secondaryAnimation, child) {
-                      // モーダル表示時のアニメーション (例: フェードイン)
-                      return FadeTransition(
-                        opacity: CurvedAnimation(
-                          parent: animation,
-                          curve: Curves.easeOut,
-                        ),
-                        child: child,
-                      );
-                    },
-              );
-            },
-            child: Text(
-              "箱庭モード/通常モード切替",
-              style: TextStyle(
-                color: const Color.fromARGB(255, 0, 255, 0),
-                decoration: TextDecoration.underline,
-                decorationColor: HENSUU.textcolor,
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          TextButton(
-            onPressed: () {
-              showGeneralDialog(
-                context: context,
-                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
-                barrierDismissible: true, // 背景タップで閉じられるようにする
-                barrierLabel: '最適解区間配置確率設定', // アクセシビリティ用ラベル
-                transitionDuration: const Duration(
-                  milliseconds: 300,
-                ), // アニメーション時間
-                pageBuilder: (context, animation, secondaryAnimation) {
-                  // ここに表示したいモーダルのウィジェットを指定
-                  return const ModalComputerTeamProb(); // const を追加
-                },
-                transitionBuilder:
-                    (context, animation, secondaryAnimation, child) {
-                      // モーダル表示時のアニメーション (例: フェードイン)
-                      return FadeTransition(
-                        opacity: CurvedAnimation(
-                          parent: animation,
-                          curve: Curves.easeOut,
-                        ),
-                        child: child,
-                      );
-                    },
-              );
-            },
-            child: Text(
-              "最適解区間配置確率設定",
-              style: TextStyle(
-                color: const Color.fromARGB(255, 0, 255, 0),
-                decoration: TextDecoration.underline,
-                decorationColor: HENSUU.textcolor,
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          TextButton(
-            onPressed: () {
-              showGeneralDialog(
-                context: context,
-                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
-                barrierDismissible: true, // 背景タップで閉じられるようにする
-                barrierLabel: '全体・区間ごとタイム調整', // アクセシビリティ用ラベル
-                transitionDuration: const Duration(
-                  milliseconds: 300,
-                ), // アニメーション時間
-                pageBuilder: (context, animation, secondaryAnimation) {
-                  // ここに表示したいモーダルのウィジェットを指定
-                  return const ModalTimeAdjustmentSettings(); // const を追加
-                },
-                transitionBuilder:
-                    (context, animation, secondaryAnimation, child) {
-                      // モーダル表示時のアニメーション (例: フェードイン)
-                      return FadeTransition(
-                        opacity: CurvedAnimation(
-                          parent: animation,
-                          curve: Curves.easeOut,
-                        ),
-                        child: child,
-                      );
-                    },
-              );
-            },
-            child: Text(
-              "全体・区間ごとタイム調整",
-              style: TextStyle(
-                color: const Color.fromARGB(255, 0, 255, 0),
-                decoration: TextDecoration.underline,
-                decorationColor: HENSUU.textcolor,
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          TextButton(
-            onPressed: () {
-              showGeneralDialog(
-                context: context,
-                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
-                barrierDismissible: true, // 背景タップで閉じられるようにする
-                barrierLabel: '長距離タイム抑制設定', // アクセシビリティ用ラベル
-                transitionDuration: const Duration(
-                  milliseconds: 300,
-                ), // アニメーション時間
-                pageBuilder: (context, animation, secondaryAnimation) {
-                  // ここに表示したいモーダルのウィジェットを指定
-                  return const ModalPaceAdjustment(); // const を追加
-                },
-                transitionBuilder:
-                    (context, animation, secondaryAnimation, child) {
-                      // モーダル表示時のアニメーション (例: フェードイン)
-                      return FadeTransition(
-                        opacity: CurvedAnimation(
-                          parent: animation,
-                          curve: Curves.easeOut,
-                        ),
-                        child: child,
-                      );
-                    },
-              );
-            },
-            child: Text(
-              "長距離タイム抑制設定",
-              style: TextStyle(
-                color: const Color.fromARGB(255, 0, 255, 0),
-                decoration: TextDecoration.underline,
-                decorationColor: HENSUU.textcolor,
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          TextButton(
-            onPressed: () {
-              showGeneralDialog(
-                context: context,
-                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
-                barrierDismissible: true, // 背景タップで閉じられるようにする
-                barrierLabel: '調子関連設定', // アクセシビリティ用ラベル
-                transitionDuration: const Duration(
-                  milliseconds: 300,
-                ), // アニメーション時間
-                pageBuilder: (context, animation, secondaryAnimation) {
-                  // ここに表示したいモーダルのウィジェットを指定
-                  return const ModalConditionSettings(); // const を追加
-                },
-                transitionBuilder:
-                    (context, animation, secondaryAnimation, child) {
-                      // モーダル表示時のアニメーション (例: フェードイン)
-                      return FadeTransition(
-                        opacity: CurvedAnimation(
-                          parent: animation,
-                          curve: Curves.easeOut,
-                        ),
-                        child: child,
-                      );
-                    },
-              );
-            },
-            child: Text(
-              "調子関連設定",
-              style: TextStyle(
-                color: const Color.fromARGB(255, 0, 255, 0),
-                decoration: TextDecoration.underline,
-                decorationColor: HENSUU.textcolor,
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          // 目標順位・指示の補正の強さの設定(1.8.2)
-          TextButton(
-            onPressed: () {
-              showGeneralDialog(
-                context: context,
-                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
-                barrierDismissible: true, // 背景タップで閉じられるようにする
-                barrierLabel: '目標順位・指示の補正設定', // アクセシビリティ用ラベル
-                transitionDuration: const Duration(
-                  milliseconds: 300,
-                ), // アニメーション時間
-                pageBuilder: (context, animation, secondaryAnimation) {
-                  return const ModalHoseiTsuyosa();
-                },
-                transitionBuilder:
-                    (context, animation, secondaryAnimation, child) {
-                      return FadeTransition(
-                        opacity: CurvedAnimation(
-                          parent: animation,
-                          curve: Curves.easeOut,
-                        ),
-                        child: child,
-                      );
-                    },
-              );
-            },
-            child: Text(
-              "目標順位・指示の補正設定",
-              style: TextStyle(
-                color: const Color.fromARGB(255, 0, 255, 0),
-                decoration: TextDecoration.underline,
-                decorationColor: HENSUU.textcolor,
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          // 能力のタイムへの影響度の設定(1.8.2)
-          TextButton(
-            onPressed: () {
-              showGeneralDialog(
-                context: context,
-                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
-                barrierDismissible: true, // 背景タップで閉じられるようにする
-                barrierLabel: '能力のタイムへの影響度設定', // アクセシビリティ用ラベル
-                transitionDuration: const Duration(
-                  milliseconds: 300,
-                ), // アニメーション時間
-                pageBuilder: (context, animation, secondaryAnimation) {
-                  return const ModalNouryokuEikyodo();
-                },
-                transitionBuilder:
-                    (context, animation, secondaryAnimation, child) {
-                      return FadeTransition(
-                        opacity: CurvedAnimation(
-                          parent: animation,
-                          curve: Curves.easeOut,
-                        ),
-                        child: child,
-                      );
-                    },
-              );
-            },
-            child: Text(
-              "能力のタイムへの影響度設定",
-              style: TextStyle(
-                color: const Color.fromARGB(255, 0, 255, 0),
-                decoration: TextDecoration.underline,
-                decorationColor: HENSUU.textcolor,
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          // 集団走設定(集団を引っ張る選手を決めるときの、その日の勢いの大きさ。1.9.2)
-          TextButton(
-            onPressed: () {
-              showGeneralDialog(
-                context: context,
-                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
-                barrierDismissible: true, // 背景タップで閉じられるようにする
-                barrierLabel: '集団走設定', // アクセシビリティ用ラベル
-                transitionDuration: const Duration(
-                  milliseconds: 300,
-                ), // アニメーション時間
-                pageBuilder: (context, animation, secondaryAnimation) {
-                  return const ModalShuudanSettei();
-                },
-                transitionBuilder:
-                    (context, animation, secondaryAnimation, child) {
-                      return FadeTransition(
-                        opacity: CurvedAnimation(
-                          parent: animation,
-                          curve: Curves.easeOut,
-                        ),
-                        child: child,
-                      );
-                    },
-              );
-            },
-            child: Text(
-              "集団走設定",
-              style: TextStyle(
-                color: const Color.fromARGB(255, 0, 255, 0),
-                decoration: TextDecoration.underline,
-                decorationColor: HENSUU.textcolor,
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          TextButton(
-            onPressed: () {
-              showGeneralDialog(
-                context: context,
-                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
-                barrierDismissible: true, // 背景タップで閉じられるようにする
-                barrierLabel: '金銀支給量設定', // アクセシビリティ用ラベル
-                transitionDuration: const Duration(
-                  milliseconds: 300,
-                ), // アニメーション時間
-                pageBuilder: (context, animation, secondaryAnimation) {
-                  // ここに表示したいモーダルのウィジェットを指定
-                  return const ModalMoneySettings(); // const を追加
-                },
-                transitionBuilder:
-                    (context, animation, secondaryAnimation, child) {
-                      // モーダル表示時のアニメーション (例: フェードイン)
-                      return FadeTransition(
-                        opacity: CurvedAnimation(
-                          parent: animation,
-                          curve: Curves.easeOut,
-                        ),
-                        child: child,
-                      );
-                    },
-              );
-            },
-            child: Text(
-              "金銀支給量設定",
-              style: TextStyle(
-                color: const Color.fromARGB(255, 0, 255, 0),
-                decoration: TextDecoration.underline,
-                decorationColor: HENSUU.textcolor,
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          TextButton(
-            onPressed: () {
-              showGeneralDialog(
-                context: context,
-                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
-                barrierDismissible: true, // 背景タップで閉じられるようにする
-                barrierLabel: '記録会時期設定', // アクセシビリティ用ラベル
-                transitionDuration: const Duration(
-                  milliseconds: 300,
-                ), // アニメーション時間
-                pageBuilder: (context, animation, secondaryAnimation) {
-                  // ここに表示したいモーダルのウィジェットを指定
-                  return const ModalRaceTimeSettings(); // const を追加
-                },
-                transitionBuilder:
-                    (context, animation, secondaryAnimation, child) {
-                      // モーダル表示時のアニメーション (例: フェードイン)
-                      return FadeTransition(
-                        opacity: CurvedAnimation(
-                          parent: animation,
-                          curve: Curves.easeOut,
-                        ),
-                        child: child,
-                      );
-                    },
-              );
-            },
-            child: Text(
-              "記録会時期設定",
-              style: TextStyle(
-                color: const Color.fromARGB(255, 0, 255, 0),
-                decoration: TextDecoration.underline,
-                decorationColor: HENSUU.textcolor,
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          TextButton(
-            onPressed: () {
-              showGeneralDialog(
-                context: context,
-                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
-                barrierDismissible: true, // 背景タップで閉じられるようにする
-                barrierLabel: '趣味非表示設定', // アクセシビリティ用ラベル
-                transitionDuration: const Duration(
-                  milliseconds: 300,
-                ), // アニメーション時間
-                pageBuilder: (context, animation, secondaryAnimation) {
-                  // ここに表示したいモーダルのウィジェットを指定
-                  return const ModalHobbyDisplaySettings(); // const を追加
-                },
-                transitionBuilder:
-                    (context, animation, secondaryAnimation, child) {
-                      // モーダル表示時のアニメーション (例: フェードイン)
-                      return FadeTransition(
-                        opacity: CurvedAnimation(
-                          parent: animation,
-                          curve: Curves.easeOut,
-                        ),
-                        child: child,
-                      );
-                    },
-              );
-            },
-            child: Text(
-              "趣味非表示設定",
-              style: TextStyle(
-                color: const Color.fromARGB(255, 0, 255, 0),
-                decoration: TextDecoration.underline,
-                decorationColor: HENSUU.textcolor,
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          // 持ちタイムの表示(自己ベスト/今季ベスト。1.9.1)
-          TextButton(
-            onPressed: () {
-              showGeneralDialog(
-                context: context,
-                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
-                barrierDismissible: true, // 背景タップで閉じられるようにする
-                barrierLabel: '持ちタイムの表示設定', // アクセシビリティ用ラベル
-                transitionDuration: const Duration(
-                  milliseconds: 300,
-                ), // アニメーション時間
-                pageBuilder: (context, animation, secondaryAnimation) {
-                  return const ModalKonkiBestSettei();
-                },
-                transitionBuilder:
-                    (context, animation, secondaryAnimation, child) {
-                      return FadeTransition(
-                        opacity: CurvedAnimation(
-                          parent: animation,
-                          curve: Curves.easeOut,
-                        ),
-                        child: child,
-                      );
-                    },
-              );
-            },
-            child: Text(
-              "持ちタイムの表示設定",
-              style: TextStyle(
-                color: const Color.fromARGB(255, 0, 255, 0),
-                decoration: TextDecoration.underline,
-                decorationColor: HENSUU.textcolor,
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 20),
-          TextButton(
-            onPressed: () {
-              showGeneralDialog(
-                context: context,
-                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
-                barrierDismissible: true, // 背景タップで閉じられるようにする
-                barrierLabel: '年間強化練習効果設定', // アクセシビリティ用ラベル
-                transitionDuration: const Duration(
-                  milliseconds: 300,
-                ), // アニメーション時間
-                pageBuilder: (context, animation, secondaryAnimation) {
-                  // ここに表示したいモーダルのウィジェットを指定
-                  return const ModalTrainingEffectSettings(); // const を追加
-                },
-                transitionBuilder:
-                    (context, animation, secondaryAnimation, child) {
-                      // モーダル表示時のアニメーション (例: フェードイン)
-                      return FadeTransition(
-                        opacity: CurvedAnimation(
-                          parent: animation,
-                          curve: Curves.easeOut,
-                        ),
-                        child: child,
-                      );
-                    },
-              );
-            },
-            child: Text(
-              "年間強化練習効果設定",
-              style: TextStyle(
-                color: const Color.fromARGB(255, 0, 255, 0),
-                decoration: TextDecoration.underline,
-                decorationColor: HENSUU.textcolor,
-              ),
-            ),
-          ),
-
-          // ここから4つは、全大学共通の設定なので大学画面から移した(1.9.1。画面は univ_screen.dart)
-          const SizedBox(height: 20),
-          if (ghensuu.mode != 300 && ghensuu.mode != 330 && ghensuu.mode != 350)
-            TextButton(
-              onPressed: () {
-                showGeneralDialog(
-                  context: context,
-                  barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
-                  barrierDismissible: true, // 背景タップで閉じられるようにする
-                  barrierLabel: '駅伝名声設定', // アクセシビリティ用ラベル
-                  transitionDuration: const Duration(
-                    milliseconds: 300,
-                  ), // アニメーション時間
-                  pageBuilder: (context, animation, secondaryAnimation) {
-                    return const ModalEkidenFameSettings();
-                  },
-                  transitionBuilder:
-                      (context, animation, secondaryAnimation, child) {
-                        return FadeTransition(
-                          opacity: CurvedAnimation(
-                            parent: animation,
-                            curve: Curves.easeOut,
-                          ),
-                          child: child,
-                        );
-                      },
-                );
-              },
-              child: Text(
-                "駅伝名声設定",
-                style: TextStyle(
-                  color: const Color.fromARGB(255, 0, 255, 0),
-                  decoration: TextDecoration.underline,
-                  decorationColor: HENSUU.textcolor,
-                ),
-              ),
-            )
-          else
-            Text("(エントリー画面や指示画面では駅伝名声設定はできません)"),
-
-          const SizedBox(height: 20),
-          TextButton(
-            onPressed: () {
-              showGeneralDialog(
-                context: context,
-                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
-                barrierDismissible: true, // 背景タップで閉じられるようにする
-                barrierLabel: '入学時名声影響度設定', // アクセシビリティ用ラベル
-                transitionDuration: const Duration(
-                  milliseconds: 300,
-                ), // アニメーション時間
-                pageBuilder: (context, animation, secondaryAnimation) {
-                  return const ModalSpurtryokuseichousisuu3();
-                },
-                transitionBuilder:
-                    (context, animation, secondaryAnimation, child) {
-                      return FadeTransition(
-                        opacity: CurvedAnimation(
-                          parent: animation,
-                          curve: Curves.easeOut,
-                        ),
-                        child: child,
-                      );
-                    },
-              );
-            },
-            child: Text(
-              "入学時名声影響度設定",
-              style: TextStyle(
-                color: const Color.fromARGB(255, 0, 255, 0),
-                decoration: TextDecoration.underline,
-                decorationColor: HENSUU.textcolor,
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          // 成長タイプ設定(新入生の成長タイプの割合。1.9.3)
-          TextButton(
-            onPressed: () {
-              showGeneralDialog(
-                context: context,
-                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
-                barrierDismissible: true, // 背景タップで閉じられるようにする
-                barrierLabel: '成長タイプ設定', // アクセシビリティ用ラベル
-                transitionDuration: const Duration(
-                  milliseconds: 300,
-                ), // アニメーション時間
-                pageBuilder: (context, animation, secondaryAnimation) {
-                  return const ModalSeichouTypeSettei();
-                },
-                transitionBuilder:
-                    (context, animation, secondaryAnimation, child) {
-                      return FadeTransition(
-                        opacity: CurvedAnimation(
-                          parent: animation,
-                          curve: Curves.easeOut,
-                        ),
-                        child: child,
-                      );
-                    },
-              );
-            },
-            child: Text(
-              "成長タイプ設定",
-              style: TextStyle(
-                color: const Color.fromARGB(255, 0, 255, 0),
-                decoration: TextDecoration.underline,
-                decorationColor: HENSUU.textcolor,
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 20),
-          TextButton(
-            onPressed: () {
-              showGeneralDialog(
-                context: context,
-                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
-                barrierDismissible: true, // 背景タップで閉じられるようにする
-                barrierLabel: '目標順位決め方設定(コンピュータの大学)', // アクセシビリティ用ラベル
-                transitionDuration: const Duration(
-                  milliseconds: 300,
-                ), // アニメーション時間
-                pageBuilder: (context, animation, secondaryAnimation) {
-                  return const ModalSpurtryokuseichousisuu2();
-                },
-                transitionBuilder:
-                    (context, animation, secondaryAnimation, child) {
-                      return FadeTransition(
-                        opacity: CurvedAnimation(
-                          parent: animation,
-                          curve: Curves.easeOut,
-                        ),
-                        child: child,
-                      );
-                    },
-              );
-            },
-            child: Text(
-              "目標順位決め方設定(コンピュータの大学)",
-              style: TextStyle(
-                color: const Color.fromARGB(255, 0, 255, 0),
-                decoration: TextDecoration.underline,
-                decorationColor: HENSUU.textcolor,
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 20),
-          TextButton(
-            onPressed: () {
-              showGeneralDialog(
-                context: context,
-                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
-                barrierDismissible: true, // 背景タップで閉じられるようにする
-                barrierLabel: '学連選抜モチベーション設定', // アクセシビリティ用ラベル
-                transitionDuration: const Duration(
-                  milliseconds: 300,
-                ), // アニメーション時間
-                pageBuilder: (context, animation, secondaryAnimation) {
-                  return const ModalGakurenHosei();
-                },
-                transitionBuilder:
-                    (context, animation, secondaryAnimation, child) {
-                      return FadeTransition(
-                        opacity: CurvedAnimation(
-                          parent: animation,
-                          curve: Curves.easeOut,
-                        ),
-                        child: child,
-                      );
-                    },
-              );
-            },
-            child: Text(
-              "学連選抜モチベーション設定",
-              style: TextStyle(
-                color: const Color.fromARGB(255, 0, 255, 0),
-                decoration: TextDecoration.underline,
-                decorationColor: HENSUU.textcolor,
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 20),
-          TextButton(
-            onPressed: () {
-              showGeneralDialog(
-                context: context,
-                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
-                barrierDismissible: true, // 背景タップで閉じられるようにする
-                barrierLabel: '自分のチームの歩み', // アクセシビリティ用ラベル
-                transitionDuration: const Duration(
-                  milliseconds: 300,
-                ), // アニメーション時間
-                pageBuilder: (context, animation, secondaryAnimation) {
-                  // ここに表示したいモーダルのウィジェットを指定
-                  return const ModalTeamHistoryView(); // const を追加
-                },
-                transitionBuilder:
-                    (context, animation, secondaryAnimation, child) {
-                      // モーダル表示時のアニメーション (例: フェードイン)
-                      return FadeTransition(
-                        opacity: CurvedAnimation(
-                          parent: animation,
-                          curve: Curves.easeOut,
-                        ),
-                        child: child,
-                      );
-                    },
-              );
-            },
-            child: Text(
-              "自分のチームの歩み",
-              style: TextStyle(
-                color: const Color.fromARGB(255, 0, 255, 0),
-                decoration: TextDecoration.underline,
-                decorationColor: HENSUU.textcolor,
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 20),
-          TextButton(
-            onPressed: () {
-              showGeneralDialog(
-                context: context,
-                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
-                barrierDismissible: true, // 背景タップで閉じられるようにする
-                barrierLabel: 'スキップして統計データ取得', // アクセシビリティ用ラベル
-                transitionDuration: const Duration(
-                  milliseconds: 300,
-                ), // アニメーション時間
-                pageBuilder: (context, animation, secondaryAnimation) {
-                  // ここに表示したいモーダルのウィジェットを指定
-                  return const StatisticsSimulationScreen();
-                },
-                transitionBuilder:
-                    (context, animation, secondaryAnimation, child) {
-                      // モーダル表示時のアニメーション (例: フェードイン)
-                      return FadeTransition(
-                        opacity: CurvedAnimation(
-                          parent: animation,
-                          curve: Curves.easeOut,
-                        ),
-                        child: child,
-                      );
-                    },
-              );
-            },
-            child: Text(
-              "スキップして統計データ取得",
-              style: TextStyle(
-                color: const Color.fromARGB(255, 0, 255, 0),
-                decoration: TextDecoration.underline,
-                decorationColor: HENSUU.textcolor,
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 20),
-          TextButton(
-            onPressed: () {
-              showGeneralDialog(
-                context: context,
-                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
-                barrierDismissible: true, // 背景タップで閉じられるようにする
-                barrierLabel: '駅伝コース紹介', // アクセシビリティ用ラベル
-                transitionDuration: const Duration(
-                  milliseconds: 300,
-                ), // アニメーション時間
-                pageBuilder: (context, animation, secondaryAnimation) {
-                  // ここに表示したいモーダルのウィジェットを指定
-                  return const RaceCourseSelectionView();
-                },
-                transitionBuilder:
-                    (context, animation, secondaryAnimation, child) {
-                      // モーダル表示時のアニメーション (例: フェードイン)
-                      return FadeTransition(
-                        opacity: CurvedAnimation(
-                          parent: animation,
-                          curve: Curves.easeOut,
-                        ),
-                        child: child,
-                      );
-                    },
-              );
-            },
-            child: Text(
-              "駅伝コース紹介",
-              style: TextStyle(
-                color: const Color.fromARGB(255, 0, 255, 0),
-                decoration: TextDecoration.underline,
-                decorationColor: HENSUU.textcolor,
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 20),
-          if (ghensuu.mode == 110 ||
-              (!(ghensuu.month == 2 && ghensuu.day == 25)))
-            TextButton(
-              onPressed: () {
-                showGeneralDialog(
-                  context: context,
-                  barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
-                  barrierDismissible: true, // 背景タップで閉じられるようにする
-                  barrierLabel: 'カスタム駅伝設定', // アクセシビリティ用ラベル
-                  transitionDuration: const Duration(
-                    milliseconds: 300,
-                  ), // アニメーション時間
-                  pageBuilder: (context, animation, secondaryAnimation) {
-                    // ここに表示したいモーダルのウィジェットを指定
-                    return const ModalCustomEkidenSettings(); // const を追加
-                  },
-                  transitionBuilder:
-                      (context, animation, secondaryAnimation, child) {
-                        // モーダル表示時のアニメーション (例: フェードイン)
-                        return FadeTransition(
-                          opacity: CurvedAnimation(
-                            parent: animation,
-                            curve: Curves.easeOut,
-                          ),
-                          child: child,
-                        );
-                      },
-                );
-              },
-              child: Text(
-                "カスタム駅伝設定",
-                style: TextStyle(
-                  color: const Color.fromARGB(255, 0, 255, 0),
-                  decoration: TextDecoration.underline,
-                  decorationColor: HENSUU.textcolor,
-                ),
-              ),
-            ),
-          if (ghensuu.mode != 110 &&
-              (ghensuu.month == 2 && ghensuu.day == 25))
-            Text("(カスタム駅伝当日にはカスタム駅伝設定はできません)"),
-
-          const SizedBox(height: 20),
-          if (ghensuu.mode == 110 ||
-              (!(ghensuu.month == 10 && ghensuu.day == 5) &&
-                  !(ghensuu.month == 11 && ghensuu.day == 5) &&
-                  !(ghensuu.month == 1 && ghensuu.day == 5) &&
-                  !(ghensuu.month == 2 && ghensuu.day == 25)))
-            TextButton(
-              onPressed: () {
-                showGeneralDialog(
-                  context: context,
-                  barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
-                  barrierDismissible: true, // 背景タップで閉じられるようにする
-                  barrierLabel: '駅伝コース編集', // アクセシビリティ用ラベル
-                  transitionDuration: const Duration(
-                    milliseconds: 300,
-                  ), // アニメーション時間
-                  pageBuilder: (context, animation, secondaryAnimation) {
-                    // ここに表示したいモーダルのウィジェットを指定
-                    return const RaceCourseEditSelectionView(); // const を追加
-                  },
-                  transitionBuilder:
-                      (context, animation, secondaryAnimation, child) {
-                        // モーダル表示時のアニメーション (例: フェードイン)
-                        return FadeTransition(
-                          opacity: CurvedAnimation(
-                            parent: animation,
-                            curve: Curves.easeOut,
-                          ),
-                          child: child,
-                        );
-                      },
-                );
-              },
-              child: Text(
-                "駅伝コース編集",
-                style: TextStyle(
-                  color: const Color.fromARGB(255, 0, 255, 0),
-                  decoration: TextDecoration.underline,
-                  decorationColor: HENSUU.textcolor,
-                ),
-              ),
-            ),
-          if (!(ghensuu.mode == 110 ||
-              (!(ghensuu.month == 10 && ghensuu.day == 5) &&
-                  !(ghensuu.month == 11 && ghensuu.day == 5) &&
-                  !(ghensuu.month == 1 && ghensuu.day == 5) &&
-                  !(ghensuu.month == 2 && ghensuu.day == 25))))
-            Text("(駅伝開催日には駅伝コース編集はできません)"),
-
-          const SizedBox(height: 20),
+          const SizedBox(height: 8),
           if (ghensuu.mode == 110 ||
               (!(ghensuu.month == 6 && ghensuu.day == 15) &&
                   !(ghensuu.month == 10 && ghensuu.day == 5) &&
@@ -1148,8 +280,917 @@ class _SettingScreenState extends State<SettingScreen>
                   !(ghensuu.month == 1 && ghensuu.day == 5) &&
                   !(ghensuu.month == 2 && ghensuu.day == 25))))
             Text("(駅伝・駅伝予選開催日にはQRコード設定入出力はできません)"),
+          _setteiMidashi('モードと大会'),
+          // 「夏TT開催大学変更」は1.8.8でなくした(夏の学内タイムトライアルはいつも全大学で行う)
+          TextButton(
+            onPressed: () {
+              showGeneralDialog(
+                context: context,
+                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                barrierDismissible: true, // 背景タップで閉じられるようにする
+                barrierLabel: '箱庭モード/通常モード切替', // アクセシビリティ用ラベル
+                transitionDuration: const Duration(
+                  milliseconds: 300,
+                ), // アニメーション時間
+                pageBuilder: (context, animation, secondaryAnimation) {
+                  // ここに表示したいモーダルのウィジェットを指定
+                  return const SimulationModeSelectScreen(); // const を追加
+                },
+                transitionBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                      // モーダル表示時のアニメーション (例: フェードイン)
+                      return FadeTransition(
+                        opacity: CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOut,
+                        ),
+                        child: child,
+                      );
+                    },
+              );
+            },
+            child: Text(
+              "箱庭モード/通常モード切替",
+              style: TextStyle(
+                color: const Color.fromARGB(255, 0, 255, 0),
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (ghensuu.mode == 110 ||
+              (!(ghensuu.month == 2 && ghensuu.day == 25)))
+            TextButton(
+              onPressed: () {
+                showGeneralDialog(
+                  context: context,
+                  barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                  barrierDismissible: true, // 背景タップで閉じられるようにする
+                  barrierLabel: 'カスタム駅伝設定', // アクセシビリティ用ラベル
+                  transitionDuration: const Duration(
+                    milliseconds: 300,
+                  ), // アニメーション時間
+                  pageBuilder: (context, animation, secondaryAnimation) {
+                    // ここに表示したいモーダルのウィジェットを指定
+                    return const ModalCustomEkidenSettings(); // const を追加
+                  },
+                  transitionBuilder:
+                      (context, animation, secondaryAnimation, child) {
+                        // モーダル表示時のアニメーション (例: フェードイン)
+                        return FadeTransition(
+                          opacity: CurvedAnimation(
+                            parent: animation,
+                            curve: Curves.easeOut,
+                          ),
+                          child: child,
+                        );
+                      },
+                );
+              },
+              child: Text(
+                "カスタム駅伝設定",
+                style: TextStyle(
+                  color: const Color.fromARGB(255, 0, 255, 0),
+                  decoration: TextDecoration.underline,
+                  decorationColor: HENSUU.textcolor,
+                ),
+              ),
+            ),
+          if (ghensuu.mode != 110 &&
+              (ghensuu.month == 2 && ghensuu.day == 25))
+            Text("(カスタム駅伝当日にはカスタム駅伝設定はできません)"),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: () {
+              showGeneralDialog(
+                context: context,
+                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                barrierDismissible: true, // 背景タップで閉じられるようにする
+                barrierLabel: '記録会時期設定', // アクセシビリティ用ラベル
+                transitionDuration: const Duration(
+                  milliseconds: 300,
+                ), // アニメーション時間
+                pageBuilder: (context, animation, secondaryAnimation) {
+                  // ここに表示したいモーダルのウィジェットを指定
+                  return const ModalRaceTimeSettings(); // const を追加
+                },
+                transitionBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                      // モーダル表示時のアニメーション (例: フェードイン)
+                      return FadeTransition(
+                        opacity: CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOut,
+                        ),
+                        child: child,
+                      );
+                    },
+              );
+            },
+            child: Text(
+              "記録会時期設定",
+              style: TextStyle(
+                color: const Color.fromARGB(255, 0, 255, 0),
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: () {
+              showGeneralDialog(
+                context: context,
+                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                barrierDismissible: true, // 背景タップで閉じられるようにする
+                barrierLabel: '駅伝コース紹介', // アクセシビリティ用ラベル
+                transitionDuration: const Duration(
+                  milliseconds: 300,
+                ), // アニメーション時間
+                pageBuilder: (context, animation, secondaryAnimation) {
+                  // ここに表示したいモーダルのウィジェットを指定
+                  return const RaceCourseSelectionView();
+                },
+                transitionBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                      // モーダル表示時のアニメーション (例: フェードイン)
+                      return FadeTransition(
+                        opacity: CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOut,
+                        ),
+                        child: child,
+                      );
+                    },
+              );
+            },
+            child: Text(
+              "駅伝コース紹介",
+              style: TextStyle(
+                color: const Color.fromARGB(255, 0, 255, 0),
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (ghensuu.mode == 110 ||
+              (!(ghensuu.month == 10 && ghensuu.day == 5) &&
+                  !(ghensuu.month == 11 && ghensuu.day == 5) &&
+                  !(ghensuu.month == 1 && ghensuu.day == 5) &&
+                  !(ghensuu.month == 2 && ghensuu.day == 25)))
+            TextButton(
+              onPressed: () {
+                showGeneralDialog(
+                  context: context,
+                  barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                  barrierDismissible: true, // 背景タップで閉じられるようにする
+                  barrierLabel: '駅伝コース編集', // アクセシビリティ用ラベル
+                  transitionDuration: const Duration(
+                    milliseconds: 300,
+                  ), // アニメーション時間
+                  pageBuilder: (context, animation, secondaryAnimation) {
+                    // ここに表示したいモーダルのウィジェットを指定
+                    return const RaceCourseEditSelectionView(); // const を追加
+                  },
+                  transitionBuilder:
+                      (context, animation, secondaryAnimation, child) {
+                        // モーダル表示時のアニメーション (例: フェードイン)
+                        return FadeTransition(
+                          opacity: CurvedAnimation(
+                            parent: animation,
+                            curve: Curves.easeOut,
+                          ),
+                          child: child,
+                        );
+                      },
+                );
+              },
+              child: Text(
+                "駅伝コース編集",
+                style: TextStyle(
+                  color: const Color.fromARGB(255, 0, 255, 0),
+                  decoration: TextDecoration.underline,
+                  decorationColor: HENSUU.textcolor,
+                ),
+              ),
+            ),
+          if (!(ghensuu.mode == 110 ||
+              (!(ghensuu.month == 10 && ghensuu.day == 5) &&
+                  !(ghensuu.month == 11 && ghensuu.day == 5) &&
+                  !(ghensuu.month == 1 && ghensuu.day == 5) &&
+                  !(ghensuu.month == 2 && ghensuu.day == 25))))
+            Text("(駅伝開催日には駅伝コース編集はできません)"),
+          _setteiMidashi('レースのタイム'),
+          TextButton(
+            onPressed: () {
+              showGeneralDialog(
+                context: context,
+                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                barrierDismissible: true, // 背景タップで閉じられるようにする
+                barrierLabel: '全体・区間ごとタイム調整', // アクセシビリティ用ラベル
+                transitionDuration: const Duration(
+                  milliseconds: 300,
+                ), // アニメーション時間
+                pageBuilder: (context, animation, secondaryAnimation) {
+                  // ここに表示したいモーダルのウィジェットを指定
+                  return const ModalTimeAdjustmentSettings(); // const を追加
+                },
+                transitionBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                      // モーダル表示時のアニメーション (例: フェードイン)
+                      return FadeTransition(
+                        opacity: CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOut,
+                        ),
+                        child: child,
+                      );
+                    },
+              );
+            },
+            child: Text(
+              "全体・区間ごとタイム調整",
+              style: TextStyle(
+                color: const Color.fromARGB(255, 0, 255, 0),
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: () {
+              showGeneralDialog(
+                context: context,
+                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                barrierDismissible: true, // 背景タップで閉じられるようにする
+                barrierLabel: '長距離タイム抑制設定', // アクセシビリティ用ラベル
+                transitionDuration: const Duration(
+                  milliseconds: 300,
+                ), // アニメーション時間
+                pageBuilder: (context, animation, secondaryAnimation) {
+                  // ここに表示したいモーダルのウィジェットを指定
+                  return const ModalPaceAdjustment(); // const を追加
+                },
+                transitionBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                      // モーダル表示時のアニメーション (例: フェードイン)
+                      return FadeTransition(
+                        opacity: CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOut,
+                        ),
+                        child: child,
+                      );
+                    },
+              );
+            },
+            child: Text(
+              "長距離タイム抑制設定",
+              style: TextStyle(
+                color: const Color.fromARGB(255, 0, 255, 0),
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          // 能力のタイムへの影響度の設定(1.8.2)
+          TextButton(
+            onPressed: () {
+              showGeneralDialog(
+                context: context,
+                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                barrierDismissible: true, // 背景タップで閉じられるようにする
+                barrierLabel: '能力のタイムへの影響度設定', // アクセシビリティ用ラベル
+                transitionDuration: const Duration(
+                  milliseconds: 300,
+                ), // アニメーション時間
+                pageBuilder: (context, animation, secondaryAnimation) {
+                  return const ModalNouryokuEikyodo();
+                },
+                transitionBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                      return FadeTransition(
+                        opacity: CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOut,
+                        ),
+                        child: child,
+                      );
+                    },
+              );
+            },
+            child: Text(
+              "能力のタイムへの影響度設定",
+              style: TextStyle(
+                color: const Color.fromARGB(255, 0, 255, 0),
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: () {
+              showGeneralDialog(
+                context: context,
+                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                barrierDismissible: true, // 背景タップで閉じられるようにする
+                barrierLabel: '調子関連設定', // アクセシビリティ用ラベル
+                transitionDuration: const Duration(
+                  milliseconds: 300,
+                ), // アニメーション時間
+                pageBuilder: (context, animation, secondaryAnimation) {
+                  // ここに表示したいモーダルのウィジェットを指定
+                  return const ModalConditionSettings(); // const を追加
+                },
+                transitionBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                      // モーダル表示時のアニメーション (例: フェードイン)
+                      return FadeTransition(
+                        opacity: CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOut,
+                        ),
+                        child: child,
+                      );
+                    },
+              );
+            },
+            child: Text(
+              "調子関連設定",
+              style: TextStyle(
+                color: const Color.fromARGB(255, 0, 255, 0),
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          // 目標順位・指示の補正の強さの設定(1.8.2)
+          TextButton(
+            onPressed: () {
+              showGeneralDialog(
+                context: context,
+                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                barrierDismissible: true, // 背景タップで閉じられるようにする
+                barrierLabel: '目標順位・指示の補正設定', // アクセシビリティ用ラベル
+                transitionDuration: const Duration(
+                  milliseconds: 300,
+                ), // アニメーション時間
+                pageBuilder: (context, animation, secondaryAnimation) {
+                  return const ModalHoseiTsuyosa();
+                },
+                transitionBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                      return FadeTransition(
+                        opacity: CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOut,
+                        ),
+                        child: child,
+                      );
+                    },
+              );
+            },
+            child: Text(
+              "目標順位・指示の補正設定",
+              style: TextStyle(
+                color: const Color.fromARGB(255, 0, 255, 0),
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          // 集団走設定(集団を引っ張る選手を決めるときの、その日の勢いの大きさ。1.9.2)
+          TextButton(
+            onPressed: () {
+              showGeneralDialog(
+                context: context,
+                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                barrierDismissible: true, // 背景タップで閉じられるようにする
+                barrierLabel: '集団走設定', // アクセシビリティ用ラベル
+                transitionDuration: const Duration(
+                  milliseconds: 300,
+                ), // アニメーション時間
+                pageBuilder: (context, animation, secondaryAnimation) {
+                  return const ModalShuudanSettei();
+                },
+                transitionBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                      return FadeTransition(
+                        opacity: CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOut,
+                        ),
+                        child: child,
+                      );
+                    },
+              );
+            },
+            child: Text(
+              "集団走設定",
+              style: TextStyle(
+                color: const Color.fromARGB(255, 0, 255, 0),
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: () {
+              showGeneralDialog(
+                context: context,
+                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                barrierDismissible: true, // 背景タップで閉じられるようにする
+                barrierLabel: '学連選抜モチベーション設定', // アクセシビリティ用ラベル
+                transitionDuration: const Duration(
+                  milliseconds: 300,
+                ), // アニメーション時間
+                pageBuilder: (context, animation, secondaryAnimation) {
+                  return const ModalGakurenHosei();
+                },
+                transitionBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                      return FadeTransition(
+                        opacity: CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOut,
+                        ),
+                        child: child,
+                      );
+                    },
+              );
+            },
+            child: Text(
+              "学連選抜モチベーション設定",
+              style: TextStyle(
+                color: const Color.fromARGB(255, 0, 255, 0),
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+              ),
+            ),
+          ),
+          _setteiMidashi('コンピュータの大学の作戦'),
+          TextButton(
+            onPressed: () {
+              showGeneralDialog(
+                context: context,
+                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                barrierDismissible: true, // 背景タップで閉じられるようにする
+                barrierLabel: '最適解区間配置確率設定', // アクセシビリティ用ラベル
+                transitionDuration: const Duration(
+                  milliseconds: 300,
+                ), // アニメーション時間
+                pageBuilder: (context, animation, secondaryAnimation) {
+                  // ここに表示したいモーダルのウィジェットを指定
+                  return const ModalComputerTeamProb(); // const を追加
+                },
+                transitionBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                      // モーダル表示時のアニメーション (例: フェードイン)
+                      return FadeTransition(
+                        opacity: CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOut,
+                        ),
+                        child: child,
+                      );
+                    },
+              );
+            },
+            child: Text(
+              "最適解区間配置確率設定",
+              style: TextStyle(
+                color: const Color.fromARGB(255, 0, 255, 0),
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          // 戦略的エントリー確率設定(1.9.3までは調子関連設定の画面の中にあった。1.9.4)
+          TextButton(
+            onPressed: () {
+              showGeneralDialog(
+                context: context,
+                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                barrierDismissible: true, // 背景タップで閉じられるようにする
+                barrierLabel: '戦略的エントリー確率設定', // アクセシビリティ用ラベル
+                transitionDuration: const Duration(
+                  milliseconds: 300,
+                ), // アニメーション時間
+                pageBuilder: (context, animation, secondaryAnimation) {
+                  return const ModalSenryakuEntrySettei();
+                },
+                transitionBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                      return FadeTransition(
+                        opacity: CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOut,
+                        ),
+                        child: child,
+                      );
+                    },
+              );
+            },
+            child: Text(
+              "戦略的エントリー確率設定",
+              style: TextStyle(
+                color: const Color.fromARGB(255, 0, 255, 0),
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: () {
+              showGeneralDialog(
+                context: context,
+                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                barrierDismissible: true, // 背景タップで閉じられるようにする
+                barrierLabel: '目標順位決め方設定(コンピュータの大学)', // アクセシビリティ用ラベル
+                transitionDuration: const Duration(
+                  milliseconds: 300,
+                ), // アニメーション時間
+                pageBuilder: (context, animation, secondaryAnimation) {
+                  return const ModalSpurtryokuseichousisuu2();
+                },
+                transitionBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                      return FadeTransition(
+                        opacity: CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOut,
+                        ),
+                        child: child,
+                      );
+                    },
+              );
+            },
+            child: Text(
+              "目標順位決め方設定(コンピュータの大学)",
+              style: TextStyle(
+                color: const Color.fromARGB(255, 0, 255, 0),
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+              ),
+            ),
+          ),
+          _setteiMidashi('育成と名声'),
+          TextButton(
+            onPressed: () {
+              showGeneralDialog(
+                context: context,
+                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                barrierDismissible: true, // 背景タップで閉じられるようにする
+                barrierLabel: '金銀支給量設定', // アクセシビリティ用ラベル
+                transitionDuration: const Duration(
+                  milliseconds: 300,
+                ), // アニメーション時間
+                pageBuilder: (context, animation, secondaryAnimation) {
+                  // ここに表示したいモーダルのウィジェットを指定
+                  return const ModalMoneySettings(); // const を追加
+                },
+                transitionBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                      // モーダル表示時のアニメーション (例: フェードイン)
+                      return FadeTransition(
+                        opacity: CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOut,
+                        ),
+                        child: child,
+                      );
+                    },
+              );
+            },
+            child: Text(
+              "金銀支給量設定",
+              style: TextStyle(
+                color: const Color.fromARGB(255, 0, 255, 0),
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: () {
+              showGeneralDialog(
+                context: context,
+                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                barrierDismissible: true, // 背景タップで閉じられるようにする
+                barrierLabel: '年間強化練習効果設定', // アクセシビリティ用ラベル
+                transitionDuration: const Duration(
+                  milliseconds: 300,
+                ), // アニメーション時間
+                pageBuilder: (context, animation, secondaryAnimation) {
+                  // ここに表示したいモーダルのウィジェットを指定
+                  return const ModalTrainingEffectSettings(); // const を追加
+                },
+                transitionBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                      // モーダル表示時のアニメーション (例: フェードイン)
+                      return FadeTransition(
+                        opacity: CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOut,
+                        ),
+                        child: child,
+                      );
+                    },
+              );
+            },
+            child: Text(
+              "年間強化練習効果設定",
+              style: TextStyle(
+                color: const Color.fromARGB(255, 0, 255, 0),
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          // 成長タイプ設定(新入生の成長タイプの割合。1.9.3)
+          TextButton(
+            onPressed: () {
+              showGeneralDialog(
+                context: context,
+                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                barrierDismissible: true, // 背景タップで閉じられるようにする
+                barrierLabel: '成長タイプ設定', // アクセシビリティ用ラベル
+                transitionDuration: const Duration(
+                  milliseconds: 300,
+                ), // アニメーション時間
+                pageBuilder: (context, animation, secondaryAnimation) {
+                  return const ModalSeichouTypeSettei();
+                },
+                transitionBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                      return FadeTransition(
+                        opacity: CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOut,
+                        ),
+                        child: child,
+                      );
+                    },
+              );
+            },
+            child: Text(
+              "成長タイプ設定",
+              style: TextStyle(
+                color: const Color.fromARGB(255, 0, 255, 0),
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: () {
+              showGeneralDialog(
+                context: context,
+                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                barrierDismissible: true, // 背景タップで閉じられるようにする
+                barrierLabel: '入学時名声影響度設定', // アクセシビリティ用ラベル
+                transitionDuration: const Duration(
+                  milliseconds: 300,
+                ), // アニメーション時間
+                pageBuilder: (context, animation, secondaryAnimation) {
+                  return const ModalSpurtryokuseichousisuu3();
+                },
+                transitionBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                      return FadeTransition(
+                        opacity: CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOut,
+                        ),
+                        child: child,
+                      );
+                    },
+              );
+            },
+            child: Text(
+              "入学時名声影響度設定",
+              style: TextStyle(
+                color: const Color.fromARGB(255, 0, 255, 0),
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (ghensuu.mode != 300 && ghensuu.mode != 330 && ghensuu.mode != 350)
+            TextButton(
+              onPressed: () {
+                showGeneralDialog(
+                  context: context,
+                  barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                  barrierDismissible: true, // 背景タップで閉じられるようにする
+                  barrierLabel: '駅伝名声設定', // アクセシビリティ用ラベル
+                  transitionDuration: const Duration(
+                    milliseconds: 300,
+                  ), // アニメーション時間
+                  pageBuilder: (context, animation, secondaryAnimation) {
+                    return const ModalEkidenFameSettings();
+                  },
+                  transitionBuilder:
+                      (context, animation, secondaryAnimation, child) {
+                        return FadeTransition(
+                          opacity: CurvedAnimation(
+                            parent: animation,
+                            curve: Curves.easeOut,
+                          ),
+                          child: child,
+                        );
+                      },
+                );
+              },
+              child: Text(
+                "駅伝名声設定",
+                style: TextStyle(
+                  color: const Color.fromARGB(255, 0, 255, 0),
+                  decoration: TextDecoration.underline,
+                  decorationColor: HENSUU.textcolor,
+                ),
+              ),
+            )
+          else
+            Text("(エントリー画面や指示画面では駅伝名声設定はできません)"),
+          _setteiMidashi('表示'),
+          // 持ちタイムの表示(自己ベスト/今季ベスト。1.9.1)
+          TextButton(
+            onPressed: () {
+              showGeneralDialog(
+                context: context,
+                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                barrierDismissible: true, // 背景タップで閉じられるようにする
+                barrierLabel: '持ちタイムの表示設定', // アクセシビリティ用ラベル
+                transitionDuration: const Duration(
+                  milliseconds: 300,
+                ), // アニメーション時間
+                pageBuilder: (context, animation, secondaryAnimation) {
+                  return const ModalKonkiBestSettei();
+                },
+                transitionBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                      return FadeTransition(
+                        opacity: CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOut,
+                        ),
+                        child: child,
+                      );
+                    },
+              );
+            },
+            child: Text(
+              "持ちタイムの表示設定",
+              style: TextStyle(
+                color: const Color.fromARGB(255, 0, 255, 0),
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: () {
+              showGeneralDialog(
+                context: context,
+                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                barrierDismissible: true, // 背景タップで閉じられるようにする
+                barrierLabel: '趣味非表示設定', // アクセシビリティ用ラベル
+                transitionDuration: const Duration(
+                  milliseconds: 300,
+                ), // アニメーション時間
+                pageBuilder: (context, animation, secondaryAnimation) {
+                  // ここに表示したいモーダルのウィジェットを指定
+                  return const ModalHobbyDisplaySettings(); // const を追加
+                },
+                transitionBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                      // モーダル表示時のアニメーション (例: フェードイン)
+                      return FadeTransition(
+                        opacity: CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOut,
+                        ),
+                        child: child,
+                      );
+                    },
+              );
+            },
+            child: Text(
+              "趣味非表示設定",
+              style: TextStyle(
+                color: const Color.fromARGB(255, 0, 255, 0),
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+              ),
+            ),
+          ),
+          _setteiMidashi('見る・調べる'),
+          TextButton(
+            onPressed: () {
+              showGeneralDialog(
+                context: context,
+                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                barrierDismissible: true, // 背景タップで閉じられるようにする
+                barrierLabel: '自分のチームの歩み', // アクセシビリティ用ラベル
+                transitionDuration: const Duration(
+                  milliseconds: 300,
+                ), // アニメーション時間
+                pageBuilder: (context, animation, secondaryAnimation) {
+                  // ここに表示したいモーダルのウィジェットを指定
+                  return const ModalTeamHistoryView(); // const を追加
+                },
+                transitionBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                      // モーダル表示時のアニメーション (例: フェードイン)
+                      return FadeTransition(
+                        opacity: CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOut,
+                        ),
+                        child: child,
+                      );
+                    },
+              );
+            },
+            child: Text(
+              "自分のチームの歩み",
+              style: TextStyle(
+                color: const Color.fromARGB(255, 0, 255, 0),
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: () {
+              showGeneralDialog(
+                context: context,
+                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                barrierDismissible: true, // 背景タップで閉じられるようにする
+                barrierLabel: 'スキップして統計データ取得', // アクセシビリティ用ラベル
+                transitionDuration: const Duration(
+                  milliseconds: 300,
+                ), // アニメーション時間
+                pageBuilder: (context, animation, secondaryAnimation) {
+                  // ここに表示したいモーダルのウィジェットを指定
+                  return const StatisticsSimulationScreen();
+                },
+                transitionBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                      // モーダル表示時のアニメーション (例: フェードイン)
+                      return FadeTransition(
+                        opacity: CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOut,
+                        ),
+                        child: child,
+                      );
+                    },
+              );
+            },
+            child: Text(
+              "スキップして統計データ取得",
+              style: TextStyle(
+                color: const Color.fromARGB(255, 0, 255, 0),
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+              ),
+            ),
+          ),
           const SizedBox(height: 60), // 下部の余白
         ],
+      ),
+    );
+  }
+
+  // 設定タブのボタンの見出し(大学画面の下のほうの見出しと同じ形。1.9.4)
+  Widget _setteiMidashi(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 24.0, bottom: 4.0),
+      child: Text(
+        "■$text",
+        style: TextStyle(
+          color: HENSUU.textcolor,
+          fontSize: HENSUU.fontsize_honbun,
+          fontWeight: FontWeight.bold,
+        ),
       ),
     );
   }
@@ -1169,7 +1210,7 @@ class _SettingScreenState extends State<SettingScreen>
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           const Text(
-            "SS 1.9.3 (21930)",
+            "SS 1.9.4 (21940)",
             style: TextStyle(color: Colors.white),
           ),
           // 変更履歴(ToDo.txtの箱庭小駅伝SSの部分を表示)
@@ -1231,7 +1272,7 @@ class _SettingScreenState extends State<SettingScreen>
                 // 実際のライセンス画面の表示部分
                 child: const LicensePage(
                   applicationName: '箱庭小駅伝SS',
-                  applicationVersion: '1.9.3',
+                  applicationVersion: '1.9.4',
                   // applicationIcon: Image.asset('lib/assets/icon/icon_ss1024.png', width: 48, height: 48),
                 ),
               ),

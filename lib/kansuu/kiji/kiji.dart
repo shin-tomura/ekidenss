@@ -31,7 +31,7 @@ export 'package:ekiden/kansuu/kiji/kiji_tenbou.dart' show KijiYosouJin;
 /// 表示中の大会の結果の記事
 List<Kiji> kijiKekkaIchiran() {
   try {
-    final KijiKankyou? k = KijiKankyou.yomu();
+    final KijiKankyou? k = KijiKankyou.yomu(kekka: true);
     if (k == null) return [];
     final List<Kiji> list = k.ekiden
         ? ekidenKekkaKiji(k)
@@ -137,7 +137,8 @@ String? kijiGakunaiAnnai({bool kekka = false}) {
 }
 
 /// 学内メディアの、表示中の駅伝・駅伝予選・対校戦の結果号
-List<Kiji> kijiGakunaiKekkaIchiran() => _gakunai('結果号', gakunaiKekkaKiji);
+List<Kiji> kijiGakunaiKekkaIchiran() =>
+    _gakunai('結果号', gakunaiKekkaKiji, kekka: true);
 
 /// 学内メディアの、表示中の駅伝・駅伝予選の展望号
 List<Kiji> kijiGakunaiTenbouIchiran() => _gakunai('展望号', gakunaiTenbouKiji);
@@ -163,9 +164,14 @@ List<Kiji> kijiGakunaiSotsugyouIchiran() {
   }
 }
 
-List<Kiji> _gakunai(String mei, List<Kiji> Function(KijiKankyou k) tsukuru) {
+/// [kekka] 結果号(大会のあと)のとき
+List<Kiji> _gakunai(
+  String mei,
+  List<Kiji> Function(KijiKankyou k) tsukuru, {
+  bool kekka = false,
+}) {
   try {
-    final KijiKankyou? k = KijiKankyou.yomu();
+    final KijiKankyou? k = KijiKankyou.yomu(kekka: kekka);
     if (k == null) return [];
     final List<Kiji> list = tsukuru(k);
     _log(list);

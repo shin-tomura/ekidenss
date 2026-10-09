@@ -1071,8 +1071,10 @@ Kiji _kukanTenbou(Tenbou t, List<KijiYosouJin> yosou) {
         tk == KukanTokuchou.yamaKudari) {
       final kr = _kukanKiroku(k, kk);
       if (kr != null) {
+        // 記録した年から回の数を出す(正月駅伝・カスタム駅伝は年度で数える。1.9.3)
+        final int? kai = kr.year > 0 ? k.kaiNoKazu(kr.year) : null;
         sb.write(
-          '区間記録は${kr.year > 0 ? '第${kr.year}回大会で' : ''}'
+          '区間記録は${kai != null ? '第$kai回大会で' : ''}'
           '${fullMei(kr.name)}${kr.univ.isEmpty ? '' : '(${daigakuMeiMoji(kr.univ)})'}が'
           'マークした${jikanMoji(kr.time)}。',
         );

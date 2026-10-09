@@ -214,18 +214,29 @@ class KijiKankyou {
   /// 記事にする大会
   final int race;
 
-  KijiKankyou._(this.gh, this.kantoku, this.univ, this.senshu, this.race);
+  /// 結果の記事か(大会のあとか。カスタム駅伝の開催回数を数えるときに、今回を含めるかを決める。1.9.3)
+  final bool kekka;
+
+  KijiKankyou._(
+    this.gh,
+    this.kantoku,
+    this.univ,
+    this.senshu,
+    this.race,
+    this.kekka,
+  );
 
   /// 今の表示中の大会でデータを読む(データがなければnull)
-  static KijiKankyou? yomu() {
+  /// [kekka] 結果の記事(大会のあと)のとき
+  static KijiKankyou? yomu({bool kekka = false}) {
     final Ghensuu? gh = Hive.box<Ghensuu>('ghensuuBox').getAt(0);
     if (gh == null) return null;
-    return yomuRace(gh.hyojiracebangou);
+    return yomuRace(gh.hyojiracebangou, kekka: kekka);
   }
 
   /// 大会[race]を記事にする大会としてデータを読む(データがなければnull)
   /// (1.9.3。表示中の大会と関係のない記事(学内メディアの卒業生特集)でも使う)
-  static KijiKankyou? yomuRace(int race) {
+  static KijiKankyou? yomuRace(int race, {bool kekka = false}) {
     final Ghensuu? gh = Hive.box<Ghensuu>('ghensuuBox').getAt(0);
     final KantokuData? kantoku = Hive.box<KantokuData>(
       'kantokuBox',
@@ -239,7 +250,7 @@ class KijiKankyou {
     // 駅伝・駅伝予選(0〜5)と、対校戦の3種目(6: 5000m、7: 1万m、8: ハーフ。1.9.2)
     if (race < 0 || race > 8) return null;
     if (gh.kukansuu_taikaigoto.length <= race) return null;
-    return KijiKankyou._(gh, kantoku, univ, senshu, race);
+    return KijiKankyou._(gh, kantoku, univ, senshu, race, kekka);
   }
 
   /// 区間(組)の数
@@ -248,8 +259,35 @@ class KijiKankyou {
   /// 大会の名前(対校戦は種目に分かれているが、大会の名前は「対校戦」)
   String get raceMei => taikousen ? '対校戦' : courseRaceTitle(race);
 
-  /// 「第○回正月駅伝」
-  String get taikaiMei => '第${gh.year}回$raceMei';
+  /// 「第○回正月駅伝」(回の数がそろわないカスタム駅伝は「カスタム駅伝」とだけ。1.9.3)
+  String get taikaiMei {
+    final int? kai = kaiNoKazu(gh.year);
+    return kai == null ? raceMei : '第$kai回$raceMei';
+  }
+
+  /// 年[nen]に行われたこの大会の回の数(1.9.3。年度で数える。分からなければnull)
+  /// ・年は1月に変わるので、1〜3月に行う正月駅伝とカスタム駅伝は「年の数−1」にする
+  ///   (1.9.2までは年の数をそのまま使っていて、最初の正月駅伝が「第2回」になっていた)
+  /// ・カスタム駅伝は開催しない年を設定で作れるので、年度で数えた回の数が開催の回数と
+  ///   合わないとき(途中から開催したデータなど)はnull。開催の回数は、毎回全大学が出場するので、
+  ///   出場回数の一番多い大学の回数で分かる(結果の記事では今回を含む)
+  int? kaiNoKazu(int nen) {
+    final bool ichigatsuIkou = race == 2 || race == customRaceBangou;
+    final int kai = ichigatsuIkou ? nen - 1 : nen;
+    if (kai < 1) return null;
+    if (race == customRaceBangou) {
+      int kaisai = 0;
+      for (final UnivData u in univ) {
+        final int c = shutsujouKaisuu(u, race);
+        if (c > kaisai) kaisai = c;
+      }
+      if (!kekka) kaisai += 1;
+      // 今回の大会の回の数が開催の回数と合わなければ、どの年の回の数も信用しない
+      final int imaKai = gh.year - 1;
+      if (kaisai != imaKai) return null;
+    }
+    return kai;
+  }
 
   /// 駅伝(予選ではない)か
   bool get ekiden => race <= 2 || race == 5;

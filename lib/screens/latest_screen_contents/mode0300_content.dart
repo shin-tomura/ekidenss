@@ -2891,6 +2891,8 @@ class _Mode0300ContentState extends State<Mode0300Content> {
             ),
           ),
 
+        // 体調不良者一覧は駅伝だけ(駅伝予選は調子が効かず、全員が調子100。1.9.3)
+        if (raceBangou <= 2 || raceBangou == 5)
         TextButton(
           onPressed: () {
             // ★ここを showGeneralDialog に変更★

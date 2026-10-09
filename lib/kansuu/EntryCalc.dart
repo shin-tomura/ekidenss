@@ -107,6 +107,19 @@ Future<List<int>> EntryCalc({
   }
   await kantoku.save();
 
+  // 駅伝予選(11月駅伝予選・正月駅伝予選)は調子がタイムに効かない(全員が調子100の扱い)ので、
+  // 全選手の調子を100にする(1.9.3。それまでは10日ごとに振り直した調子がそのまま残り、
+  // 区間エントリーの画面の「体調不良者一覧」や区間配置確認に、体調不良や調子が出ていた)。
+  // 次の調子の振り直し(10日後)からは、今まで通り
+  if (racebangou == 3 || racebangou == 4) {
+    for (final SenshuData s in sortedSenshuData) {
+      if (s.chousi != 100) {
+        s.chousi = 100;
+        await s.save();
+      }
+    }
+  }
+
   // Swiftの || 演算子と範囲演算子をDartの || と >= <= に変換
   if ((racebangou >= 6 && racebangou <= 9) ||
       (racebangou >= 10 && racebangou <= 12) ||

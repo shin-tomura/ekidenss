@@ -1044,6 +1044,9 @@ bool hatsuKaisaiKekka(KijiKankyou k, int race) {
 /// 三大駅伝の大会の番号(10月駅伝・11月駅伝・正月駅伝)
 const List<int> sandaiEkidenRace = [0, 1, 2];
 
+/// 三大駅伝の優勝校の表(今季と過去の季)に出す季の数(今季を含む。1.9.4)
+const int sandaiKonkiKisuu = 5;
+
 /// 三大駅伝の優勝校を、季ごとに見る道具
 class SandaiEkiden {
   final KijiKankyou k;
@@ -1102,17 +1105,32 @@ class SandaiEkiden {
   int nendo(int kiMae) =>
       (k.gh.month <= 3 ? k.gh.year - 1 : k.gh.year) - kiMae;
 
-  /// 今の季の三大駅伝の優勝校の表(まだ行われていない大会は「これから」)
-  KijiHyou konkiHyou() {
-    String mei(int race) {
-      if (!owatta(race)) return 'これから';
-      final UnivData? u = yuushou(race, 0);
-      return u == null ? '-' : daigakuMei(u);
+  /// 三大駅伝の優勝校の表(今季と過去の季。1.9.4で、今季だけの表から過去の季も並べる表にした)
+  /// ・1行目は今季。まだ行われていない大会は「これから」
+  /// ・2行目から過去の季を、新しい順に[kisuu]季分(今季を含む)まで。記録のない季は出さない
+  /// ・三冠の季は、正月駅伝の欄に「(三冠)」を付ける(rekidaiHyou と同じ)
+  KijiHyou konkiHyou({int kisuu = sandaiKonkiKisuu}) {
+    final List<List<String>> gyou = [];
+    for (int i = 0; i < kisuu; i++) {
+      if (nendo(i) < 1) break;
+      final List<UnivData?> y = [
+        for (final int race in sandaiEkidenRace) yuushou(race, i),
+      ];
+      if (i > 0 && y.every((u) => u == null)) continue;
+      final bool sk = y.every((u) => u != null && u.id == y[0]!.id);
+      gyou.add([
+        i == 0 ? '${nendo(i)}年度(今季)' : '${nendo(i)}年度',
+        for (int j = 0; j < y.length; j++)
+          (i == 0 && !owatta(sandaiEkidenRace[j]))
+              ? 'これから'
+              : (y[j] == null ? '-' : daigakuMei(y[j]!)) +
+                    (sk && j == y.length - 1 ? '(三冠)' : ''),
+      ]);
     }
-
-    return KijiHyou('今季の三大駅伝', ['大会', '優勝校'], [
-      for (final int race in sandaiEkidenRace) [courseRaceTitle(race), mei(race)],
-    ]);
+    return KijiHyou('三大駅伝の優勝校(今季と過去の季)', [
+      '年度',
+      for (final int race in sandaiEkidenRace) courseRaceTitle(race),
+    ], gyou);
   }
 
   /// 三大駅伝の歴代優勝校の表(今の季の三大駅伝がすべて終わっていれば今の季から、[kisuu]季分。

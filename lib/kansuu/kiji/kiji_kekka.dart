@@ -21,7 +21,8 @@ import 'package:ekiden/kansuu/kiji/kiji_comment.dart';
 //  6. 学連選抜の記事(正月駅伝で学連選抜が走ったとき)
 //  7. 三大駅伝の振り返り(正月駅伝のあと。今季の三大駅伝と、過去5季の優勝校・三冠。1.9.3)
 // 三大駅伝(1.9.3): トップ記事で三冠の連続、三冠・二冠を阻んだこと、優勝校が分かれた季を書き、
-// 11月駅伝・正月駅伝のトップ記事には今季の三大駅伝の優勝校の表を付ける(kiji_kihon.dart の SandaiEkiden)
+// 11月駅伝・正月駅伝のトップ記事には三大駅伝の優勝校の表を付ける(kiji_kihon.dart の SandaiEkiden)。
+// 1.9.4で、表を今季と過去の季(合わせて5季)にし、10月駅伝のトップ記事にも付けた(過去の季の記録があるときだけ)
 // ------------------------------------------------------------
 
 /// 駅伝の結果の、大学1校分
@@ -864,6 +865,9 @@ Kiji _topKiji(EkidenKekka e) {
   }
   w.kishaNoMe(me.toString());
 
+  // 三大駅伝の優勝校の表(今季と過去の季。1.9.4で過去の季も並べ、10月駅伝にも付けた。
+  // 10月駅伝は今季の優勝校が1つだけなので、過去の季の記録があるときだけ付ける)
+  final KijiHyou? sandaiHyou = sd?.konkiHyou();
   return _kansei(
     k,
     no,
@@ -874,8 +878,7 @@ Kiji _topKiji(EkidenKekka e) {
     hyou: [
       _sougouHyou(e),
       if (kinsa || taisa) _saSuiiHyou(e),
-      // 今季の三大駅伝の優勝校(11月駅伝・正月駅伝。1.9.3)
-      if (sd != null && race >= 1) sd.konkiHyou(),
+      if (sandaiHyou != null && (race >= 1 || sandaiHyou.gyou.length >= 2)) sandaiHyou,
     ],
     jibun: win.u.id == k.gh.MYunivid,
   );

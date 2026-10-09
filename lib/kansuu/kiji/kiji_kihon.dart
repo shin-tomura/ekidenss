@@ -107,6 +107,12 @@ class Kiji {
   /// 結果の記事か(false なら展望の記事。生成AIに渡すテキストの依頼文を変える)
   final bool kekka;
 
+  /// サイトの名前(1.9.3。学内メディアの記事は「○○スポーツ」。それ以外は箱庭スポーツ)
+  final String site;
+
+  /// 学内メディア(自分の大学の○○スポーツ)の記事か(1.9.3。kiji_gakunai.dart)
+  final bool gakunai;
+
   const Kiji({
     required this.category,
     required this.midashi,
@@ -117,12 +123,14 @@ class Kiji {
     required this.kisha,
     required this.jibun,
     required this.kekka,
+    this.site = kijiSiteMei,
+    this.gakunai = false,
   });
 
   /// 記事の全文(生成AIに渡すテキストと、デバッグのログに使う)
   String zenbun() {
     final StringBuffer sb = StringBuffer();
-    sb.writeln('【$kijiSiteMei】$category');
+    sb.writeln('【$site】$category');
     sb.writeln('■ $midashi');
     sb.writeln('$haishin $kisha');
     sb.writeln();
@@ -211,6 +219,14 @@ class KijiKankyou {
   /// 今の表示中の大会でデータを読む(データがなければnull)
   static KijiKankyou? yomu() {
     final Ghensuu? gh = Hive.box<Ghensuu>('ghensuuBox').getAt(0);
+    if (gh == null) return null;
+    return yomuRace(gh.hyojiracebangou);
+  }
+
+  /// 大会[race]を記事にする大会としてデータを読む(データがなければnull)
+  /// (1.9.3。表示中の大会と関係のない記事(学内メディアの卒業生特集)でも使う)
+  static KijiKankyou? yomuRace(int race) {
+    final Ghensuu? gh = Hive.box<Ghensuu>('ghensuuBox').getAt(0);
     final KantokuData? kantoku = Hive.box<KantokuData>(
       'kantokuBox',
     ).get('KantokuData');
@@ -220,7 +236,6 @@ class KijiKankyou {
     final List<SenshuData> senshu =
         Hive.box<SenshuData>('senshuBox').values.toList()
           ..sort((a, b) => a.id.compareTo(b.id));
-    final int race = gh.hyojiracebangou;
     // 駅伝・駅伝予選(0〜5)と、対校戦の3種目(6: 5000m、7: 1万m、8: ハーフ。1.9.2)
     if (race < 0 || race > 8) return null;
     if (gh.kukansuu_taikaigoto.length <= race) return null;

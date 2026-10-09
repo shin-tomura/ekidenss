@@ -8,6 +8,8 @@ import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/riji_data.dart';
 import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/screens/Modal_shinnyuuseiShingakusaki.dart';
+import 'package:ekiden/screens/kiji_screen.dart'; // 学内メディアの卒業生特集(1.9.3)
+import 'package:ekiden/kansuu/kiji/kiji.dart'; // 卒業生特集のカードの見出しの予告(1.9.3)
 // KANSUUクラスをインポートするか、必要な関数をここに直接定義
 // 仮で必要な関数をここに定義します。もし kansuu.dart があるならそちらをインポートしてください。
 // import 'package:ekiden/utils/kansuu.dart';
@@ -594,6 +596,20 @@ class Mode0100Content extends StatelessWidget {
                                       color: HENSUU.textcolor,
                                       fontWeight: FontWeight.bold, // ★ 太字に変更
                                     ),
+                                  ),
+                                  // 学内メディア「○○スポーツ」の卒業生特集(1.9.3)
+                                  // 卒業の処理のあとは卒業選手のデータが一部しか残らないので、この日だけ読める
+                                  const SizedBox(height: 16),
+                                  KijiLinkCard(
+                                    key: ValueKey(
+                                      'kijiSotsugyou_${currentGhensuu.year}',
+                                    ),
+                                    namae:
+                                        '卒業生特集(${kijiGakunaiSiteMei() ?? '学内メディア'})',
+                                    tsukuru: kijiGakunaiSotsugyouIchiran,
+                                    hiraku: kijiGakunaiSotsugyouHiraku,
+                                    annai: '4年生全員の4年間を振り返る特集です。読めるのは今日だけです',
+                                    gakunai: true,
                                   ),
                                 ] else if (currentGhensuu.mode == 110 &&
                                     currentGhensuu.month == 10 &&

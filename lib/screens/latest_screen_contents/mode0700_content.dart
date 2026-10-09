@@ -1381,6 +1381,8 @@ class _Mode0700ContentState extends State<Mode0700Content> {
                                                 namae: 'ニュース記事(箱庭スポーツ)',
                                                 tsukuru: kijiKekkaIchiran,
                                                 hiraku: kijiKekkaHiraku,
+                                                // 駅伝なら、学内メディアの結果号も記事の画面で切り替えて読める(1.9.3)
+                                                annai: kijiGakunaiAnnai(),
                                               ),
                                             if (currentGhensuu
                                                     .hyojiracebangou <=

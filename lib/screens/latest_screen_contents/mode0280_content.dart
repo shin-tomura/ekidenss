@@ -441,6 +441,21 @@ class _Mode0280Content extends State<Mode0280Content> {
                         namae: 'スタート直前号(箱庭スポーツ)',
                         tsukuru: kijiChokuzenIchiran,
                         hiraku: kijiChokuzenHiraku,
+                        // 学内メディアの当日変更号も、記事の画面で切り替えて読める(1.9.3)
+                        annai: kijiGakunaiAnnai(),
+                      ),
+                    // 復路スタート直前号(学内メディア「○○スポーツ」だけ。正月駅伝の6区のスタート前。
+                    // 往路の振り返りと、復路を走る選手の紹介。1.9.3)
+                    if (widget.ghensuu.hyojiracebangou == 2 &&
+                        widget.ghensuu.nowracecalckukan == 5 &&
+                        kijiGakunaiShutsujou())
+                      KijiLinkCard(
+                        key: ValueKey('kijiFukuro_${widget.ghensuu.year}'),
+                        namae:
+                            '復路スタート直前号(${kijiGakunaiSiteMei() ?? '学内メディア'})',
+                        tsukuru: kijiGakunaiChokuzenIchiran,
+                        hiraku: kijiGakunaiFukuroHiraku,
+                        gakunai: true,
                       ),
                     // 1区の集団のペースの予想(当日変更のあとなので、実際に走る選手で予想する。
                     // 他大学の1区の当日変更も添える。1.9.2)

@@ -548,6 +548,8 @@ class Mode0330Content extends StatelessWidget {
                                   namae: '展望記事(箱庭スポーツ)',
                                   tsukuru: () => kijiTenbouIchiran(kijiYosou),
                                   hiraku: (c) => kijiTenbouHiraku(c, kijiYosou),
+                                  // 学内メディアの展望号も、記事の画面で切り替えて読める(1.9.3)
+                                  annai: kijiGakunaiAnnai(),
                                 ),
                                 TextButton(
                                   onPressed: () {

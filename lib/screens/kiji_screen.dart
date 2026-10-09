@@ -75,13 +75,13 @@ List<KijiBan> _gakunaiBan(
   ];
 }
 
-/// 結果の記事の一覧を開く(結果画面から。駅伝と駅伝予選なら学内メディアの結果号も)
+/// 結果の記事の一覧を開く(結果画面から。駅伝・駅伝予選・対校戦なら学内メディアの結果号も)
 void kijiKekkaHiraku(BuildContext context) {
   final List<Kiji> list = kijiKekkaIchiran();
   // 対校戦の記事は駅伝ではないので、サイト名の横を「陸上ニュース・対校戦」にする(1.9.2)
   final bool taikousen = list.isNotEmpty && list.first.category == '対校戦';
   final List<Kiji> gakunai = kijiGakunaiKekkaIchiran();
-  final bool yosen = gakunai.isNotEmpty && gakunai.first.category == '駅伝予選';
+  final String gakunaiCategory = gakunai.isEmpty ? '' : gakunai.first.category;
   _hiraku(context, [
     KijiBan(
       site: kijiSiteMei,
@@ -91,7 +91,9 @@ void kijiKekkaHiraku(BuildContext context) {
     ),
     ..._gakunaiBan(
       gakunai,
-      sub: yosen ? '陸上競技部・駅伝予選' : '陸上競技部・駅伝',
+      sub: gakunaiCategory == '駅伝予選'
+          ? '陸上競技部・駅伝予選'
+          : (gakunaiCategory == '対校戦' ? '陸上競技部・対校戦' : '陸上競技部・駅伝'),
       kekka: true,
     ),
   ]);

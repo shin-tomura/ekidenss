@@ -24,7 +24,8 @@ export 'package:ekiden/kansuu/kiji/kiji_tenbou.dart' show KijiYosouJin;
 // 記事づくりで思わぬデータに当たっても画面が止まらないよう、失敗したら記事なしにする
 // 1.9.3から、自分の大学の学内メディア「○○スポーツ」の記事もある(kiji_gakunai.dart)。
 // 駅伝の結果・展望・スタート直前号は同じカードから開き、記事の画面の上で切り替える。
-// 正月駅伝の復路スタート直前号と、3月25日の卒業生特集は、学内メディアだけ
+// 正月駅伝の復路スタート直前号と、3月25日の卒業生特集は、学内メディアだけ。
+// 対校戦は、種目ごとの結果画面のカードから結果号だけを読める
 // ------------------------------------------------------------
 
 /// 表示中の大会の結果の記事
@@ -99,13 +100,14 @@ String? kijiGakunaiSiteMei() {
 }
 
 /// 表示中の大会が、学内メディアの記事がある大会か
-/// (10月・11月・正月・カスタム駅伝と、11月駅伝予選・正月駅伝予選。対校戦はない)
-bool kijiGakunaiTaikai() {
+/// (10月・11月・正月・カスタム駅伝と、11月駅伝予選・正月駅伝予選。
+/// [kekka] なら、結果号だけがある対校戦の3種目も入れる)
+bool kijiGakunaiTaikai({bool kekka = false}) {
   try {
     final Ghensuu? gh = Hive.box<Ghensuu>('ghensuuBox').getAt(0);
     if (gh == null) return false;
     final int race = gh.hyojiracebangou;
-    return race >= 0 && race <= 5;
+    return race >= 0 && race <= (kekka ? 8 : 5);
   } catch (e) {
     return false;
   }
@@ -127,13 +129,14 @@ bool kijiGakunaiShutsujou() {
 }
 
 /// 入口のカードに添える、学内メディアの案内(駅伝と駅伝予選のときだけ。それ以外はnull)
-String? kijiGakunaiAnnai() {
-  if (!kijiGakunaiTaikai()) return null;
+/// [kekka] 結果画面のカード(対校戦の結果画面にも案内を出す)
+String? kijiGakunaiAnnai({bool kekka = false}) {
+  if (!kijiGakunaiTaikai(kekka: kekka)) return null;
   final String? site = kijiGakunaiSiteMei();
   return site == null ? null : '学内メディア「$site」の記事も、記事の画面の上で切り替えて読めます';
 }
 
-/// 学内メディアの、表示中の駅伝・駅伝予選の結果号
+/// 学内メディアの、表示中の駅伝・駅伝予選・対校戦の結果号
 List<Kiji> kijiGakunaiKekkaIchiran() => _gakunai('結果号', gakunaiKekkaKiji);
 
 /// 学内メディアの、表示中の駅伝・駅伝予選の展望号

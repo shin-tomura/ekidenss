@@ -319,10 +319,17 @@ const List<int> _innenRaceJun = [3, 0, 4, 1, 2, 5];
   return (kaisuu: kaisuu, kukanshou: kukanshou);
 }
 
-/// 選手[s]の因縁(点の高い順)。駅伝の結果の記事で、区間[kk]を区間順位[kj](0が1位)で走ったとき
-/// ([kj]がnullなら、今の走りと比べる因縁は出さない。大学の順位の記録の[1]を昨年として見るので、
-/// 結果の記事(大会のあと)で使う)
-List<Innen> senshuInnen(KijiKankyou k, SenshuData s, int kk, {int? kj}) {
+/// 選手[s]の因縁(点の高い順)。駅伝の記事で、区間[kk]を走る(走った)とき
+/// [kj] 結果の記事では区間順位(0が1位)。レース前の記事ではnull(今の走りと比べる因縁は出さない)
+/// [kekka] 結果の記事(大会のあと)ならtrue。大学の順位の記録の、昨年の見方(結果なら[1]、レース前なら[0])と、
+/// 文の時制(「〜だった」か「〜になる」か)が変わる
+List<Innen> senshuInnen(
+  KijiKankyou k,
+  SenshuData s,
+  int kk, {
+  int? kj,
+  bool kekka = true,
+}) {
   final List<Innen> list = [];
   final int race = k.race;
   final String raceMei = k.raceMei;
@@ -330,26 +337,31 @@ List<Innen> senshuInnen(KijiKankyou k, SenshuData s, int kk, {int? kj}) {
   final UnivData? u = (s.univid >= 0 && s.univid < k.univ.length)
       ? k.univ[s.univid]
       : null;
-  final bool kyonenShutsujou = u != null && shutsujouJuni(juniRace(u, race, 1));
+  final bool kyonenShutsujou =
+      u != null && shutsujouJuni(juniRace(u, race, kekka ? 1 : 0));
   final int maeE = kyonenShutsujou ? k.entryMae(s, race, 1) : -2;
   final int? maeJ = kyonenShutsujou ? k.kukanJuniMae(s, race, 1) : null;
   if (maeE <= -100) {
     list.add(
-      const Innen(
+      Innen(
         InnenShurui.hazureta,
         90,
         '昨年は当日変更で区間から外れ、たすきを受けられなかった。',
-        '去年は当日に外れて、何もできないまま終わった。だから今年は、走るところを見せたかった',
+        kekka
+            ? '去年は当日に外れて、何もできないまま終わった。だから今年は、走るところを見せたかった'
+            : '去年は当日に外れて、何もできないまま終わった。今年は、走るところを見せたい',
         '1年前は走れなかった',
       ),
     );
   } else if (maeE == -1) {
     list.add(
-      const Innen(
+      Innen(
         InnenShurui.hoketsu,
         60,
         '昨年は補欠のまま、出番が回ってこなかった。',
-        '去年は補欠で、仲間の走りを見ているだけだった。その悔しさをずっと持っていた',
+        kekka
+            ? '去年は補欠で、仲間の走りを見ているだけだった。その悔しさをずっと持っていた'
+            : '去年は補欠で、仲間の走りを見ているだけだった。今年は自分が走る番です',
         '昨年は補欠だった',
       ),
     );
@@ -400,7 +412,7 @@ List<Innen> senshuInnen(KijiKankyou k, SenshuData s, int kk, {int? kj}) {
         InnenShurui.betsuKukan,
         30,
         '昨年は${maeE + 1}区${maeJ != null ? '(区間${maeJ + 1}位)' : ''}を走った。',
-        '去年とは違う区間で、新しい挑戦だった',
+        kekka ? '去年とは違う区間で、新しい挑戦だった' : '去年とは違う区間。新しい挑戦だと思っている',
       ),
     );
   }
@@ -409,18 +421,22 @@ List<Innen> senshuInnen(KijiKankyou k, SenshuData s, int kk, {int? kj}) {
   if (reki.kaisuu == 0 && !k.ichinenDake) {
     list.add(
       s.gakunen == 1
-          ? const Innen(
+          ? Innen(
               InnenShurui.debut,
               45,
-              'これが大学駅伝のデビュー戦だった。',
-              '初めての駅伝で、たすきの重さが分かった',
+              kekka ? 'これが大学駅伝のデビュー戦だった。' : 'これが大学駅伝のデビュー戦になる。',
+              kekka ? '初めての駅伝で、たすきの重さが分かった' : '初めての駅伝。たすきの重さを感じながら、思い切って走りたい',
               'デビュー戦の',
             )
           : Innen(
               InnenShurui.debut,
               55,
-              '${s.gakunen}年目で初めてつかんだ駅伝の舞台だった。',
-              '${s.gakunen}年目でやっとこの舞台に立てた。走れない時間が長かった分、うれしかった',
+              kekka
+                  ? '${s.gakunen}年目で初めてつかんだ駅伝の舞台だった。'
+                  : '${s.gakunen}年目で初めてつかんだ駅伝の舞台になる。',
+              kekka
+                  ? '${s.gakunen}年目でやっとこの舞台に立てた。走れない時間が長かった分、うれしかった'
+                  : '${s.gakunen}年目でやっとこの舞台に立てる。走れなかった時間の分まで走りたい',
               '${s.gakunen}年目で初出走の',
             ),
     );
@@ -440,18 +456,18 @@ List<Innen> senshuInnen(KijiKankyou k, SenshuData s, int kk, {int? kj}) {
   if (s.gakunen == 4) {
     list.add(
       race == 2
-          ? const Innen(
+          ? Innen(
               InnenShurui.saigo,
               50,
-              'これが最後の正月駅伝だった。',
-              '4年間の最後に、この区間を走れて幸せだった',
+              kekka ? 'これが最後の正月駅伝だった。' : 'これが最後の正月駅伝になる。',
+              kekka ? '4年間の最後に、この区間を走れて幸せだった' : '4年間の最後の区間。悔いなく走り切りたい',
               '最後の正月駅伝で',
             )
           : Innen(
               InnenShurui.saigo,
               25,
-              '4年生にとっては、これが最後の$raceMeiだった。',
-              '最後の$raceMeiなので、悔いだけは残したくなかった',
+              kekka ? '4年生にとっては、これが最後の$raceMeiだった。' : '4年生にとっては、これが最後の$raceMeiだ。',
+              kekka ? '最後の$raceMeiなので、悔いだけは残したくなかった' : '最後の$raceMei。悔いだけは残したくない',
             ),
     );
   }
@@ -1341,9 +1357,10 @@ class KijiKakite {
   }
 
   /// 「記者の目」の欄(記事の最後に、記者の見方を短く書く。1.9.4)
-  void kishaNoMe(String bun) {
+  /// [midashi] 欄の名前(展望は「本紙の見立て」、学内メディアは「編集部の目」)
+  void kishaNoMe(String bun, {String midashi = '記者の目'}) {
     if (bun.trim().isEmpty) return;
-    koMidashi('記者の目');
+    koMidashi(midashi);
     danraku(bun);
   }
 

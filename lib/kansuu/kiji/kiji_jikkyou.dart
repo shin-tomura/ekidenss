@@ -19,7 +19,10 @@ import 'package:ekiden/kansuu/kiji/kiji_kihon.dart';
 //     逃げ切ったか飲み込まれたかは区間タイムと集団のペースの比べ)、
 //     自分の大学の指示とその成否、目標順位を下回っての焦り・ほっと一息、学連選抜、因縁
 //   ・能力は、選手ごとの補正の説明(string_racesetumei。見抜く力のついた能力だけ書かれている)に
-//     出ている分だけ、数字なしで触れる。隠れている能力は見ない(解説も知らない体にする)
+//     出ている分と、分析(racechuukakuseiflag。区間順位の画面の「分析」で、見抜く力に関係なく
+//     全部の能力が出ている)で際立っていた分(絶対値5以上。1人1つ)だけ、数字なしで触れる。
+//     分析はその区間を走った選手の中の相対値なので、「この区間の選手の中で」の言い方にする。
+//     能力の値そのものは見ない
 // ・記事と同じく、年・大会・区間で決まる乱数を使うので、何度開いても同じ実況になる
 // ・最終区は、ゴールの瞬間までを語る。総括は結果の記事(kiji_kekka.dart)に任せる
 // ・シード権(11月駅伝8校・正月駅伝10校)は、優勝争いと同じ重さで伝える。最終区は「シード権争い」の
@@ -158,11 +161,55 @@ class _Hashiri {
 
   /// 見えている能力の補正のうち、区間で一番悪かったもの(名前と順位。なければnull)
   ({String mei, int juni})? yowami;
+
+  /// 分析(区間順位の画面の「分析」。見抜く力に関係なく全部の能力が出る)で、
+  /// 良い方に際立っていた能力の呼び方(なければnull。1.9.4)
+  String? kiwaYoi;
+
+  /// 分析で、悪い方に際立っていた能力の呼び方(なければnull)
+  String? kiwaWarui;
+}
+
+/// 分析の値(その区間を走った選手の中の相対値。-7〜+7。マイナスが良い)の項目の呼び方
+/// (項目の番号は RaceCalc.dart の tensuu の並び。0調子・1指示・2集団走は別の文で書くので使わない)
+const Map<int, String> _bunsekiYobikata = {
+  3: '走力そのもの',
+  4: '登りの強さ',
+  5: '下りの巧みさ',
+  6: 'アップダウンへの対応',
+  7: '経験',
+  8: 'ロードへの適性',
+  9: 'ペースの変化への対応',
+  10: '長い距離での粘り',
+  11: 'スパートの切れ味',
+};
+
+/// 「際立っている」の線引き(分析の値の絶対値がこれ以上)
+const int _kiwadachiSen = 5;
+
+/// 分析の値から、良い方・悪い方それぞれで一番際立っていた能力を読む(数字は使わず、名前だけ)
+void _kiwadachiYomu(_Hashiri h, SenshuData s) {
+  final int flag = s.racechuukakuseiflag;
+  if (flag == 0) return;
+  int yoiTen = 0;
+  int waruiTen = 0;
+  for (final MapEntry<int, String> e in _bunsekiYobikata.entries) {
+    final int ten = ((flag >> (e.key * 4)) & 0xF) - 7;
+    if (ten <= -_kiwadachiSen && ten < yoiTen) {
+      yoiTen = ten;
+      h.kiwaYoi = e.value;
+    }
+    if (ten >= _kiwadachiSen && ten > waruiTen) {
+      waruiTen = ten;
+      h.kiwaWarui = e.value;
+    }
+  }
 }
 
 /// 補正の説明の読み取り(数字は読まず、何があったかだけを拾う)
 _Hashiri _hashiriYomu(SenshuData s, int kk) {
   final _Hashiri h = _Hashiri();
+  _kiwadachiYomu(h, s);
   h.siji = s.sijiflag.clamp(0, 2).toInt();
   if (kk == 0) {
     if (s.startchokugotobidasiflag == 1) {
@@ -428,27 +475,30 @@ Kiji? _kukanJikkyou(
     final bool tSeikou = ts.startchokugotobidasiseikouflag == 1;
     final bool tNige = shuudanPace == null || t.kukanTime < shuudanPace;
     final List<Innen> ti = senshuInnen(k, ts, 0, kj: t.kukanJuni, kekka: owatta);
+    final _Hashiri th = _hashiriYomu(ts, 0);
     switch (kata) {
       case KishaKata.suuji:
         if (shuudanPace != null) {
           final int sa = saByou(t.kukanTime, shuudanPace);
           kai(
             sa < 0
-                ? '${myouji(ts.name)}の区間タイムは、集団のペースより${saMoji(sa)}速い。飛び出した分が、そのまま数字に出ています'
+                ? '${myouji(ts.name)}の区間タイムは、集団のペースより${saMoji(sa)}速い。飛び出した分が、そのまま数字に出ています${th.kiwaYoi != null ? '。${th.kiwaYoi}も際立っていました' : ''}'
                 : '${myouji(ts.name)}の区間タイムは、集団のペースより${saMoji(sa)}遅い。飛び出しの代償が数字に出てしまいました',
           );
         } else {
           kai('飛び出しは、決まればタイムが縮み、外れれば後半に跳ね返ってきます。今日は${tSeikou ? '前者' : '後者'}でした');
         }
       case KishaKata.joukei:
-        kai(
-          ti.isNotEmpty && ti.first.ten >= 45
-              ? '${myouji(ts.name)}、${ti.first.kotoba}。その思いが、スタート直後の一歩に出ましたね'
-              : '集団の安心を捨てて前に出るのは、勇気のいることです。${tSeikou ? 'その勇気が報われました' : '結果は出ませんでしたが、あの一歩は忘れられません'}',
-        );
+        if (ti.isNotEmpty && ti.first.ten >= 45) {
+          kai('${myouji(ts.name)}、${ti.first.kotoba}。その思いが、スタート直後の一歩に出ましたね');
+        } else if (tSeikou && th.kiwaYoi != null) {
+          kai('${myouji(ts.name)}は${th.kiwaYoi}が、この区間の選手の中で際立っていました。前に出る勇気を、力が支えましたね');
+        } else {
+          kai('集団の安心を捨てて前に出るのは、勇気のいることです。${tSeikou ? 'その勇気が報われました' : '結果は出ませんでしたが、あの一歩は忘れられません'}');
+        }
       case KishaKata.karakuchi:
         if (tSeikou && tNige) {
-          kai('飛び出して${t.tuuka == 0 ? '逃げ切る' : '粘り切る'}のは、力がなければできません。${myouji(ts.name)}は今日、それを証明しました');
+          kai('飛び出して${t.tuuka == 0 ? '逃げ切る' : '粘り切る'}のは、力がなければできません。${myouji(ts.name)}は今日、それを証明しました${th.kiwaYoi != null ? '。${th.kiwaYoi}が際立っていました' : ''}');
         } else if (tSeikou) {
           kai('飛び出しは決まりましたが、集団のほうが速かった。飛び出すなら、逃げ切る力まで要ります');
         } else {
@@ -500,13 +550,21 @@ Kiji? _kukanJikkyou(
   // 解説(首位について)
   if (kk > 0 && shuiMae != null && shuiMae.u.id != shui.u.id && shui.s != null) {
     final List<Innen> si = senshuInnen(k, shui.s!, kk, kj: shui.kukanJuni, kekka: owatta);
-    kai(
-      si.isNotEmpty && si.first.ten >= 45
-          ? '${myouji(shui.s!.name)}、${si.first.kotoba}、という思いがあったはずです。それを形にしましたね'
-          : '${saMoji(saMae12)}差を一人で埋めるのは簡単ではありません。${myouji(shui.s!.name)}は前が見えてから、しっかりギアを上げましたね',
-    );
+    final _Hashiri sh = _hashiriYomu(shui.s!, kk);
+    if (si.isNotEmpty && si.first.ten >= 45) {
+      kai('${myouji(shui.s!.name)}、${si.first.kotoba}、という思いがあったはずです。それを形にしましたね');
+    } else if (sh.kiwaYoi != null) {
+      kai('${myouji(shui.s!.name)}は${sh.kiwaYoi}が、この区間の選手の中で際立っていました。${saMoji(saMae12)}差を埋めたのは、そこです');
+    } else {
+      kai('${saMoji(saMae12)}差を一人で埋めるのは簡単ではありません。${myouji(shui.s!.name)}は前が見えてから、しっかりギアを上げましたね');
+    }
   } else if (kk > 0 && !saigo && sa12 > saMae12 + 5 && shui.s != null) {
-    kai('${myouji(shui.s!.name)}は後ろを気にせず、自分の走りに徹しましたね。差が広がったのは、その落ち着きです');
+    final _Hashiri sh = _hashiriYomu(shui.s!, kk);
+    kai(
+      sh.kiwaYoi != null
+          ? '${myouji(shui.s!.name)}は${sh.kiwaYoi}が際立っていましたね。差が広がったのは、その分です'
+          : '${myouji(shui.s!.name)}は後ろを気にせず、自分の走りに徹しましたね。差が広がったのは、その落ち着きです',
+    );
   }
 
   // 本文: シード権争い(最終区。優勝争いと同じ重さで伝える)
@@ -610,12 +668,17 @@ Kiji? _kukanJikkyou(
         final _Koma jx = nkGyakuten ? nk : mr;
         final SenshuData? js = jx.s;
         final List<Innen> ji = js == null ? [] : senshuInnen(k, js, kk, kj: jx.kukanJuni, kekka: owatta);
+        final _Hashiri? jh = js == null ? null : _hashiriYomu(js, kk);
         if (js != null && ji.isNotEmpty && ji.first.ten >= 45) {
           kai(
             nkGyakuten
                 ? '${myouji(js.name)}、${ji.first.kotoba}。その思いが、最後の1枠を引き寄せましたね'
                 : '${myouji(js.name)}は${ji.first.bun.replaceAll('。', '')}。今日は届きませんでしたが、この悔しさは必ず次につながります',
           );
+        } else if (js != null && jh != null && nkGyakuten && jh.kiwaYoi != null) {
+          kai('${myouji(js.name)}の${jh.kiwaYoi}が、この区間の選手の中で際立っていました。最後の1枠を引き寄せたのは、そこです');
+        } else if (js != null && jh != null && !nkGyakuten && jh.kiwaWarui != null) {
+          kai('${myouji(js.name)}は${jh.kiwaWarui}で差をつけられました。それでも、たすきを運び切った走りは次につながります');
         } else {
           kai('優勝のテープと同じくらい、この1枠には重みがあります。${nk.mei}は来年、予選会を走らずに済むんです');
         }
@@ -658,6 +721,8 @@ Kiji? _kukanJikkyou(
     final _Hashiri kh = _hashiriYomu(kukanshou.s!, kk);
     if (kh.tsuyomi != null && kh.tsuyomi!.juni <= 2) {
       kai('${myouji(kukanshou.s!.name)}の${kh.tsuyomi!.mei}は、この区間の選手の中で${kh.tsuyomi!.juni == 1 ? '一番' : '2番目'}でした。コースに合った走りでしたね');
+    } else if (kh.kiwaYoi != null) {
+      kai('${myouji(kukanshou.s!.name)}は${kh.kiwaYoi}が、この区間の選手の中で際立っていました。区間賞は、そこから生まれましたね');
     } else if (kata == KishaKata.suuji && ksa >= 20) {
       kai('2位と${saMoji(ksa)}。$kyoriでこの差は、数字以上に大きいですよ');
     }
@@ -687,6 +752,23 @@ Kiji? _kukanJikkyou(
     if (ub.isNotEmpty) {
       w.koMidashi('順位の動き');
       w.danraku(ub.toString());
+      // 解説(大きく順位を上げた・下げた選手の、際立った能力)
+      final _Koma? ueK = (ue != null && ueKazu >= 3 && ue.s != null && (my == null || ue.u.id != my.u.id)) ? ue : null;
+      final _Koma? shitaK = (shita != null && shitaKazu >= 3 && shita.s != null && (my == null || shita.u.id != my.u.id)) ? shita : null;
+      bool ugokiKaita = false;
+      if (ueK != null && ueK.s != null) {
+        final _Hashiri uh = _hashiriYomu(ueK.s!, kk);
+        if (uh.kiwaYoi != null) {
+          kai('${myouji(ueK.s!.name)}は${uh.kiwaYoi}が、この区間の選手の中で際立っていました。$ueKazu人抜きは、そこから来ています');
+          ugokiKaita = true;
+        }
+      }
+      if (!ugokiKaita && shitaK != null && shitaK.s != null && kata != KishaKata.joukei) {
+        final _Hashiri sh = _hashiriYomu(shitaK.s!, kk);
+        if (sh.kiwaWarui != null) {
+          kai('${myouji(shitaK.s!.name)}は${sh.kiwaWarui}で差をつけられました。区間の相性は、配置の時点で決まっている部分もあります');
+        }
+      }
     }
   }
 
@@ -850,6 +932,11 @@ Kiji? _kukanJikkyou(
       kai('${myouji(s.name)}は${h.tsuyomi!.mei}がこの区間の選手の中で${h.tsuyomi!.juni}番目。それが順位に出ましたね');
     } else if (warui && h.yowami != null && h.yowami!.juni >= n - 2) {
       kai('${myouji(s.name)}は${h.yowami!.mei}で差をつけられました。この区間との相性が出てしまいましたね');
+    } else if (yoi && h.kiwaYoi != null) {
+      // 分析で際立っていた能力(見抜く力がついていなくても、区間順位の画面の「分析」で見えている)
+      kai('${myouji(s.name)}は${h.kiwaYoi}が、この区間の選手の中で際立っていましたね。それが順位に出ました');
+    } else if (warui && h.kiwaWarui != null) {
+      kai('${myouji(s.name)}は${h.kiwaWarui}で差をつけられました。この区間との相性が出てしまいましたね');
     } else if (mi.isNotEmpty && mi.first.ten >= 45) {
       kai(yoi ? '${myouji(s.name)}、${mi.first.kotoba}、という走りでしたね' : '${myouji(s.name)}は${mi.first.bun.replaceAll('。', '')}。今日は苦しみましたが、この経験は次につながります');
     } else if (kata == KishaKata.karakuchi && warui && mokuhyouAri && my.tuuka > mokuhyou) {

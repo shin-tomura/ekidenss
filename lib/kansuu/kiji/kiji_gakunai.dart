@@ -8,7 +8,13 @@ import 'package:ekiden/kansuu/kiji/kiji_kekka.dart' show EkidenKekka, EkidenUniv
 import 'package:ekiden/kansuu/kiji/kiji_yosen.dart'
     show YosenKekka, YosenUnivKekka, YosenSenshuKekka;
 import 'package:ekiden/kansuu/kiji/kiji_taikousen.dart'
-    show TaikousenKekka, TaikousenUnivKekka, TaikousenSenshuKekka;
+    show
+        TaikousenKekka,
+        TaikousenUnivKekka,
+        TaikousenSenshuKekka,
+        taikousenSougouMeisei,
+        taikousenKojinMeisei,
+        taikousenMeiseiHikaku;
 
 // ------------------------------------------------------------
 // 学内メディア「○○スポーツ」の記事(1.9.3)
@@ -30,7 +36,9 @@ import 'package:ekiden/kansuu/kiji/kiji_taikousen.dart'
 //  7. 対校戦の結果号(5000m・1万m・ハーフの種目ごとの結果画面): 8位以内の入賞者全員と、
 //     チーム内3位までの選手と、昨年の同じ種目から一番順位を上げた「伸び盛り」の選手を紹介する。
 //     ハーフのあとは、3種目を合わせた総合の記事も先に置く。成長は昨年の同じ種目との比べで伝え、
-//     昨年のない1年生は、5000mだけ入学時の記録と比べる
+//     昨年のない1年生は、5000mだけ入学時の記録と比べる。対校戦の総合は8位まででも名声が大きいので、
+//     5000m・1万mのあとは「総合争い」(8位のラインとの点差と名声の大きさ)を書き、
+//     ハーフのあとの総合の記事には、大学が得た名声を書く
 //
 // 守る決まり(箱庭スポーツと同じ)
 //  ・能力値は書かない(見抜く力の仕組みを壊さないため)。成長タイプ・上限・サプライズも書かない
@@ -1702,6 +1710,53 @@ const int _taikousenSougou = 9;
 /// 種目の記事で紹介する、チーム内の上位の人数(入賞者がこれより多ければ、入賞者を全員紹介する)
 const int _taikousenShoukaiSuu = 3;
 
+/// 大学[u]の対校戦の総合の目標順位(0が1位。全大学とも8位。[n] 大学の数)
+int _taikousenMokuhyou(UnivData u, int n) =>
+    (u.mokuhyojuni.length > _taikousenSougou &&
+        u.mokuhyojuni[_taikousenSougou] >= 0 &&
+        u.mokuhyojuni[_taikousenSougou] < n)
+    ? u.mokuhyojuni[_taikousenSougou]
+    : _taikousenNyuushouSuu - 1;
+
+/// 5000m・1万mのあとの、総合争いの文(今の総合順位・8位のラインとの点差・名声の大きさ)
+String _taikousenSougouArasoiBun(TaikousenKekka e, TaikousenUnivKekka m) {
+  final int sh = e.shumoku;
+  final int n = e.n;
+  final int r = m.juni;
+  final int mk = _taikousenMokuhyou(m.u, n);
+  final String nokori = sh == 0 ? '残る1万mとハーフ' : '最終種目のハーフ';
+  // 残りの種目を走る延べ人数(対校戦は全員が3種目を走るので、この種目の人数×残りの種目の数)
+  final int nobe = sh <= 1 ? m.ninzuu[sh] * (2 - sh) : 0;
+  final StringBuffer sb = StringBuffer();
+  sb.write('総合のポイントは、出場した全員の順位で決まる。');
+  sb.write('${kijiShumokuMei[sh]}を終えて、陸上競技部は${m.goukei}点で総合${juniMoji(r)}。');
+  if (r == 0) {
+    final TaikousenUnivKekka ni = e.jun[1];
+    sb.write('首位に立っている。2位の${ni.mei}とは${_tensa(m.goukei - ni.goukei)}。');
+  } else if (r <= mk) {
+    sb.write('目標の${juniMoji(mk)}以内につけている。');
+    if (mk + 1 < n) {
+      final TaikousenUnivKekka soto = e.jun[mk + 1];
+      sb.write('${juniMoji(mk + 1)}の${soto.mei}とは${_tensa(m.goukei - soto.goukei)}。');
+    }
+  } else {
+    final TaikousenUnivKekka line = e.jun[mk];
+    final int sa = line.goukei - m.goukei;
+    sb.write('目標の${juniMoji(mk)}の${line.mei}とは${_tensa(sa)}。');
+    if (sa > 0 && nobe > 0) {
+      final int x = (sa + nobe - 1) ~/ nobe;
+      sb.write(
+        '$nokoriを走る${sh == 0 ? '延べ' : ''}$nobe人が、1人あたり${_tsu(x)}ずつ順位を上げれば届く計算だ。',
+      );
+    }
+  }
+  final String? hikaku = taikousenMeiseiHikaku(e.k, _taikousenNyuushouSuu - 1);
+  if (hikaku != null) {
+    sb.write('総合の名声は8位まで与えられ、8位の名声でも、$hikaku。');
+  }
+  return sb.toString();
+}
+
 /// 対校戦の結果号(種目ごとの記事。ハーフのあとは総合の記事を先に置く。
 /// 自分の大学の選手が走っていなければ空)
 List<Kiji> _taikousenKiji(KijiKankyou k, String site) {
@@ -1851,11 +1906,16 @@ Kiji _taikousenShumokuKiji(
     _taikousenSenshuKaku(w, e, nobi, mine.indexOf(nobi), nobiSa: nobiSa);
   }
 
-  // 本文: チームのポイント
+  // 本文: 総合争い(5000m・1万mのあと)・チームのポイント(ハーフのあと)
   final int hoka = mine.length - shoukai.length - (nobiBetsu ? 1 : 0);
-  w.koMidashi('チームのポイント');
   final StringBuffer pt = StringBuffer();
-  pt.write('この種目のポイントは、出場した全員の順位で決まる。');
+  if (e.saigo) {
+    w.koMidashi('チームのポイント');
+    pt.write('この種目のポイントは、出場した全員の順位で決まる。');
+  } else {
+    w.koMidashi('総合争い');
+    w.danraku(_taikousenSougouArasoiBun(e, m));
+  }
   if (hoka > 0) {
     pt.write('ほかの$hoka人も、1つでも前を目指して走り切った。全員の成績は下の表のとおり。');
   }
@@ -1977,11 +2037,7 @@ Kiji _taikousenSougouKiji(
   final int r = m.juni;
   final int n = e.n;
   // 総合の目標順位(0が1位。全大学とも8位)
-  final int mk = (u.mokuhyojuni.length > _taikousenSougou &&
-          u.mokuhyojuni[_taikousenSougou] >= 0 &&
-          u.mokuhyojuni[_taikousenSougou] < n)
-      ? u.mokuhyojuni[_taikousenSougou]
-      : _taikousenNyuushouSuu - 1;
+  final int mk = _taikousenMokuhyou(u, n);
   final bool tassei = r <= mk;
   final bool hatsuKaisai = e.hatsuKaisai;
   final int mae = juniRace(u, _taikousenSougou, 1);
@@ -2096,6 +2152,26 @@ Kiji _taikousenSougouKiji(
                   ? KantokuBamen.taikousenHachiiNogasu
                   : KantokuBamen.taikousenMitassei));
   w.comment(kantokuComment(w, kb, u.id, kuyashii: !tassei));
+
+  // 本文: 大学の名声(総合は8位まで。個人は種目ごとに8位まで)
+  w.koMidashi('大学の名声');
+  final StringBuffer ms = StringBuffer();
+  if (r < taikousenSougouMeisei.length) {
+    ms.write('この総合${juniMoji(r)}で、大学の名声は${taikousenSougouMeisei[r]}高まった。');
+    final String? hikaku = taikousenMeiseiHikaku(k, r);
+    if (hikaku != null) ms.write('これは、$hikaku。');
+  } else {
+    ms.write('総合の名声は${taikousenSougouMeisei.length}位まで与えられ、今回は届かなかった。');
+  }
+  final int kojinMeisei = nyuushou.fold<int>(
+    0,
+    (t, x) => t +
+        (x.juni < taikousenKojinMeisei.length ? taikousenKojinMeisei[x.juni] : 0),
+  );
+  if (kojinMeisei > 0) {
+    ms.write('3種目の個人の入賞でも、合わせて$kojinMeiseiの名声を得た。');
+  }
+  w.danraku(ms.toString());
 
   // 本文: 入賞した選手
   if (nyuushou.isNotEmpty) {

@@ -1273,14 +1273,16 @@ class _Mode0700ContentState extends State<Mode0700Content> {
                                               idJunUnivData,
                                               limit: 8,
                                             ), // 上位8名表示
+                                            // 説明文(1.9.3。ポイントは8位までではなく、走った全員の順位で入るので、
+                                            // そのことが分かるように直した。名声の量は KirokuKousin.dart と同じ)
                                             const Text(
-                                              "個人8位までの所属大学にポイントが与えられました(1位360p、2位359p、3位358p...360位1p)",
+                                              "走った全員の順位が、所属大学のポイントになりました(出場がN人なら、1位N点・2位N-1点…最下位1点。大学ごとに合計します)",
                                               style: TextStyle(
                                                 color: HENSUU.textcolor,
                                               ),
                                             ),
                                             const Text(
-                                              "個人8位までの所属大学の名声が高まりました",
+                                              "個人8位までの所属大学の名声が高まりました(1位100、2位50、3位40、4〜8位18〜10)",
                                               style: TextStyle(
                                                 color: HENSUU.textcolor,
                                               ),
@@ -1310,7 +1312,14 @@ class _Mode0700ContentState extends State<Mode0700Content> {
                                                     .hyojiracebangou ==
                                                 8)
                                               const Text(
-                                                "上位８大学の名声が高まりました",
+                                                "総合8位までの大学の名声が高まりました(1位1000、2位500、3位400、4〜8位180〜100)",
+                                                style: TextStyle(
+                                                  color: HENSUU.textcolor,
+                                                ),
+                                              )
+                                            else
+                                              const Text(
+                                                "ハーフのあとの最終の総合順位で、8位までの大学の名声が高まります(1位1000、2位500、3位400、4〜8位180〜100)",
                                                 style: TextStyle(
                                                   color: HENSUU.textcolor,
                                                 ),

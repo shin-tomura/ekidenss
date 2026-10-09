@@ -8,8 +8,11 @@ import 'package:ekiden/kansuu/kiji/kiji_comment.dart';
 // 対校戦(5月。5000m・1万m・ハーフ)の結果の記事(1.9.2。結果画面の「ニュース記事」)
 //
 // 対校戦は種目ごとに結果画面が出るので、種目ごとに記事を作る
-//  5000m・1万mのあと: 1.種目の記事(個人) 2.自分の大学 3.総合の途中経過
-//  ハーフのあと:      1.総合優勝 2.自分の大学 3.種目の記事(個人) 4.総合8位争い
+//  5000mのあと: 1.種目の記事(個人) 2.総合の途中経過 3.自分の大学
+//  1万mのあと:  1.総合の途中経過 2.種目の記事(個人) 3.自分の大学
+//  ハーフのあと: 1.総合優勝 2.自分の大学 3.種目の記事(個人) 4.総合8位争い
+//  (対校戦の総合は、8位まででも名声が大きいので、総合の争いを前に出す。1.9.3。
+//   総合優勝・8位のライン・8位争いの記事では、名声の大きさを正月駅伝と比べて書く)
 //
 // データ
 //  ・選手: SenshuData.kukanjuni_race[6〜8][学年-1] がその種目の全体の順位(0が1位。
@@ -30,6 +33,56 @@ const int _sougouBangou = 9;
 
 /// 名声のかかる順位の数(個人・総合とも8位まで)
 const int _meiseiJuniSuu = 8;
+
+/// 対校戦の総合の順位ごとの名声(KirokuKousin.dart と同じ。目標順位で割らず、駅伝名声設定の倍率もない。1.9.3)
+const List<int> taikousenSougouMeisei = [1000, 500, 400, 180, 160, 140, 120, 100];
+
+/// 対校戦の種目ごとの個人の順位ごとの名声(KirokuKousin.dart と同じ。1.9.3)
+const List<int> taikousenKojinMeisei = [100, 50, 40, 18, 16, 14, 12, 10];
+
+/// 正月駅伝の順位ごとの基本の名声(8位まで。KirokuKousin.dart・shiyou_text.dart と同じ。
+/// 実際は「駅伝名声設定」の倍率をかけて、目標順位で割る)
+const List<int> _shougatsuMeiseiKihon = [2000, 1000, 800, 360, 320, 280, 240, 200];
+
+/// 対校戦の総合[juni]位(0が1位。8位まで)の名声の大きさを、正月駅伝で目標順位どおりに同じ順位に
+/// 入ったときの名声と比べる文(「正月駅伝を目標1位で制したときの半分にあたる」など。文末の「。」はなし。
+/// 比べられなければnull。1.9.3)
+/// 正月駅伝の名声は「駅伝名声設定」の倍率で変わるので、このデータの倍率で比べる
+String? taikousenMeiseiHikaku(KijiKankyou k, int juni) {
+  if (juni < 0 ||
+      juni >= taikousenSougouMeisei.length ||
+      juni >= _shougatsuMeiseiKihon.length) {
+    return null;
+  }
+  // 正月駅伝の「駅伝名声設定」の倍率(大学id 5・6 の name_tanshuku。KirokuKousin.dart と同じ読み方)
+  int yomu(int id) {
+    if (id >= k.univ.length) return 1;
+    final int? v = int.tryParse(k.univ[id].name_tanshuku);
+    return (v == null || v < 1 || v > 10) ? 1 : v;
+  }
+
+  final double bairitu = yomu(5).toDouble() / yomu(6).toDouble();
+  // 目標順位どおりに入ったときの量(KirokuKousin.dart と同じく、小数を切り捨てて最低1)
+  int shougatsu =
+      (_shougatsuMeiseiKihon[juni].toDouble() * bairitu * (1.0 / (juni + 1)))
+          .toInt();
+  if (shougatsu < 1) shougatsu = 1;
+  final double hi = taikousenSougouMeisei[juni] / shougatsu;
+  final String moto = juni == 0
+      ? '正月駅伝を目標1位で制したとき'
+      : '正月駅伝で目標${juni + 1}位どおりに${juni + 1}位に入ったとき';
+  if (hi >= 0.95 && hi < 1.05) return '$motoと同じ大きさだ';
+  if (hi >= 1.05) {
+    final double b = (hi * 10).round() / 10;
+    final String bs = b == b.roundToDouble()
+        ? '${b.toInt()}'
+        : b.toStringAsFixed(1);
+    return '$motoの$bs倍にあたる';
+  }
+  if (hi >= 0.45 && hi < 0.55) return '$motoの半分にあたる';
+  final int wari = (hi * 10).round();
+  return wari < 1 ? '$motoの1割に満たない' : '$motoの約$wari割にあたる';
+}
 
 /// 対校戦の選手1人の、表示中の種目の結果
 class TaikousenSenshuKekka {
@@ -238,9 +291,13 @@ List<Kiji> taikousenKekkaKiji(KijiKankyou k) {
     final Kiji? hachii = _hachiiKiji(e);
     if (hachii != null) list.add(hachii);
   } else {
+    // 総合は最終種目のハーフで決まるので、1万mのあとは総合の途中経過をトップ記事にする。
+    // 5000mのあとも、自分の大学の記事より前に置く(1.9.3)
+    final Kiji tochuu = _tochuuKiji(e);
+    if (e.shumoku == 1) list.add(tochuu);
     if (kojin != null) list.add(kojin);
+    if (e.shumoku == 0) list.add(tochuu);
     if (jibun != null) list.add(jibun);
-    list.add(_tochuuKiji(e));
   }
   return list;
 }
@@ -535,6 +592,11 @@ Kiji _tochuuKiji(TaikousenKekka e) {
       '${sa89 <= 0 ? '9位の${h9.mei}も同点で並んでいる。' : '9位の${h9.mei}が$sa89点差で追う。'}'
       '${w.erabu(['$nokoriで、ラインの攻防はまだ続く。', '8位以内を巡る争いは、$nokoriにもつれ込む。'])}',
     );
+    // 名声の大きさ(1.9.3)
+    final String? hikaku = taikousenMeiseiHikaku(k, _meiseiJuniSuu - 1);
+    if (hikaku != null) {
+      w.danraku('総合の名声は8位まで与えられ、8位の名声でも、$hikaku。');
+    }
   }
 
   return _kansei(
@@ -662,6 +724,11 @@ Kiji _sougouKiji(TaikousenKekka e) {
   if (nyuushou >= 1) sb.write('3種目で延べ$nyuushou人が、名声のかかる8位以内に入った。');
   w.danraku(sb.toString());
   w.comment(kantokuComment(w, KantokuBamen.taikousenYuushou, win.u.id));
+  // 名声の大きさ(1.9.3)
+  final String? hikaku = taikousenMeiseiHikaku(k, 0);
+  if (hikaku != null) {
+    w.danraku('対校戦の総合優勝で大学が得る名声は、$hikaku。');
+  }
 
   // 本文: 2位以下
   w.koMidashi('2位以下');
@@ -748,6 +815,9 @@ Kiji? _hachiiKiji(TaikousenKekka e) {
     '${sa <= 0 ? '同点だったため、抽選で順位が決まった。' : '差は$sa点だった。'}',
   );
   lead.write(_gyakutenKeisanBun(h9, sa));
+  // 名声の大きさ(1.9.3)
+  final String? hikaku = taikousenMeiseiHikaku(k, _meiseiJuniSuu - 1);
+  if (hikaku != null) lead.write('総合8位の名声でも、$hikaku。');
 
   // 本文
   w.koMidashi('最終種目の攻防');

@@ -336,10 +336,12 @@ class IkkuPaceKouhoView extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          const Text(
+          // 集団走設定でその日の勢いがあるとき(「なし」以外)は、カリスマが一番高くても、
+          // カリスマの近い選手が引っ張ることがあるので言い切らない(1.9.3)
+          Text(
             '1区の選手だけを入れ替えたときの、1区の集団のペースの予想です。'
-            '入れる選手のカリスマが一番高ければ、その選手が集団を引っ張る見込みです。',
-            style: TextStyle(
+            '${(kantoku != null && shuudanIkioiHaba(kantoku) == 0) ? '入れる選手のカリスマが一番高ければ、その選手が集団を引っ張ります。' : '入れる選手のカリスマが一番高ければ、その選手が集団を引っ張る見込みです。ただし、カリスマの近い選手がいると、その日の勢いで別の選手が引っ張ることがあります(「ほかに引っ張るかもしれない選手」に出ます)。'}',
+            style: const TextStyle(
               color: HENSUU.textcolor,
               fontSize: HENSUU.fontsize_honbun - 2,
             ),

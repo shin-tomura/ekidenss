@@ -1601,6 +1601,48 @@ Kiji _yosenTop(YosenKekka e, YosenUnivKekka m, String site) {
         : '悔しさを胸に、チームはまた一から積み上げる。',
   );
 
+  // 編集部の目(学生記者の型で見方が変わる。1.9.4)
+  final KishaKata kata = _gakunaiKata(k, site, no);
+  final StringBuffer me = StringBuffer();
+  if (kata == KishaKata.suuji) {
+    if (sa != null) {
+      me.write(
+        tsuuka
+            ? '次点との差は${kinsaMoji(sa.sa)}。$nin人で${hitoriAtariMoji(sa.sa, nin)}だった。'
+            : '通過ラインまで${kinsaMoji(sa.sa)}。$nin人で${hitoriAtariMoji(sa.sa, nin)}だった。',
+      );
+    }
+    if (m.senshu.length >= nin) {
+      final YosenSenshuKekka top = m.senshu.first;
+      final YosenSenshuKekka last = m.senshu[nin - 1];
+      me.write(
+        k.race == 3
+            ? 'チームトップは組${juniMoji(top.juni)}、合計に入った最後の1人は組${juniMoji(last.juni)}。'
+            : 'チームトップは個人${juniMoji(top.juni)}、合計に入った$nin番手は個人${juniMoji(last.juni)}。',
+      );
+      me.write(tsuuka ? 'この幅の小ささが、チームを本戦に運んだ。' : 'この幅をどこまで縮められるかが、来年への宿題だ。');
+    }
+  } else {
+    // 情景で語る: 因縁の点が一番高い選手
+    YosenSenshuKekka? hito;
+    Innen? no1;
+    for (final YosenSenshuKekka y in m.senshu) {
+      final List<Innen> l = yosenInnen(k, y.s, juni: y.juni, time: y.time);
+      if (l.isNotEmpty && (no1 == null || l.first.ten > no1.ten)) {
+        no1 = l.first;
+        hito = y;
+      }
+    }
+    if (hito != null && no1 != null) {
+      final String my = myouji(hito.s.name);
+      me.write('この日を一人で語るなら、$myだ。${no1.bun}');
+      me.write(tsuuka ? 'その走りが、仲間の背中を押した。' : 'その走りは、来年のチームにつながる。');
+    } else {
+      me.write('$nin人全員でつないだ予選だった。一人ひとりの1秒が、チームの合計を作った。');
+    }
+  }
+  w.kishaNoMe(me.toString(), midashi: '編集部の目');
+
   final List<List<String>> gyou = [
     ['順位', juniMoji(r)],
     ['合計タイム', jikanMoji(m.time)],
@@ -1688,6 +1730,9 @@ Kiji _yosenZenin(YosenKekka e, YosenUnivKekka m, String site) {
     } else if (!k.ichinenDake && !_yosenKeiken(k, s)) {
       sb.write('これが初めての予選だった。');
     }
+    // 入学時の記録からの伸び(1.9.4)
+    final Innen? nobi = nyuugakuNobiInnen(k, s);
+    if (nobi != null) sb.write(nobi.bun);
     if (s.gakunen == 4) {
       if (kumiAri) {
         sb.write('4年生として最後の11月駅伝予選だった。');
@@ -1716,7 +1761,20 @@ Kiji _yosenZenin(YosenKekka e, YosenUnivKekka m, String site) {
     } else {
       bamen = CommentBamen.gakunaiYosen;
     }
-    w.comment(senshuComment(w, bamen, myouji(s.name), kuyashii: kuyashii));
+    // コメントの事実(因縁と、その日の順位。1.9.4)
+    final List<Innen> yi = yosenInnen(k, s, juni: y.juni, time: y.time);
+    w.comment(
+      senshuCommentJijitsu(
+        w,
+        bamen,
+        myouji(s.name),
+        kuyashii: kuyashii,
+        jijitsu: [
+          if (yi.isNotEmpty) yi.first.kotoba,
+          kumiAri ? '組${juniMoji(y.juni)}。${y.juni <= 4 ? '前のほうで走れたのは収穫' : 'もっと前で走れたはず'}' : '全体${juniMoji(y.juni)}。${y.univJuni < nin ? '合計に入る走りができたのはよかった' : '合計に入れなかったのは悔しい'}',
+        ],
+      ),
+    );
     gyou.add([
       kumiAri ? '${y.kumi + 1}組' : '${y.univJuni + 1}',
       '${fullMei(s.name)}(${s.gakunen})',
@@ -1809,6 +1867,9 @@ Kiji _yosenMeikan(
       sb.write('予選は${yosenKai + 1}度目。');
     }
     if (honsenKai > 0) sb.write('駅伝の本戦も$honsenKai度走っている。');
+    // 入学時の記録からの伸び(1.9.4)
+    final Innen? nobi = nyuugakuNobiInnen(k, s);
+    if (nobi != null) sb.write(nobi.bun);
     if (s.gakunen == 4) {
       sb.write(
         kumiAri ? '4年生にとっては、これが最後の11月駅伝予選だ。' : '最後の正月駅伝予選。本戦へのラストチャンスに挑む。',
@@ -1816,11 +1877,13 @@ Kiji _yosenMeikan(
     }
     w.danraku(sb.toString());
     w.danraku(shusshinShumiBun(k, s, w.r, yobi));
+    final List<Innen> yi = yosenInnen(k, s, kekka: false);
     w.comment(
-      senshuComment(
+      senshuCommentJijitsu(
         w,
         s.gakunen == 4 ? CommentBamen.gakunaiYonenIkigomi : CommentBamen.gakunaiYosenIkigomi,
         yobi,
+        jijitsu: [if (yi.isNotEmpty) yi.first.kotoba],
       ),
     );
   }

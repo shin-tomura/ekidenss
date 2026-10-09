@@ -439,6 +439,112 @@ const List<String> _kantokuKuyashiShimeKotoba = [
   'と悔しさをかみしめた',
 ];
 
+// 事実入りのコメント(1.9.4)。気持ちの言葉に、その選手の因縁やその日の数字を話し言葉で足す
+
+/// 次へ向かう言葉(事実入りのコメントの最後に、ときどき足す)
+const List<String> _tsugiKotoba = [
+  '次はもっと上で勝負したい',
+  'まだ終わりじゃない。ここからです',
+  'この走りを、次につなげたい',
+  '支えてくれた仲間に感謝したい',
+  'まだ満足はしていない',
+];
+
+const List<String> _tsugiKuyashiKotoba = [
+  'この悔しさは、次で必ず返します',
+  'もう一度、一から積み上げます',
+  '言い訳はしない。やるだけです',
+];
+
+/// 事実入りのコメントの締め(「」のあとに続く文。[yobi]を選手の呼び方に置き換える)
+const List<String> _jijitsuShime = [
+  '。[yobi]は、一つずつ言葉を選びながら話した。',
+  '。そう言って[yobi]は、ようやく表情を緩めた。',
+  '。[yobi]の言葉には、実感がこもっていた。',
+  '。[yobi]は、1年分の思いを一気に吐き出した。',
+];
+
+const List<String> _jijitsuKuyashiShime = [
+  '。[yobi]は、それ以上は言葉にしなかった。',
+  '。[yobi]は、最後まで顔を上げなかった。',
+  '。[yobi]は、言葉を絞り出すように話した。',
+];
+
+/// 選手のコメント(事実入り。1.9.4)
+/// [jijitsu] その選手の事実の話し言葉(因縁の kotoba や、その日の数字。「。」なし)。
+/// 空なら今まで通りの気持ちだけのコメントにする
+String senshuCommentJijitsu(
+  KijiKakite w,
+  CommentBamen bamen,
+  String yobi, {
+  List<String> jijitsu = const [],
+  bool kuyashii = false,
+}) {
+  final List<String> j = [
+    for (final String x in jijitsu)
+      if (x.trim().isNotEmpty) x.trim(),
+  ];
+  if (j.isEmpty) return senshuComment(w, bamen, yobi, kuyashii: kuyashii);
+  final List<String> kouho = _senshuComment[bamen] ?? const ['よかった'];
+  final String kimochi = w.erabu(kouho);
+  // 気持ちの言葉が2文なら事実は1つ、1文なら2つまで(長くなりすぎないように)
+  final List<String> tsukau = j.take(kimochi.contains('。') ? 1 : 2).toList();
+  final List<String> bu = [];
+  if (w.r.kakuritsu(50)) {
+    bu.addAll(tsukau);
+    bu.add(kimochi);
+  } else {
+    bu.add(kimochi);
+    bu.addAll(tsukau);
+  }
+  // 気持ちの言葉が1文で事実も1つなら、ときどき次へ向かう言葉を足す(長くなりすぎないように)
+  if (tsukau.length == 1 && !kimochi.contains('。') && w.r.kakuritsu(50)) {
+    bu.add(w.erabu(kuyashii ? _tsugiKuyashiKotoba : _tsugiKotoba));
+  }
+  final String naka = bu.join('。');
+  if (w.r.kakuritsu(50)) {
+    final String shime = w.erabu(
+      kuyashii ? _kuyashiShimeKotoba : _senshuShimeKotoba,
+    );
+    return '「$naka」と$yobiは${shime.substring(1)}。';
+  }
+  final String shime = w.erabu(kuyashii ? _jijitsuKuyashiShime : _jijitsuShime);
+  return '「$naka」${shime.replaceAll('[yobi]', yobi)}';
+}
+
+/// 監督のコメント(事実入り。1.9.4。監督がいなければ空)
+/// [jijitsu] 監督の事実の話し言葉(目標との差や、流れを変えた区間など。「。」なし)
+String kantokuCommentJijitsu(
+  KijiKakite w,
+  KantokuBamen bamen,
+  int univid, {
+  List<String> jijitsu = const [],
+  bool kuyashii = false,
+}) {
+  final List<String> j = [
+    for (final String x in jijitsu)
+      if (x.trim().isNotEmpty) x.trim(),
+  ];
+  if (j.isEmpty) return kantokuComment(w, bamen, univid, kuyashii: kuyashii);
+  final ({String name, int nenrei})? kt = w.k.kantokuMei(univid);
+  if (kt == null) return '';
+  final List<String> kouho = _kantokuComment[bamen] ?? const ['よくやってくれた'];
+  final String kimochi = w.erabu(kouho);
+  final List<String> tsukau = j.take(kimochi.contains('。') ? 1 : 2).toList();
+  final List<String> bu = w.r.kakuritsu(50)
+      ? [...tsukau, kimochi]
+      : [kimochi, ...tsukau];
+  final String naka = bu.join('。');
+  final String shime = w.erabu(
+    kuyashii ? _kantokuKuyashiShimeKotoba : _kantokuShimeKotoba,
+  );
+  final String kagi = 'K$univid';
+  final bool hajimete = !w.deta(kagi);
+  final String yobi = w.hito(kagi, kt.name, '', '');
+  final String kata = hajimete ? '$yobi監督(${kt.nenrei})' : '$yobi監督';
+  return '「$naka」と$kataは${shime.substring(1)}。';
+}
+
 /// 選手のコメントの文(「「……」と山田は振り返った。」の形)
 /// [kuyashii] 悔しい場面なら、締めの言葉を悔しいほうにする
 String senshuComment(

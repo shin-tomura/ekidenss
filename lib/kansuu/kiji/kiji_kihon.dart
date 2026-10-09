@@ -18,6 +18,16 @@ import 'package:ekiden/kansuu/custom_seigen.dart'; // カスタム駅伝の出�
 //  3. 文を組み立てる: 場面ごとの言い回しを数通りずつ持ち、年・大会・記事で決まる乱数で選ぶ
 //     (何度開いても同じ記事になる。同じ記事の中では同じ言い回しを重ねない)
 //
+// 型っぽさを減らす仕組み(1.9.4。まず駅伝の結果の記事(kiji_kekka.dart)で使う)
+//  ・因縁(senshuInnen): 選手ごとの年別のデータから、「昨年は当日変更で外れた」「3年連続の同じ区間」
+//    「昨年の同じ区間から順位を上げた」「入学時の記録からの伸び」などを点数つきで見つける
+//  ・事実入りのコメント(kiji_comment.dart の senshuCommentJijitsu): 気持ちの言葉に、その選手の
+//    因縁やその日の数字(抜いた人数・差・相手)を話し言葉で足す
+//  ・文のリズム(KijiKakite): 直前の2つの文末が同じ形(「〜した。」が続くなど)なら、言い回しの候補から
+//    違う文末のものを選ぶ
+//  ・記者の型(KishaKata): 署名の記者名から「数字で語る」「情景で語る」「辛口」の型が決まり、
+//    リードの入り方と「記者の目」の欄に効く(同じ記者はいつも同じ型)
+//
 // 守る決まり
 //  ・能力値は書かない(見抜く力の仕組みを壊さないため)。勝因・敗因は、区間順位・タイム差・
 //    当日変更・1区のペースなど、結果から言えることだけにする
@@ -196,6 +206,274 @@ class KijiRand {
 /// 乱数の種(年・大会・記事の番号・つけたし)
 int kijiTane(Ghensuu gh, int race, int kijiBangou, [int tsuika = 0]) =>
     gh.year * 7919 + race * 104729 + kijiBangou * 1299709 + tsuika * 15485863;
+
+// ------------------------------------------------------------
+// 記者の型(1.9.4)。署名の記者名から決めるので、同じ記者はいつも同じ型
+// ------------------------------------------------------------
+
+enum KishaKata {
+  /// 数字で語る(タイム差・順位の数字から入る)
+  suuji,
+
+  /// 情景で語る(選手の因縁や場面から入る)
+  joukei,
+
+  /// 辛口(課題を指摘する。自分の大学には、目標に届かなかったときだけ辛口)
+  karakuchi,
+}
+
+/// 記者名の文字から型を決める
+KishaKata kishaKataKara(String kishaMei) {
+  int h = 0;
+  for (final int c in kishaMei.codeUnits) {
+    h = (h * 31 + c) % 1000003;
+  }
+  return KishaKata.values[h % KishaKata.values.length];
+}
+
+// ------------------------------------------------------------
+// 選手の因縁(1.9.4)。年別のデータから、記事の切り口になる事実を見つける
+// ------------------------------------------------------------
+
+/// 因縁の種類
+enum InnenShurui {
+  /// 昨年は当日変更で区間から外れた
+  hazureta,
+
+  /// 昨年は補欠のまま出番がなかった
+  hoketsu,
+
+  /// 同じ区間を何年も続けて走っている
+  onajiKukan,
+
+  /// 昨年の同じ区間から順位を上げた
+  juniUe,
+
+  /// 昨年の同じ区間の順位に届かなかった
+  juniShita,
+
+  /// 昨年は別の区間を走った
+  betsuKukan,
+
+  /// 初めての駅伝
+  debut,
+
+  /// 4年生の最後の大会
+  saigo,
+
+  /// 入学時の記録から大きく伸びた
+  nyuugakuNobi,
+
+  /// 区間賞を何度も取っている
+  kukanshouTsuusan,
+}
+
+/// 選手の因縁1つ
+class Innen {
+  final InnenShurui shurui;
+
+  /// ニュース価値(大きいほど見出しやリードに使う)
+  final int ten;
+
+  /// 地の文(常体。「。」で終わる。選手の呼び方は呼ぶ側で前に付ける)
+  final String bun;
+
+  /// 選手の話し言葉(「」の中に入れる。「。」なし)
+  final String kotoba;
+
+  /// 見出しに使う短い句(「1年前は走れなかった」など。見出し向きでなければ空)
+  final String midashiKu;
+
+  const Innen(this.shurui, this.ten, this.bun, this.kotoba, [this.midashiKu = '']);
+}
+
+/// 年度の中の大会の順(11月駅伝予選・10月駅伝・正月駅伝予選・11月駅伝・正月駅伝・カスタム駅伝)
+const List<int> _innenRaceJun = [3, 0, 4, 1, 2, 5];
+
+/// 選手[s]が、記事にする大会より前に駅伝(本戦。予選は除く)の区間を走った回数と、
+/// そのうち区間賞の回数(今の学年の、記事にする大会とそれより後の大会は除く)
+({int kaisuu, int kukanshou}) ekidenShussouKaisuu(KijiKankyou k, SenshuData s) {
+  int kaisuu = 0;
+  int kukanshou = 0;
+  final int imaJun = _innenRaceJun.indexOf(k.race);
+  for (int g = 1; g <= s.gakunen; g++) {
+    for (int ji = 0; ji < _innenRaceJun.length; ji++) {
+      final int race = _innenRaceJun[ji];
+      if (race == 3 || race == 4) continue;
+      if (g == s.gakunen && imaJun >= 0 && ji >= imaJun) continue;
+      if (s.entrykukan_race.length <= race) continue;
+      if (s.entrykukan_race[race].length < g) continue;
+      if (s.entrykukan_race[race][g - 1] < 0) continue;
+      kaisuu++;
+      if (s.kukanjuni_race.length > race &&
+          s.kukanjuni_race[race].length >= g &&
+          s.kukanjuni_race[race][g - 1] == 0) {
+        kukanshou++;
+      }
+    }
+  }
+  return (kaisuu: kaisuu, kukanshou: kukanshou);
+}
+
+/// 選手[s]の因縁(点の高い順)。駅伝の結果の記事で、区間[kk]を区間順位[kj](0が1位)で走ったとき
+/// ([kj]がnullなら、今の走りと比べる因縁は出さない。大学の順位の記録の[1]を昨年として見るので、
+/// 結果の記事(大会のあと)で使う)
+List<Innen> senshuInnen(KijiKankyou k, SenshuData s, int kk, {int? kj}) {
+  final List<Innen> list = [];
+  final int race = k.race;
+  final String raceMei = k.raceMei;
+  // 昨年のこの大会(大学が昨年出場していなければ、昨年の区間エントリーの値は意味を持たない)
+  final UnivData? u = (s.univid >= 0 && s.univid < k.univ.length)
+      ? k.univ[s.univid]
+      : null;
+  final bool kyonenShutsujou = u != null && shutsujouJuni(juniRace(u, race, 1));
+  final int maeE = kyonenShutsujou ? k.entryMae(s, race, 1) : -2;
+  final int? maeJ = kyonenShutsujou ? k.kukanJuniMae(s, race, 1) : null;
+  if (maeE <= -100) {
+    list.add(
+      const Innen(
+        InnenShurui.hazureta,
+        90,
+        '昨年は当日変更で区間から外れ、たすきを受けられなかった。',
+        '去年は当日に外れて、何もできないまま終わった。だから今年は、走るところを見せたかった',
+        '1年前は走れなかった',
+      ),
+    );
+  } else if (maeE == -1) {
+    list.add(
+      const Innen(
+        InnenShurui.hoketsu,
+        60,
+        '昨年は補欠のまま、出番が回ってこなかった。',
+        '去年は補欠で、仲間の走りを見ているだけだった。その悔しさをずっと持っていた',
+        '昨年は補欠だった',
+      ),
+    );
+  } else if (maeE == kk) {
+    // 同じ区間を何年続けて走っているか(今回を含む)
+    int renzoku = 1;
+    for (int n = 1; n <= 3; n++) {
+      if (k.entryMae(s, race, n) == kk) {
+        renzoku++;
+      } else {
+        break;
+      }
+    }
+    if (maeJ != null && kj != null && maeJ - kj >= 3) {
+      list.add(
+        Innen(
+          InnenShurui.juniUe,
+          70 + (maeJ - kj >= 6 ? 10 : 0),
+          '昨年の同じ区間は区間${maeJ + 1}位。${maeJ - kj}つ順位を上げた。',
+          '去年は区間${maeJ + 1}位で終わっていたので、今年は絶対に上げたかった',
+          '昨年区間${maeJ + 1}位からの',
+        ),
+      );
+    } else if (maeJ != null && kj != null && kj - maeJ >= 3) {
+      list.add(
+        Innen(
+          InnenShurui.juniShita,
+          40,
+          '昨年は同じ区間で区間${maeJ + 1}位。今年は、その走りには届かなかった。',
+          '去年の自分を超えられなかった。それが一番悔しい',
+        ),
+      );
+    }
+    if (renzoku >= 2) {
+      list.add(
+        Innen(
+          InnenShurui.onajiKukan,
+          45 + (renzoku - 2) * 15,
+          '$renzoku年連続で${kk + 1}区を任された${maeJ != null ? '(昨年は区間${maeJ + 1}位)' : ''}。',
+          '$renzoku年続けてこの区間を走らせてもらっている。コースは体が覚えている',
+          '$renzoku年連続の${kk + 1}区で',
+        ),
+      );
+    }
+  } else if (maeE >= 0) {
+    list.add(
+      Innen(
+        InnenShurui.betsuKukan,
+        30,
+        '昨年は${maeE + 1}区${maeJ != null ? '(区間${maeJ + 1}位)' : ''}を走った。',
+        '去年とは違う区間で、新しい挑戦だった',
+      ),
+    );
+  }
+  // 初めての駅伝(1年生だけの大会では、全員が初めてなので出さない)
+  final ({int kaisuu, int kukanshou}) reki = ekidenShussouKaisuu(k, s);
+  if (reki.kaisuu == 0 && !k.ichinenDake) {
+    list.add(
+      s.gakunen == 1
+          ? const Innen(
+              InnenShurui.debut,
+              45,
+              'これが大学駅伝のデビュー戦だった。',
+              '初めての駅伝で、たすきの重さが分かった',
+              'デビュー戦の',
+            )
+          : Innen(
+              InnenShurui.debut,
+              55,
+              '${s.gakunen}年目で初めてつかんだ駅伝の舞台だった。',
+              '${s.gakunen}年目でやっとこの舞台に立てた。走れない時間が長かった分、うれしかった',
+              '${s.gakunen}年目で初出走の',
+            ),
+    );
+  }
+  // 区間賞を何度も取っている(今回も区間賞のとき)
+  if (kj == 0 && reki.kukanshou >= 1) {
+    list.add(
+      Innen(
+        InnenShurui.kukanshouTsuusan,
+        45,
+        '区間賞は通算${reki.kukanshou + 1}度目となった。',
+        '区間賞は${reki.kukanshou + 1}度目になるけど、毎回違う苦しさがある',
+      ),
+    );
+  }
+  // 4年生の最後の大会
+  if (s.gakunen == 4) {
+    list.add(
+      race == 2
+          ? const Innen(
+              InnenShurui.saigo,
+              50,
+              'これが最後の正月駅伝だった。',
+              '4年間の最後に、この区間を走れて幸せだった',
+              '最後の正月駅伝で',
+            )
+          : Innen(
+              InnenShurui.saigo,
+              25,
+              '4年生にとっては、これが最後の$raceMeiだった。',
+              '最後の$raceMeiなので、悔いだけは残したくなかった',
+            ),
+    );
+  }
+  // 入学時の記録からの伸び(5000m。留学生は除く)
+  if (s.hirou != 1 && s.gakunen >= 2) {
+    final double ny = s.kiroku_nyuugakuji_5000;
+    final double best = k.jikoBest(s, 0);
+    if (ny > 0 && ny < TEISUU.DEFAULTTIME && best < TEISUU.DEFAULTTIME) {
+      final int nyFun = byou(ny) ~/ 60;
+      final int bestFun = byou(best) ~/ 60;
+      if (nyFun - bestFun >= 1) {
+        list.add(
+          Innen(
+            InnenShurui.nyuugakuNobi,
+            35 + (nyFun - bestFun >= 2 ? 15 : 0),
+            '入学時の5000mは$nyFun分台。今は${jikanMoji(best)}まで記録を伸ばしてきた。',
+            '入学したときは5000mが$nyFun分台の選手だった。ここまで来られたのは、積み上げてきた練習のおかげ',
+            '入学時$nyFun分台からの',
+          ),
+        );
+      }
+    }
+  }
+  list.sort((a, b) => b.ten.compareTo(a.ten));
+  return list;
+}
 
 // ------------------------------------------------------------
 // 記事を書くときに使うデータのまとめ
@@ -391,6 +669,9 @@ class KijiKankyou {
     if (mae.isEmpty || ato.isEmpty) return '$kijiSiteMei 駅伝取材班';
     return '$kijiSiteMei ${r.erabu(mae)}${r.erabu(ato)}';
   }
+
+  /// 記者の型(1.9.4。記者名から決まるので、同じ記者はいつも同じ型)
+  KishaKata kishaKata(int kijiBangou) => kishaKataKara(kishaMei(kijiBangou));
 
   /// 配信日時の文([asa]なら朝、そうでなければ午後の時刻)
   String haishinMei(int kijiBangou, {required bool asa}) {
@@ -785,7 +1066,35 @@ class KijiKakite {
   // 使った言い回し(同じ記事で重ねない)
   final Set<String> _tsukatta = {};
 
+  // 直前の2つの段落の文末の種類(文のリズム。1.9.4)
+  final List<int> _bunmatsu = [];
+
   KijiKakite(this.k, int tane) : r = KijiRand(tane);
+
+  /// 文末の種類(0: 「〜た。」、1: 「〜だ。」「〜る。」など、2: 体言止めなど)
+  static int bunmatsuShurui(String bun) {
+    String t = bun.trim();
+    while (t.endsWith('。') || t.endsWith('」')) {
+      t = t.substring(0, t.length - 1);
+    }
+    final int i = t.lastIndexOf('。');
+    if (i >= 0) t = t.substring(i + 1);
+    if (t.isEmpty) return 2;
+    if (t.endsWith('た')) return 0;
+    if (t.endsWith('だ') || t.endsWith('る') || t.endsWith('い') || t.endsWith('う')) {
+      return 1;
+    }
+    return 2;
+  }
+
+  void _bunmatsuOboeru(String bun) {
+    _bunmatsu.add(bunmatsuShurui(bun));
+    if (_bunmatsu.length > 2) _bunmatsu.removeAt(0);
+  }
+
+  /// 直前の2つの文末が同じ種類なら、その種類(違えばnull)
+  int? get _tsuzuitaBunmatsu =>
+      (_bunmatsu.length >= 2 && _bunmatsu[0] == _bunmatsu[1]) ? _bunmatsu[0] : null;
 
   /// 選手の呼び方。初めては「山田太郎(3年)」、2回目からは「山田」
   /// [daigaku] 初めて出すときに「東西大の」を前に付けるか
@@ -817,13 +1126,23 @@ class KijiKakite {
     return '$atama${fullMei(name)}$kk';
   }
 
-  /// 言い回しを選ぶ(同じ記事で使ったものは、ほかに候補があれば避ける)
+  /// 言い回しを選ぶ(同じ記事で使ったものは、ほかに候補があれば避ける。
+  /// 直前の2つの段落の文末が同じ形なら、違う文末の候補があればそれを選ぶ。1.9.4)
   String erabu(List<String> kouho) {
-    final List<String> mada = [
+    List<String> mada = [
       for (final String s in kouho)
         if (!_tsukatta.contains(s)) s,
     ];
-    final String e = r.erabu(mada.isEmpty ? kouho : mada);
+    if (mada.isEmpty) mada = kouho;
+    final int? tz = _tsuzuitaBunmatsu;
+    if (tz != null) {
+      final List<String> chigau = [
+        for (final String s in mada)
+          if (bunmatsuShurui(s) != tz) s,
+      ];
+      if (chigau.isNotEmpty) mada = chigau;
+    }
+    final String e = r.erabu(mada);
     _tsukatta.add(e);
     return e;
   }
@@ -831,11 +1150,20 @@ class KijiKakite {
   void danraku(String bun) {
     if (bun.trim().isEmpty) return;
     honbun.add(KijiBlock(KijiBlockShurui.danraku, bun));
+    _bunmatsuOboeru(bun);
   }
 
   void comment(String bun) {
     if (bun.trim().isEmpty) return;
     honbun.add(KijiBlock(KijiBlockShurui.comment, bun));
+    _bunmatsuOboeru(bun);
+  }
+
+  /// 「記者の目」の欄(記事の最後に、記者の見方を短く書く。1.9.4)
+  void kishaNoMe(String bun) {
+    if (bun.trim().isEmpty) return;
+    koMidashi('記者の目');
+    danraku(bun);
   }
 
   void koMidashi(String bun) {

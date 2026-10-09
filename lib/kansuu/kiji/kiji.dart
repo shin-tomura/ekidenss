@@ -8,9 +8,11 @@ import 'package:ekiden/kansuu/kiji/kiji_yosen.dart';
 import 'package:ekiden/kansuu/kiji/kiji_tenbou.dart';
 import 'package:ekiden/kansuu/kiji/kiji_taikousen.dart';
 import 'package:ekiden/kansuu/kiji/kiji_gakunai.dart';
+import 'package:ekiden/kansuu/kiji/kiji_jikkyou.dart'; // 駅伝の実況「箱庭スポーツ中継」(1.9.4)
 
 export 'package:ekiden/kansuu/kiji/kiji_kihon.dart'
     show Kiji, KijiBlock, KijiBlockShurui, KijiHyou, kijiSiteMei;
+export 'package:ekiden/kansuu/kiji/kiji_jikkyou.dart' show jikkyouSiteMei;
 export 'package:ekiden/kansuu/kiji/kiji_tenbou.dart' show KijiYosouJin;
 
 // ------------------------------------------------------------
@@ -26,6 +28,8 @@ export 'package:ekiden/kansuu/kiji/kiji_tenbou.dart' show KijiYosouJin;
 // 駅伝の結果・展望・スタート直前号は同じカードから開き、記事の画面の上で切り替える。
 // 正月駅伝の復路スタート直前号と、3月25日の卒業生特集は、学内メディアだけ。
 // 対校戦は、種目ごとの結果画面のカードから結果号だけを読める
+// 1.9.4から、駅伝の実況「箱庭スポーツ中継」もある(kiji_jikkyou.dart)。レース画面(区間が終わるたびの
+// 指示の画面)のカードと、結果画面の記事の画面の切り替えで読める
 // ------------------------------------------------------------
 
 /// 表示中の大会の結果の記事
@@ -55,6 +59,24 @@ List<Kiji> kijiTenbouIchiran(List<KijiYosouJin> yosou) {
     return list;
   } catch (e, st) {
     debugPrint('[ニュース記事] 展望の記事を作れませんでした: $e\n$st');
+    return [];
+  }
+}
+
+/// 表示中の駅伝の実況(終わった区間の分。終わったばかりの区間が先頭。1.9.4)
+/// 結果画面(mode 700)では大会が終わっているので、昨年の記録の見方を結果の記事と同じにする
+List<Kiji> kijiJikkyouIchiran() {
+  try {
+    final Ghensuu? gh = Hive.box<Ghensuu>('ghensuuBox').getAt(0);
+    if (gh == null) return [];
+    final bool owatta = gh.mode == 700;
+    final KijiKankyou? k = KijiKankyou.yomu(kekka: owatta);
+    if (k == null || !k.ekiden) return [];
+    final List<Kiji> list = jikkyouKiji(k, owatta: owatta);
+    _log(list);
+    return list;
+  } catch (e, st) {
+    debugPrint('[ニュース記事] 実況を作れませんでした: $e\n$st');
     return [];
   }
 }
@@ -196,6 +218,16 @@ void _log(List<Kiji> list) {
 /// 生成AIに記事を渡すときの依頼文
 /// [gakunai] 学内メディアの記事のとき([site] はそのサイトの名前。1.9.3)
 String kijiIraibun(bool kekka, {bool gakunai = false, String site = kijiSiteMei}) {
+  // 駅伝の実況(1.9.4)
+  if (site == jikkyouSiteMei) {
+    return '以下は、駅伝ゲーム「箱庭小駅伝SS」のレースの途中経過をもとにした、架空のテレビ中継'
+        '「$jikkyouSiteMei」の実況です。あなたは駅伝中継の実況アナウンサーと解説者になりきって、'
+        'この実況をもとに、臨場感のある中継の文に書き直してください。'
+        '実況と解説の掛け合いの形は残してください。'
+        '順位・タイム差・選手名・大学名などの事実は変えないでください。'
+        '選手の能力については、実況の中に書かれていること以外を決めつけないでください。'
+        'コメントは実況の中のものだけを使い、新しい発言は作らないでください。\n\n';
+  }
   if (gakunai) {
     if (kekka) {
       return '以下は、駅伝ゲーム「箱庭小駅伝SS」のデータをもとにした、大学の陸上競技部を追う架空の学内メディア'

@@ -35,6 +35,8 @@ import 'package:ekiden/screens/ai_copy_matome.dart';
 import 'package:ekiden/kansuu/yosen_omakase.dart'; // 正月駅伝予選の「おまかせで組む」(1.8.8)
 import 'package:ekiden/kansuu/ikku_pace.dart'; // 1区の集団のペース(1.9.2)
 import 'package:ekiden/screens/ikku_pace_box.dart'; // 1区のペースの予想と結果の枠(1.9.2)
+import 'package:ekiden/screens/kiji_screen.dart'; // 駅伝の実況「箱庭スポーツ中継」のカード(1.9.4)
+import 'package:ekiden/kansuu/kiji/kiji.dart'; // 実況の一覧(カードの見出しの予告。1.9.4)
 
 String _getCombinedDifficultyText(KantokuData kantoku, Ghensuu currentGhensuu) {
   // 難易度モードを取得 (0:通常, 1:極, 2:天)
@@ -532,6 +534,16 @@ class _Mode0350ContentState extends State<Mode0350Content> {
                               Text(timesastr),
                               // 1区の集団のペースの結果(駅伝の2区の指示のとき。1.9.2)
                               const IkkuPaceKekkaBox(),
+                              // 駅伝の実況「箱庭スポーツ中継」(区間が終わるたびに、その区間の実況を読める。1.9.4)
+                              if (_jikkyouAri(currentGhensuu))
+                                KijiLinkCard(
+                                  key: ValueKey(
+                                    'kijiJikkyou_${currentGhensuu.year}_${currentGhensuu.hyojiracebangou}_${currentGhensuu.nowracecalckukan}',
+                                  ),
+                                  namae: '実況(箱庭スポーツ中継)',
+                                  tsukuru: kijiJikkyouIchiran,
+                                  hiraku: kijiJikkyouHiraku,
+                                ),
                               // 生成AIに渡すテキストのまとめボタン(1.8.2)
                               const AiCopyMatomeButton(),
                               // リンクボタン
@@ -1318,6 +1330,16 @@ class _Mode0350ContentState extends State<Mode0350Content> {
                   Text(saBun),
                   // 1区の集団のペースの結果(2区の指示のとき。学連選抜の選手の分を出す。1.9.2)
                   const IkkuPaceKekkaBox(gakurenKantoku: true),
+                  // 駅伝の実況「箱庭スポーツ中継」(1.9.4)
+                  if (_jikkyouAri(currentGhensuu))
+                    KijiLinkCard(
+                      key: ValueKey(
+                        'kijiJikkyouG_${currentGhensuu.year}_${currentGhensuu.hyojiracebangou}_${currentGhensuu.nowracecalckukan}',
+                      ),
+                      namae: '実況(箱庭スポーツ中継)',
+                      tsukuru: kijiJikkyouIchiran,
+                      hiraku: kijiJikkyouHiraku,
+                    ),
                   // 正月駅伝の6区のスタート前は、大学と同じく復路の目標順位を決め直せる
                   // (6区は判定せず、7区から効く。1.8.2)
                   if (kukan == 5 && shutsujouSuu > 0) ...[
@@ -1569,6 +1591,13 @@ class _Mode0350ContentState extends State<Mode0350Content> {
         ],
       ),
     );
+  }
+
+  /// 駅伝の実況のカードを出すか(駅伝で、1つ以上の区間が終わっているとき。1.9.4)
+  bool _jikkyouAri(Ghensuu currentGhensuu) {
+    final int race = currentGhensuu.hyojiracebangou;
+    final bool ekiden = race == 0 || race == 1 || race == 2 || race == 5;
+    return ekiden && currentGhensuu.nowracecalckukan > 0;
   }
 
   // 現在順位表示をWidgetに分離

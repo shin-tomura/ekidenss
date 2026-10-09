@@ -75,13 +75,15 @@ List<KijiBan> _gakunaiBan(
   ];
 }
 
-/// 結果の記事の一覧を開く(結果画面から。駅伝・駅伝予選・対校戦なら学内メディアの結果号も)
+/// 結果の記事の一覧を開く(結果画面から。駅伝・駅伝予選・対校戦なら学内メディアの結果号も。
+/// 駅伝なら実況「箱庭スポーツ中継」も切り替えて読める。1.9.4)
 void kijiKekkaHiraku(BuildContext context) {
   final List<Kiji> list = kijiKekkaIchiran();
   // 対校戦の記事は駅伝ではないので、サイト名の横を「陸上ニュース・対校戦」にする(1.9.2)
   final bool taikousen = list.isNotEmpty && list.first.category == '対校戦';
   final List<Kiji> gakunai = kijiGakunaiKekkaIchiran();
   final String gakunaiCategory = gakunai.isEmpty ? '' : gakunai.first.category;
+  final List<Kiji> jikkyou = (list.isNotEmpty && list.first.category == '駅伝') ? kijiJikkyouIchiran() : [];
   _hiraku(context, [
     KijiBan(
       site: kijiSiteMei,
@@ -96,7 +98,24 @@ void kijiKekkaHiraku(BuildContext context) {
           : (gakunaiCategory == '対校戦' ? '陸上競技部・対校戦' : '陸上競技部・駅伝'),
       kekka: true,
     ),
+    if (jikkyou.isNotEmpty) _jikkyouBan(jikkyou),
   ]);
+}
+
+/// 駅伝の実況を、サイト1つ分にする(1.9.4)
+KijiBan _jikkyouBan(List<Kiji> list) {
+  return KijiBan(
+    site: jikkyouSiteMei,
+    sub: '駅伝中継・区間ごとの実況',
+    list: list,
+    kekka: true,
+    nashiMoji: '実況はまだありません',
+  );
+}
+
+/// 駅伝の実況を開く(レース画面の、区間が終わったあとの指示の画面から。1.9.4)
+void kijiJikkyouHiraku(BuildContext context) {
+  _hiraku(context, [_jikkyouBan(kijiJikkyouIchiran())]);
 }
 
 /// 展望の記事の一覧を開く(直前順位予想の画面から。駅伝なら学内メディアの展望号も)
@@ -809,6 +828,8 @@ class KijiGamen extends StatelessWidget {
           Text(
             kiji.gakunai
                 ? 'この記事を依頼文つきでコピーして生成AIに貼り付けると、学生記者になりきって書き直してくれます。'
+                : kiji.site == jikkyouSiteMei
+                ? 'この実況を依頼文つきでコピーして生成AIに貼り付けると、実況アナと解説者になりきって書き直してくれます。'
                 : kiji.kekka
                 ? 'この記事を依頼文つきでコピーして生成AIに貼り付けると、記者になりきって書き直してくれます。'
                       '結果の詳しいデータは「生成AIに渡すテキスト」の振り返りセットなどで渡せます。'

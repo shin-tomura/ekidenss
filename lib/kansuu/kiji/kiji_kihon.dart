@@ -1220,8 +1220,26 @@ String toujituJijouBun(ToujituJijou j, KijiKakite w, {String daigakuMei = ''}) {
 }
 
 /// 当日変更で入った選手の、事情を含めたひと言(コメントの事実の部分。「。」なし)
-String toujituJijouKotoba(ToujituJijou j, KijiRand r, {required bool yoi}) {
+/// [yoi] 結果が良かったか。[mae] レース前(スタート直前号)なら、これから走る言い方にする
+String toujituJijouKotoba(
+  ToujituJijou j,
+  KijiRand r, {
+  required bool yoi,
+  bool mae = false,
+}) {
   final String out = myouji(j.hazureta.name);
+  if (mae) {
+    if (j.riyuu == HazuretaRiyuu.taichouFuryou) {
+      return r.erabu([
+        '朝に$outさんが走れないと聞いた。$outさんの分まで走ります',
+        '急に名前を呼ばれて驚いたけど、準備はしてきた。落ち着いて入りたい',
+      ]);
+    }
+    if (j.riyuu == HazuretaRiyuu.chousi) {
+      return '朝に起用を聞いた。チャンスをもらえた以上、結果で返したい';
+    }
+    return 'いつでも行けるように準備していた。任された区間で、思い切って走るだけです';
+  }
   if (j.riyuu == HazuretaRiyuu.taichouFuryou) {
     return r.erabu(
       yoi

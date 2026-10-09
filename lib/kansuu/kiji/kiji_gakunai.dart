@@ -40,6 +40,10 @@ import 'package:ekiden/kansuu/kiji/kiji_taikousen.dart'
 //     5000m・1万mのあとは「総合争い」(8位のラインとの点差と名声の大きさ)を書き、
 //     ハーフのあとの総合の記事には、大学が得た名声を書く
 //
+// 1.9.4: 選手の因縁(kiji_kihon.dart の senshuInnen。出走歴の文と重ならない種類だけ _innenHosoku)と、
+//  事実入りのコメント(senshuCommentJijitsu)、当日変更の事情(ToujituJijou)、学生記者の型で見方が変わる
+//  「編集部の目」(辛口はなし)を、駅伝の結果号・展望号・当日変更号・復路スタート直前号に入れた
+//
 // 守る決まり(箱庭スポーツと同じ)
 //  ・能力値は書かない(見抜く力の仕組みを壊さないため)。成長タイプ・上限・サプライズも書かない
 //    (伸びたことは、持ちタイムや区間順位など見えている事実からだけ書く)
@@ -210,6 +214,27 @@ String _kishaMei(KijiKankyou k, String site, int no) {
   return '$site ${r.erabu(mae)}${r.erabu(ato)}(${1 + r.ikutsu(4)}年)';
 }
 
+/// 学生記者の型(1.9.4。学内メディアは選手に寄り添うので、辛口はなく「数字で語る」「情景で語る」の2つ)
+KishaKata _gakunaiKata(KijiKankyou k, String site, int no) {
+  final KishaKata kata = kishaKataKara(_kishaMei(k, site, no));
+  return kata == KishaKata.karakuchi ? KishaKata.joukei : kata;
+}
+
+/// 選手の紹介に添える因縁(1.9.4。出走歴の文(_maeNoShussouBun)や昨年との比べと重ならない種類だけ:
+/// 昨年当日変更で外れた・昨年は補欠・入学時の記録からの伸び・通算の区間賞。なければnull)
+Innen? _innenHosoku(KijiKankyou k, SenshuData s, int kk, {required bool kekka, int? kj}) {
+  const List<InnenShurui> tsukau = [
+    InnenShurui.hazureta,
+    InnenShurui.hoketsu,
+    InnenShurui.nyuugakuNobi,
+    InnenShurui.kukanshouTsuusan,
+  ];
+  for (final Innen i in senshuInnen(k, s, kk, kj: kj, kekka: kekka)) {
+    if (tsukau.contains(i.shurui)) return i;
+  }
+  return null;
+}
+
 /// 学内メディアの記事を作るときの共通の仕上げ
 Kiji _kansei(
   KijiKankyou k,
@@ -279,13 +304,17 @@ String _maeNoShussouBun(KijiKankyou k, SenshuData s, int kk, String yobi) {
 }
 
 /// 選手[s]を区間[kk]の選手として紹介する段落(持ちタイム・出走歴・4年生・出身地と趣味)
-void _shoukai(KijiKakite w, SenshuData s, int kk) {
+/// 戻り値は、紹介に添えた因縁(コメントの事実に使う。なければnull。1.9.4)
+Innen? _shoukai(KijiKakite w, SenshuData s, int kk) {
   final KijiKankyou k = w.k;
   final String yobi = myouji(s.name);
   final StringBuffer sb = StringBuffer();
   final String? mochi = _kukanMochiTime(k, s, kk);
   if (mochi != null) sb.write('持ちタイムは$mochi。');
   sb.write(_maeNoShussouBun(k, s, kk, yobi));
+  // 因縁(昨年当日変更で外れた・昨年は補欠・入学時の記録からの伸び。1.9.4)
+  final Innen? innen = _innenHosoku(k, s, kk, kekka: false);
+  if (innen != null) sb.write(innen.bun);
   if (s.gakunen == 4) {
     sb.write(
       k.race == 2 ? '最後の正月駅伝に挑む。' : '4年生にとっては、これが最後の${k.raceMei}だ。',
@@ -293,6 +322,7 @@ void _shoukai(KijiKakite w, SenshuData s, int kk) {
   }
   w.danraku(sb.toString());
   w.danraku(shusshinShumiBun(k, s, w.r, yobi));
+  return innen;
 }
 
 /// 意気込みのコメントの場面(4年生・初出走・そのほか)
@@ -517,6 +547,53 @@ Kiji _kekkaTop(EkidenKekka e, EkidenUnivKekka m, String site) {
             : (race == 2 ? 'この経験を胸に、チームは新たなシーズンへ向かう。' : ''));
   w.danraku(tsugi);
 
+  // 編集部の目(学生記者の型で見方が変わる。1.9.4)
+  final KishaKata kata = _gakunaiKata(k, site, no);
+  final StringBuffer me = StringBuffer();
+  if (kata == KishaKata.suuji) {
+    int goukei = 0;
+    for (int kk = 0; kk < ks; kk++) {
+      goukei += m.kukanJuni[kk] + 1;
+    }
+    me.write('$ks人の区間順位の平均は${(goukei / ks).toStringAsFixed(1)}位。');
+    if (jouKukan >= 1 && jouGain >= 2 && m.senshu[jouKukan] != null) {
+      me.write('${jouKukan + 1}区の${myouji(m.senshu[jouKukan]!.name)}の$jouGain人抜きが、数字の上でも一番大きな一歩だった。');
+    } else if (kukanshou.isNotEmpty) {
+      me.write('区間賞の$ks分の${kukanshou.length}が、チームを引っ張った。');
+    } else {
+      me.write('大きく崩れた区間がなく、全員で積み上げた順位だった。');
+    }
+    if (mokuhyou != null && !tassei) {
+      me.write('目標まで、あと${r - mokuhyou}つ。遠い数字ではない。');
+    }
+  } else {
+    // 情景で語る: 一番順位を上げた区間か、区間賞の選手の因縁
+    SenshuData? shuyaku;
+    int shuyakuKk = -1;
+    if (jouKukan >= 1 && jouGain >= 2 && m.senshu[jouKukan] != null) {
+      shuyaku = m.senshu[jouKukan];
+      shuyakuKk = jouKukan;
+    } else {
+      for (int kk = 0; kk < ks; kk++) {
+        if (m.kukanJuni[kk] == 0 && m.senshu[kk] != null) {
+          shuyaku = m.senshu[kk];
+          shuyakuKk = kk;
+          break;
+        }
+      }
+    }
+    if (shuyaku != null && shuyakuKk >= 0) {
+      final String my = myouji(shuyaku.name);
+      final Innen? si = _innenHosoku(k, shuyaku, shuyakuKk, kekka: true, kj: m.kukanJuni[shuyakuKk]);
+      me.write('この日の主役は、${shuyakuKk + 1}区の$myだった。');
+      me.write(si != null ? si.bun : '区間${m.kukanJuni[shuyakuKk] + 1}位の走りで、チームに流れを呼び込んだ。');
+      me.write('$myの走りは、仲間の背中を押した。');
+    } else {
+      me.write('派手な見せ場はなくても、$ks人が一人も崩れずにつないだたすきに、このチームの1年間が詰まっていた。');
+    }
+  }
+  w.kishaNoMe(me.toString(), midashi: '編集部の目');
+
   final List<List<String>> gyou = [
     ['総合順位', juniMoji(r)],
     ['タイム', jikanMoji(m.time)],
@@ -608,6 +685,9 @@ Kiji _kekkaZenin(EkidenKekka e, EkidenUnivKekka m, String site) {
     } else if (debut && !k.ichinenDake) {
       sb.write('これが駅伝デビュー戦だった。');
     }
+    // 因縁(昨年当日変更で外れた・昨年は補欠・入学時の記録からの伸び・通算の区間賞。1.9.4)
+    final Innen? innen = _innenHosoku(k, s, kk, kekka: true, kj: kj);
+    if (innen != null) sb.write(innen.bun);
     if (s.gakunen == 4) {
       sb.write(race == 2 ? 'これが最後の正月駅伝だった。' : '4年生として最後の${k.raceMei}だった。');
     }
@@ -646,9 +726,17 @@ Kiji _kekkaZenin(EkidenKekka e, EkidenUnivKekka m, String site) {
     } else {
       bamen = CommentBamen.gakunaiKekka;
     }
-    final List<String> jijitsu = j == null
-        ? const []
-        : [toujituJijouKotoba(j, w.r, yoi: !kurushii)];
+    // コメントの事実(当日変更の事情・因縁・その日の数字。1.9.4)
+    final int nuita = kk > 0 ? m.tuuka[kk - 1] - ima : 0;
+    final int kukanshouSa = kj == 0 ? e.kukanshouSa(kk) : 0;
+    final List<String> jijitsu = [
+      if (j != null) toujituJijouKotoba(j, w.r, yoi: !kurushii),
+      if (innen != null) innen.kotoba,
+      if (kj == 0 && kukanshouSa >= 10) '2位と${saMoji(kukanshouSa)}差と聞いて、やっと実感が湧いた',
+      if (kj == 0 && kukanshouSa < 10) '2位とは${kinsaMoji(kukanshouSa)}。最後まで気は抜けなかった',
+      if (kj != 0 && nuita >= 3) '${juniMoji(m.tuuka[kk - 1] - 1)}の背中が見えてからは、一人ずつと決めていた',
+      if (kj != 0 && nuita < 3 && kurushii) '区間${kj + 1}位。言い訳はできない',
+    ];
     w.comment(
       senshuCommentJijitsu(w, bamen, myouji(s.name), kuyashii: kuyashii, jijitsu: jijitsu),
     );
@@ -765,8 +853,15 @@ Kiji _meikan(
     final SenshuData? s = hashiru[kk];
     if (s == null) continue;
     w.koMidashi('${kukanYobikata(k.gh, k.race, kk, ks)}　${w.senshu(s)}');
-    _shoukai(w, s, kk);
-    w.comment(senshuComment(w, _ikigomiBamen(k, s), myouji(s.name)));
+    final Innen? innen = _shoukai(w, s, kk);
+    w.comment(
+      senshuCommentJijitsu(
+        w,
+        _ikigomiBamen(k, s),
+        myouji(s.name),
+        jijitsu: [if (innen != null) innen.kotoba],
+      ),
+    );
   }
   if (hoketsu.isNotEmpty) {
     w.koMidashi('補欠');
@@ -920,26 +1015,65 @@ List<int> _kawattaKukan(KijiKankyou k, int hajime, int owari) => [
     if (_hazuretaSenshu(k, kk) != null) kk,
 ];
 
-/// 入った選手と外れた選手を書く
+/// 入った選手と外れた選手を書く(外れた理由と持ちタイムの比べは ToujituJijou。1.9.4)
 void _irekaeKaku(KijiKakite w, List<int> kawatta) {
   final KijiKankyou k = w.k;
   final int ks = k.kukansuu;
+  final UnivData? u = k.jibunUniv;
+  final Map<int, ToujituJijou> jijou = u == null
+      ? const {}
+      : toujituJijou(k, u, [for (int kk = 0; kk < ks; kk++) _kukanNoSenshu(k, kk)]);
   final List<SenshuData> hazureta = [];
+  final List<SenshuData> taichou = []; // そのうち体調不良で外れた選手
   for (final int kk in kawatta) {
     final SenshuData? iri = _kukanNoSenshu(k, kk);
     final SenshuData? deta = _hazuretaSenshu(k, kk);
-    if (deta != null) hazureta.add(deta);
+    final ToujituJijou? j = jijou[kk];
+    if (deta != null) {
+      if (j != null && j.riyuu == HazuretaRiyuu.taichouFuryou) {
+        taichou.add(deta);
+      } else {
+        hazureta.add(deta);
+      }
+    }
     if (iri == null) continue;
     w.koMidashi('${kukanYobikata(k.gh, k.race, kk, ks)}　${w.senshu(iri)}');
-    w.danraku('当日変更で${kk + 1}区に入った。');
-    _shoukai(w, iri, kk);
-    w.comment(senshuComment(w, CommentBamen.gakunaiIri, myouji(iri.name)));
+    w.danraku(j != null ? toujituJijouBun(j, w) : '当日変更で${kk + 1}区に入った。');
+    final Innen? innen = _shoukai(w, iri, kk);
+    w.comment(
+      senshuCommentJijitsu(
+        w,
+        CommentBamen.gakunaiIri,
+        myouji(iri.name),
+        jijitsu: [
+          if (j != null) toujituJijouKotoba(j, w.r, yoi: true, mae: true),
+          if (innen != null) innen.kotoba,
+        ],
+      ),
+    );
+  }
+  if (taichou.isNotEmpty) {
+    w.koMidashi('体調を崩した仲間');
+    final List<String> namae = [for (final SenshuData s in taichou) w.senshu(s)];
+    w.danraku(
+      '${namae.join('、')}は、当日の朝に体調を崩し、走る予定だった区間を仲間に託すことになった。'
+      '悔しさを抱えながら、スタートラインに立つ仲間を送り出す。',
+    );
+    w.comment(
+      senshuCommentJijitsu(
+        w,
+        CommentBamen.gakunaiHazureta,
+        myouji(taichou.first.name),
+        kuyashii: true,
+        jijitsu: ['朝に体調を崩してしまった。悔しいけど、仲間を信じています'],
+      ),
+    );
   }
   if (hazureta.isNotEmpty) {
     w.koMidashi('仲間に思いを託して');
     final List<String> namae = [for (final SenshuData s in hazureta) w.senshu(s)];
     w.danraku(
-      '代わって区間エントリーから外れたのは${namae.join('、')}。'
+      '${taichou.isEmpty ? '代わって' : 'また、'}区間エントリーから外れたのは${namae.join('、')}。'
       'スタートラインに立つ仲間を、チームの一員として送り出す。',
     );
     w.comment(
@@ -1077,10 +1211,12 @@ Kiji? _fukuro(KijiKankyou k, String site, UnivData u) {
     if (s == null) continue;
     final String yobi = w.senshu(s);
     final String? mochi = _kukanMochiTime(k, s, kk);
+    final Innen? innen = _innenHosoku(k, s, kk, kekka: false);
     w.danraku(
       '${kukanYobikata(k.gh, k.race, kk, ks)}は$yobi。'
       '${mochi == null ? '' : '持ちタイムは$mochi。'}'
       '${_maeNoShussouBun(k, s, kk, myouji(s.name))}'
+      '${innen == null ? '' : innen.bun}'
       '${s.gakunen == 4 ? '最後の正月駅伝を走る。' : ''}',
     );
   }

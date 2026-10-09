@@ -597,6 +597,20 @@ class Mode0100Content extends StatelessWidget {
                                       fontWeight: FontWeight.bold, // ★ 太字に変更
                                     ),
                                   ),
+                                  // 箱庭スポーツの年間表彰と、学内メディアの学内表彰(1.9.4)
+                                  // 卒業で4年生のデータが変わるので、卒業生特集と同じくこの日だけ読める
+                                  const SizedBox(height: 16),
+                                  KijiLinkCard(
+                                    key: ValueKey(
+                                      'kijiNenkan_${currentGhensuu.year}',
+                                    ),
+                                    namae: '年間表彰(箱庭スポーツ)',
+                                    tsukuru: kijiNenkanIchiran,
+                                    hiraku: kijiNenkanHiraku,
+                                    annai:
+                                        '今季の年間最優秀選手・新人賞・年間最優秀チームなどの表彰です。'
+                                        '学内メディアの学内表彰も、記事の画面の上で切り替えて読めます。読めるのは今日だけです',
+                                  ),
                                   // 学内メディア「○○スポーツ」の卒業生特集(1.9.3)
                                   // 卒業の処理のあとは卒業選手のデータが一部しか残らないので、この日だけ読める
                                   const SizedBox(height: 16),

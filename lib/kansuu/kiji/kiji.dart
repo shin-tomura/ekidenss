@@ -9,6 +9,7 @@ import 'package:ekiden/kansuu/kiji/kiji_tenbou.dart';
 import 'package:ekiden/kansuu/kiji/kiji_taikousen.dart';
 import 'package:ekiden/kansuu/kiji/kiji_gakunai.dart';
 import 'package:ekiden/kansuu/kiji/kiji_jikkyou.dart'; // 駅伝の実況「箱庭スポーツ中継」(1.9.4)
+import 'package:ekiden/kansuu/kiji/kiji_nenkan.dart'; // 年間表彰と学内表彰(3月25日。1.9.4)
 
 export 'package:ekiden/kansuu/kiji/kiji_kihon.dart'
     show Kiji, KijiBlock, KijiBlockShurui, KijiHyou, kijiSiteMei;
@@ -27,6 +28,7 @@ export 'package:ekiden/kansuu/kiji/kiji_tenbou.dart' show KijiYosouJin;
 // 1.9.3から、自分の大学の学内メディア「○○スポーツ」の記事もある(kiji_gakunai.dart)。
 // 駅伝の結果・展望・スタート直前号は同じカードから開き、記事の画面の上で切り替える。
 // 正月駅伝の復路スタート直前号と、3月25日の卒業生特集は、学内メディアだけ。
+// 3月25日には、箱庭スポーツの年間表彰と学内メディアの学内表彰もある(kiji_nenkan.dart。1.9.4)。
 // 対校戦は、種目ごとの結果画面のカードから結果号だけを読める
 // 1.9.4から、駅伝の実況「箱庭スポーツ中継」もある(kiji_jikkyou.dart)。レース画面(区間が終わるたびの
 // 指示の画面)のカードと、結果画面の記事の画面の切り替えで読める
@@ -182,6 +184,34 @@ List<Kiji> kijiGakunaiSotsugyouIchiran() {
     return list;
   } catch (e, st) {
     debugPrint('[ニュース記事] 卒業生特集を作れませんでした: $e\n$st');
+    return [];
+  }
+}
+
+/// 箱庭スポーツの年間表彰(3月25日。大会に関係ないので、正月駅伝を記事にする大会として読む。1.9.4)
+List<Kiji> kijiNenkanIchiran() {
+  try {
+    final KijiKankyou? k = KijiKankyou.yomuRace(2, kekka: true);
+    if (k == null) return [];
+    final List<Kiji> list = nenkanHyoushouKiji(k);
+    _log(list);
+    return list;
+  } catch (e, st) {
+    debugPrint('[ニュース記事] 年間表彰を作れませんでした: $e\n$st');
+    return [];
+  }
+}
+
+/// 学内メディアの学内表彰(3月25日。1.9.4)
+List<Kiji> kijiGakunaiHyoushouIchiran() {
+  try {
+    final KijiKankyou? k = KijiKankyou.yomuRace(2, kekka: true);
+    if (k == null) return [];
+    final List<Kiji> list = gakunaiHyoushouKiji(k);
+    _log(list);
+    return list;
+  } catch (e, st) {
+    debugPrint('[ニュース記事] 学内表彰を作れませんでした: $e\n$st');
     return [];
   }
 }

@@ -177,6 +177,21 @@ void kijiGakunaiSotsugyouHiraku(BuildContext context) {
   ]);
 }
 
+/// 年間表彰を開く(3月25日の最新画面から。箱庭スポーツの年間表彰と、学内メディアの学内表彰。1.9.4)
+void kijiNenkanHiraku(BuildContext context) {
+  final List<Kiji> gakunai = kijiGakunaiHyoushouIchiran();
+  _hiraku(context, [
+    KijiBan(
+      site: kijiSiteMei,
+      sub: '陸上ニュース・年間表彰',
+      list: kijiNenkanIchiran(),
+      kekka: true,
+      nashiMoji: '今季の記録がないので、年間表彰はありません',
+    ),
+    ..._gakunaiBan(gakunai, sub: '陸上競技部・学内表彰', kekka: true),
+  ]);
+}
+
 void _hiraku(BuildContext context, List<KijiBan> bans) {
   showGeneralDialog(
     context: context,
@@ -858,8 +873,8 @@ class KijiGamen extends StatelessWidget {
                   side: const BorderSide(color: Colors.cyanAccent),
                 ),
               ),
-              // 卒業生特集は大会の記事ではないので、大会のまとめのボタンは出さない(1.9.3)
-              if (kiji.category != '卒業生特集')
+              // 卒業生特集・年間表彰・学内表彰は大会の記事ではないので、大会のまとめのボタンは出さない(1.9.3)
+              if (kiji.category != '卒業生特集' && kiji.category != '年間表彰' && kiji.category != '学内表彰')
                 AiCopyMatomeButton(kekkaGamen: kiji.kekka),
             ],
           ),

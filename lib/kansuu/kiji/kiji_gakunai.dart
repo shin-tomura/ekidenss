@@ -200,6 +200,9 @@ int? _juraiKiroku(KijiKankyou k, int i) {
 }
 
 /// 記者の名前(学生記者。年・大会・記事で決まる)
+/// 学生記者の名前(ほかのファイルの学内メディアの記事から使う。年間表彰の学内表彰。1.9.4)
+String gakunaiKishaMei(KijiKankyou k, String site, int no) => _kishaMei(k, site, no);
+
 String _kishaMei(KijiKankyou k, String site, int no) {
   final KijiRand r = KijiRand(kijiTane(k.gh, k.race, no, 91));
   final List<String> mae = [

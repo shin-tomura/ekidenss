@@ -187,13 +187,13 @@ String _kenMijikai(int ken) {
   return n.substring(0, n.length - 1);
 }
 
-/// 校名(「青嶺学院高」)
+/// 校名(「雷鳥館高」)
 String koukouMeiMoji(KoukouJouhou j) {
   final KoukouMei? m = j.mei;
   return m == null ? '' : '${m.mei}高';
 }
 
-/// 校名と都道府県(「青嶺学院高(長野)」)
+/// 校名と都道府県(「雷鳥館高(長野)」)
 String koukouMeiKenMoji(KoukouJouhou j) {
   final KoukouMei? m = j.mei;
   return m == null ? '' : '${m.mei}高(${_kenMijikai(m.ken)})';
@@ -320,7 +320,7 @@ String koukouJissekiBun(KoukouJouhou j) {
   return '';
 }
 
-/// 一覧の画面に出す出身校(「青嶺学院高(長野)」。1.9.5)
+/// 一覧の画面に出す出身校(「雷鳥館高(長野)」。1.9.5)
 /// 表示しない設定のときと、留学生・未設定のときは空
 String koukouIchiranMoji(int samusataisei, int hirou, KantokuData kantoku) {
   if (hirou == 1 || koukouHyoujiNashi(kantoku)) return '';

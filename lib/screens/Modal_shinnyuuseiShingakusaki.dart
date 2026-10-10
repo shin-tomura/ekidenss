@@ -484,7 +484,7 @@ class _ModalShinnyuuseiShingakusakiState
     );
   }
 
-  /// 出身校(「青嶺学院高(長野)」。1.9.5。表示しない設定のときと留学生は空)
+  /// 出身校(「雷鳥館高(長野)」。1.9.5。表示しない設定のときと留学生は空)
   String _koukouMei(SenshuData s) {
     if (s.hirou == 1) return '';
     final KantokuData? kantoku = Hive.box<KantokuData>(
@@ -612,7 +612,7 @@ class _ModalShinnyuuseiShingakusakiState
                         ),
                       ),
                       Text(
-                        // 出身校があれば前に付ける(「青嶺学院高(長野) → 東西大学」。1.9.5)
+                        // 出身校があれば前に付ける(「雷鳥館高(長野) → 東西大学」。1.9.5)
                         '${_koukouMei(s).isEmpty ? '' : '${_koukouMei(s)} '}→ $shingakusaki',
                         style: TextStyle(
                           color: jibun ? Colors.amber : _joutaiIro(j),

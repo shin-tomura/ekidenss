@@ -545,7 +545,7 @@ Innen? koukouInnen(KijiKankyou k, SenshuData s, {int? kj, bool kekka = true}) {
   return null;
 }
 
-/// 出身校と高校時代の一言(1.9.5。「青嶺学院高時代は、全国高校駅伝の1区で区間賞を取った。」など)
+/// 出身校と高校時代の一言(1.9.5。「雷鳥館高時代は、全国高校駅伝の1区で区間賞を取った。」など)
 /// 表示しない設定のときと、留学生・分からないときは空
 String koukouJidaiBun(KijiKankyou k, SenshuData s, KijiRand r, String yobi) {
   if (s.hirou == 1 || koukouHyoujiNashi(k.kantoku)) return '';

@@ -221,7 +221,7 @@ class _MeimonShoukai extends StatelessWidget {
           _kaadoWidget(
             meibo[i],
             i < kai.zenkoku.length ? kai.zenkoku[i] : 0,
-            i < kai.ken.length ? kai.ken[i] : 0,
+            kai.chikuDaihyou(i),
             i < kai.shutsujou.length ? kai.shutsujou[i] : 0,
           ),
         const SizedBox(height: 8),
@@ -230,7 +230,7 @@ class _MeimonShoukai extends StatelessWidget {
     );
   }
 
-  Widget _kaadoWidget(KoukouMei m, int zenkokuKai, int kenKai, int shutsujouKai) {
+  Widget _kaadoWidget(KoukouMei m, int zenkokuKai, int chikuKai, int shutsujouKai) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
@@ -277,12 +277,9 @@ class _MeimonShoukai extends StatelessWidget {
             '集まりやすい選手: ${koukouIroKeikou[_iroBan(m.iro)]}',
             style: _hosoku,
           ),
+          // 都道府県予選の優勝回数は出さず、地区代表での出場回数だけを添える(1.9.5)
           Text(
-            '全国高校駅伝: 出場$shutsujouKai回・優勝$zenkokuKai回',
-            style: _hosoku,
-          ),
-          Text(
-            '都道府県予選優勝: $kenKai回',
+            '全国高校駅伝: 出場$shutsujouKai回${chikuKai > 0 ? '(うち地区代表$chikuKai回)' : ''}・優勝$zenkokuKai回',
             style: _hosoku,
           ),
         ],
@@ -359,7 +356,6 @@ class _KenBetsu extends StatelessWidget {
               i,
               meibo[i],
               i < kai.zenkoku.length ? kai.zenkoku[i] : 0,
-              i < kai.ken.length ? kai.ken[i] : 0,
               i < kai.shutsujou.length ? kai.shutsujou[i] : 0,
               henkou.contains(i),
             ),
@@ -413,7 +409,7 @@ class _KenBetsu extends StatelessWidget {
     if (kawatta == true) onHenkou();
   }
 
-  Widget _gyou(BuildContext context, int i, KoukouMei m, int zenkokuKai, int kenKai, int shutsujouKai, bool henkouAri) {
+  Widget _gyou(BuildContext context, int i, KoukouMei m, int zenkokuKai, int shutsujouKai, bool henkouAri) {
     final bool meimon = m.meimon == 3;
     return InkWell(
       onTap: () => _henshuu(context, i),
@@ -449,7 +445,6 @@ class _KenBetsu extends StatelessWidget {
             if (shutsujouKai > 0) Text('全国出場$shutsujouKai回', style: _hosoku),
             if (zenkokuKai > 0)
               Text('全国優勝$zenkokuKai回', style: const TextStyle(color: _kin, fontSize: HENSUU.fontsize_honbun - 2)),
-            if (kenKai > 0) Text('都道府県予選優勝$kenKai回', style: _hosoku),
           ],
         ),
       ),
@@ -530,6 +525,30 @@ class _KoukouHenshuuState extends State<_KoukouHenshuu> {
     Navigator.of(context).pop(true);
   }
 
+  /// この高校の回数を0に戻す(確認してから。1.9.5)
+  Future<void> _kaisuuReset() async {
+    final bool? ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        backgroundColor: Colors.grey[900],
+        title: const Text('この高校の回数を0に戻しますか?', style: TextStyle(color: Colors.white)),
+        content: const Text(
+          '全国高校駅伝の出場回数・優勝回数・連続出場を0に戻します。過去の大会の記録はそのまま残ります。',
+          style: _honbun,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(c).pop(false), child: const Text('やめる')),
+          TextButton(onPressed: () => Navigator.of(c).pop(true), child: const Text('0に戻す')),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _hozonChuu = true);
+    await koukouKaisuuReset(widget.ban);
+    if (!mounted) return;
+    Navigator.of(context).pop(true);
+  }
+
   InputDecoration _deco(String label) {
     return InputDecoration(
       labelText: label,
@@ -551,6 +570,20 @@ class _KoukouHenshuuState extends State<_KoukouHenshuu> {
   Widget build(BuildContext context) {
     final KoukouMei shoki = koukouMeiboShoki[widget.ban];
     final bool henkouAri = koukouHenkouAri(widget.ban);
+    // その都道府県の名簿の高校が1校だけなら、都道府県は変えられない(名簿の高校が0校の県を作らないように。1.9.5)
+    final List<KoukouMei> meibo = koukouMeiboGenzai();
+    final int imaKen = meibo[widget.ban].ken;
+    final bool kenKotei = meibo.where((KoukouMei m) => m.ken == imaKen).length <= 1;
+    final String imaKenMei =
+        (imaKen >= 0 && imaKen < LocationDatabase.allPrefectures.length) ? LocationDatabase.allPrefectures[imaKen] : '';
+    // 元に戻すと都道府県が変わり、今の都道府県の名簿の高校が0校になるなら、元に戻せない
+    final bool modosenai = kenKotei && shoki.ken != imaKen;
+    // この高校の回数(1回以上あれば、0に戻すボタンを出す)
+    final KoukouYuushouKaisuu kai = koukouYuushouKaisuuYomu();
+    final int b = widget.ban;
+    final bool kaisuuAri = (b < kai.zenkoku.length && kai.zenkoku[b] > 0) ||
+        (b < kai.ken.length && kai.ken[b] > 0) ||
+        (b < kai.shutsujou.length && kai.shutsujou[b] > 0);
     return Scaffold(
       backgroundColor: HENSUU.backgroundcolor,
       appBar: AppBar(
@@ -581,8 +614,14 @@ class _KoukouHenshuuState extends State<_KoukouHenshuu> {
               for (int k = 0; k < LocationDatabase.allPrefectures.length; k++)
                 DropdownMenuItem<int>(value: k, child: Text(LocationDatabase.allPrefectures[k], style: _honbun)),
             ],
-            onChanged: _hozonChuu ? null : (int? v) => setState(() => _ken = v ?? _ken),
+            onChanged: (_hozonChuu || kenKotei) ? null : (int? v) => setState(() => _ken = v ?? _ken),
           ),
+          if (kenKotei)
+            Text(
+              '$imaKenMeiの名簿の高校はこの1校だけなので、都道府県は変えられません'
+              '(ほかの高校を$imaKenMeiに移すと、変えられるようになります)。',
+              style: _hosoku,
+            ),
           _label('名門度(高いほど、名前のない部員が強く、速い新入生が集まりやすい。名門は県外からも集まる)'),
           DropdownButton<int>(
             value: _meimon,
@@ -626,7 +665,8 @@ class _KoukouHenshuuState extends State<_KoukouHenshuu> {
           const SizedBox(height: 8),
           const Text(
             '都道府県・名門度・タイプ・留学生の変更は、次の新入生の計算から効きます。今の選手の高校時代の実績は変わりません。'
-            '校名の変更は、今の選手の出身校や大会の記録にもそのまま出ます。',
+            '校名の変更は、今の選手の出身校にもそのまま出ます。過去の大会の記録は、そのときの校名で出ます。'
+            '全国高校駅伝の出場回数と優勝回数は、校名を変えてもこの高校に残ります(0に戻すこともできます)。',
             style: _hosoku,
           ),
           const SizedBox(height: 16),
@@ -640,11 +680,25 @@ class _KoukouHenshuuState extends State<_KoukouHenshuu> {
               ),
               if (henkouAri)
                 OutlinedButton(
-                  onPressed: _hozonChuu ? null : _modosu,
+                  onPressed: (_hozonChuu || modosenai) ? null : _modosu,
                   child: const Text('この高校を元に戻す', style: _honbun),
+                ),
+              if (kaisuuAri)
+                OutlinedButton(
+                  onPressed: _hozonChuu ? null : _kaisuuReset,
+                  child: const Text('この高校の回数を0に戻す', style: _honbun),
                 ),
             ],
           ),
+          if (henkouAri && modosenai)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                '元に戻すと$imaKenMeiの名簿の高校がなくなるので、この高校は元に戻せません'
+                '(ほかの高校を$imaKenMeiに移すか、「すべての高校を元に戻す」を使ってください)。',
+                style: _hosoku,
+              ),
+            ),
           const SizedBox(height: 40),
         ],
       ),
@@ -706,8 +760,9 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
 
   /// 選手の行(名前と高校、大学に入った選手は進学先。自分の大学に来た選手は色を変える)
   /// [kouAri] がfalseなら高校の名前を出さない(チームの走者の一覧のとき)
-  Widget _soushaGyou(String juni, KoukouKirokuSousha s, String time, {bool kouAri = true}) {
-    final String kou = koukouCodeMei(s.kouCode);
+  /// 高校の名前は、その回の当時の名前([kiroku]。あとで校名を変えた高校は前の名前)
+  Widget _soushaGyou(KoukouTaikaiKiroku kiroku, String juni, KoukouKirokuSousha s, String time, {bool kouAri = true}) {
+    final String kou = kiroku.kouMei(s.kouCode);
     String mei;
     String sub = '';
     bool jibun = false;
@@ -763,7 +818,7 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
     );
   }
 
-  String _teamMei(KoukouKirokuTeam t) => koukouCodeMei(t.kouCode);
+  String _teamMei(KoukouTaikaiKiroku kiroku, KoukouKirokuTeam t) => kiroku.kouMei(t.kouCode);
 
   int _kaisuu(List<int> l, int i) => i < l.length ? l[i] : 0;
 
@@ -774,7 +829,7 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
   }
 
   /// チームの見出し(「1位 天馬学園高(栃木) 2時間03分12秒 地区代表(北関東)」)
-  String _teamMidashi(int j, KoukouKirokuTeam t) {
+  String _teamMidashi(KoukouTaikaiKiroku kiroku, int j, KoukouKirokuTeam t) {
     final int c = t.daihyou - 1;
     final String daihyou = (t.daihyou >= 1 && c < koukouChikuMei.length) ? '　地区代表(${koukouChikuMei[c]})' : '';
     // 出場の回数目(記録を残し始めてからなので、2回目から出す。「3年連続5回目」「5回目」)
@@ -782,11 +837,11 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
     if (t.kaime >= 2) {
       kaime = t.renzoku >= 2 ? '　${t.renzoku}年連続${t.kaime}回目' : '　${t.kaime}回目';
     }
-    return '${j + 1}位　${_teamMei(t)}　${TimeDate.timeToJikanFunByouString(t.time)}$daihyou$kaime';
+    return '${j + 1}位　${_teamMei(kiroku, t)}　${TimeDate.timeToJikanFunByouString(t.time)}$daihyou$kaime';
   }
 
   /// チームの走者(区間の順、補欠は最後)
-  List<Widget> _teamMember(int j, KoukouKirokuTeam t) {
+  List<Widget> _teamMember(KoukouTaikaiKiroku kiroku, int j, KoukouKirokuTeam t) {
     final List<KoukouKirokuSousha>? m = t.member;
     if (m == null) {
       return const [Text('この回は走者の記録がありません。', style: _hosoku)];
@@ -798,6 +853,7 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
       if (jun.isEmpty) const Text('大学に入った選手はいません。', style: _hosoku),
       for (final KoukouKirokuSousha s in jun)
         _soushaGyou(
+          kiroku,
           s.kukan >= 1 ? '${s.kukan}区' : '補欠',
           s,
           s.kukan >= 1 ? TimeDate.timeToFunByouString(s.time) : '',
@@ -836,13 +892,13 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
         chokkin.add(
           Padding(
             padding: const EdgeInsets.only(left: 24, top: 2),
-            child: Text('${j + 1}位　${_teamMei(r.zenkoku[j])}', style: _honbun),
+            child: Text('${j + 1}位　${_teamMei(r, r.zenkoku[j])}', style: _honbun),
           ),
         );
       }
       for (int sh = 0; sh < r.soutai.length && sh < _shumokuMei.length; sh++) {
         if (r.soutai[sh].isEmpty) continue;
-        chokkin.add(_soushaGyou('総体${_shumokuMei[sh]} 優勝', r.soutai[sh].first, ''));
+        chokkin.add(_soushaGyou(r, '総体${_shumokuMei[sh]} 優勝', r.soutai[sh].first, ''));
       }
     }
 
@@ -853,7 +909,7 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
     ]..sort((a, b) {
         final int s = _kai.zenkoku[b].compareTo(_kai.zenkoku[a]);
         if (s != 0) return s;
-        final int s2 = _kai.ken[b].compareTo(_kai.ken[a]);
+        final int s2 = _kaisuu(_kai.shutsujou, b).compareTo(_kaisuu(_kai.shutsujou, a));
         return s2 != 0 ? s2 : a.compareTo(b);
       });
 
@@ -885,8 +941,7 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
               Padding(
                 padding: const EdgeInsets.only(left: 12, top: 4),
                 child: Text(
-                  '${koukouCodeMei(i)}　優勝${_kai.zenkoku[i]}回'
-                  '(出場${_kaisuu(_kai.shutsujou, i)}回・都道府県予選優勝${_kai.ken[i]}回)',
+                  '${koukouCodeMei(i)}　優勝${_kai.zenkoku[i]}回(出場${_kaisuu(_kai.shutsujou, i)}回)',
                   style: _honbun,
                 ),
               ),
@@ -901,7 +956,8 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
               Padding(
                 padding: const EdgeInsets.only(left: 12, top: 4),
                 child: Text(
-                  '${koukouCodeMei(i)}　出場${_kaisuu(_kai.shutsujou, i)}回(優勝${_kai.zenkoku[i]}回)',
+                  '${koukouCodeMei(i)}　出場${_kaisuu(_kai.shutsujou, i)}回'
+                  '${_kai.chikuDaihyou(i) > 0 ? '(うち地区代表${_kai.chikuDaihyou(i)}回)' : ''}・優勝${_kai.zenkoku[i]}回',
                   style: _honbun,
                 ),
               ),
@@ -945,8 +1001,8 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
           for (int j = 0; j < k.zenkoku.length; j++)
             _Oritatami(
               key: ValueKey<String>('team$erabu-$j'),
-              midashi: _teamMidashi(j, k.zenkoku[j]),
-              naka: _teamMember(j, k.zenkoku[j]),
+              midashi: _teamMidashi(k, j, k.zenkoku[j]),
+              naka: _teamMember(k, j, k.zenkoku[j]),
               futoi: j == 0,
             ),
         ],
@@ -966,6 +1022,7 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
             ),
             for (int j = 0; j < k.kukan[kk].length; j++)
               _soushaGyou(
+                k,
                 j == 0 ? '区間賞' : '${j + 1}位',
                 k.kukan[kk][j],
                 TimeDate.timeToFunByouString(k.kukan[kk][j].time),
@@ -980,7 +1037,7 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
           midashi: '高校総体 ${_shumokuMei[sh]} 決勝',
           naka: [
             for (int j = 0; j < k.soutai[sh].length; j++)
-              _soushaGyou('${j + 1}位', k.soutai[sh][j], TimeDate.timeToFunByouString(k.soutai[sh][j].time)),
+              _soushaGyou(k, '${j + 1}位', k.soutai[sh][j], TimeDate.timeToFunByouString(k.soutai[sh][j].time)),
           ],
         ),
       const SizedBox(height: 24),

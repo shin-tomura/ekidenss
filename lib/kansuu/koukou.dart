@@ -1327,6 +1327,7 @@ bool koukouHenkouAri(int i) => _henkouYomu(_kaisuuJsonYomu()).containsKey(i);
 /// 高校[i]を[m]に変えて保存する([m]がnullか、初期値と同じなら元に戻す)
 Future<void> koukouHenkouHozon(int i, KoukouMei? m) async {
   if (i < 0 || i >= koukouMeiboShoki.length) return;
+  final String maeMei = koukouCodeMei(i);
   final Map<String, dynamic> d = _kaisuuJsonYomu();
   final Map<String, dynamic> h = d['h'] is Map ? Map<String, dynamic>.from(d['h'] as Map) : <String, dynamic>{};
   final KoukouMei moto = koukouMeiboShoki[i];
@@ -1348,13 +1349,71 @@ Future<void> koukouHenkouHozon(int i, KoukouMei? m) async {
     d['h'] = h;
   }
   await _kaisuuJsonKaku(d);
+  // 校名か都道府県が変わったら、それまでの大会の記録には当時の名前で出す
+  if (koukouCodeMei(i) != maeMei) await _kirokuNiKyuumeiNokosu({i: maeMei});
 }
 
 /// 高校の名簿を、すべて初期値に戻す
 Future<void> koukouHenkouZenbuModosu() async {
+  final List<KoukouMei> mae = koukouMeiboGenzai();
+  final Map<int, String> maeMei = {
+    for (int i = 0; i < mae.length; i++)
+      if (!identical(mae[i], koukouMeiboShoki[i])) i: koukouCodeMei(i),
+  };
   final Map<String, dynamic> d = _kaisuuJsonYomu();
   d.remove('h');
   await _kaisuuJsonKaku(d);
+  await _kirokuNiKyuumeiNokosu({
+    for (final MapEntry<int, String> e in maeMei.entries)
+      if (koukouCodeMei(e.key) != e.value) e.key: e.value,
+  });
+}
+
+/// 大会の記録に、校名か都道府県を変えた高校の当時の名前を残す(1.9.5。kn に {"高校の番号": 名前})
+/// もっと前の名前が残っている回は、そちらのままにする(その回の当時の名前なので)
+Future<void> _kirokuNiKyuumeiNokosu(Map<int, String> kyuumei) async {
+  if (kyuumei.isEmpty) return;
+  final List<dynamic> kiroku = _kirokuYomuMoto();
+  if (kiroku.isEmpty) return;
+  bool kawatta = false;
+  for (final dynamic r in kiroku) {
+    if (r is! Map) continue;
+    final Map<String, dynamic> kn = r['kn'] is Map ? Map<String, dynamic>.from(r['kn'] as Map) : <String, dynamic>{};
+    for (final MapEntry<int, String> e in kyuumei.entries) {
+      if (kn.containsKey('${e.key}')) continue;
+      kn['${e.key}'] = e.value;
+      kawatta = true;
+    }
+    r['kn'] = kn;
+  }
+  if (!kawatta) return;
+  final UnivData? u = _kirokuUniv(_kirokuUnivId);
+  if (u == null) return;
+  u.name_tanshuku = '$_kirokuMidashi\n${jsonEncode(kiroku)}';
+  await u.save();
+}
+
+/// 高校[i]の全国高校駅伝の出場回数・優勝回数・連続出場と、都道府県予選の優勝回数を0に戻す(1.9.5。
+/// 高校名鑑の編集の画面。大会の記録はそのまま残す)
+Future<void> koukouKaisuuReset(int i) async {
+  if (i < 0 || i >= koukouMeiboShoki.length) return;
+  final Map<String, dynamic> kaisuuJson = _kaisuuJsonYomu();
+  final List<int> z = _kaisuuList(kaisuuJson, 'z', 0);
+  final List<int> k = _kaisuuList(kaisuuJson, 'k', 0);
+  final List<int> d = _kaisuuList(kaisuuJson, 'd', 0);
+  final List<int> rn = _kaisuuList(kaisuuJson, 'rn', 0);
+  final List<int> ln = _kaisuuList(kaisuuJson, 'ln', _mishutsujou);
+  z[i] = 0;
+  k[i] = 0;
+  d[i] = 0;
+  rn[i] = 0;
+  ln[i] = _mishutsujou;
+  kaisuuJson['z'] = z;
+  kaisuuJson['k'] = k;
+  kaisuuJson['d'] = d;
+  kaisuuJson['rn'] = rn;
+  kaisuuJson['ln'] = ln;
+  await _kaisuuJsonKaku(kaisuuJson);
 }
 
 /// 大学id 29 のJSON(優勝回数と名簿の編集)を読む(読めなければ空)
@@ -1649,7 +1708,13 @@ class KoukouTaikaiKiroku {
   /// 高校総体の種目ごとの決勝(着順。0=1500m・1=5000m・2=3000m障害)
   final List<List<KoukouKirokuSousha>> soutai;
 
-  const KoukouTaikaiKiroku(this.nyuugakuNendo, this.zenkoku, this.kukan, this.soutai);
+  /// この回のあとに校名や都道府県を変えた高校の、当時の名前(「天馬学園高(栃木)」。高校の番号から。1.9.5)
+  final Map<int, String> kyuumei;
+
+  const KoukouTaikaiKiroku(this.nyuugakuNendo, this.zenkoku, this.kukan, this.soutai, [this.kyuumei = const {}]);
+
+  /// この回の高校の名前(当時の名前が残っていればそちら)
+  String kouMei(int code) => kyuumei[code] ?? koukouCodeMei(code);
 }
 
 KoukouKirokuSousha? _soushaYomu(dynamic a) {
@@ -1676,6 +1741,16 @@ List<List<KoukouKirokuSousha>> _soushaListYomu(dynamic l) {
             if (_soushaYomu(a) != null) _soushaYomu(a)!,
         ],
   ];
+}
+
+Map<int, String> _kyuumeiYomu(dynamic kn) {
+  final Map<int, String> m = {};
+  if (kn is! Map) return m;
+  for (final MapEntry<dynamic, dynamic> e in kn.entries) {
+    final int? i = int.tryParse('${e.key}');
+    if (i != null && e.value is String) m[i] = e.value as String;
+  }
+  return m;
 }
 
 /// 保存してある大会の記録(新しい順。なければ空)
@@ -1710,6 +1785,7 @@ List<KoukouTaikaiKiroku> koukouTaikaiKirokuYomu() {
           teams,
           _soushaListYomu(d['k']),
           _soushaListYomu(d['s']),
+          _kyuumeiYomu(d['kn']),
         ),
       );
     } catch (_) {}
@@ -1730,6 +1806,10 @@ class KoukouYuushouKaisuu {
   final List<int> shutsujou;
 
   const KoukouYuushouKaisuu(this.zenkoku, this.ken, this.shutsujou);
+
+  /// 地区代表として全国高校駅伝に出た回数(1.9.5。都道府県予選で優勝すれば必ず全国に出るので、出場回数から
+  /// 都道府県予選の優勝回数を引いた残り。どちらも同じ回から数え、新しいゲームと0に戻すときに一緒に消す)
+  int chikuDaihyou(int i) => (i < shutsujou.length && i < ken.length) ? max(0, shutsujou[i] - ken[i]) : 0;
 }
 
 /// 保存してある優勝回数(記録を残し始めてからの回数。なければ全部0)

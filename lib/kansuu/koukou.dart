@@ -212,6 +212,9 @@ String _kenMijikai(int ken) {
   return n.substring(0, n.length - 1);
 }
 
+/// 都道府県の短い名前(ほかの画面で使う。高校名鑑。1.9.5)
+String koukouKenMijikai(int ken) => _kenMijikai(ken);
+
 /// 校名(「雷鳥館高」)
 String koukouMeiMoji(KoukouJouhou j) {
   final KoukouMei? m = j.mei;

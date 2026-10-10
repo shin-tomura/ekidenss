@@ -18,6 +18,7 @@ import 'package:ekiden/screens/Modal_nouryokuEikyodo.dart';
 import 'package:ekiden/screens/Modal_bairitu_goldsilver.dart';
 import 'package:ekiden/screens/Modal_racejiki.dart';
 import 'package:ekiden/screens/Modal_shumihihyouji.dart';
+import 'package:ekiden/screens/Modal_koukouMeikan.dart'; // 高校名鑑(1.9.5)
 import 'package:ekiden/screens/konki_best_parts.dart'; // 持ちタイムの表示設定(1.9.1)
 import 'package:ekiden/screens/shuudan_settei.dart'; // 集団走設定(1.9.2)
 import 'package:ekiden/screens/seichou_type_settei.dart'; // 成長タイプ設定(1.9.3)
@@ -1130,6 +1131,42 @@ class _SettingScreenState extends State<SettingScreen>
             },
             child: Text(
               "自分のチームの歩み",
+              style: TextStyle(
+                color: const Color.fromARGB(255, 0, 255, 0),
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          // 高校名鑑(名門校の紹介と都道府県別の一覧。1.9.5。高校の情報を表示しない設定のときも開ける)
+          TextButton(
+            onPressed: () {
+              showGeneralDialog(
+                context: context,
+                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                barrierDismissible: true, // 背景タップで閉じられるようにする
+                barrierLabel: '高校名鑑', // アクセシビリティ用ラベル
+                transitionDuration: const Duration(
+                  milliseconds: 300,
+                ), // アニメーション時間
+                pageBuilder: (context, animation, secondaryAnimation) {
+                  return const ModalKoukouMeikan();
+                },
+                transitionBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                      return FadeTransition(
+                        opacity: CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOut,
+                        ),
+                        child: child,
+                      );
+                    },
+              );
+            },
+            child: Text(
+              "高校名鑑",
               style: TextStyle(
                 color: const Color.fromARGB(255, 0, 255, 0),
                 decoration: TextDecoration.underline,

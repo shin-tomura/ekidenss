@@ -863,6 +863,15 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
     return '${kk + 1}区(${km}km)';
   }
 
+  /// 優勝校の、その時点の優勝の回数目(「3年連続5回目の優勝」「4年ぶり2回目の優勝」「5回目の優勝」。1.9.5)
+  /// 記録を残し始めてからなので、2回目から出す(1回目と、回数を残す前の記録は空)
+  String _yuushouMoji(KoukouKirokuTeam t) {
+    if (t.yuushouKaime < 2) return '';
+    if (t.yuushouRenzoku >= 2) return '${t.yuushouRenzoku}年連続${t.yuushouKaime}回目の優勝';
+    if (t.yuushouBuri >= 2) return '${t.yuushouBuri}年ぶり${t.yuushouKaime}回目の優勝';
+    return '${t.yuushouKaime}回目の優勝';
+  }
+
   /// チームの見出し(「1位 天馬学園高(栃木) 2時間03分12秒 地区代表(北関東)」)
   String _teamMidashi(KoukouTaikaiKiroku kiroku, int j, KoukouKirokuTeam t) {
     final int c = t.daihyou - 1;
@@ -871,6 +880,11 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
     String kaime = '';
     if (t.kaime >= 2) {
       kaime = t.renzoku >= 2 ? '　${t.renzoku}年連続${t.kaime}回目' : '　${t.kaime}回目';
+    }
+    // 1位は優勝の回数目も(1.9.5)。出すときは、出場のほうに「の出場」を付けて「・」でつなぐ
+    final String yuushou = j == 0 ? _yuushouMoji(t) : '';
+    if (yuushou.isNotEmpty) {
+      kaime = kaime.isEmpty ? '　$yuushou' : '$kaimeの出場・$yuushou';
     }
     return '${j + 1}位　${_teamMei(kiroku, t)}　${TimeDate.timeToJikanFunByouString(t.time)}$daihyou$kaime';
   }
@@ -920,10 +934,10 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
     ];
   }
 
-  /// 在学生の世代の上位3校の、大学に入った選手(区間の順、補欠は最後。区間と区間順位も。1.9.5)
+  /// 在学生の世代の欄の、全国高校駅伝の優勝校の大学に入った選手(区間の順、補欠は最後。区間と区間順位も。1.9.5)
   /// 名前のない選手(1・2年生、大学に入らなかった3年生、高校の留学生)は出さない。
   /// 走者を残す前の記録では何も出さない
-  List<Widget> _jouiMember(KoukouTaikaiKiroku kiroku, KoukouKirokuTeam t) {
+  List<Widget> _yuushouMember(KoukouTaikaiKiroku kiroku, KoukouKirokuTeam t) {
     final List<KoukouKirokuSousha>? m = t.member;
     if (m == null) return const [];
     final List<KoukouKirokuSousha> jun = [
@@ -965,14 +979,14 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
     final int erabu = _erabu.clamp(0, _kiroku.length - 1).toInt();
     final KoukouTaikaiKiroku k = _kiroku[erabu];
 
-    // ---- 在学生の世代の上位校と優勝者(1.9.5) ----
+    // ---- 在学生の世代の優勝校と優勝者(1.9.5) ----
     // 一番新しい記録を今の1年生の世代として、そこから4回分(記録は新入生が入るときに増え、
     // 同じときに4年生が卒業するので、今の日付を見なくても在学生とずれない。途中の年の記録が
     // 欠けていても、卒業した世代は出さない)
     final int saishinNendo = _kiroku.first.nyuugakuNendo;
     final List<Widget> chokkin = [
       const Text(
-        '上位3校の下に、大学に入った選手と進学先を出しています。'
+        '優勝校の下に、大学に入った選手と進学先を出しています。'
         '全員の走者と、それより前の回は、下の「大会の結果」で見られます。',
         style: _hosoku,
       ),
@@ -981,25 +995,33 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
       final int imaGakunen = saishinNendo - r.nyuugakuNendo + 1;
       if (imaGakunen < 1 || imaGakunen > 4) continue;
       chokkin.add(_koMidashi(_kaiMei(r, imaGakunen: imaGakunen)));
-      chokkin.add(
-        const Padding(
-          padding: EdgeInsets.only(left: 12, top: 4),
-          child: Text('全国高校駅伝', style: _hosoku),
-        ),
-      );
-      for (int j = 0; j < r.zenkoku.length && j < 3; j++) {
+      // 全国高校駅伝は優勝校だけ(優勝タイムと、その時点の優勝の回数目。下に大学に入った選手と進学先と区間順位)
+      if (r.zenkoku.isNotEmpty) {
+        final KoukouKirokuTeam yu = r.zenkoku.first;
+        final String yuushou = _yuushouMoji(yu);
+        chokkin.add(
+          const Padding(
+            padding: EdgeInsets.only(left: 12, top: 4),
+            child: Text('全国高校駅伝 優勝', style: _hosoku),
+          ),
+        );
         chokkin.add(
           Padding(
             padding: const EdgeInsets.only(left: 24, top: 2),
-            child: Text('${j + 1}位　${_teamMei(r, r.zenkoku[j])}', style: _honbun),
+            child: Text(
+              '${_teamMei(r, yu)}　${TimeDate.timeToJikanFunByouString(yu.time)}'
+              '${yuushou.isEmpty ? '' : '　$yuushou'}',
+              style: _honbun,
+            ),
           ),
         );
-        // 上位3校は、大学に入った選手と進学先と区間順位も(1.9.5)
-        chokkin.addAll(_jouiMember(r, r.zenkoku[j]));
+        chokkin.addAll(_yuushouMember(r, yu));
       }
+      // 高校総体の優勝者(タイムも)
       for (int sh = 0; sh < r.soutai.length && sh < _shumokuMei.length; sh++) {
         if (r.soutai[sh].isEmpty) continue;
-        chokkin.add(_soushaGyou(r, '総体${_shumokuMei[sh]} 優勝', r.soutai[sh].first, ''));
+        final KoukouKirokuSousha s = r.soutai[sh].first;
+        chokkin.add(_soushaGyou(r, '総体${_shumokuMei[sh]} 優勝', s, TimeDate.timeToFunByouString(s.time)));
       }
     }
 
@@ -1034,7 +1056,7 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
         style: _honbun,
       ),
       const SizedBox(height: 8),
-      _Oritatami(midashi: '在学生の世代の上位校と優勝者', naka: chokkin, hajimeHiraku: true),
+      _Oritatami(midashi: '在学生の世代の優勝校と優勝者', naka: chokkin, hajimeHiraku: true),
       if (tsuyoi.isNotEmpty)
         _Oritatami(
           midashi: '全国高校駅伝の優勝回数',

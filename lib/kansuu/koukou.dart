@@ -1288,7 +1288,10 @@ Future<int> _koukouJouhouFuyoHontai() async {
 //     高校の番号は名簿の番号、その他の高校は1000+都道府県の番号
 //     m: [チームごとに[選手 + 区間(1〜7。補欠は0) + 区間順位(走った選手だけ)]...](z と同じ並び)。
 //     区間順位は、順位を残す前の記録にはない(画面では上位3人の記録から分かる分だけ出す)
-//   ・優勝回数: {z: [全国高校駅伝の優勝回数(名簿の並び)], k: [都道府県予選の優勝回数]}
+//     z の優勝校(1位)だけ、出場の回数目と連続出場の後ろに、その時点の優勝の回数目・連続優勝の年数・
+//     何年ぶり(連続でない2回目以上の優勝のとき。ほかは0)を書き足す(1.9.5。書き足す前の記録にはない)
+//   ・優勝回数: {z: [全国高校駅伝の優勝回数(名簿の並び)], k: [都道府県予選の優勝回数],
+//     d: [出場回数], rn: [連続出場], ln: [最後に出た年度], lz: [最後に優勝した年度], h: 名簿の編集}
 // ・大学に入った選手の大学は、見るときに選手のidと名前が合えば今の大学を出す(スカウトで変わるため)。
 //   卒業した選手は、毎年の保存のときに直した大学を出す(_kirokuHozon)
 // ・新しいゲームの開始時に消す(ShokitiUnivdata.dart。年が1から始まり直すため)
@@ -1435,16 +1438,19 @@ Future<void> koukouKaisuuReset(int i) async {
   final List<int> d = _kaisuuList(kaisuuJson, 'd', 0);
   final List<int> rn = _kaisuuList(kaisuuJson, 'rn', 0);
   final List<int> ln = _kaisuuList(kaisuuJson, 'ln', _mishutsujou);
+  final List<int> lz = _kaisuuList(kaisuuJson, 'lz', _mishutsujou);
   z[i] = 0;
   k[i] = 0;
   d[i] = 0;
   rn[i] = 0;
   ln[i] = _mishutsujou;
+  lz[i] = _mishutsujou;
   kaisuuJson['z'] = z;
   kaisuuJson['k'] = k;
   kaisuuJson['d'] = d;
   kaisuuJson['rn'] = rn;
   kaisuuJson['ln'] = ln;
+  kaisuuJson['lz'] = lz;
   await _kaisuuJsonKaku(kaisuuJson);
 }
 
@@ -1563,6 +1569,16 @@ Future<void> _kirokuHozon(int nyuugakuNendo, Map<String, dynamic> kiroku) async 
   final List<int> saigo = _kaisuuList(kaisuuJson, 'ln', _mishutsujou);
   final dynamic zKonkai = kiroku['z'];
   if (zKonkai is List) _shutsujouSusumeru(nyuugakuNendo, zKonkai, shutsujou, renzoku, saigo);
+  // 優勝回数(記録を保存する前に足し、優勝校に、その時点の優勝の回数目・連続・何年ぶりを書き足す。1.9.5)
+  final KoukouYuushouKaisuu kai = koukouYuushouKaisuuYomu();
+  final List<int> saigoYuushou = _kaisuuList(kaisuuJson, 'lz', _mishutsujou);
+  if (zKonkai is List && zKonkai.isNotEmpty && zKonkai.first is List && (zKonkai.first as List).isNotEmpty) {
+    final dynamic code = (zKonkai.first as List).first;
+    if (code is num && code.toInt() >= 0 && code.toInt() < kai.zenkoku.length) {
+      kai.zenkoku[code.toInt()]++;
+      _yuushouKakitasu(nyuugakuNendo, zKonkai, kai.zenkoku, saigoYuushou, mae);
+    }
+  }
   final List<dynamic> l = [
     {
       'y': nyuugakuNendo,
@@ -1575,13 +1591,7 @@ Future<void> _kirokuHozon(int nyuugakuNendo, Map<String, dynamic> kiroku) async 
   ]..sort((a, b) => _kirokuNen(b).compareTo(_kirokuNen(a)));
   u.name_tanshuku = '$_kirokuMidashi\n${jsonEncode(l.take(_kirokuHozonSuu).toList())}';
   await u.save();
-  // 優勝回数
-  final KoukouYuushouKaisuu kai = koukouYuushouKaisuuYomu();
-  final dynamic z = kiroku['z'];
-  if (z is List && z.isNotEmpty && z.first is List && (z.first as List).isNotEmpty) {
-    final dynamic code = (z.first as List).first;
-    if (code is num && code.toInt() >= 0 && code.toInt() < kai.zenkoku.length) kai.zenkoku[code.toInt()]++;
-  }
+  // 都道府県予選の優勝回数
   final dynamic ky = kiroku['ky'];
   if (ky is List) {
     for (final dynamic code in ky) {
@@ -1594,10 +1604,11 @@ Future<void> _kirokuHozon(int nyuugakuNendo, Map<String, dynamic> kiroku) async 
   kaisuuJson['d'] = shutsujou;
   kaisuuJson['rn'] = renzoku;
   kaisuuJson['ln'] = saigo;
+  kaisuuJson['lz'] = saigoYuushou;
   await _kaisuuJsonKaku(kaisuuJson);
 }
 
-/// まだ全国高校駅伝に出ていない高校の、最後に出た年度
+/// まだ全国高校駅伝に出ていない(優勝していない)高校の、最後に出た(優勝した)年度
 const int _mishutsujou = -99999;
 
 /// 大学id 29 のJSONの、高校ごとの数の一覧(名簿の並び。なければ[shoki])
@@ -1622,11 +1633,53 @@ void _shutsujouSusumeru(int nendo, List<dynamic> teams, List<int> shutsujou, Lis
     shutsujou[code]++;
     renzoku[code] = (saigo[code] == nendo - 1 && renzoku[code] > 0) ? renzoku[code] + 1 : 1;
     saigo[code] = nendo;
-    // t は数だけの一覧(List<int>)のこともあるので、1つずつ足す(型の決まらない一覧を addAll すると型のエラーになる)
-    t.removeRange(3, t.length);
-    t.add(shutsujou[code]);
-    t.add(renzoku[code]);
+    // t は数だけの一覧(List<int>)のこともあるので、1つずつ足す(型の決まらない一覧を addAll すると型のエラーになる)。
+    // 優勝校の後ろ(5番目から)にある優勝の回数目などは消さない(数え直すときのため。1.9.5)
+    if (t.length >= 5) {
+      t[3] = shutsujou[code];
+      t[4] = renzoku[code];
+    } else {
+      t.removeRange(3, t.length);
+      t.add(shutsujou[code]);
+      t.add(renzoku[code]);
+    }
   }
+}
+
+/// 全国高校駅伝の優勝校に、その時点の優勝の回数目・連続優勝の年数・何年ぶりかを書き足す(1.9.5)
+/// [yuushou] は優勝回数(この回の分を足したあと)、[saigoYuushou] は高校ごとの最後に優勝した年度(この回の年度に進める)。
+/// [mae] はこれまでの記録(前の年度の回の優勝校が同じなら、その連続に1を足す。連続は優勝回数を超えない
+/// ので、回数を0に戻したあとは1から数え直す)。何年ぶりは、連続でない2回目以上の優勝のとき(ほかは0)
+void _yuushouKakitasu(int nendo, List<dynamic> z, List<int> yuushou, List<int> saigoYuushou, List<dynamic> mae) {
+  if (z.isEmpty || z.first is! List) return;
+  final List<dynamic> t = z.first as List<dynamic>;
+  if (t.isEmpty || t.first is! num) return;
+  final int code = (t.first as num).toInt();
+  if (code < 0 || code >= yuushou.length || code >= saigoYuushou.length) return;
+  final int kaime = yuushou[code];
+  int renzoku = 1;
+  for (final dynamic d in mae) {
+    if (_kirokuNen(d) != nendo - 1 || d is! Map) continue;
+    final dynamic zMae = d['z'];
+    if (zMae is! List || zMae.isEmpty || zMae.first is! List) break;
+    final List<dynamic> tMae = zMae.first as List<dynamic>;
+    if (tMae.isEmpty || tMae.first is! num || (tMae.first as num).toInt() != code) break;
+    // 前の回に連続の年数がなければ(書き足す前の記録)、前の回の1年分だけ数える
+    final int maeRenzoku = (tMae.length >= 7 && tMae[6] is num) ? (tMae[6] as num).toInt() : 1;
+    renzoku = min(maeRenzoku + 1, kaime);
+    break;
+  }
+  if (renzoku < 1) renzoku = 1;
+  final int saigo = saigoYuushou[code];
+  final int buri = (renzoku == 1 && kaime >= 2 && saigo != _mishutsujou && nendo - saigo >= 2) ? nendo - saigo : 0;
+  saigoYuushou[code] = nendo;
+  while (t.length < 5) {
+    t.add(0);
+  }
+  t.removeRange(5, t.length);
+  t.add(kaime);
+  t.add(renzoku);
+  t.add(buri);
 }
 
 /// 出場回数がまだないデータで、残っている大会の記録から数え直す(1.9.5。出場回数を足す前に作った記録のため)
@@ -1666,7 +1719,7 @@ Future<void> koukouKirokuZenbuKesu() async {
       await u.save();
     }
     final Map<String, dynamic> d = _kaisuuJsonYomu();
-    for (final String kagi in const ['z', 'k', 'd', 'rn', 'ln']) {
+    for (final String kagi in const ['z', 'k', 'd', 'rn', 'ln', 'lz']) {
       d.remove(kagi);
     }
     await _kaisuuJsonKaku(d);
@@ -1727,7 +1780,22 @@ class KoukouKirokuTeam {
   final int kaime;
   final int renzoku;
 
-  const KoukouKirokuTeam(this.kouCode, this.daihyou, this.time, {this.member, this.kaime = 0, this.renzoku = 0});
+  /// 優勝校の、その時点の優勝の回数目・連続優勝の年数・何年ぶり(記録を残し始めてから。分からなければ0。1.9.5)
+  final int yuushouKaime;
+  final int yuushouRenzoku;
+  final int yuushouBuri;
+
+  const KoukouKirokuTeam(
+    this.kouCode,
+    this.daihyou,
+    this.time, {
+    this.member,
+    this.kaime = 0,
+    this.renzoku = 0,
+    this.yuushouKaime = 0,
+    this.yuushouRenzoku = 0,
+    this.yuushouBuri = 0,
+  });
 }
 
 /// 1世代分の大会の記録(画面用)
@@ -1812,6 +1880,9 @@ List<KoukouTaikaiKiroku> koukouTaikaiKirokuYomu() {
               member: j < m.length ? m[j] : null,
               kaime: t.length >= 5 && t[3] is num ? (t[3] as num).toInt() : 0,
               renzoku: t.length >= 5 && t[4] is num ? (t[4] as num).toInt() : 0,
+              yuushouKaime: t.length >= 8 && t[5] is num ? (t[5] as num).toInt() : 0,
+              yuushouRenzoku: t.length >= 8 && t[6] is num ? (t[6] as num).toInt() : 0,
+              yuushouBuri: t.length >= 8 && t[7] is num ? (t[7] as num).toInt() : 0,
             ),
           );
         }

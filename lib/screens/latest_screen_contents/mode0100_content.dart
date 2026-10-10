@@ -10,6 +10,7 @@ import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/screens/Modal_shinnyuuseiShingakusaki.dart';
 import 'package:ekiden/screens/kiji_screen.dart'; // 学内メディアの卒業生特集(1.9.3)
 import 'package:ekiden/kansuu/kiji/kiji.dart'; // 卒業生特集のカードの見出しの予告(1.9.3)
+import 'package:ekiden/kansuu/koukou.dart'; // 新入生の出身校と高校時代の実績(1.9.5)
 // KANSUUクラスをインポートするか、必要な関数をここに直接定義
 // 仮で必要な関数をここに定義します。もし kansuu.dart があるならそちらをインポートしてください。
 // import 'package:ekiden/utils/kansuu.dart';
@@ -497,6 +498,24 @@ class Mode0100Content extends StatelessWidget {
                                               color: HENSUU.textcolor,
                                             ),
                                           ),
+                                          // 出身校(1.9.5。表示しない設定のときと留学生は出さない)
+                                          if (koukouIchiranMoji(
+                                            nyuugakuji5000timejunSenshuData[i].samusataisei,
+                                            nyuugakuji5000timejunSenshuData[i].hirou,
+                                            kantoku,
+                                          ).isNotEmpty) ...[
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              koukouIchiranMoji(
+                                                nyuugakuji5000timejunSenshuData[i].samusataisei,
+                                                nyuugakuji5000timejunSenshuData[i].hirou,
+                                                kantoku,
+                                              ),
+                                              style: const TextStyle(
+                                                color: HENSUU.textcolor,
+                                              ),
+                                            ),
+                                          ],
                                         ],
                                       ),
                                   // 全大学の新入生の進学先(交渉・志望・留学生)を見る(1.8.0)
@@ -565,7 +584,7 @@ class Mode0100Content extends StatelessWidget {
                                   )
                                     if (nyuugakuji5000timejununivfilteredsenshudata[i]
                                             .gakunen ==
-                                        1)
+                                        1) ...[
                                       Wrap(
                                         children: [
                                           Text(
@@ -585,8 +604,47 @@ class Mode0100Content extends StatelessWidget {
                                               color: HENSUU.textcolor,
                                             ),
                                           ),
+                                          // 出身校(1.9.5)
+                                          if (koukouIchiranMoji(
+                                            nyuugakuji5000timejununivfilteredsenshudata[i].samusataisei,
+                                            nyuugakuji5000timejununivfilteredsenshudata[i].hirou,
+                                            kantoku,
+                                          ).isNotEmpty) ...[
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              koukouIchiranMoji(
+                                                nyuugakuji5000timejununivfilteredsenshudata[i].samusataisei,
+                                                nyuugakuji5000timejununivfilteredsenshudata[i].hirou,
+                                                kantoku,
+                                              ),
+                                              style: const TextStyle(
+                                                color: HENSUU.textcolor,
+                                              ),
+                                            ),
+                                          ],
                                         ],
                                       ),
+                                      // 高校時代の一番の実績(1.9.5。なければ出さない)
+                                      if (koukouJissekiHitokoto(
+                                        nyuugakuji5000timejununivfilteredsenshudata[i].samusataisei,
+                                        nyuugakuji5000timejununivfilteredsenshudata[i].hirou,
+                                        kantoku,
+                                      ).isNotEmpty)
+                                        Padding(
+                                          padding: const EdgeInsets.only(left: 16, bottom: 4),
+                                          child: Text(
+                                            koukouJissekiHitokoto(
+                                              nyuugakuji5000timejununivfilteredsenshudata[i].samusataisei,
+                                              nyuugakuji5000timejununivfilteredsenshudata[i].hirou,
+                                              kantoku,
+                                            ),
+                                            style: const TextStyle(
+                                              color: HENSUU.textcolor,
+                                              fontSize: HENSUU.fontsize_honbun - 2,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
                                 ] else if (currentGhensuu.mode == 100 &&
                                     currentGhensuu.month == 3 &&
                                     currentGhensuu.day == 25) ...[

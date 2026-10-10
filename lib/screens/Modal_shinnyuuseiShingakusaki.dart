@@ -472,6 +472,8 @@ class _ModalShinnyuuseiShingakusakiState
             ),
           ),
           TextSpan(text: ' ${comScoutTimeMoji(s.kiroku_nyuugakuji_5000)}'),
+          // 出身校(1.9.5。表示しない設定のときと留学生は出さない)
+          if (_koukouMei(s).isNotEmpty) TextSpan(text: ' ${_koukouMei(s)}'),
         ],
       ),
     );

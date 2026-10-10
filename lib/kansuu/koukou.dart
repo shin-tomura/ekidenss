@@ -320,6 +320,28 @@ String koukouJissekiBun(KoukouJouhou j) {
   return '';
 }
 
+/// 一覧の画面に出す出身校(「青嶺学院高(長野)」。1.9.5)
+/// 表示しない設定のときと、留学生・未設定のときは空
+String koukouIchiranMoji(int samusataisei, int hirou, KantokuData kantoku) {
+  if (hirou == 1 || koukouHyoujiNashi(kantoku)) return '';
+  return koukouMeiKenMoji(KoukouJouhou.yomu(samusataisei));
+}
+
+/// 一覧の画面に出す、高校時代の一番の実績の短い文(1.9.5。なければ空)
+/// 全国高校駅伝 → 高校総体の全国大会 → 都道府県予選 → 地区・県大会 → 経歴の順に、最初に出せるもの
+String koukouJissekiHitokoto(int samusataisei, int hirou, KantokuData kantoku) {
+  if (hirou == 1 || koukouHyoujiNashi(kantoku)) return '';
+  final KoukouJouhou j = KoukouJouhou.yomu(samusataisei);
+  if (j.mei == null) return '';
+  final String ekiden = koukouEkidenMoji(j);
+  final String soutai = koukouSoutaiMoji(j);
+  if (j.ekidenZenkoku && ekiden.isNotEmpty) return ekiden;
+  if (j.soutaiDankai >= 2 && soutai.isNotEmpty) return soutai;
+  if (ekiden.isNotEmpty) return ekiden;
+  if (soutai.isNotEmpty) return soutai;
+  return koukouKeirekiMoji(j);
+}
+
 /// 選手画面に出す、出身校と高校時代の文(出さないときは空)
 /// [hirou] 留学生(1)には出さない
 String koukouProfileMoji(int samusataisei, int hirou, KantokuData kantoku) {

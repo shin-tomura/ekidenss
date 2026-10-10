@@ -26,6 +26,9 @@ class _ModalHobbyDisplaySettingsState extends State<ModalHobbyDisplaySettings> {
   // kantoku.yobiint2[15]が1だと非表示(true)、0だと表示(false)
   late bool _isHobbyHidden;
 
+  // 出身校と高校時代の実績を表示しないか(kantoku.yobiint2[86]。0=表示(初期値)・1=表示しない。1.9.5)
+  late bool _isKoukouHidden;
+
   // 初期化完了フラグ
   bool _isInitialized = false;
 
@@ -53,7 +56,16 @@ class _ModalHobbyDisplaySettingsState extends State<ModalHobbyDisplaySettings> {
       await kantoku.save();
     }
 
+    // 出身校と高校時代の実績(1.9.5)
+    int koukouSetting = kantoku.yobiint2.length > 86 ? kantoku.yobiint2[86] : 0;
+    if (koukouSetting != 0 && koukouSetting != 1) {
+      koukouSetting = 0;
+      kantoku.yobiint2[86] = 0;
+      await kantoku.save();
+    }
+
     setState(() {
+      _isKoukouHidden = (koukouSetting == 1);
       _hobbyDisplaySetting = initialSetting;
       // 💡 変更点 4: `_isHobbyHidden` は `1` の場合に `true` (非表示)
       _isHobbyHidden = (initialSetting == 1);
@@ -70,6 +82,16 @@ class _ModalHobbyDisplaySettingsState extends State<ModalHobbyDisplaySettings> {
       _isHobbyHidden = isHidden;
       _hobbyDisplaySetting = newSetting;
       kantoku.yobiint2[15] = newSetting;
+    });
+
+    await kantoku.save();
+  }
+
+  /// 出身校と高校時代の実績の表示 (`yobiint2[86]`) を変更し、Hiveに保存する関数(1.9.5)
+  void _updateKoukouDisplaySetting(bool isHidden) async {
+    setState(() {
+      _isKoukouHidden = isHidden;
+      kantoku.yobiint2[86] = isHidden ? 1 : 0;
     });
 
     await kantoku.save();
@@ -147,7 +169,7 @@ class _ModalHobbyDisplaySettingsState extends State<ModalHobbyDisplaySettings> {
         appBar: AppBar(
           // 💡 変更点 7: タイトルを趣味表示設定に変更
           title: const Text(
-            '🎭 趣味非表示設定',
+            '🎭 趣味・高校時代の表示設定',
             style: TextStyle(color: Colors.white),
           ),
           backgroundColor: HENSUU.backgroundcolor,
@@ -166,7 +188,7 @@ class _ModalHobbyDisplaySettingsState extends State<ModalHobbyDisplaySettings> {
           appBar: AppBar(
             // 💡 変更点 8: タイトルを趣味表示設定に変更
             title: const Text(
-              '🎭 趣味非表示設定',
+              '🎭 趣味・高校時代の表示設定',
               style: TextStyle(color: Colors.white),
             ),
             backgroundColor: HENSUU.backgroundcolor,
@@ -190,7 +212,7 @@ class _ModalHobbyDisplaySettingsState extends State<ModalHobbyDisplaySettings> {
                       ),
                     ),
                     child: Text(
-                      "選手プロフィール画面での趣味の表示・非表示を切り替えることができます。\n\nON (非表示): 趣味の情報を画面に表示しません。\nOFF (表示): 趣味の情報を画面に表示します。",
+                      "選手プロフィール画面での趣味と、出身校・高校時代の実績の表示・非表示を切り替えることができます。\n\nON (非表示): その情報を画面に表示しません。\nOFF (表示): その情報を画面に表示します。\n\n出身校と高校時代の実績は、架空の高校と大会の結果です(ゲーム内の計算には一切影響しません)。",
                       style: TextStyle(
                         color: HENSUU.textcolor,
                         fontSize: HENSUU.fontsize_honbun,
@@ -205,6 +227,16 @@ class _ModalHobbyDisplaySettingsState extends State<ModalHobbyDisplaySettings> {
                     description: 'ONにすると選手プロフィール画面で趣味が非表示になります。',
                     currentValue: _isHobbyHidden,
                     onChanged: _updateHobbyDisplaySetting,
+                    activeColor: Colors.red, // 非表示
+                    inactiveColor: Colors.green, // 表示
+                  ),
+
+                  // 出身校と高校時代の実績の表示設定スイッチ(1.9.5)
+                  _buildHobbyDisplaySwitch(
+                    title: '出身校・高校時代の表示・非表示を切り替え',
+                    description: 'ONにすると選手プロフィール画面で出身校と高校時代の実績が非表示になります。',
+                    currentValue: _isKoukouHidden,
+                    onChanged: _updateKoukouDisplaySetting,
                     activeColor: Colors.red, // 非表示
                     inactiveColor: Colors.green, // 表示
                   ),

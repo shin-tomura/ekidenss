@@ -66,6 +66,7 @@ import 'package:ekiden/screens/9003FreshHoushutu.dart';
 import 'package:ekiden/kansuu/ChartPanelSenshu.dart';
 import 'package:ekiden/kansuu/ChartPanelUniv.dart';
 import 'package:ekiden/kansuu/seichou_type.dart'; // 新入生の成長タイプの割合の移行処理(1.9.3)
+import 'package:ekiden/kansuu/koukou.dart'; // 出身校と高校時代の実績(1.9.5)
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 // ★ここに buildAppTheme() 関数を記述する★
@@ -1020,6 +1021,11 @@ Future<void> main() async {
       }
     }
 
+    // 出身校と高校時代の実績がまだない日本人選手に付ける(1.9.5。koukou.dart)
+    // 版の番号では判定しない(1.9.5testで開いたデータにも付くように)。付いていれば何もしない
+    //save_load_screenの中の _importFromSlot の中にもあるので、そちらも変更すること！
+    await koukouJouhouFuyo();
+
     //1.4.3からバージョン番号保存することにした(この処理は一連の処理の中で1番最後にすること)
     //save_load_screenの中の _importFromSlot の中にもあるので、そちらも変更すること！
     final versionValue = int.tryParse(sortedUnivData[7].name_tanshuku);
@@ -1400,6 +1406,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       await _senshuBox.put(senshu.id, senshu);
     }
 
+    // 出身校と高校時代の実績(1.9.5。学年ごとに、その学年が高校3年のときの大会を計算する。koukou.dart)
+    await koukouJouhouFuyo();
+
     final Skip? skip = _skipBox.get('SkipData');
     if (skip!.skipflag == 0) {
       await Future.delayed(const Duration(milliseconds: 200)); // 処理のシミュレーション
@@ -1591,6 +1600,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       }
       await _senshuBox.put(senshu.id, senshu);
     }
+
+    // 出身校と高校時代の実績(1.9.5。学年ごとに、その学年が高校3年のときの大会を計算する。koukou.dart)
+    await koukouJouhouFuyo();
 
     final Skip? skip = _skipBox.get('SkipData');
     if (skip!.skipflag == 0) {

@@ -12,6 +12,7 @@ import 'package:ekiden/kansuu/GakunenZurasi.dart';
 import 'package:ekiden/kansuu/ShozokusakiKettei_By_Univmeisei.dart';
 import 'package:ekiden/kansuu/SenshuShokiti.dart';
 import 'package:ekiden/kansuu/meisei_rireki.dart'; // 名声の履歴(1.8.8)
+import 'package:ekiden/kansuu/koukou.dart'; // 出身校と高校時代の実績(1.9.5)
 
 /// 年度替わりの選手引退、新入生入学、データ更新処理をまとめて実行します。
 ///
@@ -682,6 +683,10 @@ Future<void> RetireNew({
     gakunen: gakunenForNewStudents,
     ghensuu: ghensuu,
   );
+
+  // --- 新入生の出身校と高校時代の実績(1.9.5。ゲームの計算には使わない) ---
+  // 留学生が決まったあとに、日本人の新入生全員で全国高校駅伝と高校総体を計算する(koukou.dart)
+  await koukouJouhouFuyo();
 
   // --- 個人ベスト記録の全体順位・学内順位更新 ---
   // TEISUU.SUU_KOJINBESTKIROKUSHURUISUU は定数として定義されていると仮定

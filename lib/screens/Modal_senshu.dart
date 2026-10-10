@@ -5,6 +5,7 @@ import 'package:ekiden/constants.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/senshu_data.dart';
 import 'package:ekiden/kantoku_data.dart';
+import 'package:ekiden/kansuu/koukou.dart'; // 出身校と高校時代の実績(1.9.5)
 import 'package:ekiden/kansuu/time_date.dart';
 import 'package:ekiden/screens/Modal_editSenshu.dart';
 import 'package:ekiden/screens/Modal_nameedit.dart';
@@ -353,6 +354,15 @@ class _ModalSenshuDetailViewState extends State<ModalSenshuDetailView> {
                       '出身: ${LocationDatabase.allPrefectures[extractedPrefectureIndex]}\n趣味: ${HobbyDatabase.allHobbies[extractedHobbyIndex]}';
                 }
               }
+            }
+            // 出身校と高校時代の実績(1.9.5。koukou.dart。表示しない設定のときと留学生は空)
+            final String koukouStr = koukouProfileMoji(
+              currentSenshu.samusataisei,
+              currentSenshu.hirou,
+              kantoku,
+            );
+            if (koukouStr.isNotEmpty) {
+              shumi_str = shumi_str.isEmpty ? koukouStr : '$shumi_str\n$koukouStr';
             }
             final String menuName = TrainingMenu.getMenuString(
               currentSenshu.kaifukuryoku,

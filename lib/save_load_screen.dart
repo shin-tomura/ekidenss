@@ -24,6 +24,7 @@ import 'package:ekiden/kansuu/goldsilver_com.dart';
 import 'package:ekiden/kansuu/scout_com.dart';
 import 'package:ekiden/kansuu/gakuren_kantoku.dart'; // 学連選抜の監督の移行処理(1.8.2)
 import 'package:ekiden/kansuu/seichou_type.dart'; // 新入生の成長タイプの割合の移行処理(1.9.3)
+import 'package:ekiden/kansuu/koukou.dart'; // 出身校と高校時代の実績(1.9.5)
 //import 'dart:io';
 //import 'package:path_provider/path_provider.dart';
 
@@ -836,6 +837,10 @@ class _SaveLoadScreenState extends State<SaveLoadScreen> {
           }
         }
       }
+
+      // 出身校と高校時代の実績がまだない日本人選手に付ける(1.9.5。mainの中の同じ処理の説明を参照)
+      //mainの中にもあるので、そちらも変更すること！
+      await koukouJouhouFuyo();
 
       //1.4.3からバージョン番号保存することにした(この処理は一連の処理の中で1番最後にすること)
       //mainの中にもあるので、そちらも変更すること！

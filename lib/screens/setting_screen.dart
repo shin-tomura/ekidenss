@@ -1070,7 +1070,7 @@ class _SettingScreenState extends State<SettingScreen>
                 context: context,
                 barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
                 barrierDismissible: true, // 背景タップで閉じられるようにする
-                barrierLabel: '趣味非表示設定', // アクセシビリティ用ラベル
+                barrierLabel: '趣味・高校時代の表示設定', // アクセシビリティ用ラベル
                 transitionDuration: const Duration(
                   milliseconds: 300,
                 ), // アニメーション時間
@@ -1092,7 +1092,7 @@ class _SettingScreenState extends State<SettingScreen>
               );
             },
             child: Text(
-              "趣味非表示設定",
+              "趣味・高校時代の表示設定", // 1.9.5から出身校と高校時代の実績も切り替える
               style: TextStyle(
                 color: const Color.fromARGB(255, 0, 255, 0),
                 decoration: TextDecoration.underline,

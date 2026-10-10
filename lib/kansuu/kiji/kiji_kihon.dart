@@ -1240,6 +1240,78 @@ List<int> kukanShumoku(Ghensuu gh, int race, int k) {
   }
 }
 
+/// 区間[kk]の持ちタイムを比べる種目(time_bestkiroku の番号。展望記事の「各区間」と実況の次の区間で使う。1.9.5)
+/// 区間で見る種目(kukanShumoku)の順に、1万m・5000mを後ろに足した候補から、
+/// その区間を走る選手[hashiru]の半分以上が記録を持っている最初の種目にする(どれもなければ最後の候補)
+/// (1.9.2から展望記事の中にあった選び方を、実況でも使えるようにここへ移した)
+int kukanHikakuShumoku(KijiKankyou k, int kk, List<SenshuData> hashiru) {
+  final List<int> kouho = List<int>.of(kukanShumoku(k.gh, k.race, kk));
+  for (final int c in const [1, 0]) {
+    if (!kouho.contains(c)) kouho.add(c);
+  }
+  // 走る選手の半分以上が記録を持っている種目で比べる
+  int idx = kouho.last;
+  for (final int c in kouho) {
+    int ari = 0;
+    for (final SenshuData s in hashiru) {
+      if (k.jikoBest(s, c) < TEISUU.DEFAULTTIME) ari++;
+    }
+    if (ari > 0 && ari * 2 >= hashiru.length) {
+      idx = c;
+      break;
+    }
+  }
+  return idx;
+}
+
+/// 区間[kk]の区間記録(なければnull。1.9.2から展望記事の中にあったものを、実況でも使えるようにここへ移した。1.9.5)
+/// [konkaiNozoku] 今回の大会(今の年と月)で出た記録を除いた最高記録にする。大会が終わると区間記録が
+/// 更新されるので、結果画面で実況を読み直したときに、走る前の区間記録を出すため
+({String name, String univ, double time, int year})? kukanKiroku(
+  KijiKankyou k,
+  int kk, {
+  bool konkaiNozoku = false,
+}) {
+  final gh = k.gh;
+  final int r = k.race;
+  if (gh.time_zentaikukankiroku.length <= r) return null;
+  if (gh.time_zentaikukankiroku[r].length <= kk) return null;
+  final List<double> times = gh.time_zentaikukankiroku[r][kk];
+  for (int i = 0; i < times.length; i++) {
+    final double t = times[i];
+    if (t <= 0 || t >= TEISUU.DEFAULTTIME) return null;
+    String name = '';
+    String univ = '';
+    int year = 0;
+    int month = 0;
+    if (gh.name_zentaikukankiroku.length > r &&
+        gh.name_zentaikukankiroku[r].length > kk &&
+        gh.name_zentaikukankiroku[r][kk].length > i) {
+      name = gh.name_zentaikukankiroku[r][kk][i];
+    }
+    if (gh.univname_zentaikukankiroku.length > r &&
+        gh.univname_zentaikukankiroku[r].length > kk &&
+        gh.univname_zentaikukankiroku[r][kk].length > i) {
+      univ = gh.univname_zentaikukankiroku[r][kk][i];
+    }
+    if (gh.year_zentaikukankiroku.length > r &&
+        gh.year_zentaikukankiroku[r].length > kk &&
+        gh.year_zentaikukankiroku[r][kk].length > i) {
+      year = gh.year_zentaikukankiroku[r][kk][i];
+    }
+    if (gh.month_zentaikukankiroku.length > r &&
+        gh.month_zentaikukankiroku[r].length > kk &&
+        gh.month_zentaikukankiroku[r][kk].length > i) {
+      month = gh.month_zentaikukankiroku[r][kk][i];
+    }
+    // 今回の大会の記録は飛ばして、次の記録を見る
+    if (konkaiNozoku && year == gh.year && month == gh.month) continue;
+    if (name.isEmpty) return null;
+    return (name: name, univ: univ, time: t, year: year);
+  }
+  return null;
+}
+
 /// 選手[s]が、記事にする対校戦より前に対校戦(5000m・1万m・ハーフ)を走った回数
 /// (学年ごとに残る順位から数える。今の学年の分は数えない)
 int taikousenShussouKaisuu(SenshuData s) {

@@ -274,22 +274,8 @@ class Tenbou {
           for (final SenshuData s in x.hashiru)
             if (k.entry(s) == kk) s,
       ];
-      final List<int> kouho = List<int>.of(kukanShumoku(k.gh, race, kk));
-      for (final int c in const [1, 0]) {
-        if (!kouho.contains(c)) kouho.add(c);
-      }
-      // 走る選手の半分以上が記録を持っている種目で比べる
-      int idx = kouho.last;
-      for (final int c in kouho) {
-        int ari = 0;
-        for (final SenshuData s in hashiru) {
-          if (k.jikoBest(s, c) < TEISUU.DEFAULTTIME) ari++;
-        }
-        if (ari > 0 && ari * 2 >= hashiru.length) {
-          idx = c;
-          break;
-        }
-      }
+      // 走る選手の半分以上が記録を持っている種目で比べる(実況と共通。kiji_kihon.dart。1.9.5)
+      final int idx = kukanHikakuShumoku(k, kk, hashiru);
       shumoku.add(idx);
       hashiru.sort((a, b) {
         final int c = k.jikoBest(a, idx).compareTo(k.jikoBest(b, idx));
@@ -436,40 +422,6 @@ class Tenbou {
   String sankouMoji(TenbouUniv x) => x.sankouIchiman >= TEISUU.DEFAULTTIME
       ? '-'
       : jikanMoji(x.sankouIchiman);
-}
-
-/// 区間記録(なければnull)
-({String name, String univ, double time, int year})? _kukanKiroku(
-  KijiKankyou k,
-  int kk,
-) {
-  final gh = k.gh;
-  final int r = k.race;
-  if (gh.time_zentaikukankiroku.length <= r) return null;
-  if (gh.time_zentaikukankiroku[r].length <= kk) return null;
-  if (gh.time_zentaikukankiroku[r][kk].isEmpty) return null;
-  final double t = gh.time_zentaikukankiroku[r][kk][0];
-  if (t <= 0 || t >= TEISUU.DEFAULTTIME) return null;
-  String name = '';
-  String univ = '';
-  int year = 0;
-  if (gh.name_zentaikukankiroku.length > r &&
-      gh.name_zentaikukankiroku[r].length > kk &&
-      gh.name_zentaikukankiroku[r][kk].isNotEmpty) {
-    name = gh.name_zentaikukankiroku[r][kk][0];
-  }
-  if (gh.univname_zentaikukankiroku.length > r &&
-      gh.univname_zentaikukankiroku[r].length > kk &&
-      gh.univname_zentaikukankiroku[r][kk].isNotEmpty) {
-    univ = gh.univname_zentaikukankiroku[r][kk][0];
-  }
-  if (gh.year_zentaikukankiroku.length > r &&
-      gh.year_zentaikukankiroku[r].length > kk &&
-      gh.year_zentaikukankiroku[r][kk].isNotEmpty) {
-    year = gh.year_zentaikukankiroku[r][kk][0];
-  }
-  if (name.isEmpty) return null;
-  return (name: name, univ: univ, time: t, year: year);
 }
 
 /// 予想陣の印(1番手◎・2番手○・3番手▲。それより下は「-」)
@@ -1077,7 +1029,7 @@ Kiji _kukanTenbou(Tenbou t, List<KijiYosouJin> yosou) {
         kk == ks - 1 ||
         tk == KukanTokuchou.yamaNobori ||
         tk == KukanTokuchou.yamaKudari) {
-      final kr = _kukanKiroku(k, kk);
+      final kr = kukanKiroku(k, kk); // 区間記録(kiji_kihon.dart。1.9.5)
       if (kr != null) {
         // 記録した年から回の数を出す(正月駅伝・カスタム駅伝は年度で数える。1.9.3)
         final int? kai = kr.year > 0 ? k.kaiNoKazu(kr.year) : null;

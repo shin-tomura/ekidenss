@@ -26,7 +26,10 @@ import 'package:ekiden/kansuu/koukou_meibo.dart';
 //   長距離の選手は、力の順に1区・3区・4区・7区・6区・(空いていれば)2区・5区へ。
 //   中距離出身の選手は、3kmの区間では1%速く、8km以上の区間では1.5%遅く走る
 // ・高校総体: 1500m・5000m・3000m障害。県大会の上位6人が地区大会、地区大会の上位6人が全国大会。
-//   全国大会は予選3組(各組4着とタイムで3人)のあと、15人の決勝。選手は1人1種目
+//   全国大会は予選3組(各組4着とタイムで3人)のあと、15人の決勝。
+//   種目は、中距離出身は1500m、長距離の選手は障害への向き(_shougaiMuki)が高いほど3000m障害、
+//   ペース変動対応力が高いほど1500m、ほかは5000m。各校の上位2人は掛け持ちし(1500mと5000mなど)、
+//   保存するのは一番良い種目の結果。1校1種目3人の枠からあふれた選手は、空いている種目に回す
 // ・タイムの目安(数年分を試した平均): 全国高校駅伝の優勝は2時間2〜4分、1区の区間賞は29分台前半、
 //   高校総体5000mの日本人トップは13分50秒前後(優勝は留学生が多い)。
 //   新入生150人のうち、全国高校駅伝を走るのは毎年60人前後、区間賞は2〜3人、高校総体の決勝は18人前後
@@ -353,9 +356,10 @@ class _Kousei {
   int ekidenKukan = 0;
   int ekidenKukanJuni = 0;
   int ekidenJuni = 0;
-  int soutaiShumoku = 0;
-  int soutaiDankai = 0;
-  int soutaiJuni = 0;
+  /// 高校総体の種目ごとの一番上の段階(番号は種目。-1は出ていない)と、その段階の順位(1〜15、0は16位以下か全国予選)
+  /// (掛け持ちがあるので種目ごとに持ち、最後に一番良い種目を1つ選んで保存する。1.9.5)
+  final List<int> sDankai = [-1, -1, -1, -1];
+  final List<int> sJuni = [0, 0, 0, 0];
 
   _Kousei({
     required this.s,
@@ -503,22 +507,32 @@ double _kukanTime(_Kousei k, int kk, List<_Kukan> kukan, Random r) {
   return t;
 }
 
-/// 高校総体のタイム(秒)。[shumoku] 1=1500m・2=5000m・3=3000m障害
-double _trackTime(_Kousei k, int shumoku, Random r) {
+/// 3000m障害への向き(1〜99。アップダウン対応力を強め、ペース変動対応力を中くらい、登り適性を弱めに見る。1.9.5)
+/// 障害の前で減速して越え、また加速する繰り返しなので、アップダウンとペースの変化への対応が近い。
+/// 登りは脚の筋力を通して少しだけ。下りは根拠が見つからないので使わない。土台は持ちタイム(地力)のまま
+double _shougaiMuki(_Kousei k) => 0.5 * k.updown + 0.3 * k.pace + 0.2 * k.nobori;
+
+/// 高校総体の見込みのタイム(秒。ばらつきなし。夏の大会の分は入る)。[shumoku] 1=1500m・2=5000m・3=3000m障害
+double _trackMikomi(_Kousei k, int shumoku) {
   double t;
   if (shumoku == 1) {
     t = k.t5 * pow(0.3, 1.08).toDouble() * (k.keireki == 1 ? 0.98 : 1.0);
     t += -0.3265 * 0.15 * (k.spurt - 50);
   } else if (shumoku == 3) {
     t = k.t5 * pow(0.6, 1.06).toDouble() * 1.075;
-    t *= 1.0 - 0.0004 * (k.updown - 50); // 障害はアップダウンへの対応で
+    t *= 1.0 - 0.0005 * (_shougaiMuki(k) - 50); // 障害への向き
     t += -0.3265 * 0.25 * (k.spurt - 50);
   } else {
     t = k.t5;
     t += -0.3265 * 0.4 * (k.spurt - 50);
     t *= 1.0 + (50 - k.pace) * 0.0003 * 0.5;
   }
-  t *= 1.03; // 夏の大会(持ちタイムより遅い)
+  return t * 1.03; // 夏の大会(持ちタイムより遅い)
+}
+
+/// 高校総体のタイム(秒。見込みのタイムに、その日のばらつきを入れる)
+double _trackTime(_Kousei k, int shumoku, Random r) {
+  double t = _trackMikomi(k, shumoku);
   t *= 1.0 + _gauss(r) * 0.011;
   if (r.nextInt(100) < 8) t *= 1.02 + r.nextDouble() * 0.04; // 暑さで崩れる
   return t;
@@ -784,32 +798,63 @@ Map<int, KoukouJouhou> _nendoKeisan(List<SenshuData> shinnyuusei, Random r) {
   _ekidenKekka(zenkokuTeams, zkj, zenkoku: true);
 
   // ---- 高校総体(県大会 → 地区大会 → 全国大会) ----
-  // 種目を選ぶ(中距離出身は1500m。ほかは5000m 70%・3000m障害15%・1500m 15%。留学生は5000mか障害)
+  // 種目(1.9.5): 中距離出身は1500m。長距離の選手は、障害への向きが高いほど3000m障害(全体で約15%)、
+  // ペース変動対応力が高いほど1500m(約15%)、ほかは5000m。留学生は5000mか障害。
+  // 各校の上位2人(持ちタイムの順)は掛け持ちする(中距離出身は5000mにも、5000mの選手でペース変動対応力が
+  // 50以上なら1500mにも、障害の選手は5000mにも)。1校1種目3人までを、見込みのタイムの順に選び、
+  // どの種目にも入れなかった選手は、空いている種目に回す
   final List<List<List<_Kousei>>> kenEntry = [
     for (int ken = 0; ken < kenSuu; ken++) [<_Kousei>[], <_Kousei>[], <_Kousei>[], <_Kousei>[]],
   ];
   for (int i = 0; i < koukouMeibo.length; i++) {
     final int ken = koukouMeibo[i].ken;
     if (ken < 0 || ken >= kenSuu) continue;
-    final List<List<_Kousei>> per = [<_Kousei>[], <_Kousei>[], <_Kousei>[], <_Kousei>[]];
+    final List<List<_Kousei>> kouhoSh = [<_Kousei>[], <_Kousei>[], <_Kousei>[], <_Kousei>[]];
+    final Map<_Kousei, int> honmei = {};
     for (final _Kousei k in bu[i]) {
-      int sh;
-      if (k.ryuugakusei) {
-        sh = r.nextInt(100) < 70 ? 2 : 3;
-      } else if (k.keireki == 1) {
-        sh = 1;
-      } else {
-        final int x = r.nextInt(100);
-        sh = x < 70 ? 2 : (x < 85 ? 3 : 1);
-      }
-      per[sh].add(k);
+      final int sh = _shumokuErabu(k, r);
+      honmei[k] = sh;
+      kouhoSh[sh].add(k);
     }
-    // 1校1種目3人まで(持ちタイムの順)
-    for (int sh = 1; sh <= 3; sh++) {
-      per[sh].sort((a, b) => a.t5.compareTo(b.t5));
-      for (final _Kousei k in per[sh].take(3)) {
-        kenEntry[ken][sh].add(k);
+    // 掛け持ち(各校の上位2人)
+    final List<_Kousei> ue = [for (final _Kousei k in bu[i]) if (!k.ryuugakusei) k]
+      ..sort((a, b) => a.t5.compareTo(b.t5));
+    for (final _Kousei k in ue.take(2)) {
+      final int sh = honmei[k] ?? 2;
+      if (k.keireki == 1) {
+        kouhoSh[2].add(k);
+      } else if (sh == 2 && k.pace >= 50) {
+        kouhoSh[1].add(k);
+      } else if (sh == 3) {
+        kouhoSh[2].add(k);
       }
+    }
+    // 1校1種目3人まで(見込みのタイムの順)
+    final List<List<_Kousei>> erabu = [<_Kousei>[], <_Kousei>[], <_Kousei>[], <_Kousei>[]];
+    final Set<_Kousei> deru = {};
+    for (int sh = 1; sh <= 3; sh++) {
+      final List<_Kousei> l = List<_Kousei>.of(kouhoSh[sh])
+        ..sort((a, b) => _trackMikomi(a, sh).compareTo(_trackMikomi(b, sh)));
+      for (final _Kousei k in l.take(3)) {
+        erabu[sh].add(k);
+        deru.add(k);
+      }
+    }
+    // どの種目にも入れなかった選手は、空いている種目へ(本命が1500mなら5000m→障害、5000mなら障害→1500m、障害なら5000m→1500m)
+    for (final _Kousei k in bu[i]) {
+      if (deru.contains(k)) continue;
+      final int sh = honmei[k] ?? 2;
+      final List<int> tsugi = sh == 1 ? const [2, 3] : (sh == 2 ? const [3, 1] : const [2, 1]);
+      for (final int s2 in tsugi) {
+        if (erabu[s2].length < 3) {
+          erabu[s2].add(k);
+          deru.add(k);
+          break;
+        }
+      }
+    }
+    for (int sh = 1; sh <= 3; sh++) {
+      kenEntry[ken][sh].addAll(erabu[sh]);
     }
   }
   for (int ken = 0; ken < kenSuu; ken++) {
@@ -869,12 +914,26 @@ Map<int, KoukouJouhou> _nendoKeisan(List<SenshuData> shinnyuusei, Random r) {
     }
   }
 
-  // 結果をまとめる
+  // 結果をまとめる(高校総体は、掛け持ちした種目のうち一番良いもの: 段階が上、同じなら順位が上)
   for (final _Kousei k in jitsuzai) {
     final SenshuData? s = k.s;
     if (s == null) continue;
     final KoukouJouhou? mae = kekka[s.id];
     if (mae == null) continue;
+    int sShumoku = 0;
+    int sDankai = 0;
+    int sJuni = 0;
+    int sTen = -1;
+    for (int sh = 1; sh <= 3; sh++) {
+      if (k.sDankai[sh] < 0) continue;
+      final int ten = k.sDankai[sh] * 100 + (k.sJuni[sh] >= 1 ? 16 - k.sJuni[sh] : 0);
+      if (ten > sTen) {
+        sTen = ten;
+        sShumoku = sh;
+        sDankai = k.sDankai[sh];
+        sJuni = k.sJuni[sh];
+      }
+    }
     kekka[s.id] = KoukouJouhou(
       koukou: mae.koukou,
       keireki: mae.keireki,
@@ -882,9 +941,9 @@ Map<int, KoukouJouhou> _nendoKeisan(List<SenshuData> shinnyuusei, Random r) {
       ekidenKukan: k.ekidenAri ? k.ekidenKukan : 0,
       ekidenKukanJuni: k.ekidenAri ? k.ekidenKukanJuni : 0,
       ekidenJuni: k.ekidenAri ? k.ekidenJuni : 0,
-      soutaiShumoku: k.soutaiShumoku,
-      soutaiDankai: k.soutaiDankai,
-      soutaiJuni: k.soutaiJuni,
+      soutaiShumoku: sShumoku,
+      soutaiDankai: sDankai,
+      soutaiJuni: sJuni,
     );
   }
   return kekka;
@@ -898,13 +957,25 @@ List<_Kousei> _track(List<_Kousei> sousha, int sh, Random r) {
   return [for (final MapEntry<_Kousei, double> e in t) e.key];
 }
 
-/// 高校総体の結果を新入生に書く(段階が上がったときだけ上書き)。[juni0] 0が1位、-1は順位なし
+/// 高校総体の結果を新入生に書く(種目ごとに、段階が上がったときだけ上書き)。[juni0] 0が1位、-1は順位なし
 void _soutaiKaku(_Kousei k, int sh, int dankai, int juni0) {
-  if (k.s == null) return;
-  if (k.soutaiShumoku != 0 && dankai < k.soutaiDankai) return;
-  k.soutaiShumoku = sh;
-  k.soutaiDankai = dankai;
-  k.soutaiJuni = (juni0 >= 0 && juni0 < 15) ? juni0 + 1 : 0;
+  if (k.s == null || sh < 1 || sh > 3) return;
+  if (dankai < k.sDankai[sh]) return;
+  k.sDankai[sh] = dankai;
+  k.sJuni[sh] = (juni0 >= 0 && juni0 < 15) ? juni0 + 1 : 0;
+}
+
+/// 高校総体の本命の種目を選ぶ(1=1500m・2=5000m・3=3000m障害。1.9.5)
+/// 中距離出身は1500m。長距離の選手は、障害への向きが高いほど障害、ペース変動対応力が高いほど1500m
+int _shumokuErabu(_Kousei k, Random r) {
+  if (k.ryuugakusei) return r.nextInt(100) < 70 ? 2 : 3;
+  if (k.keireki == 1) return 1;
+  final double pShougai = (0.15 + 0.006 * (_shougaiMuki(k) - 50)).clamp(0.03, 0.40).toDouble();
+  final double p1500 = (0.15 + 0.004 * (k.pace - 35)).clamp(0.03, 0.35).toDouble();
+  final double x = r.nextDouble();
+  if (x < pShougai) return 3;
+  if (x < pShougai + p1500) return 1;
+  return 2;
 }
 
 /// 高校が未設定の日本人選手に、出身校と高校時代の実績を付けて保存する(学年ごとにまとめて計算)。

@@ -125,7 +125,8 @@ class IkkuPaceYosouBox extends StatelessWidget {
   /// 調子を入れるか(直前順位予想では入れない)
   final bool chousiIreru;
 
-  /// 他大学の当日変更の前の予想か(直前順位予想と当日変更の画面。注意書きを添える)
+  /// 他大学の当日変更の前の予想か(直前順位予想と当日変更の画面。注意書きを添え、
+  /// 当日変更で1区に入れば集団を引っ張りそうな他大学の補欠も出す(1.9.5))
   final bool kakuteiMae;
 
   const IkkuPaceYosouBox({
@@ -154,6 +155,9 @@ class IkkuPaceYosouBox extends StatelessWidget {
     final List<SenshuData> sortedSenshu = _sortedSenshu();
     final List<UnivData> sortedUniv = _sortedUniv();
     final int? jibunId = jibunSenshuId;
+    final Set<int> tobidasu = (jibunTobidasu && jibunId != null)
+        ? <int>{jibunId}
+        : <int>{};
     final IkkuPaceYosou? yosou = ikkuPaceYosou(
       gh: gh,
       racebangou: race,
@@ -161,9 +165,7 @@ class IkkuPaceYosouBox extends StatelessWidget {
       sortedUniv: sortedUniv,
       kantoku: kantoku,
       chousiIreru: chousiIreru,
-      tobidasuSenshu: (jibunTobidasu && jibunId != null)
-          ? <int>{jibunId}
-          : <int>{},
+      tobidasuSenshu: tobidasu,
       irekae: irekae,
     );
     if (yosou == null) return const SizedBox.shrink();
@@ -176,14 +178,59 @@ class IkkuPaceYosouBox extends StatelessWidget {
     final String taikou = _taikouMoji(yosou, sortedUniv);
     if (taikou.isNotEmpty) gyou.add('ほかに引っ張るかもしれない選手: $taikou');
 
+    // 当日変更で1区に入れば集団を引っ張りそうな他大学の補欠(他大学の当日変更の前だけ。1.9.5)
+    final List<IkkuHoketsuKouho> hoketsu = kakuteiMae
+        ? ikkuHoketsuKouho(
+            gh: gh,
+            racebangou: race,
+            sortedSenshu: sortedSenshu,
+            sortedUniv: sortedUniv,
+            kantoku: kantoku,
+            yosou: yosou,
+            chousiIreru: chousiIreru,
+            tobidasuSenshu: tobidasu,
+            irekae: irekae,
+            jibunSenshuId: jibunId,
+          )
+        : const <IkkuHoketsuKouho>[];
+    if (hoketsu.isNotEmpty) {
+      final String hoketsuMoji = hoketsu
+          .map((h) {
+            final String midashiMoji = ikkuPaceMidashiMoji[h.midashi];
+            return _senshuMei(
+              h.senshu.name,
+              h.senshu.gakunen,
+              sortedUniv,
+              h.senshu.univid,
+              tsuika: [
+                if (h.soegaki.isNotEmpty) h.soegaki,
+                h.honmei ? '入れば$midashiMoji' : '入って引っ張れば$midashiMoji',
+              ].join('。'),
+            );
+          })
+          .join('、');
+      gyou.add('当日変更で1区に入れば引っ張りそうな補欠: $hoketsuMoji');
+    }
+
     // 自分の大学の選手
     if (jibunId != null && jibunId >= 0 && jibunId < sortedSenshu.length) {
       final SenshuData s = sortedSenshu[jibunId];
+      final IkkuAishou jibunAishou = yosou.aishou(s.id);
       gyou.add(
-        '自分の大学の${s.name}(${s.gakunen}年): ${ikkuAishouYosouMoji(yosou.aishou(s.id))}',
+        '自分の大学の${s.name}(${s.gakunen}年): ${ikkuAishouYosouMoji(jibunAishou)}',
       );
       if (jibunShijiNashi && s.konjou >= 85) {
         gyou.add('・指示なしでも、スタート直後に飛び出すことがあります');
+      }
+      // 他大学の補欠が入って引っ張ると、大失速しそうになるとき(1.9.5)
+      if (jibunAishou != IkkuAishou.daiShissoku) {
+        for (final IkkuHoketsuKouho h in hoketsu) {
+          if (h.jibunAishou != IkkuAishou.daiShissoku) continue;
+          gyou.add(
+            '・補欠の${_senshuMei(h.senshu.name, h.senshu.gakunen, sortedUniv, h.senshu.univid)}'
+            'が入って引っ張ると、大失速のおそれがあります',
+          );
+        }
       }
     }
 

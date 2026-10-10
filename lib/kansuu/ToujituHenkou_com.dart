@@ -632,6 +632,27 @@ Future<void> comToujituHenkouAfterPlayer(
   );
 }
 
+/// コンピュータの大学[univid]が、これからその日の自動の当日変更をするか(1.9.5)
+/// 自動の当日変更が済んだ日と、箱庭モードの「他大学変更」で確定した大学はfalse
+/// (1区のペース予想で、当日変更で1区に入りそうな補欠を探すときに使う。ikku_pace.dart)
+/// [day] 0=1日開催、1=正月駅伝往路、2=正月駅伝復路
+bool comToujituHenkouMae({
+  required KantokuData kantoku,
+  required int year,
+  required int racebangou,
+  required int day,
+  required int univid,
+}) {
+  if (kantoku.yobiint2.length <= manualToujituMaskIndex) return false;
+  final int code = _toujituCode(year, racebangou, day);
+  if (kantoku.yobiint2[comToujituDoneIndex] == code) return false;
+  if (kantoku.yobiint2[manualToujituCodeIndex] == code &&
+      (kantoku.yobiint2[manualToujituMaskIndex] >> univid) & 1 == 1) {
+    return false;
+  }
+  return true;
+}
+
 /// 箱庭モードの「他大学変更」で確定した大学を記録する
 /// [targetGroup] 0=通常または正月駅伝往路、1=正月駅伝復路
 Future<void> markManualToujituHenkou({

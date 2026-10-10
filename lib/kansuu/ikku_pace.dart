@@ -6,6 +6,7 @@ import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/kansuu/TrialTime.dart';
 import 'package:ekiden/kansuu/chousi_keiken_hosei.dart';
 import 'package:ekiden/kansuu/time_date.dart';
+import 'package:ekiden/kansuu/ToujituHenkou_com.dart'; // 戦略的エントリー確率と、自動の当日変更の前か(1.9.5)
 
 // ------------------------------------------------------------
 // 駅伝の1区の集団のペースの予想と結果(1.9.2)
@@ -30,6 +31,8 @@ import 'package:ekiden/kansuu/time_date.dart';
 // ・集団を引っ張りそうな選手(本命)はカリスマが一番高い選手。本命とのカリスマの差が
 //   勢いの幅より小さい選手を、最大2人まで「ほかに引っ張るかもしれない選手」(対抗)として出す
 // ・出す画面: 直前順位予想・当日変更・目標順位の確認(当日変更のあと)・1区の指示の画面
+// ・直前順位予想と当日変更の画面(他大学の当日変更の前)では、当日変更で1区に入れば
+//   集団を引っ張りそうな他大学の補欠も出す(ikkuHoketsuKouho。1.9.5)
 //
 // ■ 結果(KantokuData.yobiint4[60]〜[66]。1区の計算のときに RaceCalc.dart で保存し、
 //   2区の指示の画面で出す)
@@ -438,6 +441,258 @@ class IkkuTaikou {
     required this.pace,
     required this.midashi,
   });
+}
+
+// ------------------------------------------------------------
+// 当日変更で1区に入れば集団を引っ張りそうな他大学の補欠(1.9.5。直前順位予想と当日変更の画面)
+// ・コンピュータの大学が補欠を1区に入れるのは、1区の見込みタイムが今の1区の選手より速いときだけ
+//   (ToujituHenkou_com.dart の当日変更)なので、それを条件にする
+//   ・戦略的エントリー確率が0%のときは、調子の悪い選手との交代(0.3%以上速い補欠)しかないので、
+//     0.3%以上速いことも条件にし、調子が入っていて1区の選手の調子が100なら出さない
+//   ・調子が入っていて1区の選手が体調不良なら、1区で一番速い補欠だけ(体調不良の交代)
+// ・戦略的エントリーで温存した印(SenshuData.kazetaisei の負の値)は見ない(どの大学が
+//   戦略的エントリーをしたかが画面で分かってしまうため)。正月駅伝では復路用の補欠も出ることがある
+// ・その補欠を入れ替えたときの予想をやり直し、本命か対抗になる選手を出す(最大2人。本命になる選手が先、
+//   同じならカリスマの高い順)
+// ・自動の当日変更が済んだ日と、箱庭モードの他大学変更で確定した大学の補欠は出さない
+// ・添え書きは1つ(前回1区 → 1区の経験あり → ペース変動対応力が持ち味の順)。
+//   ペース変動対応力は、ロード適性とペース変動対応力の両方を見抜く力がついているときだけ比べる
+// ------------------------------------------------------------
+
+/// 当日変更で1区に入れば集団を引っ張りそうな補欠
+class IkkuHoketsuKouho {
+  /// 補欠の選手
+  final SenshuData senshu;
+
+  /// 入れば本命(集団を引っ張りそうな選手)になるか(falseなら、その日の勢いで引っ張るかもしれない選手)
+  final bool honmei;
+
+  /// その選手が引っ張ったときの予想ペース(ぼかし込み)
+  final double pace;
+
+  /// その選手が引っ張ったときの見出しの番号
+  final int midashi;
+
+  /// 添え書き(「前回1区」など。なければ空)
+  final String soegaki;
+
+  /// その選手が引っ張ったときの、自分の大学の選手の相性(自分の大学の選手を渡さなかったときはnull)
+  final IkkuAishou? jibunAishou;
+
+  const IkkuHoketsuKouho({
+    required this.senshu,
+    required this.honmei,
+    required this.pace,
+    required this.midashi,
+    required this.soegaki,
+    this.jibunAishou,
+  });
+}
+
+/// 選手が補欠に入っているか
+bool _hoketsuEntry(SenshuData s, int racebangou) {
+  if (racebangou >= s.entrykukan_race.length) return false;
+  final int g = s.gakunen - 1;
+  if (g < 0 || g >= s.entrykukan_race[racebangou].length) return false;
+  return s.entrykukan_race[racebangou][g] == -1;
+}
+
+/// 補欠の選手の添え書き(前回1区・1区の経験あり・ペース変動対応力が持ち味。なければ空)
+String _hoketsuSoegaki(SenshuData s, int racebangou, Ghensuu gh) {
+  if (racebangou < s.entrykukan_race.length) {
+    final List<int> e = s.entrykukan_race[racebangou];
+    final int mae = s.gakunen - 2; // 前の学年の並びの番号
+    if (mae >= 0 && mae < e.length && e[mae] == 0) return '前回1区';
+    for (int g = mae - 1; g >= 0; g--) {
+      if (g < e.length && e[g] == 0) return '1区の経験あり';
+    }
+  }
+  // ロード適性(nouryokumieruflag[8])とペース変動対応力([9])の両方が見えているときだけ
+  final List<int> mieru = gh.nouryokumieruflag;
+  if (mieru.length > 9 &&
+      mieru[8] == 1 &&
+      mieru[9] == 1 &&
+      s.paceagesagetaiouryoku > s.tandokusou) {
+    return 'ペース変動対応力が持ち味';
+  }
+  return '';
+}
+
+/// 当日変更で1区に入れば集団を引っ張りそうな他大学の補欠(最大2人。いなければ空)
+/// [yosou] 区間エントリーどおり(と[irekae]の交代)の予想。ほかの引数は、その予想と同じものを渡す
+/// [jibunSenshuId] 自分の大学の1区の選手(その補欠が引っ張ったときの相性を出す)
+List<IkkuHoketsuKouho> ikkuHoketsuKouho({
+  required Ghensuu gh,
+  required int racebangou,
+  required List<SenshuData> sortedSenshu,
+  required List<UnivData> sortedUniv,
+  required KantokuData kantoku,
+  required IkkuPaceYosou yosou,
+  bool chousiIreru = true,
+  Set<int> tobidasuSenshu = const {},
+  Map<int, int> irekae = const {},
+  int? jibunSenshuId,
+}) {
+  if (!ikkuPaceTaishou(racebangou)) return [];
+  final int day = racebangou == 2 ? 1 : 0; // 1区の日(正月駅伝は往路)
+  final int kakuritu = senryakuEntryKakuritu(kantoku);
+  final int haba = shuudanIkioiHaba(kantoku);
+
+  // 他大学の1区の選手と補欠(大学id→選手)
+  final Map<int, SenshuData> ikkuSenshu = {};
+  final Map<int, List<SenshuData>> hoketsu = {};
+  for (int i = 0; i < sortedSenshu.length; i++) {
+    final SenshuData s = sortedSenshu[i];
+    if (s.id != i) continue; // 試走タイムの計算は、並びの番号と選手idが同じことが前提
+    final int u = s.univid;
+    if (u == gh.MYunivid || u < 0 || u >= sortedUniv.length) continue;
+    if (_ikkuEntry(s, racebangou)) {
+      ikkuSenshu[u] = s;
+    } else if (_hoketsuEntry(s, racebangou)) {
+      (hoketsu[u] ??= []).add(s);
+    }
+  }
+
+  final List<IkkuHoketsuKouho> kekka = [];
+  for (final MapEntry<int, SenshuData> e in ikkuSenshu.entries) {
+    final int u = e.key;
+    final SenshuData x = e.value; // 入れ替わる1区の選手
+    final List<SenshuData>? hl = hoketsu[u];
+    if (hl == null || hl.isEmpty) continue;
+    final UnivData univ = sortedUniv[u];
+    if (racebangou >= univ.taikaientryflag.length ||
+        univ.taikaientryflag[racebangou] != 1) {
+      continue;
+    }
+    if (!comToujituHenkouMae(
+      kantoku: kantoku,
+      year: gh.year,
+      racebangou: racebangou,
+      day: day,
+      univid: u,
+    )) {
+      continue;
+    }
+    final double? tx = yosou.mikomi[x.id];
+    if (tx == null) continue;
+    final bool taichouFuryou = chousiIreru && x.chousi == 0;
+    // 戦略的エントリーがなく、1区の選手の調子が100なら、入れ替えない
+    if (kakuritu <= 0 && chousiIreru && !taichouFuryou && x.chousi >= 100) {
+      continue;
+    }
+
+    // ほかの1区の選手(飛び出す選手と、入れ替わる選手を除く)のカリスマの最高
+    int maxKarisuma = -1;
+    for (final int id in yosou.mikomi.keys) {
+      if (id == x.id || tobidasuSenshu.contains(id)) continue;
+      if (id < 0 || id >= sortedSenshu.length) continue;
+      maxKarisuma = max(maxKarisuma, sortedSenshu[id].karisuma);
+    }
+
+    // 補欠の1区の見込みタイム
+    double mikomiTime(SenshuData r) => ikkuMikomiTime(
+      senshuId: r.id,
+      chousi: r.chousi,
+      gh: gh,
+      racebangou: racebangou,
+      sortedSenshu: sortedSenshu,
+      sortedUniv: sortedUniv,
+      kantoku: kantoku,
+      chousiIreru: chousiIreru,
+    );
+
+    // 1区に入りそうな補欠
+    final List<SenshuData> hairu = [];
+    final List<SenshuData> kouho = [
+      for (final SenshuData r in hl)
+        if (!(chousiIreru && r.chousi == 0)) r,
+    ];
+    if (taichouFuryou) {
+      // 体調不良の交代は、1区で一番速い補欠
+      SenshuData? best;
+      double bestTime = double.infinity;
+      for (final SenshuData r in kouho) {
+        final double t = mikomiTime(r);
+        if (t < bestTime) {
+          bestTime = t;
+          best = r;
+        }
+      }
+      if (best != null && bestTime < tx) hairu.add(best);
+    } else {
+      for (final SenshuData r in kouho) {
+        // カリスマで、本命か対抗になれる見込みのない選手は先に除く
+        if (r.karisuma < maxKarisuma && maxKarisuma - r.karisuma >= haba) {
+          continue;
+        }
+        final double t = mikomiTime(r);
+        final bool hayai = kakuritu > 0
+            ? t < tx
+            : (tx - t) >= tx * 0.003; // 調子の悪い選手との交代と同じ境目
+        if (hayai) hairu.add(r);
+      }
+    }
+
+    for (final SenshuData r in hairu) {
+      // その補欠を入れ替えたときの予想
+      final IkkuPaceYosou? y = ikkuPaceYosou(
+        gh: gh,
+        racebangou: racebangou,
+        sortedSenshu: sortedSenshu,
+        sortedUniv: sortedUniv,
+        kantoku: kantoku,
+        chousiIreru: chousiIreru,
+        tobidasuSenshu: tobidasuSenshu,
+        irekae: {...irekae, x.id: r.id},
+      );
+      if (y == null) continue;
+      bool honmei = false;
+      double? pace;
+      int midashi = 2;
+      if (y.pacemaker.id == r.id) {
+        honmei = true;
+        pace = y.pace;
+        midashi = y.midashi;
+      } else {
+        for (final IkkuTaikou t in y.taikou) {
+          if (t.senshu.id == r.id) {
+            pace = t.pace;
+            midashi = t.midashi;
+            break;
+          }
+        }
+      }
+      final double? p = pace;
+      if (p == null) continue;
+      IkkuAishou? jibun;
+      final int? jid = jibunSenshuId;
+      if (jid != null) {
+        if (tobidasuSenshu.contains(jid)) {
+          jibun = IkkuAishou.tobidashi;
+        } else {
+          final double? jt = y.mikomi[jid];
+          if (jt != null) jibun = ikkuAishou(jt, p);
+        }
+      }
+      kekka.add(
+        IkkuHoketsuKouho(
+          senshu: r,
+          honmei: honmei,
+          pace: p,
+          midashi: midashi,
+          soegaki: _hoketsuSoegaki(r, racebangou, gh),
+          jibunAishou: jibun,
+        ),
+      );
+    }
+  }
+
+  kekka.sort((a, b) {
+    if (a.honmei != b.honmei) return a.honmei ? -1 : 1;
+    final int c = b.senshu.karisuma.compareTo(a.senshu.karisuma);
+    return c != 0 ? c : a.senshu.id.compareTo(b.senshu.id);
+  });
+  return kekka.take(2).toList();
 }
 
 /// 自分の大学の1区の選手のうち、「スタート直後に飛び出す」の指示が付いている選手のid

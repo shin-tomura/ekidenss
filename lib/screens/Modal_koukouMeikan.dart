@@ -781,18 +781,28 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
     }
   }
 
-  /// 回の名前(「第78回(3年入学の世代)」。年度に75を足した数を回にする)
-  /// 回の名前(「第78回 2年12月(3年入学の世代)」。年度に75を足した数を回にする。
-  /// 全国高校駅伝は、その世代が大学に入る前の年の12月。ゲーム開始前の大会は「ゲーム開始前の大会」)
+  /// 回の名前(「第2回 2年12月(3年入学の世代)」。1.9.5)
+  /// 全国高校駅伝は、その世代が大学に入る前の年の12月。大学の駅伝と同じく、1年目の大会を第1回にする
+  /// (N年12月の大会が第N回。同じ年度の大学の駅伝と回の数がそろう)。
+  /// ゲーム開始前の大会(0年12月より前。開始時の在学生4学年分)は「プレ大会」にして、開始時の学年で見分ける
+  /// (「プレ大会(ゲーム開始時の4年生の世代)」)。
   /// [imaGakunen] が1以上なら、かっこの中を今の学年にする(「(今の1年生の世代)」。在学生の世代の欄のとき)
   String _kaiMei(KoukouTaikaiKiroku k, {int imaGakunen = 0}) {
-    final String sedai = imaGakunen >= 1
-        ? '今の$imaGakunen年生の世代'
-        : (k.nyuugakuNendo >= 1 ? '${k.nyuugakuNendo}年入学の世代' : 'ゲーム開始時の在学生の世代');
     final int taikaiNen = k.nyuugakuNendo - 1;
-    final String jiki = taikaiNen >= 1 ? '$taikaiNen年12月' : 'ゲーム開始前の大会';
-    return '第${k.nyuugakuNendo + 75}回 $jiki($sedai)';
+    if (taikaiNen >= 1) {
+      final String sedai = imaGakunen >= 1 ? '今の$imaGakunen年生の世代' : '${k.nyuugakuNendo}年入学の世代';
+      return '第$taikaiNen回 $taikaiNen年12月($sedai)';
+    }
+    // 1年入学の世代が開始時の1年生、0年入学が2年生…
+    final int kaishiGakunen = 2 - k.nyuugakuNendo;
+    final String sedai = imaGakunen >= 1 ? '今の$imaGakunen年生の世代' : 'ゲーム開始時の$kaishiGakunen年生の世代';
+    return 'プレ大会($sedai)';
   }
+
+  /// 名前のない選手の説明(大会の記録とスカウト画面からの結果の画面。1.9.5)
+  static const String _namaeNashiSetsumei =
+      '名前のない3年生は、ゲームの大学には進まない選手です(ほかの大学や実業団に進む選手、高校で陸上をやめる選手など)。'
+      '名前のない留学生も、ゲームの大学には進まない留学生です。';
 
   /// 記録がいつ増えるかの注釈(実在の大会は秋に予選、12月に全国なので、その時期に増えると
   /// 思われないように、増える時期を「4月上旬だけ」と言い切って、目立つ枠で出す。1.9.5)
@@ -1101,6 +1111,12 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
         '大学に入った選手には進学先を、自分の大学に来た選手は色を変えて出します。',
         style: _honbun,
       ),
+      const SizedBox(height: 4),
+      const Text(
+        '名前の出ている選手は、ゲームの大学に入った選手です。$_namaeNashiSetsumei'
+        '大会の回は、大学の駅伝と同じく1年目の大会を第1回とし、ゲーム開始前の大会はプレ大会として出します。',
+        style: _hosoku,
+      ),
       const SizedBox(height: 8),
       _Oritatami(midashi: '在学生の世代の優勝校と優勝者', naka: chokkin, hajimeHiraku: true),
       if (tsuyoi.isNotEmpty)
@@ -1252,6 +1268,11 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
           '今年の新入生(スカウトの候補)が高校3年だった年度の、全国高校駅伝と高校総体の結果です。'
           '前の回は、スカウトのあとに説明画面の設定タブの「高校名鑑」で見られます。',
           style: _honbun,
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          '名前の出ている選手は今年の新入生で、進学先はスカウトの画面と同じ出し方です。$_namaeNashiSetsumei',
+          style: _hosoku,
         ),
         const SizedBox(height: 12),
         Text(

@@ -484,14 +484,13 @@ class _ModalShinnyuuseiShingakusakiState
     );
   }
 
-  /// 出身校(「雷鳥館高(長野)」。1.9.5。表示しない設定のときと留学生は空)
+  /// 出身校(「雷鳥館高(長野)」。1.9.5。表示しない設定のときと、出身校がない留学生は空)
   String _koukouMei(SenshuData s) {
-    if (s.hirou == 1) return '';
     final KantokuData? kantoku = Hive.box<KantokuData>(
       'kantokuBox',
     ).get('KantokuData');
-    if (kantoku == null || koukouHyoujiNashi(kantoku)) return '';
-    return koukouMeiKenMoji(KoukouJouhou.yomu(s.samusataisei));
+    if (kantoku == null) return '';
+    return koukouIchiranMoji(s.samusataisei, s.hirou, kantoku);
   }
 
   /// 選手データ(選手の詳細)を開く(ほかの画面と同じ開き方)

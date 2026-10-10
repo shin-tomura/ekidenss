@@ -497,11 +497,10 @@ List<Innen> senshuInnen(
 /// ・全国高校駅伝で区間3位以内(またはチーム3位以内)だった1年生: 40点(上級生は20点)
 /// ・高校までほかの競技をしていた選手: 30点。結果の記事で区間3位以内なら50点(見出しにも使える)
 /// ・高校総体で入賞(8位以内)した1年生: 30点
-/// 表示しない設定のときと、留学生・分からないときはnull
+/// 表示しない設定のときと、出身校がない・分からないときはnull(留学生は日本の高校の出身のときだけ)
 Innen? koukouInnen(KijiKankyou k, SenshuData s, {int? kj, bool kekka = true}) {
-  if (s.hirou == 1 || koukouHyoujiNashi(k.kantoku)) return null;
-  final KoukouJouhou j = KoukouJouhou.yomu(s.samusataisei);
-  if (j.mei == null) return null;
+  final KoukouJouhou? j = koukouHyoujiJouhou(s.samusataisei, s.hirou, k.kantoku);
+  if (j == null) return null;
   final String kou = koukouMeiMoji(j);
   // ほかの競技の出身
   if (j.keireki == 2) {
@@ -546,11 +545,10 @@ Innen? koukouInnen(KijiKankyou k, SenshuData s, {int? kj, bool kekka = true}) {
 }
 
 /// 出身校と高校時代の一言(1.9.5。「雷鳥館高時代は、全国高校駅伝の1区で区間賞を取った。」など)
-/// 表示しない設定のときと、留学生・分からないときは空
+/// 表示しない設定のときと、出身校がない・分からないときは空(留学生は日本の高校の出身のときだけ)
 String koukouJidaiBun(KijiKankyou k, SenshuData s, KijiRand r, String yobi) {
-  if (s.hirou == 1 || koukouHyoujiNashi(k.kantoku)) return '';
-  final KoukouJouhou j = KoukouJouhou.yomu(s.samusataisei);
-  if (j.mei == null) return '';
+  final KoukouJouhou? j = koukouHyoujiJouhou(s.samusataisei, s.hirou, k.kantoku);
+  if (j == null) return '';
   final String jisseki = koukouJissekiBun(j);
   if (jisseki.isEmpty) {
     return r.erabu([

@@ -4,6 +4,7 @@ import 'package:ekiden/constants.dart';
 import 'package:ekiden/senshu_data.dart';
 import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/kansuu/koukou_meibo.dart';
+import 'package:ekiden/kansuu/joukai.dart'; // 留学生の入学時の優秀度(1.9.5)
 
 // ------------------------------------------------------------
 // 出身校と高校時代の実績(1.9.5)
@@ -50,21 +51,45 @@ import 'package:ekiden/kansuu/koukou_meibo.dart';
 //   (Webでも正しく動くように、ビット演算ではなく掛け算と割り算で詰める)
 // ・高校が未設定(0)の日本人選手には、起動時・セーブデータの読み込み時・年度替わり・新しいゲームの開始時に、
 //   学年ごとにまとめて付ける(koukouJouhouFuyo)。版の番号では判定しない(1.9.5testで開いたデータにも付くように)
+// ・大学に来た留学生(1.9.5): 約半分(_ryuugakuseiKoukouWariai)に、名簿の留学生のいる高校のどれかを付ける
+//   (名門の高校ほど選ばれやすい。1校から同じ年に大学へ来る留学生は1人まで)。その年は、その高校の名前のない
+//   留学生の代わりに、その選手が日本人の新入生と一緒に走る。力の土台は入学時の5000mの記録がないので、
+//   大学の留学生の優秀度(入学時の基本走力を決めたもの。magicnumberに残っている)から決める(_ryuugakuseiKousei)。
+//   登り・下りなどの補正は、その選手の能力値を使う。残りの留学生は日本の高校に通っていない(出身校なし)。
+//   どちらも経歴を3(koukouKeirekiRyuugakusei)にして「決めた」しるしにする(起動のたびに抽選し直さないように。
+//   経歴が3でない留学生は、日本人だったころの古い情報が入っていても、決め直す)
 // ・表示しない設定: KantokuData.yobiint2[86](0=表示(初期値)・1=表示しない。趣味・高校時代の表示設定の画面)
 // ------------------------------------------------------------
 
 const int _shitaBit = 131072; // 2の17乗(出身地と趣味の分)
 
+/// 経歴の3: 大学に来た留学生の高校を決めたしるし(高校が0なら、日本の高校に通っていない。1.9.5)
+const int koukouKeirekiRyuugakusei = 3;
+
+/// 大学に来た留学生のうち、日本の高校の出身にする割合(1.9.5)
+const double _ryuugakuseiKoukouWariai = 0.5;
+
 /// 高校の情報を表示しないか(KantokuData.yobiint2[86]=1)
 bool koukouHyoujiNashi(KantokuData kantoku) =>
     kantoku.yobiint2.length > 86 && kantoku.yobiint2[86] == 1;
+
+/// 画面や記事に出してよい高校の情報(1.9.5。出さないときはnull)
+/// 表示しない設定のときと、高校が未設定・なしのときはnull。
+/// 留学生([hirou]が1)は、高校を決めたあと(経歴が3)のときだけ(日本人だったころの古い情報は出さない)
+KoukouJouhou? koukouHyoujiJouhou(int samusataisei, int hirou, KantokuData kantoku) {
+  if (koukouHyoujiNashi(kantoku)) return null;
+  final KoukouJouhou j = KoukouJouhou.yomu(samusataisei);
+  if (j.mei == null) return null;
+  if (hirou == 1 && j.keireki != koukouKeirekiRyuugakusei) return null;
+  return j;
+}
 
 /// 1人分の高校の情報(samusataisei の上の値)
 class KoukouJouhou {
   /// 高校の番号+1(0は未設定)
   final int koukou;
 
-  /// 経歴(0長距離ひと筋 1中距離出身 2ほかの競技の出身)
+  /// 経歴(0長距離ひと筋 1中距離出身 2ほかの競技の出身 3大学に来た留学生(高校を決めたしるし。1.9.5))
   final int keireki;
 
   /// 全国高校駅伝を走ったか(falseなら都道府県予選の結果)
@@ -321,18 +346,17 @@ String koukouJissekiBun(KoukouJouhou j) {
 }
 
 /// 一覧の画面に出す出身校(「雷鳥館高(長野)」。1.9.5)
-/// 表示しない設定のときと、留学生・未設定のときは空
+/// 表示しない設定のときと、未設定・出身校なし(日本の高校に通っていない留学生)のときは空
 String koukouIchiranMoji(int samusataisei, int hirou, KantokuData kantoku) {
-  if (hirou == 1 || koukouHyoujiNashi(kantoku)) return '';
-  return koukouMeiKenMoji(KoukouJouhou.yomu(samusataisei));
+  final KoukouJouhou? j = koukouHyoujiJouhou(samusataisei, hirou, kantoku);
+  return j == null ? '' : koukouMeiKenMoji(j);
 }
 
 /// 一覧の画面に出す、高校時代の一番の実績の短い文(1.9.5。なければ空)
 /// 全国高校駅伝 → 高校総体の全国大会 → 都道府県予選 → 地区・県大会 → 経歴の順に、最初に出せるもの
 String koukouJissekiHitokoto(int samusataisei, int hirou, KantokuData kantoku) {
-  if (hirou == 1 || koukouHyoujiNashi(kantoku)) return '';
-  final KoukouJouhou j = KoukouJouhou.yomu(samusataisei);
-  if (j.mei == null) return '';
+  final KoukouJouhou? j = koukouHyoujiJouhou(samusataisei, hirou, kantoku);
+  if (j == null) return '';
   final String ekiden = koukouEkidenMoji(j);
   final String soutai = koukouSoutaiMoji(j);
   if (j.ekidenZenkoku && ekiden.isNotEmpty) return ekiden;
@@ -343,12 +367,10 @@ String koukouJissekiHitokoto(int samusataisei, int hirou, KantokuData kantoku) {
 }
 
 /// 選手画面に出す、出身校と高校時代の文(出さないときは空)
-/// [hirou] 留学生(1)には出さない
+/// [hirou] 留学生(1)は、日本の高校の出身のときだけ出す(1.9.5)
 String koukouProfileMoji(int samusataisei, int hirou, KantokuData kantoku) {
-  if (hirou == 1) return '';
-  if (koukouHyoujiNashi(kantoku)) return '';
-  final KoukouJouhou j = KoukouJouhou.yomu(samusataisei);
-  if (j.mei == null) return '';
+  final KoukouJouhou? j = koukouHyoujiJouhou(samusataisei, hirou, kantoku);
+  if (j == null) return '';
   final List<String> jisseki = koukouJissekiList(j);
   return '出身校: ${koukouMeiKenMoji(j)}'
       '${jisseki.isEmpty ? '' : '\n高校時代: ${jisseki.join('、')}'}';
@@ -467,6 +489,61 @@ _Kousei? _shinnyuusei(SenshuData s, int keireki) {
     ryuugakusei: false,
     keireki: keireki,
   );
+}
+
+/// 大学に来た留学生の、入学時の優秀度(1が一番強い〜4。1.9.5)
+/// 入学時に大学の留学生の優秀度で決めた基本走力の上限(magicnumber)から読む(一番近い優秀度)
+int _ryuugakuseiYuushuudo(SenshuData s) {
+  int yoi = 1;
+  double saMin = double.infinity;
+  for (int y = 1; y <= 4; y++) {
+    final double sa = (s.magicnumber - ryuugakuseiJoukaiMagicnumber(y)).abs();
+    if (sa < saMin) {
+      saMin = sa;
+      yoi = y;
+    }
+  }
+  return yoi;
+}
+
+/// 大学に来た留学生を、高校3年生の留学生にする(1.9.5)
+/// 入学時の5000mの記録がないので、力の土台は入学時の優秀度から決める(優秀度1は13分18秒前後、
+/// 1つ下がるごとに8秒遅く。名前のない留学生は13分20〜55秒)。ほかの能力は、その選手の値を使う
+_Kousei _ryuugakuseiKousei(SenshuData s, Random r) {
+  final int yuushuudo = _ryuugakuseiYuushuudo(s);
+  final double t5 = (798.0 + (yuushuudo - 1) * 8.0 + _gauss(r) * 6.0).clamp(785.0, 845.0).toDouble();
+  return _Kousei(
+    s: s,
+    t5: t5,
+    nobori: _nouryoku(s.noboritekisei),
+    kudari: _nouryoku(s.kudaritekisei),
+    updown: _nouryoku(s.noborikudarikirikaenouryoku),
+    road: _nouryoku(s.tandokusou),
+    pace: _nouryoku(s.paceagesagetaiouryoku),
+    spurt: _nouryoku(s.spurtryoku),
+    ryuugakusei: true,
+    keireki: 0,
+  );
+}
+
+/// 大学に来た留学生の高校を選ぶ(名簿の留学生のいる高校のうち、この年にまだ使っていない高校から。
+/// 名門ほど選ばれやすい。選べる高校がなければ-1。1.9.5)
+int _ryuugakuseiKoukouErabu(Set<int> tsukatta, Random r) {
+  final List<int> kouho = [
+    for (int i = 0; i < koukouMeibo.length; i++)
+      if (koukouMeibo[i].ryuugakusei && !tsukatta.contains(i)) i,
+  ];
+  if (kouho.isEmpty) return -1;
+  final List<double> omomi = [
+    for (final int i in kouho) koukouMeibo[i].meimon >= 3 ? 3.0 : (koukouMeibo[i].meimon == 2 ? 2.0 : 1.0),
+  ];
+  final double goukei = omomi.fold<double>(0, (a, b) => a + b);
+  double x = r.nextDouble() * goukei;
+  for (int j = 0; j < kouho.length; j++) {
+    x -= omomi[j];
+    if (x <= 0) return kouho[j];
+  }
+  return kouho.last;
 }
 
 /// 駅伝の区間(距離m、記録の係数、登りの強さ(登りの割合×勾配)、下りの強さ、登り下りの切り替えの回数)
@@ -754,8 +831,27 @@ Map<int, KoukouJouhou> _nendoKeisan(List<SenshuData> shinnyuusei, Random r) {
   final List<_Kousei> jitsuzai = []; // 走る新入生
   final List<List<_Kousei>> bu = [for (int i = 0; i < koukouMeibo.length; i++) <_Kousei>[]];
 
+  // 大学に来た留学生(1.9.5): 約半分を、留学生のいる高校のどれかの出身にする(その高校の名前のない留学生の代わりに走る)。
+  // 残りは日本の高校に通っていない。どちらも経歴を3にして、決めたしるしにする
+  final Set<int> ryuugakuseiKoukou = {}; // この年に大学へ来る留学生がいる高校(名前のない留学生を入れない)
+  for (final SenshuData s in shinnyuusei) {
+    if (s.hirou != 1) continue;
+    int koukou = -1;
+    if (r.nextDouble() < _ryuugakuseiKoukouWariai) {
+      koukou = _ryuugakuseiKoukouErabu(ryuugakuseiKoukou, r);
+    }
+    if (koukou >= 0) {
+      final _Kousei k = _ryuugakuseiKousei(s, r);
+      ryuugakuseiKoukou.add(koukou);
+      jitsuzai.add(k);
+      bu[koukou].add(k);
+    }
+    kekka[s.id] = KoukouJouhou(koukou: koukou + 1, keireki: koukouKeirekiRyuugakusei);
+  }
+
   // 新入生の高校と経歴
   for (final SenshuData s in shinnyuusei) {
+    if (s.hirou == 1) continue; // 留学生は上で決めた
     int ken = PackedIndexHelper.unpackIndices(s.samusataisei)['prefectureIndex'] ?? -1;
     if (ken < 0 || ken >= kenSuu) ken = r.nextInt(kenSuu);
     final double t5 = s.kiroku_nyuugakuji_5000;
@@ -788,7 +884,8 @@ Map<int, KoukouJouhou> _nendoKeisan(List<SenshuData> shinnyuusei, Random r) {
     for (final int g in const [3, 3, 3, 2, 2, 2, 1, 1, 1]) {
       bu[i].add(_nanashi(koukouMeibo[i].meimon, g, r));
     }
-    if (koukouMeibo[i].ryuugakusei) bu[i].add(_nanashiRyuugakusei(r));
+    // 大学に来る留学生がいる高校には、名前のない留学生を入れない(1.9.5)
+    if (koukouMeibo[i].ryuugakusei && !ryuugakuseiKoukou.contains(i)) bu[i].add(_nanashiRyuugakusei(r));
   }
 
   // ---- 全国高校駅伝(都道府県予選 → 全国) ----
@@ -1000,7 +1097,8 @@ int _shumokuErabu(_Kousei k, Random r) {
   return 2;
 }
 
-/// 高校が未設定の日本人選手に、出身校と高校時代の実績を付けて保存する(学年ごとにまとめて計算)。
+/// 高校が未設定の選手に、出身校と高校時代の実績を付けて保存する(学年ごとにまとめて計算)。
+/// 日本人選手は高校が0のとき、留学生は経歴が3(決めたしるし)でないときに決める(1.9.5)。
 /// 起動時・セーブデータの読み込み時・年度替わり(新入生の所属先が決まったあと)・新しいゲームの開始時に呼ぶ。
 /// 付けた人数を返す(未設定の選手がいなければ何もしない)
 Future<int> koukouJouhouFuyo() async {
@@ -1008,8 +1106,12 @@ Future<int> koukouJouhouFuyo() async {
   final Box<SenshuData> box = Hive.box<SenshuData>('senshuBox');
   final Map<int, List<SenshuData>> gakunenGoto = {};
   for (final SenshuData s in box.values) {
-    if (s.hirou == 1) continue; // 留学生には付けない
-    if (KoukouJouhou.yomu(s.samusataisei).koukou != 0) continue;
+    final KoukouJouhou j = KoukouJouhou.yomu(s.samusataisei);
+    if (s.hirou == 1) {
+      if (j.keireki == koukouKeirekiRyuugakusei) continue; // 留学生は決めたあと
+    } else {
+      if (j.koukou != 0) continue;
+    }
     gakunenGoto.putIfAbsent(s.gakunen, () => <SenshuData>[]).add(s);
   }
   if (gakunenGoto.isEmpty) return 0;

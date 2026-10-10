@@ -866,13 +866,16 @@ Kiji? _kukanJikkyou(
     int koTen = 1 << 30;
     for (int i = 0; i < jun.length; i++) {
       final SenshuData? senA = jun[i].s;
-      if (senA == null || senA.hirou == 1) continue;
-      final int kouNo = KoukouJouhou.yomu(senA.samusataisei).koukou;
-      if (kouNo == 0) continue;
+      if (senA == null) continue;
+      // 留学生も、日本の高校の出身なら入る(1.9.5)
+      final KoukouJouhou? jA = koukouHyoujiJouhou(senA.samusataisei, senA.hirou, k.kantoku);
+      if (jA == null) continue;
+      final int kouNo = jA.koukou;
       for (int i2 = i + 1; i2 < jun.length; i2++) {
         final SenshuData? senB = jun[i2].s;
-        if (senB == null || senB.hirou == 1) continue;
-        if (KoukouJouhou.yomu(senB.samusataisei).koukou != kouNo) continue;
+        if (senB == null) continue;
+        final KoukouJouhou? jB = koukouHyoujiJouhou(senB.samusataisei, senB.hirou, k.kantoku);
+        if (jB == null || jB.koukou != kouNo) continue;
         final int ten = jun[i].kukanJuni + jun[i2].kukanJuni + (senA.gakunen == senB.gakunen ? 0 : 1000);
         if (ten < koTen) {
           koTen = ten;

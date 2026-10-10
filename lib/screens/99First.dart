@@ -50,6 +50,7 @@ class _FirstScreen extends State<FirstScreen> {
                 final Box<Ghensuu> ghensuuBox = Hive.box<Ghensuu>('ghensuuBox');
                 final Ghensuu currentGhensuu = ghensuuBox.getAt(0)!;
                 currentGhensuu.mode = 10;
+                currentGhensuu.gamenflag = 0; // 最新の画面にしておく(1.9.5)
                 await currentGhensuu.save();
 
                 // 必要に応じてここで画面遷移などの処理を追加

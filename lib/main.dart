@@ -4228,7 +4228,23 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         } else if (currentGhensuu.mode == 10 && !_isMode10Processing) {
           // フラグを追加
           WidgetsBinding.instance.addPostFrameCallback((_) async {
-            await _runMode0010Processing(currentGhensuu);
+            try {
+              await _runMode0010Processing(currentGhensuu);
+            } catch (e) {
+              // 新規ゲームの処理で問題が起きたときは、エラー画面を出し、次に起動したときは再開画面に戻す(1.9.5)
+              // (モード10のままだと、起動するたびに同じ処理をやり直して、同じところで止まってしまうため。
+              // _isMode10Processing はtrueのままにして、この処理を呼び直さない)
+              try {
+                final Ghensuu? g = _ghensuuBox.get('global_ghensuu');
+                if (g != null) {
+                  g.mode = 99;
+                  g.gamenflag = 0;
+                  await g.save();
+                }
+              } catch (_) {}
+              ShoriGuard.reportError('新規ゲームの開始', e);
+              if (mounted) setState(() {});
+            }
           });
           return MaterialApp(
             theme: appTheme, // ★テーマを適用★
@@ -4786,9 +4802,24 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           );
         } else {}
         Widget currentScreen;
-        int selectedIndex = currentGhensuu.gamenflag;
+        // 下のバーが出る場面か(1.9.5。出ない場面ではほかのタブに移れないので、最後に開いていたタブに
+        // 関係なく、いつも「最新」を出す。設定などの画面が出たまま進めなくならないように)
+        final bool barAri =
+            currentGhensuu.mode == 100 ||
+            currentGhensuu.mode == 150 ||
+            currentGhensuu.mode == 280 ||
+            currentGhensuu.mode == 290 ||
+            currentGhensuu.mode == 343 ||
+            currentGhensuu.mode == 1111 ||
+            currentGhensuu.mode == 110 ||
+            currentGhensuu.mode == 300 ||
+            currentGhensuu.mode == 330 ||
+            currentGhensuu.mode == 350 ||
+            currentGhensuu.mode == 700;
+        final int gamen = barAri ? currentGhensuu.gamenflag : 0;
+        int selectedIndex = gamen;
 
-        switch (currentGhensuu.gamenflag) {
+        switch (gamen) {
           case 0:
             // ★★★ 変更箇所 START ★★★
             // onAdvanceMode に常に有効なコールバック関数を直接渡す
@@ -4940,18 +4971,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
               child: currentScreen,
             ),*/
             body: currentScreen,
-            bottomNavigationBar:
-                (currentGhensuu.mode == 100 ||
-                    currentGhensuu.mode == 150 ||
-                    currentGhensuu.mode == 280 ||
-                    currentGhensuu.mode == 290 ||
-                    currentGhensuu.mode == 343 ||
-                    currentGhensuu.mode == 1111 ||
-                    currentGhensuu.mode == 110 ||
-                    currentGhensuu.mode == 300 ||
-                    currentGhensuu.mode == 330 ||
-                    currentGhensuu.mode == 350 ||
-                    currentGhensuu.mode == 700)
+            bottomNavigationBar: barAri
                 ? BottomNavigationBar(
                     items: const <BottomNavigationBarItem>[
                       BottomNavigationBarItem(

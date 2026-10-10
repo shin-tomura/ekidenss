@@ -965,7 +965,7 @@ Map<int, KoukouJouhou> _nendoKeisan(List<SenshuData> shinnyuusei, Random r, [Map
   if (kirokuOut != null) {
     kirokuOut['z'] = [
       for (final _Team t in zenkokuTeams)
-        [_teamCode(t), daihyou[t] ?? 0, t.goukei.round()],
+        <dynamic>[_teamCode(t), daihyou[t] ?? 0, t.goukei.round()],
     ];
     kirokuOut['k'] = [
       for (int kk = 0; kk < _zenkokuKukan.length; kk++)
@@ -1191,7 +1191,18 @@ int _shumokuErabu(_Kousei k, Random r) {
 /// 日本人選手は高校が0のとき、留学生は経歴が3(決めたしるし)でないときに決める(1.9.5)。
 /// 起動時・セーブデータの読み込み時・年度替わり(新入生の所属先が決まったあと)・新しいゲームの開始時に呼ぶ。
 /// 付けた人数を返す(未設定の選手がいなければ何もしない)
+/// ゲームの計算には使わない飾りの処理なので、エラーが起きても止めずにログに出すだけにする(1.9.5。
+/// 起動時はアプリの画面を出す前に呼ぶので、ここで例外を出すとスプラッシュ画面から進まなくなる)
 Future<int> koukouJouhouFuyo() async {
+  try {
+    return await _koukouJouhouFuyoHontai();
+  } catch (e, st) {
+    print('出身校と高校時代の実績の計算でエラー(ゲームはそのまま続ける): $e\n$st');
+    return 0;
+  }
+}
+
+Future<int> _koukouJouhouFuyoHontai() async {
   if (!Hive.isBoxOpen('senshuBox')) return 0;
   // 出場回数を足す前に作った大会の記録があれば、そこから数え直す(1.9.5)
   await _shutsujouIkou();
@@ -1520,8 +1531,10 @@ void _shutsujouSusumeru(int nendo, List<dynamic> teams, List<int> shutsujou, Lis
     shutsujou[code]++;
     renzoku[code] = (saigo[code] == nendo - 1 && renzoku[code] > 0) ? renzoku[code] + 1 : 1;
     saigo[code] = nendo;
+    // t は数だけの一覧(List<int>)のこともあるので、1つずつ足す(型の決まらない一覧を addAll すると型のエラーになる)
     t.removeRange(3, t.length);
-    t.addAll([shutsujou[code], renzoku[code]]);
+    t.add(shutsujou[code]);
+    t.add(renzoku[code]);
   }
 }
 
@@ -1553,17 +1566,22 @@ Future<void> _shutsujouIkou() async {
 }
 
 /// 大会の記録と優勝回数を消す(新しいゲームの開始時。名簿の編集は残す)
+/// エラーが起きても、新しいゲームの処理を止めない
 Future<void> koukouKirokuZenbuKesu() async {
-  final UnivData? u = _kirokuUniv(_kirokuUnivId);
-  if (u != null) {
-    u.name_tanshuku = '';
-    await u.save();
+  try {
+    final UnivData? u = _kirokuUniv(_kirokuUnivId);
+    if (u != null) {
+      u.name_tanshuku = '';
+      await u.save();
+    }
+    final Map<String, dynamic> d = _kaisuuJsonYomu();
+    for (final String kagi in const ['z', 'k', 'd', 'rn', 'ln']) {
+      d.remove(kagi);
+    }
+    await _kaisuuJsonKaku(d);
+  } catch (e) {
+    print('高校の大会の記録を消すところでエラー(ゲームはそのまま続ける): $e');
   }
-  final Map<String, dynamic> d = _kaisuuJsonYomu();
-  for (final String kagi in const ['z', 'k', 'd', 'rn', 'ln']) {
-    d.remove(kagi);
-  }
-  await _kaisuuJsonKaku(d);
 }
 
 /// 大会の記録の選手1人(画面用)

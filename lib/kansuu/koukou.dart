@@ -270,6 +270,45 @@ List<String> koukouJissekiList(KoukouJouhou j) {
   ];
 }
 
+/// ほかの競技の出身のときの部活の名前(「サッカー部」。ほかの競技の出身でなければ空)
+String koukouHokaKyougi(KoukouJouhou j) {
+  if (j.keireki != 2) return '';
+  return _hokaKyougi[(j.koukou * 31 + j.shita) % _hokaKyougi.length];
+}
+
+/// 記事に書く、高校時代の一番の実績の文(過去形。「全国高校駅伝の1区で区間賞を取った」など。
+/// 目立つものがなければ、経歴(中距離・ほかの競技)。それもなければ空)
+String koukouJissekiBun(KoukouJouhou j) {
+  final int ku = j.ekidenKukan;
+  final int kj = j.ekidenKukanJuni;
+  final int tj = j.ekidenJuni;
+  final int sh = j.soutaiShumoku;
+  final String sm = (sh >= 1 && sh <= 3) ? koukouShumokuMei[sh] : '';
+  final bool ekidenMedatsu = j.ekidenZenkoku && ku > 0 && ((kj >= 1 && kj <= 3) || (tj >= 1 && tj <= 3));
+  if (ekidenMedatsu) {
+    final String kukanMoji = kj == 1 ? '区間賞' : ((kj >= 2 && kj <= 30) ? '区間$kj位' : '');
+    if (tj == 1) {
+      return kukanMoji.isEmpty
+          ? '全国高校駅伝の優勝メンバーで、$ku区を走った'
+          : '全国高校駅伝の優勝メンバーで、$ku区を$kukanMojiで走った';
+    }
+    if (kj == 1) return '全国高校駅伝の$ku区で区間賞を取った';
+    if (kukanMoji.isNotEmpty) return '全国高校駅伝の$ku区で$kukanMojiに入った';
+    return '全国高校駅伝の$ku区を走り、チームは$tj位だった';
+  }
+  if (j.soutaiDankai == 3 && sm.isNotEmpty) {
+    final int r = j.soutaiJuni;
+    if (r == 1) return '高校総体の$smで優勝した';
+    if (r >= 2 && r <= 8) return '高校総体の$smで$r位に入った';
+    return '高校総体の$smで決勝に進んだ';
+  }
+  if (j.ekidenZenkoku && ku > 0) return '全国高校駅伝の$ku区を走った';
+  if (j.soutaiDankai == 2 && sm.isNotEmpty) return '高校総体の$smに出場した';
+  if (j.keireki == 2) return '${koukouHokaKyougi(j)}に所属していた';
+  if (j.keireki == 1) return '中距離が専門だった';
+  return '';
+}
+
 /// 選手画面に出す、出身校と高校時代の文(出さないときは空)
 /// [hirou] 留学生(1)には出さない
 String koukouProfileMoji(int samusataisei, int hirou, KantokuData kantoku) {

@@ -8,6 +8,7 @@ import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/kansuu/time_date.dart';
 import 'package:ekiden/screens/Modal_courseshoukai.dart'; // 大会の名前(courseRaceTitle)
 import 'package:ekiden/kansuu/custom_seigen.dart'; // カスタム駅伝の出場制限(1年生だけか)
+import 'package:ekiden/kansuu/koukou.dart'; // 出身校と高校時代の実績(1.9.5)
 
 // ------------------------------------------------------------
 // ニュース記事(箱庭スポーツ)の共通の部品(1.9.2)
@@ -36,6 +37,8 @@ import 'package:ekiden/kansuu/custom_seigen.dart'; // カスタム駅伝の出�
 //  ・能力値は書かない(見抜く力の仕組みを壊さないため)。勝因・敗因は、区間順位・タイム差・
 //    当日変更・1区のペースなど、結果から言えることだけにする
 //  ・趣味は、趣味非表示設定(KantokuData.yobiint2[15]=1)のときは書かない
+//  ・出身校と高校時代の実績(1.9.5。koukou.dart)は、表示しない設定(KantokuData.yobiint2[86]=1)のときは書かない。
+//    出身地と趣味の一言(shusshinShumiBun)の後ろに付け、駅伝の因縁(senshuInnen)にも入れる
 //  ・総監督(プレイヤー)の言葉は作らない。コメントは選手と、大学の監督(OB)のものだけ
 //  ・文体はニュース記事らしく常体(〜した。)。コメントの中は話し言葉
 // ------------------------------------------------------------
@@ -276,6 +279,9 @@ enum InnenShurui {
 
   /// 駅伝予選: 駅伝の本戦を走った経験がある(1.9.4)
   honsenKeiken,
+
+  /// 高校時代の実績や経歴(全国高校駅伝の区間賞、ほかの競技の出身など。1.9.5)
+  koukou,
 }
 
 /// 選手の因縁1つ
@@ -480,8 +486,82 @@ List<Innen> senshuInnen(
   // 入学時の記録からの伸び(5000m。留学生は除く)
   final Innen? nobi = nyuugakuNobiInnen(k, s);
   if (nobi != null) list.add(nobi);
+  // 高校時代の実績や経歴(1.9.5)
+  final Innen? kou = koukouInnen(k, s, kj: kj, kekka: kekka);
+  if (kou != null) list.add(kou);
   list.sort((a, b) => b.ten.compareTo(a.ten));
   return list;
+}
+
+/// 高校時代の因縁(1.9.5。koukou.dart)
+/// ・全国高校駅伝で区間3位以内(またはチーム3位以内)だった1年生: 40点(上級生は20点)
+/// ・高校までほかの競技をしていた選手: 30点。結果の記事で区間3位以内なら50点(見出しにも使える)
+/// ・高校総体で入賞(8位以内)した1年生: 30点
+/// 表示しない設定のときと、留学生・分からないときはnull
+Innen? koukouInnen(KijiKankyou k, SenshuData s, {int? kj, bool kekka = true}) {
+  if (s.hirou == 1 || koukouHyoujiNashi(k.kantoku)) return null;
+  final KoukouJouhou j = KoukouJouhou.yomu(s.samusataisei);
+  if (j.mei == null) return null;
+  final String kou = koukouMeiMoji(j);
+  // ほかの競技の出身
+  if (j.keireki == 2) {
+    final String bu = koukouHokaKyougi(j);
+    final bool kakuyaku = kekka && kj != null && kj <= 2;
+    return Innen(
+      InnenShurui.koukou,
+      kakuyaku ? 50 : 30,
+      '$kou時代は$buで、陸上の大会の実績はなかった。',
+      kekka
+          ? '高校までは$buだった。陸上でこの舞台に立てるとは、思っていなかった'
+          : '高校までは$buだった。陸上でこの舞台に立てるなんて、思っていなかった',
+      kakuyaku ? '元$buの' : '',
+    );
+  }
+  final int ku = j.ekidenKukan;
+  final int kjK = j.ekidenKukanJuni;
+  final int tj = j.ekidenJuni;
+  // 全国高校駅伝で目立った選手
+  if (j.ekidenZenkoku && ku > 0 && ((kjK >= 1 && kjK <= 3) || (tj >= 1 && tj <= 3))) {
+    final String jisseki = koukouJissekiBun(j);
+    return Innen(
+      InnenShurui.koukou,
+      s.gakunen == 1 ? 40 : 20,
+      '$kou時代は、$jisseki。',
+      kekka
+          ? '高校の駅伝とは距離も重みも違う。一から挑戦するつもりで走った'
+          : '高校の駅伝とは距離も重みも違う。一から挑戦するつもりで走りたい',
+      kjK == 1 ? '高校駅伝区間賞の' : '',
+    );
+  }
+  // 高校総体で入賞した1年生
+  if (s.gakunen == 1 && j.soutaiDankai == 3 && j.soutaiJuni >= 1 && j.soutaiJuni <= 8) {
+    return Innen(
+      InnenShurui.koukou,
+      30,
+      '$kou時代は、${koukouJissekiBun(j)}。',
+      kekka ? 'トラックとは違うロードの難しさを、身をもって知った' : 'トラックとは違う。ロードでどこまでやれるか試したい',
+    );
+  }
+  return null;
+}
+
+/// 出身校と高校時代の一言(1.9.5。「青嶺学院高時代は、全国高校駅伝の1区で区間賞を取った。」など)
+/// 表示しない設定のときと、留学生・分からないときは空
+String koukouJidaiBun(KijiKankyou k, SenshuData s, KijiRand r, String yobi) {
+  if (s.hirou == 1 || koukouHyoujiNashi(k.kantoku)) return '';
+  final KoukouJouhou j = KoukouJouhou.yomu(s.samusataisei);
+  if (j.mei == null) return '';
+  final String jisseki = koukouJissekiBun(j);
+  if (jisseki.isEmpty) {
+    return r.erabu([
+      '高校は${koukouMeiKenMoji(j)}。',
+      '$yobiの母校は${koukouMeiKenMoji(j)}。',
+    ]);
+  }
+  return r.erabu([
+    '${koukouMeiMoji(j)}時代は、$jisseki。',
+    '高校は${koukouMeiKenMoji(j)}。$jisseki。',
+  ]);
 }
 
 /// 入学時の5000mの記録からの伸びの因縁(留学生と1年生は除く。伸びていなければnull)
@@ -1737,7 +1817,14 @@ class KijiKakite {
 }
 
 /// 出身地と趣味の一言(「福岡県出身。趣味は○○という」など。書けることがなければ空)
+/// 1.9.5から、出身校と高校時代の一言(koukouJidaiBun)を後ろに付ける
 String shusshinShumiBun(KijiKankyou k, SenshuData s, KijiRand r, String yobi) {
+  final String moto = _shusshinShumiBunMoto(k, s, r, yobi);
+  return '$moto${koukouJidaiBun(k, s, r, yobi)}';
+}
+
+/// 出身地と趣味の一言(1.9.4までの shusshinShumiBun の中身)
+String _shusshinShumiBunMoto(KijiKankyou k, SenshuData s, KijiRand r, String yobi) {
   final String? ken = k.shusshin(s);
   final String? shumi = k.shumi(s);
   if (ken == null && shumi == null) return '';

@@ -6,6 +6,7 @@ import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/senshu_data.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/kansuu/scout_com.dart';
+import 'package:ekiden/kansuu/koukou.dart'; // 出身校(1.9.5)
 import 'package:ekiden/screens/Modal_senshu.dart'; // 選手データ(選手の詳細)
 
 // ------------------------------------------------------------
@@ -476,6 +477,16 @@ class _ModalShinnyuuseiShingakusakiState
     );
   }
 
+  /// 出身校(「青嶺学院高(長野)」。1.9.5。表示しない設定のときと留学生は空)
+  String _koukouMei(SenshuData s) {
+    if (s.hirou == 1) return '';
+    final KantokuData? kantoku = Hive.box<KantokuData>(
+      'kantokuBox',
+    ).get('KantokuData');
+    if (kantoku == null || koukouHyoujiNashi(kantoku)) return '';
+    return koukouMeiKenMoji(KoukouJouhou.yomu(s.samusataisei));
+  }
+
   /// 選手データ(選手の詳細)を開く(ほかの画面と同じ開き方)
   /// 閉じたら、名前の変更などを反映するために描き直す
   void _senshuShousai(SenshuData s) {
@@ -594,7 +605,8 @@ class _ModalShinnyuuseiShingakusakiState
                         ),
                       ),
                       Text(
-                        '→ $shingakusaki',
+                        // 出身校があれば前に付ける(「青嶺学院高(長野) → 東西大学」。1.9.5)
+                        '${_koukouMei(s).isEmpty ? '' : '${_koukouMei(s)} '}→ $shingakusaki',
                         style: TextStyle(
                           color: jibun ? Colors.amber : _joutaiIro(j),
                           fontSize: HENSUU.fontsize_honbun - 2,

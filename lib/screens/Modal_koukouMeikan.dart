@@ -353,7 +353,7 @@ class _KenBetsu extends StatelessWidget {
       const SizedBox(height: 6),
       const Text(
         '高校を押すと、年度ごとの都道府県予選・地区大会・全国高校駅伝の成績を見られます。'
-        '校名・都道府県・名門度などは、その画面の「編集」で変えられます。',
+        '校名・名門度などは、その画面の「編集」で変えられます(都道府県は変えられません)。',
         style: _hosoku,
       ),
       const SizedBox(height: 4),
@@ -442,7 +442,7 @@ class _KenBetsu extends StatelessWidget {
         backgroundColor: Colors.grey[900],
         title: const Text('すべての高校を元に戻しますか?', style: TextStyle(color: Colors.white)),
         content: const Text(
-          '校名・都道府県・名門度・タイプ・留学生の有無・紹介文の変更を、すべて初期の名簿に戻します。',
+          '校名・名門度・タイプ・留学生の有無・紹介文の変更を、すべて初期の名簿に戻します。',
           style: _honbun,
         ),
         actions: [
@@ -593,7 +593,7 @@ String _kukanJuniMoji(KoukouTaikaiKiroku kiroku, KoukouKirokuTeam t, KoukouKirok
   return '${s.kukan}区';
 }
 
-/// 高校1校の編集(校名・都道府県・名門度・タイプ・留学生の有無・紹介文。1.9.5)
+/// 高校1校の編集(校名・名門度・タイプ・留学生の有無・紹介文。都道府県は表示だけ。1.9.5)
 class _KoukouHenshuu extends StatefulWidget {
   const _KoukouHenshuu({required this.ban});
 
@@ -607,7 +607,7 @@ class _KoukouHenshuu extends StatefulWidget {
 class _KoukouHenshuuState extends State<_KoukouHenshuu> {
   late final TextEditingController _mei;
   late final TextEditingController _shoukai;
-  late int _ken;
+  late final int _ken; // 都道府県は変えられない(今の値のまま保存に渡す。1.9.5)
   late int _meimon;
   late int _iro;
   late bool _ryuu;
@@ -712,14 +712,9 @@ class _KoukouHenshuuState extends State<_KoukouHenshuu> {
   Widget build(BuildContext context) {
     final KoukouMei shoki = koukouMeiboShoki[widget.ban];
     final bool henkouAri = koukouHenkouAri(widget.ban);
-    // その都道府県の名簿の高校が1校だけなら、都道府県は変えられない(名簿の高校が0校の県を作らないように。1.9.5)
-    final List<KoukouMei> meibo = koukouMeiboGenzai();
-    final int imaKen = meibo[widget.ban].ken;
-    final bool kenKotei = meibo.where((KoukouMei m) => m.ken == imaKen).length <= 1;
-    final String imaKenMei =
-        (imaKen >= 0 && imaKen < LocationDatabase.allPrefectures.length) ? LocationDatabase.allPrefectures[imaKen] : '';
-    // 元に戻すと都道府県が変わり、今の都道府県の名簿の高校が0校になるなら、元に戻せない
-    final bool modosenai = kenKotei && shoki.ken != imaKen;
+    // 都道府県は変えられない(1.9.5。全国高校駅伝の予選を1県5校で走るため)
+    final String kenMei =
+        (shoki.ken >= 0 && shoki.ken < LocationDatabase.allPrefectures.length) ? LocationDatabase.allPrefectures[shoki.ken] : '';
     // この高校の回数(1回以上あれば、0に戻すボタンを出す)
     final KoukouYuushouKaisuu kai = koukouYuushouKaisuuYomu();
     final int b = widget.ban;
@@ -747,24 +742,12 @@ class _KoukouHenshuuState extends State<_KoukouHenshuu> {
             style: _honbun,
             decoration: _deco('校名(「高」は表示のときに付きます)'),
           ),
+          // 都道府県は表示だけ(変えられない。1.9.5)
           _label('都道府県'),
-          DropdownButton<int>(
-            value: _ken,
-            isExpanded: true,
-            dropdownColor: Colors.grey[900],
-            style: _honbun,
-            items: [
-              for (int k = 0; k < LocationDatabase.allPrefectures.length; k++)
-                DropdownMenuItem<int>(value: k, child: Text(LocationDatabase.allPrefectures[k], style: _honbun)),
-            ],
-            onChanged: (_hozonChuu || kenKotei) ? null : (int? v) => setState(() => _ken = v ?? _ken),
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text('$kenMei(都道府県は変えられません)', style: _honbun),
           ),
-          if (kenKotei)
-            Text(
-              '$imaKenMeiの名簿の高校はこの1校だけなので、都道府県は変えられません'
-              '(ほかの高校を$imaKenMeiに移すと、変えられるようになります)。',
-              style: _hosoku,
-            ),
           _label('名門度(高いほど、名前のない部員が強く、速い新入生が集まりやすい。名門は県外からも集まる)'),
           DropdownButton<int>(
             value: _meimon,
@@ -807,7 +790,7 @@ class _KoukouHenshuuState extends State<_KoukouHenshuu> {
           ),
           const SizedBox(height: 8),
           const Text(
-            '都道府県・名門度・タイプ・留学生の変更は、次の新入生の計算から効きます。今の選手の高校時代の実績は変わりません。'
+            '名門度・タイプ・留学生の変更は、次の新入生の計算から効きます。今の選手の高校時代の実績は変わりません。'
             '校名の変更は、今の選手の出身校にもそのまま出ます。過去の大会の記録は、そのときの校名で出ます。'
             '全国高校駅伝の出場回数と優勝回数は、校名を変えてもこの高校に残ります(0に戻すこともできます)。',
             style: _hosoku,
@@ -823,7 +806,7 @@ class _KoukouHenshuuState extends State<_KoukouHenshuu> {
               ),
               if (henkouAri)
                 OutlinedButton(
-                  onPressed: (_hozonChuu || modosenai) ? null : _modosu,
+                  onPressed: _hozonChuu ? null : _modosu,
                   child: const Text('この高校を元に戻す', style: _honbun),
                 ),
               if (kaisuuAri)
@@ -833,15 +816,6 @@ class _KoukouHenshuuState extends State<_KoukouHenshuu> {
                 ),
             ],
           ),
-          if (henkouAri && modosenai)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text(
-                '元に戻すと$imaKenMeiの名簿の高校がなくなるので、この高校は元に戻せません'
-                '(ほかの高校を$imaKenMeiに移すか、「すべての高校を元に戻す」を使ってください)。',
-                style: _hosoku,
-              ),
-            ),
           const SizedBox(height: 40),
         ],
       ),
@@ -1070,7 +1044,7 @@ class _KoukouPageState extends State<_KoukouPage> {
         final int c = (s.ken >= 0 && s.ken < koukouKenChiku.length) ? koukouKenChiku[s.ken] : -1;
         final List<List<KoukouChikuTeam>>? chiku = r.chiku;
         if (chiku != null && c >= 0 && c < chiku.length && chiku[c].isNotEmpty) {
-          l.add(_gyouHosoku('地区大会には進めませんでした(予選の上位6校が進みます)。'));
+          l.add(_gyouHosoku('地区大会には進めませんでした(予選の上位3校が進みます)。'));
         }
       }
     }
@@ -1196,7 +1170,7 @@ class _KoukouPageState extends State<_KoukouPage> {
           const SizedBox(height: 4),
           const Text(
             'お気に入りの高校は、都道府県別のタブの一番上に並びます。'
-            '「編集」では、校名・都道府県・名門度・タイプ・留学生の有無・紹介文を変えられます。',
+            '「編集」では、校名・名門度・タイプ・留学生の有無・紹介文を変えられます(都道府県は変えられません)。',
             style: _hosoku,
           ),
           // ---- 年度ごとの成績 ----
@@ -1307,6 +1281,9 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
   int _myUnivId = -1;
   int _erabu = 0; // 詳しく見る回(_kiroku の番号。0が一番新しい)
 
+  /// コンピュータスカウトONでスカウトの途中か(決まっていない新入生の大学を出さない。1.9.5)
+  bool _scoutChuu = false;
+
   static const List<String> _shumokuMei = ['1500m', '5000m', '3000m障害'];
 
   @override
@@ -1326,8 +1303,22 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
     }
     if (Hive.isBoxOpen('ghensuuBox')) {
       final Box<Ghensuu> b = Hive.box<Ghensuu>('ghensuuBox');
-      if (b.isNotEmpty) _myUnivId = b.getAt(0)?.MYunivid ?? -1;
+      final Ghensuu? g = b.isNotEmpty ? b.getAt(0) : null;
+      _myUnivId = g?.MYunivid ?? -1;
+      // 新入生の進学先の画面と同じ見分け方(1.9.5)
+      if (g != null && g.mode == 9000 && Hive.isBoxOpen('kantokuBox')) {
+        final KantokuData? kantoku = Hive.box<KantokuData>('kantokuBox').get('KantokuData');
+        _scoutChuu = kantoku != null && isComScoutOn(kantoku);
+      }
     }
+  }
+
+  /// スカウトの途中で、進学先が決まっていない新入生か(仮の振り分けの大学を見せない。1.9.5)
+  bool _miteiKa(KoukouKirokuSousha s) {
+    if (!_scoutChuu) return false;
+    final SenshuData? z = _zaigaku[s.id];
+    if (z == null || z.name != s.name) return false;
+    return z.gakunen == 1 && z.hirou != 1 && !comScoutKettei(z);
   }
 
   // 回の名前(_kaiMei)は、高校のページでも使うので外に出した(1.9.5)
@@ -1392,6 +1383,10 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
         sub = shingaku;
       }
       jibun = widget.jibunHantei?.call(s) ?? false;
+    } else if (s.namaeAri && _miteiKa(s)) {
+      // コンピュータスカウトONでスカウトの途中の、決まっていない新入生は大学を出さない(1.9.5)
+      mei = '${s.name}$touji';
+      sub = kouAri ? '$kou　進路未定' : '進路未定';
     } else if (s.namaeAri) {
       mei = '${s.name}$touji';
       final int u = _univId(s);
@@ -1715,7 +1710,7 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
     );
   }
 
-  /// 都道府県予選の1都道府県分(見出しと、上位8校と名簿の高校の行。1.9.5)
+  /// 都道府県予選の1都道府県分(見出しと、各チームの行。残していないチームは「ほか○校」。1.9.5)
   List<Widget> _yosenKen(KoukouTaikaiKiroku k, int ken, KoukouYosenKen y) {
     final String kenMei =
         (ken >= 0 && ken < LocationDatabase.allPrefectures.length) ? LocationDatabase.allPrefectures[ken] : '';
@@ -1794,7 +1789,7 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
             ? const [Text('この回は、地区大会の記録がありません。', style: _hosoku)]
             : [
                 const Text(
-                  '各都道府県の予選の上位6校が走り、県代表を除いた最上位の高校が、地区代表として全国高校駅伝に進みます。'
+                  '各都道府県の予選の上位3校が走り、県代表を除いた最上位の高校が、地区代表として全国高校駅伝に進みます。'
                   '北海道は地区大会がなく、予選の2位が地区代表です。',
                   style: _hosoku,
                 ),
@@ -1810,7 +1805,7 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
                     ),
               ],
       ),
-      // 都道府県予選(上位8校と名簿の高校のチームの順位とタイム。地区ごとに折りたたみ。1.9.5)
+      // 都道府県予選(チームの順位とタイム。地区ごとに折りたたみ。1.9.5)
       _Oritatami(
         key: ValueKey<String>('yosen$erabu'),
         midashi: '都道府県予選',
@@ -1818,7 +1813,7 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
             ? const [Text('この回は、都道府県予選の記録がありません。', style: _hosoku)]
             : [
                 const Text(
-                  '1位の高校が県代表として全国高校駅伝に進みます。上位8校と、高校名鑑に載っている高校を残しています。'
+                  '各都道府県の名簿の5校が走り、1位の高校が県代表として全国高校駅伝に、上位3校が地区大会に進みます。'
                   '予選のコースは全国と同じ距離の平らなコースですが、その日の気温や風で、県ごとにタイムの出やすさが違います。',
                   style: _hosoku,
                 ),

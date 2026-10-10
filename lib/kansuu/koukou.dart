@@ -16,14 +16,14 @@ import 'package:ekiden/kansuu/joukai.dart'; // 留学生の入学時の優秀度
 // ゲーム本体の計算(大学のレース・育成)には一切使わない。表示と記事のためだけのもの
 //
 // 実績は、入学する年の新入生全員(高校3年生)と、名前のない高校生(同じ高校の1・2年生や、
-// 大学に来ない3年生、その他の高校の選手。保存しない)で、全国高校駅伝と高校総体を実際に計算して決める
+// 大学に来ない3年生、高校総体の県大会だけに出るその他の高校の選手。保存しない)で、全国高校駅伝と高校総体を実際に計算して決める
 // ・力の土台は入学時の5000mの記録(持ちタイム)。基本走力は使わない(隠れた逸材は入学時の基本走力が
 //   持ちタイムより速いので、基本走力で計算すると高校の結果で分かってしまう。サプライズなので使わない)
 // ・登り・下り・アップダウン・ロード・ペース変動・スパートの補正には、入学時の能力値(見抜く力に
 //   関係なく全部)を使う。あとで能力が見えるようになったときに、高校の結果と答え合わせができるように
 // ・全国高校駅伝: 7区間42.195km(1区10km・2区3km・3区8.1075km・4区8.0875km・5区3km・6区5km・7区5km)。
-//   都道府県予選(名簿の5校と名前のない高校)の1位47校と、11地区の代表の58校が走る。
-//   地区代表は、各都道府県の予選の上位6校(県代表を含む)が走る地区大会で、県代表を除いた最上位の高校
+//   都道府県予選(名簿の5校。名前のない「その他の高校」は走らない。1.9.5)の1位47校と、11地区の代表の58校が走る。
+//   地区代表は、各都道府県の予選の上位3校(県代表を含む)が走る地区大会で、県代表を除いた最上位の高校
 //   (北海道は地区大会がなく、予選の2位。実在と同じ。1.9.5)。都道府県予選と地区大会は、距離は全国と同じで
 //   起伏のない平らなコース。どの大会も、その日の条件(気温や風)として全チーム共通の補正をかける
 //   (_sonohiJouken。平均は変わらない。年や都道府県でタイムが違うので、県どうしのタイムは比べない。1.9.5)。
@@ -264,9 +264,9 @@ String koukouEkidenMoji(KoukouJouhou j) {
     final String kjMoji = kj == 1 ? ' 区間賞' : ((kj >= 2 && kj <= 30) ? ' 区間$kj位' : '');
     return '全国高校駅伝 $kukan区$kjMoji$team';
   }
-  // 都道府県予選は、区間5位以内か、チームが3位以内のときだけ
+  // 都道府県予選は、区間2位以内か、チームが優勝したときだけ(1.9.5。予選は1県5校なので)
   if (kukan == 0) return '';
-  if (!((kj >= 1 && kj <= 5) || (tj >= 1 && tj <= 3))) return '';
+  if (!((kj >= 1 && kj <= 2) || tj == 1)) return '';
   final String ken = (m.ken >= 0 && m.ken < LocationDatabase.allPrefectures.length)
       ? LocationDatabase.allPrefectures[m.ken]
       : '';
@@ -606,11 +606,8 @@ const List<_Kukan> _yosenKukan = [
   _Kukan(5000, 1.0, 0, 0, 0),
 ];
 
-/// 地区大会に進む、各都道府県の予選の上位の校数(県代表を含む。1.9.5)
-const int _chikuShussouSuu = 6;
-
-/// 大会の記録に残す、都道府県予選の上位の校数(名簿の高校は、順位に関係なく残す。1.9.5)
-const int _yosenKirokuJoui = 8;
+/// 地区大会に進む、各都道府県の予選の上位の校数(県代表を含む。予選は1県5校なので、勝ち上がりになるように3校。1.9.5)
+const int _chikuShussouSuu = 3;
 
 /// その日の条件(気温や風)の補正のばらつき(全チーム共通に掛ける割合の標準偏差。2時間の駅伝で約33秒。1.9.5)
 const double _joukenHaba = 0.0045;
@@ -1003,17 +1000,15 @@ Map<int, KoukouJouhou> _nendoKeisan(
   final List<List<_Team>> kenTeams = []; // 都道府県ごとの予選の着順(都道府県の番号の順。地区大会と大会の記録に使う。1.9.5)
   final Set<_Team> kenDaihyou = {}; // 都道府県代表(予選の1位)
   for (int ken = 0; ken < kenSuu; ken++) {
+    // 走るのは名簿の5校だけ(1.9.5。名前のない「その他の高校」は、高校総体の県大会だけに出る)
     final List<_Team> teams = [];
     for (int i = 0; i < koukouMeibo.length; i++) {
       if (koukouMeibo[i].ken == ken) teams.add(_haichi(i, bu[i], r));
     }
-    final int sonota = ken < koukouKenSonota.length ? koukouKenSonota[ken] : 6;
-    for (int f = 0; f < sonota; f++) {
-      final List<_Kousei> sonotaBu = [for (final int g in const [3, 3, 3, 2, 2, 2, 1, 1, 1]) _nanashi(-1, g, r)];
-      for (final _Kousei n in sonotaBu) {
-        n.ken = ken;
-      }
-      teams.add(_haichi(-1, sonotaBu, r));
+    if (teams.isEmpty) {
+      // 名簿の高校がない都道府県(都道府県は変えられないので、普通は起きない)
+      kenTeams.add(teams);
+      continue;
     }
     // 都道府県予選(平らなコース。その日の条件は都道府県ごと。1.9.5)
     final List<List<int>> kj = _ekiden(teams, _yosenKukan, r, jouken: _sonohiJouken(r));
@@ -1023,7 +1018,7 @@ Map<int, KoukouJouhou> _nendoKeisan(
     if (teams.first.koukou >= 0) kenYuushou.add(teams.first.koukou);
     kenTeams.add(teams);
   }
-  // 地区大会(1.9.5): 各都道府県の予選の上位6校(県代表を含む)が、予選の区間の並びのまま、平らなコースを走る。
+  // 地区大会(1.9.5): 各都道府県の予選の上位3校(県代表を含む)が、予選の区間の並びのまま、平らなコースを走る。
   // 県代表を除いた最上位の高校が地区代表。都道府県が1つだけの地区(北海道)は地区大会がなく、予選の2位が地区代表。
   // 選手の高校時代の実績には書かない(予選か全国のまま)。県どうしのタイムは、その日の条件が違うので比べない
   final Map<_Team, int> chikuDaihyou = {}; // 地区代表(予選のチーム) → 地区の番号(大会の記録に書く)
@@ -1077,15 +1072,13 @@ Map<int, KoukouJouhou> _nendoKeisan(
   // 大会の記録(1.9.5): 全国の全チームの順位とタイム、各区間の上位3人、都道府県予選の優勝校
   if (kirokuOut != null) {
     // 都道府県予選(1.9.5): 都道府県ごとに[出場校数, [[順位, 高校の番号, タイム(秒)]...(着順)]]。
-    // 上位8校と、名簿の高校(順位に関係なく)だけを残す(チームの順位とタイムだけ。走者は残さない)
+    // 全チーム(名簿の5校)を残す(チームの順位とタイムだけ。走者は残さない)
     kirokuOut['yo'] = [
       for (final List<_Team> teams in kenTeams)
         <dynamic>[
           teams.length,
           [
-            for (int j = 0; j < teams.length; j++)
-              if (j < _yosenKirokuJoui || teams[j].koukou >= 0)
-                <dynamic>[j + 1, _teamCode(teams[j]), teams[j].goukei.round()],
+            for (int j = 0; j < teams.length; j++) <dynamic>[j + 1, _teamCode(teams[j]), teams[j].goukei.round()],
           ],
         ],
     ];
@@ -1670,7 +1663,7 @@ Future<void> _hikitsugiKakikomi(List<_HikitsugiKekka> l, Map<int, SenshuData> se
 //
 // ・毎年の計算(koukouJouhouFuyo)で、全国高校駅伝の全チームの順位とタイム(都道府県代表か地区代表か)、
 //   各区間の上位3人、高校総体3種目の決勝の全員を、直近10回分残す。都道府県予選と地区大会は、
-//   チームの順位とタイムだけを残す(予選は上位8校と名簿の高校。1.9.5)
+//   チームの順位とタイムだけを残す(1.9.5)
 // ・高校ごとの優勝回数(全国高校駅伝・都道府県予選・地区大会)は、記録を残し始めてからの回数を数える
 // ・保存場所は UnivData.name_tanshuku(短縮名は使っていない。meisei_rireki.dart と同じやり方)。
 //   大学id 28 に大会の記録、29 に優勝回数。1行目は見出し、2行目からはJSON
@@ -1688,7 +1681,7 @@ Future<void> _hikitsugiKakikomi(List<_HikitsugiKekka> l, Map<int, SenshuData> se
 //     z の優勝校(1位)だけ、出場の回数目と連続出場の後ろに、その時点の優勝の回数目・連続優勝の年数・
 //     何年ぶり(連続でない2回目以上の優勝のとき。ほかは0)を書き足す(1.9.5。書き足す前の記録にはない)
 //     yo: [都道府県ごとに[出場校数, [[順位, 高校の番号, タイム(秒)]...]]](都道府県の番号の順。
-//     上位8校と名簿の高校だけ。1.9.5。残す前の記録にはない)
+//     1.9.5の開発中の記録には、名前のないその他の高校も入っている。残す前の記録にはない)
 //     ch: [地区ごとに[[高校の番号, タイム(秒), 代表(1都道府県代表・2地区代表・0ほか)]...(着順)]]
 //     (地区大会がない北海道は空。1.9.5。残す前の記録にはない)
 //   ・優勝回数: {z: [全国高校駅伝の優勝回数(名簿の並び)], k: [都道府県予選の優勝回数],
@@ -1706,13 +1699,15 @@ const String _kirokuMidashi = '#高校の大会の記録';
 const String _kaisuuMidashi = '#高校の優勝回数';
 
 // ------------------------------------------------------------
-// 高校の名簿の編集(1.9.5。高校名鑑の「都道府県別」で高校を押して変える)
+// 高校の名簿の編集(1.9.5。高校名鑑の高校のページの「編集」で変える)
 // ・変えた高校の分だけ、優勝回数と同じところ(大学id 29)のJSONの h に
 //   {"高校の番号": [校名, 都道府県の番号, 名門度, 留学生(0/1), 色, 紹介文]} で保存する
+// ・都道府県は変えられない(1.9.5。全国高校駅伝の予選を1県5校で走るため)。保存する都道府県は初期値のままで、
+//   1.9.5の開発中に変えて保存した都道府県も、読むときに使わない(初期の都道府県に戻る)
 // ・koukouMeibo(getter)は、初期値(koukou_meibo.dart の koukouMeiboShoki)に変えた分を重ねた今の名簿。
 //   保存してある文字列が変わったとき(編集・セーブデータの読み込み)だけ作り直す
 // ・高校の数は変えられない(番号で覚えているため)。新しいゲームを始めても、変えた分は残す
-// ・校名の変更は、在学中の選手の出身校や大会の記録にもそのまま出る。都道府県・名門度・色・留学生は、
+// ・校名の変更は、在学中の選手の出身校や大会の記録にもそのまま出る。名門度・色・留学生は、
 //   次の新入生の計算から効く(今の選手の実績は変えない)
 // ------------------------------------------------------------
 
@@ -1748,11 +1743,16 @@ Map<int, KoukouMei> _henkouYomu(Map<String, dynamic> d) {
     if (v is! List || v.length < 6) continue;
     final KoukouMei moto = koukouMeiboShoki[i];
     final String mei = v[0] is String && (v[0] as String).trim().isNotEmpty ? (v[0] as String).trim() : moto.mei;
-    final int ken = v[1] is num ? (v[1] as num).toInt().clamp(0, LocationDatabase.allPrefectures.length - 1).toInt() : moto.ken;
+    // 都道府県は変えられない(保存してある都道府県は使わない。1.9.5)
+    final int ken = moto.ken;
     final int meimon = v[2] is num ? (v[2] as num).toInt().clamp(0, 3).toInt() : moto.meimon;
     final bool ryuu = v[3] is num ? (v[3] as num).toInt() == 1 : moto.ryuugakusei;
     final int iro = v[4] is num ? (v[4] as num).toInt().clamp(0, 2).toInt() : moto.iro;
     final String shoukai = v[5] is String ? v[5] as String : moto.shoukai;
+    // 都道府県だけを変えていた高校は、初期値のまま(「変更」の印を出さない)
+    if (mei == moto.mei && meimon == moto.meimon && ryuu == moto.ryuugakusei && iro == moto.iro && shoukai == moto.shoukai) {
+      continue;
+    }
     kekka[i] = KoukouMei(mei, ken, meimon, ryuu, iro, shoukai: shoukai);
   }
   return kekka;
@@ -1768,9 +1768,9 @@ Future<void> koukouHenkouHozon(int i, KoukouMei? m) async {
   final Map<String, dynamic> d = _kaisuuJsonYomu();
   final Map<String, dynamic> h = d['h'] is Map ? Map<String, dynamic>.from(d['h'] as Map) : <String, dynamic>{};
   final KoukouMei moto = koukouMeiboShoki[i];
+  // 都道府県は変えられないので、比べない(保存するのも初期の都道府県。1.9.5)
   final bool onaji = m == null ||
       (m.mei == moto.mei &&
-          m.ken == moto.ken &&
           m.meimon == moto.meimon &&
           m.ryuugakusei == moto.ryuugakusei &&
           m.iro == moto.iro &&
@@ -1778,7 +1778,7 @@ Future<void> koukouHenkouHozon(int i, KoukouMei? m) async {
   if (onaji || m == null) {
     h.remove('$i');
   } else {
-    h['$i'] = [m.mei, m.ken, m.meimon, m.ryuugakusei ? 1 : 0, m.iro, m.shoukai];
+    h['$i'] = [m.mei, moto.ken, m.meimon, m.ryuugakusei ? 1 : 0, m.iro, m.shoukai];
   }
   if (h.isEmpty) {
     d.remove('h');
@@ -2262,7 +2262,7 @@ class KoukouYosenKen {
   /// 出場した校数
   final int shussouSuu;
 
-  /// 残したチーム(上位8校と名簿の高校。着順)
+  /// 残したチーム(着順。1.9.5の開発中の記録は、上位8校と名簿の高校だけ)
   final List<KoukouYosenTeam> teams;
 
   const KoukouYosenKen(this.shussouSuu, this.teams);

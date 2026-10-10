@@ -4,6 +4,9 @@
 // ・架空の高校。都道府県ごとに5校(全部で235校。番号は0から、保存するときは+1する。256校まで)。
 //   実在の学校と同じ名前になっていることがあれば、名前だけ直してよい(並びと数は変えない。
 //   並びを変えると、保存してある番号の高校が変わってしまう)。足すときは最後に足す
+// ・1.9.5で、全235校の名前をWeb検索で実在の高校と照らし合わせ、校名がそのまま同じか、校名の固有の部分
+//   (学院・学園・東・工業などを除いた最初の2文字)が実在校と同じだった19校の名前を直した
+//   (読みだけ同じ・1字だけ同じものは残した)
 // ・名門度: 3名門(全国の常連。県外からも選手が来る) 2強豪 1中堅 0普通。名前のない部員の強さが変わる
 // ・留学生: 名前のない留学生が1人いる(全国高校駅伝は2区か5区だけ。高校総体は5000mか3000m障害)
 // ・色: 0スピード型 1駅伝型 2起伏型(クロカンに強い)。新入生がどの高校に入るかに少し効く
@@ -77,22 +80,22 @@ const List<int> koukouKenSonota = [
 /// 高校の名簿(都道府県の並びで5校ずつ)
 const List<KoukouMei> koukouMeibo = [
   KoukouMei('蒼蘭実業', 0, 3, false, 2), // 北海道
-  KoukouMei('光星館', 0, 2, true, 2), // 北海道
+  KoukouMei('澪星館', 0, 2, true, 2), // 北海道
   KoukouMei('杉尾商業', 0, 1, false, 1), // 北海道
-  KoukouMei('茅崎南', 0, 1, false, 1), // 北海道
+  KoukouMei('椋崎南', 0, 1, false, 1), // 北海道
   KoukouMei('梓浦総合', 0, 0, false, 0), // 北海道
   KoukouMei('栄和学園', 1, 3, false, 0), // 青森県
   KoukouMei('白和学院', 1, 2, false, 2), // 青森県
   KoukouMei('楓稜学園', 1, 1, false, 1), // 青森県
   KoukouMei('栗峰農林', 1, 1, false, 2), // 青森県
   KoukouMei('鷹島第一', 1, 0, false, 2), // 青森県
-  KoukouMei('翔風学園', 2, 3, false, 1), // 岩手県
-  KoukouMei('煌華学園', 2, 2, false, 2), // 岩手県
+  KoukouMei('汐凰学園', 2, 3, false, 1), // 岩手県
+  KoukouMei('琥華学園', 2, 2, false, 2), // 岩手県
   KoukouMei('樹光義塾', 2, 1, false, 1), // 岩手県
   KoukouMei('柴崎第一', 2, 1, false, 1), // 岩手県
   KoukouMei('桐谷北', 2, 0, false, 1), // 岩手県
   KoukouMei('凛英学院', 3, 3, false, 1), // 宮城県
-  KoukouMei('青稜館', 3, 2, false, 0), // 宮城県
+  KoukouMei('茜稜館', 3, 2, false, 0), // 宮城県
   KoukouMei('芦浜商業', 3, 1, false, 1), // 宮城県
   KoukouMei('藤瀬商業', 3, 1, false, 1), // 宮城県
   KoukouMei('榎沢', 3, 0, false, 0), // 宮城県
@@ -102,7 +105,7 @@ const List<KoukouMei> koukouMeibo = [
   KoukouMei('榎川第一', 4, 1, false, 2), // 秋田県
   KoukouMei('梓瀬商業', 4, 0, false, 1), // 秋田県
   KoukouMei('葵和学院', 5, 2, false, 0), // 山形県
-  KoukouMei('誠和義塾', 5, 2, true, 0), // 山形県
+  KoukouMei('琳和義塾', 5, 2, true, 0), // 山形県
   KoukouMei('榎坂南', 5, 1, false, 2), // 山形県
   KoukouMei('雀島商業', 5, 1, false, 1), // 山形県
   KoukouMei('鳩沢西', 5, 0, false, 2), // 山形県
@@ -110,7 +113,7 @@ const List<KoukouMei> koukouMeibo = [
   KoukouMei('樹翠学院', 6, 2, false, 1), // 福島県
   KoukouMei('葦島', 6, 1, false, 1), // 福島県
   KoukouMei('藤峰東', 6, 1, false, 2), // 福島県
-  KoukouMei('光英学園', 6, 0, false, 1), // 福島県
+  KoukouMei('篁英学園', 6, 0, false, 1), // 福島県
   KoukouMei('朝光学院', 7, 2, false, 1), // 茨城県
   KoukouMei('樹峰学園', 7, 2, false, 2), // 茨城県
   KoukouMei('梓坂', 7, 1, false, 0), // 茨城県
@@ -125,12 +128,12 @@ const List<KoukouMei> koukouMeibo = [
   KoukouMei('榎里商業', 9, 2, true, 1), // 群馬県
   KoukouMei('榎丘第二', 9, 1, false, 0), // 群馬県
   KoukouMei('杉田農林', 9, 1, false, 2), // 群馬県
-  KoukouMei('鷲宮商業', 9, 0, false, 1), // 群馬県
+  KoukouMei('楢宮商業', 9, 0, false, 1), // 群馬県
   KoukouMei('朝星義塾', 10, 3, false, 1), // 埼玉県
-  KoukouMei('鳩谷西', 10, 2, false, 2), // 埼玉県
+  KoukouMei('鴫谷西', 10, 2, false, 2), // 埼玉県
   KoukouMei('黎峰学舎', 10, 1, false, 2), // 埼玉県
   KoukouMei('茅川総合', 10, 1, false, 2), // 埼玉県
-  KoukouMei('蓮田', 10, 0, false, 1), // 埼玉県
+  KoukouMei('楡田', 10, 0, false, 1), // 埼玉県
   KoukouMei('栄凰館', 11, 3, false, 1), // 千葉県
   KoukouMei('啓雅学院', 11, 2, false, 1), // 千葉県
   KoukouMei('猪川総合', 11, 1, false, 1), // 千葉県
@@ -156,7 +159,7 @@ const List<KoukouMei> koukouMeibo = [
   KoukouMei('菖宮北', 15, 1, false, 1), // 富山県
   KoukouMei('燕瀬農林', 15, 1, false, 1), // 富山県
   KoukouMei('叡鳳学園', 15, 0, false, 2), // 富山県
-  KoukouMei('秀光館', 16, 2, false, 2), // 石川県
+  KoukouMei('瑠光館', 16, 2, false, 2), // 石川県
   KoukouMei('恵颯学院', 16, 2, false, 1), // 石川県
   KoukouMei('恵洋学園', 16, 1, false, 1), // 石川県
   KoukouMei('葵嶺学園', 16, 1, false, 1), // 石川県
@@ -178,19 +181,19 @@ const List<KoukouMei> koukouMeibo = [
   KoukouMei('茅尾第一', 19, 0, false, 2), // 長野県
   KoukouMei('暁英学園', 20, 2, true, 1), // 岐阜県
   KoukouMei('熊瀬第二', 20, 2, false, 1), // 岐阜県
-  KoukouMei('藤沢農林', 20, 1, false, 2), // 岐阜県
+  KoukouMei('樅沢農林', 20, 1, false, 2), // 岐阜県
   KoukouMei('菖浜第一', 20, 1, false, 2), // 岐阜県
   KoukouMei('鶴里北', 20, 0, false, 1), // 岐阜県
   KoukouMei('楓嶺学園', 21, 2, false, 0), // 静岡県
   KoukouMei('芦宮第二', 21, 2, false, 0), // 静岡県
   KoukouMei('雀尾農林', 21, 1, false, 2), // 静岡県
-  KoukouMei('柴島総合', 21, 1, false, 1), // 静岡県
+  KoukouMei('菱島総合', 21, 1, false, 1), // 静岡県
   KoukouMei('熊沢商業', 21, 0, false, 1), // 静岡県
   KoukouMei('藤谷東', 22, 2, false, 0), // 愛知県
   KoukouMei('叡華義塾', 22, 2, false, 2), // 愛知県
   KoukouMei('楠田西', 22, 1, false, 1), // 愛知県
   KoukouMei('榎浦商業', 22, 1, false, 2), // 愛知県
-  KoukouMei('栄光学園', 22, 0, false, 1), // 愛知県
+  KoukouMei('柊栄学園', 22, 0, false, 1), // 愛知県
   KoukouMei('蓮丘商業', 23, 2, false, 0), // 三重県
   KoukouMei('榎津第一', 23, 2, false, 2), // 三重県
   KoukouMei('鷲浜中央', 23, 1, false, 2), // 三重県
@@ -202,7 +205,7 @@ const List<KoukouMei> koukouMeibo = [
   KoukouMei('清翠学院', 24, 1, false, 1), // 滋賀県
   KoukouMei('柴野工業', 24, 0, false, 1), // 滋賀県
   KoukouMei('啓嶺義塾', 25, 2, false, 1), // 京都府
-  KoukouMei('光陽実業', 25, 2, false, 1), // 京都府
+  KoukouMei('苓雅実業', 25, 2, false, 1), // 京都府
   KoukouMei('葦野工業', 25, 1, false, 0), // 京都府
   KoukouMei('樫島', 25, 1, false, 0), // 京都府
   KoukouMei('萩瀬第二', 25, 0, false, 1), // 京都府
@@ -217,13 +220,13 @@ const List<KoukouMei> koukouMeibo = [
   KoukouMei('槻浦中央', 27, 1, false, 2), // 兵庫県
   KoukouMei('鶴沢南', 27, 0, false, 1), // 兵庫県
   KoukouMei('鶴浜総合', 28, 2, false, 2), // 奈良県
-  KoukouMei('鶴田第一', 28, 2, false, 2), // 奈良県
+  KoukouMei('鶉田第一', 28, 2, false, 2), // 奈良県
   KoukouMei('黎雅義塾', 28, 1, false, 1), // 奈良県
   KoukouMei('榎島中央', 28, 1, false, 0), // 奈良県
   KoukouMei('猪浦', 28, 0, false, 1), // 奈良県
   KoukouMei('凛華学園', 29, 2, true, 2), // 和歌山県
-  KoukouMei('白陵実業', 29, 2, false, 1), // 和歌山県
-  KoukouMei('翔英学園', 29, 1, false, 0), // 和歌山県
+  KoukouMei('菫陵実業', 29, 2, false, 1), // 和歌山県
+  KoukouMei('凪英学園', 29, 1, false, 0), // 和歌山県
   KoukouMei('笹崎農林', 29, 1, false, 1), // 和歌山県
   KoukouMei('桜颯学園', 29, 0, false, 0), // 和歌山県
   KoukouMei('鷹台西', 30, 2, false, 1), // 鳥取県
@@ -286,7 +289,7 @@ const List<KoukouMei> koukouMeibo = [
   KoukouMei('葛里農林', 41, 1, false, 2), // 長崎県
   KoukouMei('鳩里農林', 41, 1, false, 1), // 長崎県
   KoukouMei('蒼陽学院', 41, 0, false, 1), // 長崎県
-  KoukouMei('煌光義塾', 42, 3, true, 1), // 熊本県
+  KoukouMei('煌嶺義塾', 42, 3, true, 1), // 熊本県
   KoukouMei('皓稜学舎', 42, 2, false, 1), // 熊本県
   KoukouMei('葵英学院', 42, 1, false, 1), // 熊本県
   KoukouMei('鷲峰中央', 42, 1, false, 1), // 熊本県

@@ -19,6 +19,8 @@ import 'package:ekiden/kansuu/time_date.dart';
 //   koukou.dart の koukouTaikaiKirokuYomu。見出しごとに折りたたみ)を、タブで切り替える
 // ・名門校のカードと都道府県別の高校を押すと、高校のページ(_KoukouPage)を開く。年度ごとの都道府県予選・
 //   地区大会・全国高校駅伝の成績、お気に入りの付け外し、今大学にいる卒業生。編集はその中から(1.9.5)
+// ・新入生のスカウトの画面の「高校名鑑」からも開く(1.9.5。「大会の記録」のタブから。進学先はスカウトの画面と
+//   同じ出し方で、一番新しい回(今年の新入生の世代)の全国高校駅伝を開いておく)
 // ・名簿は koukouMeibo(初期値に、この画面で変えた分を重ねたもの)から作る
 // ・高校の情報を表示しない設定のときも開ける(自分で開く画面なので)
 // ・文字を大きくしている人がいるので、横並びは Wrap にし、高さは固定しない
@@ -156,7 +158,27 @@ class _OritatamiState extends State<_Oritatami> {
 }
 
 class ModalKoukouMeikan extends StatefulWidget {
-  const ModalKoukouMeikan({super.key});
+  const ModalKoukouMeikan({
+    super.key,
+    this.shokiTab = 0,
+    this.scoutKara = false,
+    this.shingakuMoji,
+    this.jibunHantei,
+  });
+
+  /// 最初に開くタブ(0名門校・1都道府県別・2大会の記録。1.9.5)
+  final int shokiTab;
+
+  /// 新入生のスカウトの画面から開いたか(1.9.5。大会の記録で、一番新しい回の全国高校駅伝を開いておき、
+  /// 在学生の世代の欄は閉じておく)
+  final bool scoutKara;
+
+  /// 大会の記録の選手の後ろに出す進学先(スカウトの画面から渡す。「○○大学に確定」「進路未定」など。
+  /// nullを返した選手は、名鑑の出し方。1.9.5)
+  final String? Function(KoukouKirokuSousha s)? shingakuMoji;
+
+  /// 自分の大学の選手として色を変えるか(shingakuMoji がnullでない選手だけ使う。1.9.5)
+  final bool Function(KoukouKirokuSousha s)? jibunHantei;
 
   @override
   State<ModalKoukouMeikan> createState() => _ModalKoukouMeikanState();
@@ -171,6 +193,7 @@ class _ModalKoukouMeikanState extends State<ModalKoukouMeikan> {
   Widget build(BuildContext context) {
     return DefaultTabController(
       length: 3,
+      initialIndex: widget.shokiTab.clamp(0, 2).toInt(),
       child: Scaffold(
         backgroundColor: HENSUU.backgroundcolor,
         appBar: AppBar(
@@ -193,7 +216,11 @@ class _ModalKoukouMeikanState extends State<ModalKoukouMeikan> {
           children: [
             _MeimonShoukai(key: ValueKey<int>(_kousinBan), onHenkou: _kousin),
             _KenBetsu(onHenkou: _kousin),
-            const _TaikaiKiroku(),
+            _TaikaiKiroku(
+              scoutKara: widget.scoutKara,
+              shingakuMoji: widget.shingakuMoji,
+              jibunHantei: widget.jibunHantei,
+            ),
           ],
         ),
       ),
@@ -1230,42 +1257,13 @@ class _KoukouPageState extends State<_KoukouPage> {
   }
 }
 
-/// スカウト画面から開く、今年の新入生(スカウトの候補)が高校3年だったときの大会の結果(1.9.5)
-/// 進学先の文字は、スカウト画面から渡す(コンピュータスカウトONのときは、仮の振り分けの大学を見せないため)
-class KoukouScoutKekka extends StatelessWidget {
-  const KoukouScoutKekka({super.key, required this.shingakuMoji, required this.jibunHantei});
-
-  /// 選手の後ろに出す進学先(「→ ○○大学」「進路未定」など)。nullを返した選手は、名鑑と同じ出し方
-  final String? Function(KoukouKirokuSousha s) shingakuMoji;
-
-  /// 自分の大学の選手として色を変えるか(shingakuMoji がnullでない選手だけ使う)
-  final bool Function(KoukouKirokuSousha s) jibunHantei;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: HENSUU.backgroundcolor,
-      appBar: AppBar(
-        title: const Text('高校の大会の結果', style: TextStyle(color: Colors.white)),
-        backgroundColor: Colors.grey[900],
-        foregroundColor: Colors.white,
-        centerTitle: true,
-      ),
-      body: _TaikaiKiroku(
-        scoutNendo: koukouImaNoNendo() ?? -99999,
-        shingakuMoji: shingakuMoji,
-        jibunHantei: jibunHantei,
-      ),
-    );
-  }
-}
-
-/// 大会の記録(直近10回の全国高校駅伝と高校総体。見出しごとに折りたたみ。1.9.5)
-/// [scoutNendo] があれば(スカウト画面から開いたとき)、その年度に大学に入った世代の回の結果だけを出す
+/// 大会の記録(直近10回の全国高校駅伝と高校総体、都道府県予選と地区大会。見出しごとに折りたたみ。1.9.5)
+/// [scoutKara] なら(スカウトの画面から開いたとき)、一番新しい回の全国高校駅伝を開いておき、在学生の世代の欄は閉じる。
+/// 進学先の文字と色は、[shingakuMoji] と [jibunHantei] で、スカウトの画面に決めてもらう
 class _TaikaiKiroku extends StatefulWidget {
-  const _TaikaiKiroku({this.scoutNendo, this.shingakuMoji, this.jibunHantei});
+  const _TaikaiKiroku({this.scoutKara = false, this.shingakuMoji, this.jibunHantei});
 
-  final int? scoutNendo;
+  final bool scoutKara;
   final String? Function(KoukouKirokuSousha s)? shingakuMoji;
   final bool Function(KoukouKirokuSousha s)? jibunHantei;
 
@@ -1528,7 +1526,6 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.scoutNendo != null) return _scoutBuild();
     if (_kiroku.isEmpty) {
       return ListView(
         padding: const EdgeInsets.all(16),
@@ -1614,6 +1611,10 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
       });
 
     final List<Widget> l = [
+      if (widget.scoutKara) ...[
+        _scoutSetsumei(),
+        const SizedBox(height: 12),
+      ],
       _jikiChuuki(),
       const SizedBox(height: 12),
       const Text(
@@ -1629,7 +1630,7 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
         style: _hosoku,
       ),
       const SizedBox(height: 8),
-      _Oritatami(midashi: '在学生の世代の優勝校と優勝者', naka: chokkin, hajimeHiraku: true),
+      _Oritatami(midashi: '在学生の世代の優勝校と優勝者', naka: chokkin, hajimeHiraku: !widget.scoutKara),
       if (tsuyoi.isNotEmpty)
         _Oritatami(
           midashi: '全国高校駅伝の優勝回数',
@@ -1690,7 +1691,7 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
           setState(() => _erabu = v);
         },
       ),
-      ..._kekka(k, erabu),
+      ..._kekka(k, erabu, zenkokuHiraku: widget.scoutKara && erabu == 0),
       const SizedBox(height: 24),
       const Text('架空の高校の大会です。大学のレースや育成には影響しません。', style: _hosoku),
       const SizedBox(height: 24),
@@ -1842,59 +1843,25 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
     ];
   }
 
-  /// スカウト画面から開いたときの画面(今年の新入生の世代の回と、閉じた折りたたみで去年の回。1.9.5)
-  Widget _scoutBuild() {
-    KoukouTaikaiKiroku? k;
-    KoukouTaikaiKiroku? kyonen;
-    for (final KoukouTaikaiKiroku r in _kiroku) {
-      if (r.nyuugakuNendo == widget.scoutNendo) k = r;
-      if (widget.scoutNendo != null && r.nyuugakuNendo == widget.scoutNendo! - 1) kyonen = r;
-    }
-    if (k == null) {
-      return ListView(
-        padding: const EdgeInsets.all(16),
-        children: const [
-          Text('今年の新入生の、高校の大会の記録がありません。', style: _honbun),
-        ],
-      );
-    }
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        const Text(
-          '今年の新入生(スカウトの候補)が高校3年だった年度の、全国高校駅伝(都道府県予選・地区大会も)と高校総体の結果です。'
-          '下に去年の回もあります。それより前の回は、スカウトのあとに説明画面の設定タブの「高校名鑑」で見られます。',
-          style: _honbun,
-        ),
-        const SizedBox(height: 4),
-        const Text(
-          '名前の出ている選手は、ゲームの大学に入った選手です。'
-          '今年の新入生の進学先は、スカウトの画面と同じ出し方です。$_namaeNashiSetsumei',
-          style: _hosoku,
-        ),
-        const SizedBox(height: 12),
-        Text(
-          '■${_kaiMei(k)}',
-          style: const TextStyle(
-            color: HENSUU.textcolor,
-            fontSize: HENSUU.fontsize_honbun,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        ..._kekka(k, 0, zenkokuHiraku: true),
-        // 去年の回(最初は閉じておく。1.9.5)
-        if (kyonen != null) ...[
-          const SizedBox(height: 16),
-          _Oritatami(
-            key: const ValueKey<String>('kyonen'),
-            midashi: '去年の大会　${_kaiMei(kyonen)}',
-            naka: _kekka(kyonen, 1),
-          ),
-        ],
-        const SizedBox(height: 24),
-        const Text('架空の高校の大会です。大学のレースや育成には影響しません。', style: _hosoku),
-        const SizedBox(height: 24),
-      ],
+  /// スカウトの画面から開いたときの説明(1.9.5)。一番新しい回が今年の新入生の世代か(記録がなければ、そう書く)
+  Widget _scoutSetsumei() {
+    final bool kotoshi = _kiroku.isNotEmpty && _kiroku.first.nyuugakuNendo == koukouImaNoNendo();
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.lightBlueAccent),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        kotoshi
+            ? '一番新しい回が、今年の新入生(スカウトの候補)が高校3年だった世代です。'
+                '下の「大会の結果」で、その回の全国高校駅伝を開いてあります。'
+                '今年の新入生の進学先は、スカウトの画面と同じ出し方です。'
+                'お気に入りの高校は、「都道府県別」のタブの一番上に並びます。'
+            : '今年の新入生の、高校の大会の記録はまだありません。',
+        style: const TextStyle(color: Colors.lightBlueAccent, fontSize: HENSUU.fontsize_honbun - 1),
+      ),
     );
   }
 }

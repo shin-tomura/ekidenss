@@ -10,7 +10,7 @@ import 'dart:math';
 import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/kansuu/scout_com.dart';
 import 'package:ekiden/kansuu/koukou.dart'; // 出身校と高校時代の実績(1.9.5)
-import 'package:ekiden/screens/Modal_koukouMeikan.dart'; // 高校の大会の結果(1.9.5)
+import 'package:ekiden/screens/Modal_koukouMeikan.dart'; // 高校名鑑(1.9.5)
 import 'package:ekiden/kansuu/ShoriGuard.dart';
 import 'package:ekiden/screens/ScoutRoundKekka_screen.dart';
 import 'package:ekiden/screens/Modal_shinnyuuseiShingakusaki.dart';
@@ -68,6 +68,9 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
   int _ekidenKukanJuniFilter = 0;
   List<int> _soutaiJuniFilter = [0, 0, 0];
   KoukouSaishinSeiseki? _koukouSeiseki; // 直近の大会の成績(初めて使うときに読む)
+  // お気に入りの高校の出身だけにするか(1.9.5。お気に入りは高校名鑑の高校のページの☆で付ける)
+  bool _okiniiriFilter = false;
+  Set<int>? _okiniiriKou; // お気に入りの高校(名簿の番号。初めて使うときに読む。高校名鑑から戻ったら読み直す)
 
   // ★追加: フィルタリング/並び替え可能な能力値の定義
   final Map<SortCriterion, String> _abilityLabels = {
@@ -246,7 +249,7 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
     return '${koukouMeiKenMoji(j)}${jisseki.isEmpty ? '' : '　${jisseki.join('、')}'}';
   }
 
-  /// 高校の情報を出すか(1.9.5。表示しない設定のときは、高校時代のフィルターと大会の結果のボタンを出さない)
+  /// 高校の情報を出すか(1.9.5。表示しない設定のときは、高校時代のフィルターと高校名鑑のボタンを出さない)
   bool _koukouHyouji() {
     final KantokuData? kantoku = Hive.box<KantokuData>(
       'kantokuBox',
@@ -256,6 +259,7 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
 
   /// 高校時代(直近の大会)のフィルターが入っているか(1.9.5)
   bool get _koukouFilterAri =>
+      _okiniiriFilter ||
       _koukouMeiFilter.trim().isNotEmpty ||
       _ekidenTeamJuniFilter > 0 ||
       _ekidenKukanJuniFilter > 0 ||
@@ -269,6 +273,8 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
     final KoukouJouhou j = KoukouJouhou.yomu(s.samusataisei);
     if (j.mei == null) return false;
     if (!koukouMeiAtaru(j, _koukouMeiFilter)) return false;
+    // お気に入りの高校の出身だけ(1.9.5)
+    if (_okiniiriFilter && !(_okiniiriKou ??= koukouOkiniiriYomu().toSet()).contains(j.koukou - 1)) return false;
     final KoukouSaishinSeiseki seiseki = _koukouSeiseki ??= koukouSaishinSeisekiYomu();
     // 「○位以内」(0は条件なし。順位が0の選手は、出ていない・走っていない)
     bool inai(int juni, int joukan) => joukan <= 0 || (juni >= 1 && juni <= joukan);
@@ -280,10 +286,11 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
     return true;
   }
 
-  /// 今年の新入生(スカウトの候補)が高校3年だったときの大会の結果を開く(1.9.5。Modal_koukouMeikan.dart)
-  /// 進学先はカードと同じ出し方にする(コンピュータスカウトONのときは、仮の振り分けの大学を見せず、
+  /// 高校名鑑を「大会の記録」のタブから開く(1.9.5。Modal_koukouMeikan.dart。一番新しい回が今年の新入生の世代)
+  /// 大会の記録の進学先はカードと同じ出し方にする(コンピュータスカウトONのときは、仮の振り分けの大学を見せず、
   /// 「進路未定」「○○大学に確定」などにする。自分の大学の色も、進学先が決まった選手だけ)
-  void _koukouKekkaHiraku() {
+  /// 戻ったら、お気に入りと校名の変更を反映するために作り直す
+  Future<void> _koukouMeikanHiraku() async {
     final Map<int, SenshuData> shinnyuusei = {
       for (final SenshuData s in _senshuBox.values)
         if (s.gakunen == 1) s.id: s,
@@ -295,10 +302,12 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
       return (s != null && s.name == k.name) ? s : null;
     }
 
-    Navigator.push(
+    await Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => KoukouScoutKekka(
+      MaterialPageRoute<void>(
+        builder: (_) => ModalKoukouMeikan(
+          shokiTab: 2,
+          scoutKara: true,
           shingakuMoji: (KoukouKirokuSousha k) {
             final SenshuData? s = sagasu(k);
             if (s == null) return null;
@@ -315,6 +324,8 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
         ),
       ),
     );
+    if (!mounted) return;
+    setState(() => _okiniiriKou = null);
   }
 
   String _jyoutaiMoji(SenshuData s) {
@@ -1583,7 +1594,7 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
 
     return Column(
       children: [
-        // フィルター設定ボタンと、高校の大会の結果のボタン(1.9.5。文字を大きくしていても並ぶように Wrap)
+        // フィルター設定ボタンと、高校名鑑のボタン(1.9.5。文字を大きくしていても並ぶように Wrap)
         Padding(
           padding: const EdgeInsets.all(8.0),
           child: Wrap(
@@ -1602,9 +1613,9 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
               ),
               if (koukouHyouji)
                 ElevatedButton.icon(
-                  onPressed: _koukouKekkaHiraku,
+                  onPressed: _koukouMeikanHiraku,
                   icon: const Icon(Icons.emoji_events_outlined),
-                  label: const Text('高校の大会の結果'),
+                  label: const Text('高校名鑑'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.teal[700],
                     foregroundColor: Colors.white,
@@ -1738,6 +1749,7 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
     // 高校時代(直近の大会)のフィルター(1.9.5)
     final bool koukouHyouji = _koukouHyouji();
     String tempKoukouMei = _koukouMeiFilter;
+    bool tempOkiniiri = _okiniiriFilter;
     int tempTeamJuni = _ekidenTeamJuniFilter;
     int tempKukanJuni = _ekidenKukanJuniFilter;
     final List<int> tempSoutaiJuni = List<int>.of(_soutaiJuniFilter);
@@ -1917,6 +1929,20 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
                                 ),
                               ),
                               const Divider(height: 1),
+                              // お気に入りの高校の出身だけ(1.9.5)
+                              CheckboxListTile(
+                                value: tempOkiniiri,
+                                onChanged: (v) => setDialogState(() => tempOkiniiri = v ?? false),
+                                title: const Text(
+                                  'お気に入りの高校の出身だけ',
+                                  style: TextStyle(fontSize: 15, color: Colors.black87),
+                                ),
+                                dense: true,
+                                controlAffinity: ListTileControlAffinity.leading,
+                                activeColor: Colors.blueAccent,
+                                side: const BorderSide(color: Colors.black54, width: 1.5),
+                              ),
+                              const Divider(height: 1),
                               juniGyou(
                                 '全国高校駅伝 高校の順位',
                                 tempTeamJuni,
@@ -1941,6 +1967,7 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
                               padding: const EdgeInsets.only(left: 4, top: 6),
                               child: Text(
                                 '高校名は、校名か都道府県の一部で絞ります。'
+                                'お気に入りの高校は、高校名鑑の高校のページの☆で付けます。'
                                 '順位は、今年の新入生が高校3年だった年度の大会のものです。'
                                 '高校の順位は所属高校のチームの順位で、走っていない部員も入ります。'
                                 '高校総体は決勝の順位(1〜15位)です。'
@@ -1997,6 +2024,7 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
                                 _successRateFilter = 0;
                                 _anteikanFilter = 0;
                                 // 高校時代(1.9.5)
+                                _okiniiriFilter = false;
                                 _koukouMeiFilter = '';
                                 _ekidenTeamJuniFilter = 0;
                                 _ekidenKukanJuniFilter = 0;
@@ -2011,6 +2039,8 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
                                 _successRateFilter = tempSuccessRateFilter;
                                 _anteikanFilter = tempanteikanFilter;
                                 // 高校時代(1.9.5)
+                                _okiniiriFilter = tempOkiniiri;
+                                _okiniiriKou = null;
                                 _koukouMeiFilter = tempKoukouMei.trim();
                                 _ekidenTeamJuniFilter = tempTeamJuni;
                                 _ekidenKukanJuniFilter = tempKukanJuni;

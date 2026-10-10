@@ -1407,7 +1407,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     }
 
     // 出身校と高校時代の実績(1.9.5。学年ごとに、その学年が高校3年のときの大会を計算する。koukou.dart)
-    await koukouJouhouFuyo();
+    // (新しいゲームの選手はまだだれにも見せていないので、下級生の引き継ぎで越境した選手の出身地を変えてよい)
+    await koukouJouhouFuyo(shusshinHenkou: true);
 
     final Skip? skip = _skipBox.get('SkipData');
     if (skip!.skipflag == 0) {
@@ -1602,7 +1603,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     }
 
     // 出身校と高校時代の実績(1.9.5。学年ごとに、その学年が高校3年のときの大会を計算する。koukou.dart)
-    await koukouJouhouFuyo();
+    // (新しいゲームの選手はまだだれにも見せていないので、下級生の引き継ぎで越境した選手の出身地を変えてよい)
+    await koukouJouhouFuyo(shusshinHenkou: true);
 
     final Skip? skip = _skipBox.get('SkipData');
     if (skip!.skipflag == 0) {

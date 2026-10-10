@@ -686,7 +686,8 @@ Future<void> RetireNew({
 
   // --- 新入生の出身校と高校時代の実績(1.9.5。ゲームの計算には使わない) ---
   // 留学生が決まったあとに、日本人の新入生全員で全国高校駅伝と高校総体を計算する(koukou.dart)
-  await koukouJouhouFuyo();
+  // (新入生はまだだれにも見せていないので、下級生の引き継ぎで越境した選手の出身地を変えてよい)
+  await koukouJouhouFuyo(shusshinHenkou: true);
 
   // --- 個人ベスト記録の全体順位・学内順位更新 ---
   // TEISUU.SUU_KOJINBESTKIROKUSHURUISUU は定数として定義されていると仮定

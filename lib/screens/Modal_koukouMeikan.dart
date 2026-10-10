@@ -213,7 +213,8 @@ class _MeimonShoukai extends StatelessWidget {
       children: [
         Text(
           '全国高校駅伝の常連で、県外からも選手が集まる名門${meimon.length}校です。'
-          'タイプによって、入ってくる選手の傾向が変わります。',
+          'タイプによって、入ってくる選手の傾向が変わります。'
+          '出場回数と優勝回数は、毎年4月に新入生が入るときに増えます。',
           style: _honbun,
         ),
         const SizedBox(height: 12),
@@ -307,7 +308,7 @@ class _KenBetsu extends StatelessWidget {
     final List<Widget> l = [
       const Text(
         '名門度は名門・強豪・中堅・一般の4段階で、名門度が高い高校ほど、名前のない部員も強くなります。'
-        '出場回数と優勝回数は、記録を残し始めてからの回数です。',
+        '出場回数と優勝回数は、記録を残し始めてからの回数で、毎年4月に新入生が入るときに増えます。',
         style: _honbun,
       ),
       const SizedBox(height: 6),
@@ -746,9 +747,32 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
   }
 
   /// 回の名前(「第78回(3年入学の世代)」。年度に75を足した数を回にする)
+  /// 回の名前(「第78回 2年12月(3年入学の世代)」。年度に75を足した数を回にする。
+  /// 全国高校駅伝は、その世代が大学に入る前の年の12月。ゲーム開始前の大会は「ゲーム開始前の大会」)
   String _kaiMei(KoukouTaikaiKiroku k) {
     final String sedai = k.nyuugakuNendo >= 1 ? '${k.nyuugakuNendo}年入学の世代' : 'ゲーム開始時の在学生の世代';
-    return '第${k.nyuugakuNendo + 75}回($sedai)';
+    final int taikaiNen = k.nyuugakuNendo - 1;
+    final String jiki = taikaiNen >= 1 ? '$taikaiNen年12月' : 'ゲーム開始前の大会';
+    return '第${k.nyuugakuNendo + 75}回 $jiki($sedai)';
+  }
+
+  /// 記録がいつ増えるかの注釈(実在の大会は秋に予選、12月に全国なので、ゲームの中の12月や1月に
+  /// 増えると思われないように、目立つ枠で出す。1.9.5)
+  static Widget _jikiChuuki() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.orangeAccent),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: const Text(
+        '高校の大会の記録は、毎年4月に新入生が入るときに増えます。'
+        'その世代が高校3年だった年度の、夏の高校総体と12月の全国高校駅伝の結果です。'
+        'ゲームの中の12月や1月には増えません。',
+        style: TextStyle(color: Colors.orangeAccent, fontSize: HENSUU.fontsize_honbun - 1),
+      ),
+    );
   }
 
   /// 選手の今の大学(在学中で名前が合えば今の大学、そうでなければ保存したときの大学)
@@ -867,9 +891,11 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
     if (_kiroku.isEmpty) {
       return ListView(
         padding: const EdgeInsets.all(16),
-        children: const [
-          Text(
-            'まだ記録がありません。毎年4月に新入生が入るときに、その世代の全国高校駅伝と高校総体の結果が残ります(直近10回分)。',
+        children: [
+          _jikiChuuki(),
+          const SizedBox(height: 12),
+          const Text(
+            'まだ記録がありません。直近10回分まで残ります。',
             style: _honbun,
           ),
         ],
@@ -925,6 +951,8 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
       });
 
     final List<Widget> l = [
+      _jikiChuuki(),
+      const SizedBox(height: 12),
       const Text(
         '新入生の世代ごとに、高校3年のときの全国高校駅伝と高校総体の結果を、直近10回分残しています。'
         '大学に入った選手には進学先を、自分の大学に来た選手は色を変えて出します。',

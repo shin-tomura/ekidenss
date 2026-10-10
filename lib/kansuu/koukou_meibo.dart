@@ -17,6 +17,9 @@
 // ・色: 0スピード型 1駅伝型 2起伏型(クロカンに強い)。新入生がどの高校に入るかに少し効く
 //   (スパート力が高い選手はスピード型、登り・下り・アップダウンが高い選手は起伏型に入りやすい)
 // ・ゲーム本体の計算(大学のレース)には一切使わない
+// ・プレイヤーは高校名鑑で、校名・都道府県・名門度・色・留学生・紹介文を変えられる(1.9.5)。
+//   ここにあるのは初期値(koukouMeiboShoki)で、変えた分は koukou.dart の koukouHenkouHozon で
+//   セーブデータ(大学id 29 の UnivData.name_tanshuku)に保存し、koukouMeibo(getter)で重ねて使う
 // ------------------------------------------------------------
 
 /// 高校1校
@@ -98,8 +101,9 @@ const List<int> koukouKenSonota = [
   6, 7, 8, 6, 6, 7, 7, // 佐賀〜沖縄
 ];
 
-/// 高校の名簿(都道府県の並びで5校ずつ)
-const List<KoukouMei> koukouMeibo = [
+/// 高校の名簿の初期値(都道府県の並びで5校ずつ)
+/// ゲームの中では、これに高校名鑑で変えた分を重ねた koukouMeibo(koukou.dart の getter)を使う(1.9.5)
+const List<KoukouMei> koukouMeiboShoki = [
   KoukouMei('北風学園', 0, 3, false, 2, shoukai: '雪の残る林道の起伏で脚を鍛える、北の名門。冬の長い走り込みで、登りにも下りにも強い選手が育つ。'), // 北海道
   KoukouMei('大地学院', 0, 2, true, 2), // 北海道
   KoukouMei('森川商業', 0, 1, false, 1), // 北海道

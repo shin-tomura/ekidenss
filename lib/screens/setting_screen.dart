@@ -1247,7 +1247,7 @@ class _SettingScreenState extends State<SettingScreen>
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           const Text(
-            "SS 1.9.5 (21950)",
+            "SS 1.9.5 (21951)",
             style: TextStyle(color: Colors.white),
           ),
           // 変更履歴(ToDo.txtの箱庭小駅伝SSの部分を表示)

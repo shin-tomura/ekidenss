@@ -2,18 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ekiden/constants.dart';
 import 'package:ekiden/ghensuu.dart';
+import 'package:ekiden/kantoku_data.dart'; // スカウトの途中か(高校のページの卒業生。1.9.5)
 import 'package:ekiden/senshu_data.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/kansuu/koukou.dart';
 import 'package:ekiden/kansuu/koukou_meibo.dart';
+import 'package:ekiden/kansuu/scout_com.dart'; // スカウトの途中か(高校のページの卒業生。1.9.5)
 import 'package:ekiden/kansuu/time_date.dart';
 
 // ------------------------------------------------------------
 // 高校名鑑(1.9.5。説明画面の設定タブの「高校名鑑」から開く)
 // ・「名門校」(名門校のタイプ・留学生・紹介文・集まりやすい選手・優勝回数)と、
-//   「都道府県別」(全校の名門度・タイプ・留学生・優勝回数。地区ごとに折りたたみ。高校を押すと編集)と、
-//   「大会の記録」(直近10回の全国高校駅伝と高校総体。koukou.dart の koukouTaikaiKirokuYomu。見出しごとに折りたたみ)を、
-//   タブで切り替える
+//   「都道府県別」(全校の名門度・タイプ・留学生・優勝回数・直近の勝ち上がり。地区ごとに折りたたみ。
+//   お気に入りの高校は一番上)と、
+//   「大会の記録」(直近10回の全国高校駅伝と高校総体、都道府県予選と地区大会のチームの順位とタイム。
+//   koukou.dart の koukouTaikaiKirokuYomu。見出しごとに折りたたみ)を、タブで切り替える
+// ・名門校のカードと都道府県別の高校を押すと、高校のページ(_KoukouPage)を開く。年度ごとの都道府県予選・
+//   地区大会・全国高校駅伝の成績、お気に入りの付け外し、今大学にいる卒業生。編集はその中から(1.9.5)
 // ・名簿は koukouMeibo(初期値に、この画面で変えた分を重ねたもの)から作る
 // ・高校の情報を表示しない設定のときも開ける(自分で開く画面なので)
 // ・文字を大きくしている人がいるので、横並びは Wrap にし、高さは固定しない
@@ -186,7 +191,7 @@ class _ModalKoukouMeikanState extends State<ModalKoukouMeikan> {
         ),
         body: TabBarView(
           children: [
-            _MeimonShoukai(key: ValueKey<int>(_kousinBan)),
+            _MeimonShoukai(key: ValueKey<int>(_kousinBan), onHenkou: _kousin),
             _KenBetsu(onHenkou: _kousin),
             const _TaikaiKiroku(),
           ],
@@ -198,7 +203,10 @@ class _ModalKoukouMeikanState extends State<ModalKoukouMeikan> {
 
 /// 名門校の紹介
 class _MeimonShoukai extends StatelessWidget {
-  const _MeimonShoukai({super.key});
+  const _MeimonShoukai({super.key, required this.onHenkou});
+
+  /// 高校のページから戻ったとき(編集やお気に入りを、名鑑の全部のタブに反映する。1.9.5)
+  final VoidCallback onHenkou;
 
   @override
   Widget build(BuildContext context) {
@@ -217,9 +225,13 @@ class _MeimonShoukai extends StatelessWidget {
           '出場回数と優勝回数は、毎年4月上旬に新入生が入るときに増えます。',
           style: _honbun,
         ),
+        const SizedBox(height: 4),
+        const Text('高校を押すと、年度ごとの成績を見られます。', style: _hosoku),
         const SizedBox(height: 12),
         for (final int i in meimon)
           _kaadoWidget(
+            context,
+            i,
             meibo[i],
             i < kai.zenkoku.length ? kai.zenkoku[i] : 0,
             kai.chikuDaihyou(i),
@@ -231,7 +243,15 @@ class _MeimonShoukai extends StatelessWidget {
     );
   }
 
-  Widget _kaadoWidget(KoukouMei m, int zenkokuKai, int chikuKai, int shutsujouKai) {
+  Widget _kaadoWidget(BuildContext context, int i, KoukouMei m, int zenkokuKai, int chikuKai, int shutsujouKai) {
+    return InkWell(
+      // 高校のページ(1.9.5)
+      onTap: () => _koukouPageHiraku(context, i, onHenkou),
+      child: _kaadoNaka(m, zenkokuKai, chikuKai, shutsujouKai),
+    );
+  }
+
+  Widget _kaadoNaka(KoukouMei m, int zenkokuKai, int chikuKai, int shutsujouKai) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
@@ -289,11 +309,11 @@ class _MeimonShoukai extends StatelessWidget {
   }
 }
 
-/// 都道府県別の一覧(地区ごとに折りたたみ。高校を押すと編集)
+/// 都道府県別の一覧(地区ごとに折りたたみ。お気に入りの高校は一番上。高校を押すと高校のページ)
 class _KenBetsu extends StatelessWidget {
   const _KenBetsu({required this.onHenkou});
 
-  /// 高校を編集したとき(名鑑の全部のタブを作り直す)
+  /// 高校のページから戻ったとき(編集やお気に入りを、名鑑の全部のタブに反映する)
   final VoidCallback onHenkou;
 
   @override
@@ -305,6 +325,25 @@ class _KenBetsu extends StatelessWidget {
       for (int i = 0; i < meibo.length && i < koukouMeiboShoki.length; i++)
         if (!identical(meibo[i], koukouMeiboShoki[i])) i,
     };
+    // お気に入りの高校と、直近の回(各高校の勝ち上がりを1行で添える。1.9.5)
+    final List<int> okiniiri = [
+      for (final int i in koukouOkiniiriYomu())
+        if (i < meibo.length) i,
+    ];
+    final List<KoukouTaikaiKiroku> kiroku = koukouTaikaiKirokuYomu();
+    final KoukouTaikaiKiroku? saishin = kiroku.isEmpty ? null : kiroku.first;
+    String chokkin(int i) => saishin == null ? '' : _chokkinMoji(koukouKaiSeisekiYomu(saishin, i));
+    Widget gyou(int i, {bool kenAri = false}) => _gyou(
+          context,
+          i,
+          meibo[i],
+          i < kai.zenkoku.length ? kai.zenkoku[i] : 0,
+          i < kai.shutsujou.length ? kai.shutsujou[i] : 0,
+          henkou.contains(i),
+          okiniiri.contains(i),
+          chokkin(i),
+          kenAri: kenAri,
+        );
     final List<Widget> l = [
       const Text(
         '名門度は名門・強豪・中堅・一般の4段階で、名門度が高い高校ほど、名前のない部員も強くなります。'
@@ -313,11 +352,34 @@ class _KenBetsu extends StatelessWidget {
       ),
       const SizedBox(height: 6),
       const Text(
-        '高校を押すと、校名・都道府県・名門度・タイプ・留学生の有無・紹介文を変えられます。',
+        '高校を押すと、年度ごとの都道府県予選・地区大会・全国高校駅伝の成績を見られます。'
+        '校名・都道府県・名門度などは、その画面の「編集」で変えられます。',
+        style: _hosoku,
+      ),
+      const SizedBox(height: 4),
+      const Text(
+        '高校のページで☆を付けると、お気に入りとしてこの一番上に並びます。'
+        '高校の下には、直近の回の勝ち上がりを出しています。',
         style: _hosoku,
       ),
       const SizedBox(height: 8),
     ];
+    // お気に入りの高校(1.9.5)
+    if (okiniiri.isNotEmpty) {
+      l.add(
+        const Padding(
+          padding: EdgeInsets.only(top: 4, left: 4),
+          child: Text(
+            '★お気に入りの高校',
+            style: TextStyle(color: _kin, fontSize: HENSUU.fontsize_honbun, fontWeight: FontWeight.bold),
+          ),
+        ),
+      );
+      for (final int i in okiniiri) {
+        l.add(gyou(i, kenAri: true));
+      }
+      l.add(const SizedBox(height: 8));
+    }
     for (int c = 0; c < koukouChikuMei.length; c++) {
       final List<Widget> naka = [];
       for (int ken = 0; ken < koukouKenChiku.length; ken++) {
@@ -351,16 +413,7 @@ class _KenBetsu extends StatelessWidget {
           ));
         }
         for (final int i in kou) {
-          naka.add(
-            _gyou(
-              context,
-              i,
-              meibo[i],
-              i < kai.zenkoku.length ? kai.zenkoku[i] : 0,
-              i < kai.shutsujou.length ? kai.shutsujou[i] : 0,
-              henkou.contains(i),
-            ),
-          );
+          naka.add(gyou(i));
         }
       }
       l.add(_Oritatami(midashi: koukouChikuMei[c], naka: naka));
@@ -403,54 +456,141 @@ class _KenBetsu extends StatelessWidget {
     onHenkou();
   }
 
-  Future<void> _henshuu(BuildContext context, int i) async {
-    final bool? kawatta = await Navigator.of(context).push<bool>(
-      MaterialPageRoute<bool>(builder: (_) => _KoukouHenshuu(ban: i)),
-    );
-    if (kawatta == true) onHenkou();
-  }
-
-  Widget _gyou(BuildContext context, int i, KoukouMei m, int zenkokuKai, int shutsujouKai, bool henkouAri) {
+  /// 高校の行(押すと高校のページ。1.9.5)
+  /// [okiniiri] はお気に入りの高校か(★を出す)、[chokkin] は直近の回の勝ち上がり(空なら出さない)、
+  /// [kenAri] は校名の後ろに都道府県を出すか(お気に入りの一覧のとき)
+  Widget _gyou(
+    BuildContext context,
+    int i,
+    KoukouMei m,
+    int zenkokuKai,
+    int shutsujouKai,
+    bool henkouAri,
+    bool okiniiri,
+    String chokkin, {
+    bool kenAri = false,
+  }) {
     final bool meimon = m.meimon == 3;
     return InkWell(
-      onTap: () => _henshuu(context, i),
+      onTap: () => _koukouPageHiraku(context, i, onHenkou),
       child: Padding(
         padding: const EdgeInsets.only(left: 16, top: 4, bottom: 4),
-        child: Wrap(
-          spacing: 8,
-          runSpacing: 2,
-          crossAxisAlignment: WrapCrossAlignment.center,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              koukouMeimonMei[m.meimon.clamp(0, koukouMeimonMei.length - 1).toInt()],
-              style: TextStyle(
-                color: meimon ? _kin : _usui,
-                fontSize: HENSUU.fontsize_honbun - 2,
-                fontWeight: FontWeight.bold,
-              ),
+            Wrap(
+              spacing: 8,
+              runSpacing: 2,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                if (okiniiri) const Text('★', style: TextStyle(color: _kin, fontSize: HENSUU.fontsize_honbun)),
+                Text(
+                  koukouMeimonMei[m.meimon.clamp(0, koukouMeimonMei.length - 1).toInt()],
+                  style: TextStyle(
+                    color: meimon ? _kin : _usui,
+                    fontSize: HENSUU.fontsize_honbun - 2,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  kenAri ? '${m.mei}(${koukouKenMijikai(m.ken)})' : m.mei,
+                  style: TextStyle(
+                    color: HENSUU.textcolor,
+                    fontSize: HENSUU.fontsize_honbun,
+                    fontWeight: meimon ? FontWeight.bold : FontWeight.normal,
+                    decoration: TextDecoration.underline,
+                    decorationColor: Colors.white38,
+                  ),
+                ),
+                _iroFuda(m.iro),
+                if (m.ryuugakusei) _fuda('留学生あり', HENSUU.textcolor),
+                if (henkouAri) _fuda('変更', Colors.lightBlueAccent),
+                // 出場回数と優勝回数(1回以上のときだけ)
+                if (shutsujouKai > 0) Text('全国出場$shutsujouKai回', style: _hosoku),
+                if (zenkokuKai > 0)
+                  Text('全国優勝$zenkokuKai回', style: const TextStyle(color: _kin, fontSize: HENSUU.fontsize_honbun - 2)),
+              ],
             ),
-            Text(
-              m.mei,
-              style: TextStyle(
-                color: HENSUU.textcolor,
-                fontSize: HENSUU.fontsize_honbun,
-                fontWeight: meimon ? FontWeight.bold : FontWeight.normal,
-                decoration: TextDecoration.underline,
-                decorationColor: Colors.white38,
+            // 直近の回の勝ち上がり(1.9.5)
+            if (chokkin.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(chokkin, style: _hosoku),
               ),
-            ),
-            _iroFuda(m.iro),
-            if (m.ryuugakusei) _fuda('留学生あり', HENSUU.textcolor),
-            if (henkouAri) _fuda('変更', Colors.lightBlueAccent),
-            // 出場回数と優勝回数(1回以上のときだけ)
-            if (shutsujouKai > 0) Text('全国出場$shutsujouKai回', style: _hosoku),
-            if (zenkokuKai > 0)
-              Text('全国優勝$zenkokuKai回', style: const TextStyle(color: _kin, fontSize: HENSUU.fontsize_honbun - 2)),
           ],
         ),
       ),
     );
   }
+}
+
+/// 高校のページを開き、戻ったら名鑑のタブを作り直す(編集やお気に入りを反映する。1.9.5)
+Future<void> _koukouPageHiraku(BuildContext context, int ban, VoidCallback onHenkou) async {
+  await Navigator.of(context).push<void>(
+    MaterialPageRoute<void>(builder: (_) => _KoukouPage(ban: ban)),
+  );
+  onHenkou();
+}
+
+/// 回の名前(「第2回 2年12月(3年入学の世代)」。1.9.5)
+/// 全国高校駅伝は、その世代が大学に入る前の年の12月。大学の駅伝と同じく、1年目の大会を第1回にする
+/// (N年12月の大会が第N回。同じ年度の大学の駅伝と回の数がそろう)。
+/// ゲーム開始前の大会(0年12月より前。開始時の在学生4学年分)は「プレ大会」にして、開始時の学年で見分ける
+/// (「プレ大会(ゲーム開始時の4年生の世代)」)。
+/// [imaGakunen] が1以上なら、かっこの中を今の学年にする(「(今の1年生の世代)」。在学生の世代の欄のとき)
+String _kaiMei(KoukouTaikaiKiroku k, {int imaGakunen = 0}) {
+  final int taikaiNen = k.nyuugakuNendo - 1;
+  if (taikaiNen >= 1) {
+    final String sedai = imaGakunen >= 1 ? '今の$imaGakunen年生の世代' : '${k.nyuugakuNendo}年入学の世代';
+    return '第$taikaiNen回 $taikaiNen年12月($sedai)';
+  }
+  // 1年入学の世代が開始時の1年生、0年入学が2年生…
+  final int kaishiGakunen = 2 - k.nyuugakuNendo;
+  final String sedai = imaGakunen >= 1 ? '今の$imaGakunen年生の世代' : 'ゲーム開始時の$kaishiGakunen年生の世代';
+  return 'プレ大会($sedai)';
+}
+
+/// 回の短い名前(「第2回」「プレ大会」。都道府県別の一覧の勝ち上がり。1.9.5)
+String _kaiMeiMijikai(KoukouTaikaiKiroku k) {
+  final int taikaiNen = k.nyuugakuNendo - 1;
+  return taikaiNen >= 1 ? '第$taikaiNen回' : 'プレ大会';
+}
+
+/// 1回分の勝ち上がりの短い文(「第5回: 予選2位 → 北関東大会3位 → 全国12位」。1.9.5)
+/// 予選と地区大会の記録がない回は、全国高校駅伝に出たときだけ。何もなければ空
+String _chokkinMoji(KoukouKaiSeiseki s) {
+  final List<String> l = [];
+  final KoukouYosenTeam? yo = s.yosen;
+  if (yo != null) l.add('予選${yo.juni}位');
+  if (s.chiku != null && s.chikuBan >= 0 && s.chikuBan < koukouChikuMei.length) {
+    l.add('${koukouChikuMei[s.chikuBan]}大会${s.chikuJuni}位');
+  }
+  if (s.zenkoku != null) l.add('全国${s.zenkokuJuni}位');
+  if (l.isEmpty) return '';
+  return '${_kaiMeiMijikai(s.kiroku)}: ${l.join(' → ')}';
+}
+
+/// 走者の区間と区間順位(「3区(区間賞)」「3区(区間5位)」。補欠は「補欠」。1.9.5)
+/// 区間順位を残す前の記録では、各区間の上位3人の記録に、そのチームの高校があれば順位を出す
+/// (1校1チームなので、高校と区間で決まる)
+String _kukanJuniMoji(KoukouTaikaiKiroku kiroku, KoukouKirokuTeam t, KoukouKirokuSousha s) {
+  if (s.kukan < 1) return '補欠';
+  int juni = s.kukanJuni;
+  if (juni < 1) {
+    final int kk = s.kukan - 1;
+    if (kk < kiroku.kukan.length) {
+      final List<KoukouKirokuSousha> ue = kiroku.kukan[kk];
+      for (int i = 0; i < ue.length; i++) {
+        if (ue[i].kouCode == t.kouCode) {
+          juni = i + 1;
+          break;
+        }
+      }
+    }
+  }
+  if (juni == 1) return '${s.kukan}区(区間賞)';
+  if (juni >= 2) return '${s.kukan}区(区間$juni位)';
+  return '${s.kukan}区';
 }
 
 /// 高校1校の編集(校名・都道府県・名門度・タイプ・留学生の有無・紹介文。1.9.5)
@@ -534,7 +674,8 @@ class _KoukouHenshuuState extends State<_KoukouHenshuu> {
         backgroundColor: Colors.grey[900],
         title: const Text('この高校の回数を0に戻しますか?', style: TextStyle(color: Colors.white)),
         content: const Text(
-          '全国高校駅伝の出場回数・優勝回数・連続出場を0に戻します。過去の大会の記録はそのまま残ります。',
+          '全国高校駅伝の出場回数・優勝回数・連続出場と、都道府県予選・地区大会の優勝回数を0に戻します。'
+          '過去の大会の記録はそのまま残ります。',
           style: _honbun,
         ),
         actions: [
@@ -584,6 +725,7 @@ class _KoukouHenshuuState extends State<_KoukouHenshuu> {
     final int b = widget.ban;
     final bool kaisuuAri = (b < kai.zenkoku.length && kai.zenkoku[b] > 0) ||
         (b < kai.ken.length && kai.ken[b] > 0) ||
+        (b < kai.chiku.length && kai.chiku[b] > 0) ||
         (b < kai.shutsujou.length && kai.shutsujou[b] > 0);
     return Scaffold(
       backgroundColor: HENSUU.backgroundcolor,
@@ -707,6 +849,413 @@ class _KoukouHenshuuState extends State<_KoukouHenshuu> {
   }
 }
 
+/// 高校のページ(1.9.5。名門校のカードと、都道府県別の高校から開く)
+/// ・上に校名・都道府県・名門度・タイプ・紹介文と回数、☆(お気に入り)と「編集」
+/// ・年度ごとの都道府県予選・地区大会・全国高校駅伝の成績(大会の記録の直近10回。全国は押すと走者と進学先)
+/// ・今、大学にいる卒業生(コンピュータスカウトONでスカウトの途中は、決まっていない新入生の大学を出さない)
+class _KoukouPage extends StatefulWidget {
+  const _KoukouPage({required this.ban});
+
+  /// 名簿の番号
+  final int ban;
+
+  @override
+  State<_KoukouPage> createState() => _KoukouPageState();
+}
+
+class _KoukouPageState extends State<_KoukouPage> {
+  List<KoukouTaikaiKiroku> _kiroku = [];
+  final Map<int, String> _univMei = {};
+  final Map<int, SenshuData> _zaigaku = {};
+  int _myUnivId = -1;
+
+  /// コンピュータスカウトONでスカウトの途中か(新入生の進学先の画面と同じ見分け方)
+  bool _scoutChuu = false;
+  bool _shoriChuu = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _kiroku = koukouTaikaiKirokuYomu();
+    if (Hive.isBoxOpen('univBox')) {
+      for (final UnivData u in Hive.box<UnivData>('univBox').values) {
+        _univMei[u.id] = u.name;
+      }
+    }
+    if (Hive.isBoxOpen('senshuBox')) {
+      for (final SenshuData s in Hive.box<SenshuData>('senshuBox').values) {
+        _zaigaku[s.id] = s;
+      }
+    }
+    if (Hive.isBoxOpen('ghensuuBox')) {
+      final Box<Ghensuu> b = Hive.box<Ghensuu>('ghensuuBox');
+      final Ghensuu? g = b.isNotEmpty ? b.getAt(0) : null;
+      _myUnivId = g?.MYunivid ?? -1;
+      if (g != null && g.mode == 9000 && Hive.isBoxOpen('kantokuBox')) {
+        final KantokuData? kantoku = Hive.box<KantokuData>('kantokuBox').get('KantokuData');
+        _scoutChuu = kantoku != null && isComScoutOn(kantoku);
+      }
+    }
+  }
+
+  /// スカウトの途中で、進学先が決まっていない新入生か(仮の振り分けの大学を見せない)
+  bool _miteiKa(SenshuData s) => _scoutChuu && s.gakunen == 1 && s.hirou != 1 && !comScoutKettei(s);
+
+  /// 大会の記録の選手の今の大学(在学中で名前が合えば今の大学、そうでなければ保存したときの大学)。
+  /// スカウトの途中で決まっていない新入生は「進路未定」。[jibun] は自分の大学か
+  String _univMoji(KoukouKirokuSousha s, List<bool> jibun) {
+    final SenshuData? z = _zaigaku[s.id];
+    int u = s.univid;
+    if (z != null && z.name == s.name) {
+      if (_miteiKa(z)) return '進路未定';
+      u = z.univid;
+    }
+    if (u == _myUnivId) jibun[0] = true;
+    final String? um = _univMei[u];
+    return um == null ? '' : '$um大学';
+  }
+
+  /// 選手の出身校の名簿の番号(なければ-1。留学生は高校を決めたあとだけ)
+  int _kouBan(SenshuData s) {
+    final KoukouJouhou j = KoukouJouhou.yomu(s.samusataisei);
+    if (s.hirou == 1 && j.keireki != koukouKeirekiRyuugakusei) return -1;
+    return j.koukou - 1;
+  }
+
+  Future<void> _okiniiriKae(bool tsukeru) async {
+    setState(() => _shoriChuu = true);
+    await koukouOkiniiriHozon(widget.ban, tsukeru);
+    if (!mounted) return;
+    setState(() => _shoriChuu = false);
+  }
+
+  Future<void> _henshuu() async {
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(builder: (_) => _KoukouHenshuu(ban: widget.ban)),
+    );
+    if (!mounted) return;
+    // 校名を変えると、それまでの回に当時の校名が残るので、記録も読み直す
+    setState(() => _kiroku = koukouTaikaiKirokuYomu());
+  }
+
+  Widget _midashi(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 16, bottom: 4),
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: HENSUU.textcolor,
+          fontSize: HENSUU.fontsize_honbun,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  Widget _gyouMoji(String text, {bool kin = false}) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 12, top: 4),
+      child: Text(
+        text,
+        style: kin ? const TextStyle(color: _kin, fontSize: HENSUU.fontsize_honbun) : _honbun,
+      ),
+    );
+  }
+
+  Widget _gyouHosoku(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 12, top: 4),
+      child: Text(text, style: _hosoku),
+    );
+  }
+
+  /// 全国高校駅伝の走者(区間の順、補欠は最後。大学に入った選手は進学先も)
+  List<Widget> _member(KoukouTaikaiKiroku r, KoukouKirokuTeam t, int juni) {
+    final List<KoukouKirokuSousha>? m = t.member;
+    if (m == null) return const [Text('この回は走者の記録がありません。', style: _hosoku)];
+    final List<KoukouKirokuSousha> jun = List<KoukouKirokuSousha>.of(m)
+      ..sort((a, b) => (a.kukan == 0 ? 99 : a.kukan).compareTo(b.kukan == 0 ? 99 : b.kukan));
+    return [
+      if (juni >= 9) const Text('9位以下の高校は、大学に入った選手だけを残しています。', style: _hosoku),
+      if (jun.isEmpty) const Text('大学に入った選手はいません。', style: _hosoku),
+      for (final KoukouKirokuSousha s in jun) _soushaGyou(r, t, s),
+    ];
+  }
+
+  /// 全国高校駅伝の走者1人の行(区間と区間順位、名前、進学先、タイム)
+  Widget _soushaGyou(KoukouTaikaiKiroku r, KoukouKirokuTeam t, KoukouKirokuSousha s) {
+    final List<bool> jibun = [false];
+    String mei;
+    String univ = '';
+    if (s.namaeAri) {
+      // 下級生のときの記録に、あとから名前が付いた選手は、当時の学年を添える(大会の記録と同じ)
+      final String touji = (s.gakunen >= 1 && s.gakunen <= 2) ? '(当時${s.gakunen}年)' : '';
+      mei = '${s.name}$touji';
+      univ = _univMoji(s, jibun);
+    } else {
+      mei = s.shurui == 3 ? '留学生' : '${s.gakunen}年生';
+    }
+    final Color iro = jibun[0] ? Colors.amber : HENSUU.textcolor;
+    return Padding(
+      padding: const EdgeInsets.only(left: 12, top: 4),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 2,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Text(_kukanJuniMoji(r, t, s), style: _hosoku),
+          Text(
+            mei,
+            style: TextStyle(
+              color: iro,
+              fontSize: HENSUU.fontsize_honbun,
+              fontWeight: s.namaeAri ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
+          if (univ.isNotEmpty)
+            Text(
+              univ == '進路未定' ? univ : '→ $univ',
+              style: TextStyle(color: jibun[0] ? Colors.amber : _usui, fontSize: HENSUU.fontsize_honbun - 2),
+            ),
+          if (s.kukan >= 1) Text(TimeDate.timeToFunByouString(s.time), style: _hosoku),
+        ],
+      ),
+    );
+  }
+
+  /// 1回分の成績(都道府県予選・地区大会・全国高校駅伝。全国は押すと走者)
+  List<Widget> _kaiSeiseki(KoukouTaikaiKiroku r) {
+    final int ban = widget.ban;
+    final KoukouKaiSeiseki s = koukouKaiSeisekiYomu(r, ban);
+    final List<Widget> l = [
+      Padding(
+        padding: const EdgeInsets.only(top: 12, left: 4),
+        child: Text(
+          _kaiMei(r),
+          style: const TextStyle(color: _kin, fontSize: HENSUU.fontsize_honbun, fontWeight: FontWeight.bold),
+        ),
+      ),
+    ];
+    // あとで校名か都道府県を変えた高校は、当時の名前を添える
+    final String? touji = r.kyuumei[ban];
+    if (touji != null) l.add(_gyouHosoku('当時の校名: $touji'));
+    // 都道府県予選と地区大会
+    final KoukouYosenTeam? yo = s.yosen;
+    if (!s.yosenKirokuAri) {
+      l.add(_gyouHosoku('この回は、都道府県予選と地区大会の記録がありません。'));
+    } else if (yo == null) {
+      l.add(_gyouHosoku('この回は、都道府県予選の記録がありません。'));
+    } else {
+      final String kenMei =
+          (s.ken >= 0 && s.ken < LocationDatabase.allPrefectures.length) ? LocationDatabase.allPrefectures[s.ken] : '';
+      l.add(
+        _gyouMoji(
+          '$kenMei予選　${yo.juni}位(${s.yosenSuu}校)　${TimeDate.timeToJikanFunByouString(yo.time)}'
+          '${yo.juni == 1 ? '　優勝(県代表)' : ''}',
+          kin: yo.juni == 1,
+        ),
+      );
+      final KoukouChikuTeam? ch = s.chiku;
+      if (ch != null && s.chikuBan >= 0 && s.chikuBan < koukouChikuMei.length) {
+        l.add(
+          _gyouMoji(
+            '${koukouChikuMei[s.chikuBan]}大会　${s.chikuJuni}位(${s.chikuSuu}校)　'
+            '${TimeDate.timeToJikanFunByouString(ch.time)}'
+            '${s.chikuJuni == 1 ? '　優勝' : ''}${ch.daihyou == 2 ? '　地区代表' : ''}',
+            kin: ch.daihyou == 2,
+          ),
+        );
+      } else {
+        // 地区大会がある地区で、予選の上位に入れなかった(北海道は地区大会がないので出さない)
+        final int c = (s.ken >= 0 && s.ken < koukouKenChiku.length) ? koukouKenChiku[s.ken] : -1;
+        final List<List<KoukouChikuTeam>>? chiku = r.chiku;
+        if (chiku != null && c >= 0 && c < chiku.length && chiku[c].isNotEmpty) {
+          l.add(_gyouHosoku('地区大会には進めませんでした(予選の上位6校が進みます)。'));
+        }
+      }
+    }
+    // 全国高校駅伝
+    final KoukouKirokuTeam? z = s.zenkoku;
+    if (z == null) {
+      l.add(_gyouHosoku('全国高校駅伝には出ていません。'));
+    } else {
+      final int c = z.daihyou - 1;
+      final String daihyou = (z.daihyou >= 1 && c < koukouChikuMei.length) ? '　地区代表(${koukouChikuMei[c]})' : '';
+      l.add(
+        Padding(
+          padding: const EdgeInsets.only(left: 12),
+          child: _Oritatami(
+            key: ValueKey<String>('kp${r.nyuugakuNendo}'),
+            midashi: '全国高校駅伝　${s.zenkokuJuni}位(${s.zenkokuSuu}校)　'
+                '${TimeDate.timeToJikanFunByouString(z.time)}${s.zenkokuJuni == 1 ? '　優勝' : ''}$daihyou',
+            kin: s.zenkokuJuni == 1,
+            futoi: false,
+            naka: _member(r, z, s.zenkokuJuni),
+          ),
+        ),
+      );
+    }
+    return l;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final int ban = widget.ban;
+    final List<KoukouMei> meibo = koukouMeiboGenzai();
+    final KoukouMei m = meibo[ban];
+    final KoukouYuushouKaisuu kai = koukouYuushouKaisuuYomu();
+    final bool okiniiri = koukouOkiniiriYomu().contains(ban);
+    int kaisuu(List<int> l) => ban < l.length ? l[ban] : 0;
+    final int chikuDaihyou = kai.chikuDaihyou(ban);
+    // 地区大会がある地区か(北海道は地区大会がないので、地区大会の優勝回数を出さない)
+    final int chikuBan = (m.ken >= 0 && m.ken < koukouKenChiku.length) ? koukouKenChiku[m.ken] : -1;
+    final bool chikuAri = chikuBan >= 0 && koukouKenChiku.where((int c) => c == chikuBan).length >= 2;
+    // 今、大学にいる卒業生(上の学年から、同じ学年は大学の順)
+    final List<SenshuData> sotsugyousei = [
+      for (final SenshuData s in _zaigaku.values)
+        if (s.gakunen >= 1 && s.gakunen <= 4 && _kouBan(s) == ban) s,
+    ]..sort((a, b) {
+        final int g = b.gakunen.compareTo(a.gakunen);
+        if (g != 0) return g;
+        final int u = a.univid.compareTo(b.univid);
+        return u != 0 ? u : a.id.compareTo(b.id);
+      });
+    return Scaffold(
+      backgroundColor: HENSUU.backgroundcolor,
+      appBar: AppBar(
+        title: Text('${m.mei}高', style: const TextStyle(color: Colors.white)),
+        backgroundColor: Colors.grey[900],
+        foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            tooltip: okiniiri ? 'お気に入りから外す' : 'お気に入りに追加',
+            icon: Icon(okiniiri ? Icons.star : Icons.star_border, color: okiniiri ? _kin : Colors.white),
+            onPressed: _shoriChuu ? null : () => _okiniiriKae(!okiniiri),
+          ),
+        ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(
+                koukouKenMijikai(m.ken),
+                style: const TextStyle(color: _kin, fontSize: HENSUU.fontsize_honbun - 2, fontWeight: FontWeight.bold),
+              ),
+              Text(koukouMeimonMei[m.meimon.clamp(0, koukouMeimonMei.length - 1).toInt()], style: _hosoku),
+              _iroFuda(m.iro),
+              if (m.ryuugakusei) _fuda('留学生あり', HENSUU.textcolor),
+              if (okiniiri) _fuda('★お気に入り', _kin),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '${m.mei}高',
+            style: const TextStyle(color: HENSUU.textcolor, fontSize: HENSUU.fontsize_honbun + 6, fontWeight: FontWeight.bold),
+          ),
+          if (m.shoukai.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(m.shoukai, style: _honbun),
+          ],
+          const SizedBox(height: 6),
+          Text('集まりやすい選手: ${koukouIroKeikou[_iroBan(m.iro)]}', style: _hosoku),
+          const SizedBox(height: 8),
+          Text(
+            '全国高校駅伝: 出場${kaisuu(kai.shutsujou)}回'
+            '${chikuDaihyou > 0 ? '(うち地区代表$chikuDaihyou回)' : ''}・優勝${kaisuu(kai.zenkoku)}回',
+            style: _honbun,
+          ),
+          Text(
+            '都道府県予選: 優勝${kaisuu(kai.ken)}回${chikuAri ? '　地区大会: 優勝${kaisuu(kai.chiku)}回' : ''}',
+            style: _honbun,
+          ),
+          const Text(
+            '回数は記録を残し始めてからの回数で、毎年4月上旬に新入生が入るときに増えます。',
+            style: _hosoku,
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            children: [
+              OutlinedButton.icon(
+                onPressed: _shoriChuu ? null : () => _okiniiriKae(!okiniiri),
+                icon: Icon(okiniiri ? Icons.star : Icons.star_border, color: _kin),
+                label: Text(okiniiri ? 'お気に入りから外す' : 'お気に入りに追加', style: _honbun),
+              ),
+              ElevatedButton(
+                onPressed: _shoriChuu ? null : _henshuu,
+                child: const Text('編集'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'お気に入りの高校は、都道府県別のタブの一番上に並びます。'
+            '「編集」では、校名・都道府県・名門度・タイプ・留学生の有無・紹介文を変えられます。',
+            style: _hosoku,
+          ),
+          // ---- 年度ごとの成績 ----
+          _midashi('■年度ごとの成績'),
+          const Text(
+            '新しい回から、大会の記録が残っている直近10回分です。'
+            '都道府県予選と地区大会はチームの順位とタイム、全国高校駅伝は押すと走った選手と進学先を見られます。',
+            style: _hosoku,
+          ),
+          if (_kiroku.isEmpty)
+            const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: Text('まだ記録がありません。', style: _honbun),
+            ),
+          for (final KoukouTaikaiKiroku r in _kiroku) ..._kaiSeiseki(r),
+          // ---- 今、大学にいる卒業生 ----
+          _midashi('■今、大学にいる卒業生'),
+          if (sotsugyousei.isEmpty) const Text('今、大学にいる卒業生はいません。', style: _honbun),
+          for (final SenshuData s in sotsugyousei) _sotsugyouseiGyou(s),
+          const SizedBox(height: 24),
+          const Text('架空の高校です。実在の学校とは関係ありません。大学のレースや育成には影響しません。', style: _hosoku),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  /// 卒業生の行(「3年　山田太郎　→ ○○大学」。自分の大学の選手は色を変える。スカウトの途中で決まっていない新入生は「進路未定」)
+  Widget _sotsugyouseiGyou(SenshuData s) {
+    final bool mitei = _miteiKa(s);
+    final bool jibun = !mitei && s.univid == _myUnivId;
+    final String um = mitei ? '進路未定' : (_univMei[s.univid] == null ? '' : '${_univMei[s.univid]}大学');
+    return Padding(
+      padding: const EdgeInsets.only(left: 12, top: 4),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 2,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Text('${s.gakunen}年', style: _hosoku),
+          Text(
+            s.name,
+            style: TextStyle(
+              color: jibun ? Colors.amber : HENSUU.textcolor,
+              fontSize: HENSUU.fontsize_honbun,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          if (um.isNotEmpty)
+            Text(
+              mitei ? um : '→ $um',
+              style: TextStyle(color: jibun ? Colors.amber : _usui, fontSize: HENSUU.fontsize_honbun - 2),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 /// スカウト画面から開く、今年の新入生(スカウトの候補)が高校3年だったときの大会の結果(1.9.5)
 /// 進学先の文字は、スカウト画面から渡す(コンピュータスカウトONのときは、仮の振り分けの大学を見せないため)
 class KoukouScoutKekka extends StatelessWidget {
@@ -781,23 +1330,7 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
     }
   }
 
-  /// 回の名前(「第2回 2年12月(3年入学の世代)」。1.9.5)
-  /// 全国高校駅伝は、その世代が大学に入る前の年の12月。大学の駅伝と同じく、1年目の大会を第1回にする
-  /// (N年12月の大会が第N回。同じ年度の大学の駅伝と回の数がそろう)。
-  /// ゲーム開始前の大会(0年12月より前。開始時の在学生4学年分)は「プレ大会」にして、開始時の学年で見分ける
-  /// (「プレ大会(ゲーム開始時の4年生の世代)」)。
-  /// [imaGakunen] が1以上なら、かっこの中を今の学年にする(「(今の1年生の世代)」。在学生の世代の欄のとき)
-  String _kaiMei(KoukouTaikaiKiroku k, {int imaGakunen = 0}) {
-    final int taikaiNen = k.nyuugakuNendo - 1;
-    if (taikaiNen >= 1) {
-      final String sedai = imaGakunen >= 1 ? '今の$imaGakunen年生の世代' : '${k.nyuugakuNendo}年入学の世代';
-      return '第$taikaiNen回 $taikaiNen年12月($sedai)';
-    }
-    // 1年入学の世代が開始時の1年生、0年入学が2年生…
-    final int kaishiGakunen = 2 - k.nyuugakuNendo;
-    final String sedai = imaGakunen >= 1 ? '今の$imaGakunen年生の世代' : 'ゲーム開始時の$kaishiGakunen年生の世代';
-    return 'プレ大会($sedai)';
-  }
+  // 回の名前(_kaiMei)は、高校のページでも使うので外に出した(1.9.5)
 
   /// 名前のない選手の説明(大会の記録とスカウト画面からの結果の画面。1.9.5)
   static const String _namaeNashiSetsumei =
@@ -817,7 +1350,8 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
       child: const Text(
         '高校の大会の記録は、毎年4月上旬に新入生が大学に入るときに、1回分がまとめて増えます。'
         'ほかの時期には増えません。'
-        '増えるのは、その新入生たちが高校3年だった年度の、夏の高校総体と12月の全国高校駅伝の結果です。',
+        '増えるのは、その新入生たちが高校3年だった年度の、夏の高校総体と、秋の都道府県予選・地区大会と、'
+        '12月の全国高校駅伝の結果です。',
         style: TextStyle(color: Colors.orangeAccent, fontSize: HENSUU.fontsize_honbun - 1),
       ),
     );
@@ -946,28 +1480,7 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
     return '${j + 1}位　${_teamMei(kiroku, t)}　${TimeDate.timeToJikanFunByouString(t.time)}$daihyou$kaime';
   }
 
-  /// 走者の区間と区間順位(「3区(区間賞)」「3区(区間5位)」。補欠は「補欠」。1.9.5)
-  /// 区間順位を残す前の記録では、各区間の上位3人の記録に、そのチームの高校があれば順位を出す
-  /// (1校1チームなので、高校と区間で決まる)
-  String _kukanJuniMoji(KoukouTaikaiKiroku kiroku, KoukouKirokuTeam t, KoukouKirokuSousha s) {
-    if (s.kukan < 1) return '補欠';
-    int juni = s.kukanJuni;
-    if (juni < 1) {
-      final int kk = s.kukan - 1;
-      if (kk < kiroku.kukan.length) {
-        final List<KoukouKirokuSousha> ue = kiroku.kukan[kk];
-        for (int i = 0; i < ue.length; i++) {
-          if (ue[i].kouCode == t.kouCode) {
-            juni = i + 1;
-            break;
-          }
-        }
-      }
-    }
-    if (juni == 1) return '${s.kukan}区(区間賞)';
-    if (juni >= 2) return '${s.kukan}区(区間$juni位)';
-    return '${s.kukan}区';
-  }
+  // 走者の区間と区間順位(_kukanJuniMoji)は、高校のページでも使うので外に出した(1.9.5)
 
   /// チームの走者(区間の順、補欠は最後)
   List<Widget> _teamMember(KoukouTaikaiKiroku kiroku, int j, KoukouKirokuTeam t) {
@@ -1110,7 +1623,8 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
       const SizedBox(height: 12),
       const Text(
         '新入生の世代ごとに、高校3年のときの全国高校駅伝と高校総体の結果を、直近10回分残しています。'
-        '大学に入った選手には進学先を、自分の大学に来た選手は色を変えて出します。',
+        '大学に入った選手には進学先を、自分の大学に来た選手は色を変えて出します。'
+        '都道府県予選と地区大会は、チームの順位とタイムを残しています。',
         style: _honbun,
       ),
       const SizedBox(height: 4),
@@ -1189,10 +1703,49 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
     return ListView(padding: const EdgeInsets.all(16), children: l);
   }
 
-  /// 1回分の大会の結果(全国高校駅伝の全チームと走者、区間の上位3人、高校総体の決勝。見出しごとに折りたたみ)
+  /// 地区大会の1チームの行(「1位 天馬学園高(栃木) 2時間05分12秒 地区代表」。1.9.5)
+  Widget _chikuGyou(KoukouTaikaiKiroku k, int j, KoukouChikuTeam t) {
+    final String daihyou = t.daihyou == 2 ? '　地区代表' : (t.daihyou == 1 ? '　県代表' : '');
+    return Padding(
+      padding: const EdgeInsets.only(left: 12, top: 4),
+      child: Text(
+        '${j + 1}位　${k.kouMei(t.kouCode)}　${TimeDate.timeToJikanFunByouString(t.time)}$daihyou',
+        style: t.daihyou == 2 ? const TextStyle(color: _kin, fontSize: HENSUU.fontsize_honbun) : _honbun,
+      ),
+    );
+  }
+
+  /// 都道府県予選の1都道府県分(見出しと、上位8校と名簿の高校の行。1.9.5)
+  List<Widget> _yosenKen(KoukouTaikaiKiroku k, int ken, KoukouYosenKen y) {
+    final String kenMei =
+        (ken >= 0 && ken < LocationDatabase.allPrefectures.length) ? LocationDatabase.allPrefectures[ken] : '';
+    final int nokori = y.shussouSuu - y.teams.length;
+    return [
+      _koMidashi('$kenMei(${y.shussouSuu}校)'),
+      for (final KoukouYosenTeam t in y.teams)
+        Padding(
+          padding: const EdgeInsets.only(left: 12, top: 4),
+          child: Text(
+            '${t.juni}位　${k.kouMei(t.kouCode)}　${TimeDate.timeToJikanFunByouString(t.time)}'
+            '${t.juni == 1 ? '　県代表' : ''}',
+            style: t.juni == 1 ? const TextStyle(color: _kin, fontSize: HENSUU.fontsize_honbun) : _honbun,
+          ),
+        ),
+      if (nokori > 0)
+        Padding(
+          padding: const EdgeInsets.only(left: 12, top: 2),
+          child: Text('ほか$nokori校', style: _hosoku),
+        ),
+    ];
+  }
+
+  /// 1回分の大会の結果(全国高校駅伝の全チームと走者、区間の上位3人、地区大会と都道府県予選のチームの順位とタイム、
+  /// 高校総体の決勝。見出しごとに折りたたみ)
   /// [erabu] は折りたたみの開け閉めを回ごとに分けるための番号。[zenkokuHiraku] なら全国高校駅伝を開いておく
   /// (名鑑の「大会の結果」と、スカウト画面から開いたときに使う。1.9.5)
   List<Widget> _kekka(KoukouTaikaiKiroku k, int erabu, {bool zenkokuHiraku = false}) {
+    final List<List<KoukouChikuTeam>>? ch = k.chiku;
+    final List<KoukouYosenKen>? yo = k.yosen;
     return [
       // 全国高校駅伝(高校を開くと走者と進学先)
       _Oritatami(
@@ -1233,6 +1786,54 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
           ],
         ],
       ),
+      // 地区大会(チームの順位とタイム。1.9.5)
+      _Oritatami(
+        key: ValueKey<String>('chiku$erabu'),
+        midashi: '地区大会',
+        naka: ch == null
+            ? const [Text('この回は、地区大会の記録がありません。', style: _hosoku)]
+            : [
+                const Text(
+                  '各都道府県の予選の上位6校が走り、県代表を除いた最上位の高校が、地区代表として全国高校駅伝に進みます。'
+                  '北海道は地区大会がなく、予選の2位が地区代表です。',
+                  style: _hosoku,
+                ),
+                for (int c = 0; c < ch.length && c < koukouChikuMei.length; c++)
+                  if (ch[c].isNotEmpty)
+                    _Oritatami(
+                      key: ValueKey<String>('chiku$erabu-$c'),
+                      midashi: '${koukouChikuMei[c]}大会(${ch[c].length}校)',
+                      futoi: false,
+                      naka: [
+                        for (int j = 0; j < ch[c].length; j++) _chikuGyou(k, j, ch[c][j]),
+                      ],
+                    ),
+              ],
+      ),
+      // 都道府県予選(上位8校と名簿の高校のチームの順位とタイム。地区ごとに折りたたみ。1.9.5)
+      _Oritatami(
+        key: ValueKey<String>('yosen$erabu'),
+        midashi: '都道府県予選',
+        naka: yo == null
+            ? const [Text('この回は、都道府県予選の記録がありません。', style: _hosoku)]
+            : [
+                const Text(
+                  '1位の高校が県代表として全国高校駅伝に進みます。上位8校と、高校名鑑に載っている高校を残しています。'
+                  '予選のコースは全国と同じ距離の平らなコースですが、その日の気温や風で、県ごとにタイムの出やすさが違います。',
+                  style: _hosoku,
+                ),
+                for (int c = 0; c < koukouChikuMei.length; c++)
+                  _Oritatami(
+                    key: ValueKey<String>('yosen$erabu-$c'),
+                    midashi: koukouChikuMei[c],
+                    futoi: false,
+                    naka: [
+                      for (int ken = 0; ken < yo.length && ken < koukouKenChiku.length; ken++)
+                        if (koukouKenChiku[ken] == c) ..._yosenKen(k, ken, yo[ken]),
+                    ],
+                  ),
+              ],
+      ),
       // 高校総体の決勝
       for (int sh = 0; sh < k.soutai.length && sh < _shumokuMei.length; sh++)
         _Oritatami(
@@ -1266,7 +1867,7 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
       padding: const EdgeInsets.all(16),
       children: [
         const Text(
-          '今年の新入生(スカウトの候補)が高校3年だった年度の、全国高校駅伝と高校総体の結果です。'
+          '今年の新入生(スカウトの候補)が高校3年だった年度の、全国高校駅伝(都道府県予選・地区大会も)と高校総体の結果です。'
           '下に去年の回もあります。それより前の回は、スカウトのあとに説明画面の設定タブの「高校名鑑」で見られます。',
           style: _honbun,
         ),

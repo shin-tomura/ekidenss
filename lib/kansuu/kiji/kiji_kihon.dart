@@ -308,6 +308,7 @@ const List<int> _innenRaceJun = [3, 0, 4, 1, 2, 5];
 
 /// 選手[s]が、記事にする大会より前に駅伝(本戦。予選は除く)の区間を走った回数と、
 /// そのうち区間賞の回数(今の学年の、記事にする大会とそれより後の大会は除く)
+/// 学連選抜(オープン参加)で走った正月駅伝は、大学のチームの出走ではないので数えない(1.9.5)
 ({int kaisuu, int kukanshou}) ekidenShussouKaisuu(KijiKankyou k, SenshuData s) {
   int kaisuu = 0;
   int kukanshou = 0;
@@ -320,6 +321,11 @@ const List<int> _innenRaceJun = [3, 0, 4, 1, 2, 5];
       if (s.entrykukan_race.length <= race) continue;
       if (s.entrykukan_race[race].length < g) continue;
       if (s.entrykukan_race[race][g - 1] < 0) continue;
+      if (s.kukanjuni_race.length > race &&
+          s.kukanjuni_race[race].length >= g &&
+          gakurenShussouJuni(race, s.kukanjuni_race[race][g - 1])) {
+        continue; // 学連選抜で走った(1.9.5)
+      }
       kaisuu++;
       if (s.kukanjuni_race.length > race &&
           s.kukanjuni_race[race].length >= g &&
@@ -849,21 +855,33 @@ class KijiKankyou {
   }
 
   /// 選手[s]の、ほかの大会[r]の、[maeNen]年前の学年での区間エントリー(なければ-2)
+  /// 学連選抜(オープン参加)で走った年は、大学のチームでは走っていないので-2(1.9.5)
   int entryMae(SenshuData s, int r, int maeNen) {
     if (s.entrykukan_race.length <= r) return -2;
     final int g = s.gakunen - 1 - maeNen;
     if (g < 0 || g >= s.entrykukan_race[r].length) return -2;
+    if (gakurenMae(s, r, maeNen)) return -2;
     return s.entrykukan_race[r][g];
   }
 
   /// 選手[s]の、大会[r]の、[maeNen]年前の学年での区間順位(なければnull。0が1位)
+  /// 学連選抜(オープン参加)で走った年は、区間順位相当なので比べずにnull(1.9.5)
   int? kukanJuniMae(SenshuData s, int r, int maeNen) {
     if (s.kukanjuni_race.length <= r) return null;
     final int g = s.gakunen - 1 - maeNen;
     if (g < 0 || g >= s.kukanjuni_race[r].length) return null;
     final int j = s.kukanjuni_race[r][g];
     if (j < 0 || j >= TEISUU.DEFAULTJUNI) return null;
+    if (gakurenShussouJuni(r, j)) return null;
     return j;
+  }
+
+  /// 選手[s]の、大会[r]の、[maeNen]年前の学年での出走が、学連選抜(オープン参加)だったか(1.9.5)
+  bool gakurenMae(SenshuData s, int r, int maeNen) {
+    if (s.kukanjuni_race.length <= r) return false;
+    final int g = s.gakunen - 1 - maeNen;
+    if (g < 0 || g >= s.kukanjuni_race[r].length) return false;
+    return gakurenShussouJuni(r, s.kukanjuni_race[r][g]);
   }
 
   /// 自己ベスト(なければ TEISUU.DEFAULTTIME)
@@ -1090,6 +1108,15 @@ int? saigoNoKai(
 
 /// 出場していた順位か
 bool shutsujouJuni(int juni) => juni >= 0 && juni < TEISUU.DEFAULTJUNI;
+
+/// 選手の区間順位[juni]が、正月駅伝を学連選抜(オープン参加)で走ったときのものか(1.9.5)
+/// 学連選抜で走った区間・区間順位・タイムは、正月駅伝のあとで元の選手のデータに書き戻され、
+/// 区間順位には区間順位相当に100を足した値が入る(RaceCalc_gakuren.dart・KirokuKousin.dart。
+/// 生成AI向けの履歴(rireki_text.dart)と同じ見分け方)。
+/// 記事では、大学のチームの出走とは分けて数え(回数・駅伝デビュー・区間賞・年間表彰の点に入れない)、
+/// 書くときは「学連選抜に選ばれて○区を走った(区間○位相当)」のように別に書く
+bool gakurenShussouJuni(int race, int juni) =>
+    race == 2 && juni >= 100 && juni < TEISUU.DEFAULTJUNI;
 
 /// 大会[race]がまだ一度も行われていないか(どの大学も出場したことがない。ゲームを始めた年など)
 /// 大会の前(展望)と、予選の結果の記事での本戦に使う。全校が「初出場」になるので、

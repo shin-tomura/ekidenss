@@ -72,6 +72,8 @@ _Seiseki _seiseki(SenshuData s) {
   for (final int r in _sandai) {
     final ({int entry, int juni}) a = _konki(s, r);
     if (a.entry < 0 || !shutsujouJuni(a.juni)) continue;
+    // 学連選抜(オープン参加)で走った正月駅伝は、出走数にも点にも入れない(1.9.5)
+    if (gakurenShussouJuni(r, a.juni)) continue;
     x.ekiden++;
     if (a.juni == 0) x.kukanshou++;
     x.ten += _kukanTen(a.juni, r);
@@ -516,6 +518,7 @@ List<Kiji> gakunaiHyoushouKiji(KijiKankyou k) {
         if (s.entrykukan_race[r][g] < 0) continue;
         final int j = (s.kukanjuni_race.length > r && s.kukanjuni_race[r].length > g) ? s.kukanjuni_race[r][g] : TEISUU.DEFAULTJUNI;
         if (!shutsujouJuni(j)) continue;
+        if (gakurenShussouJuni(r, j)) continue; // 学連選抜で走った正月駅伝は数えない(1.9.5)
         shussou++;
         if (j == 0) kukanshou++;
       }

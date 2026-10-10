@@ -620,6 +620,39 @@ String _kukanJuniMoji(KoukouTaikaiKiroku kiroku, KoukouKirokuTeam t, KoukouKirok
   return '${s.kukan}区';
 }
 
+/// 優勝校の、その時点の優勝の回数目(「初優勝」「3年連続5回目の優勝」「4年ぶり2回目の優勝」「5回目の優勝」。1.9.5)
+/// 記録を残し始めてからの回数(回数を残す前の記録は空)
+String _yuushouMoji(KoukouKirokuTeam t) {
+  if (t.yuushouKaime < 1) return '';
+  if (t.yuushouKaime == 1) return '初優勝';
+  if (t.yuushouRenzoku >= 2) return '${t.yuushouRenzoku}年連続${t.yuushouKaime}回目の優勝';
+  if (t.yuushouBuri >= 2) return '${t.yuushouBuri}年ぶり${t.yuushouKaime}回目の優勝';
+  return '${t.yuushouKaime}回目の優勝';
+}
+
+/// 全国高校駅伝の出場の回数目(「初出場」「3年連続5回目」「5年ぶり3回目」「5回目」。1.9.5)
+/// 記録を残し始めてからの回数(回数を0に戻した高校は、次に出たときが「初出場」)。
+/// 何年ぶりを残す前の記録では、あいだがあいた出場も「5回目」。回数を残す前の記録は空
+String _shutsujouMoji(KoukouKirokuTeam t) {
+  if (t.kaime < 1) return '';
+  if (t.kaime == 1) return '初出場';
+  if (t.renzoku >= 2) return '${t.renzoku}年連続${t.kaime}回目';
+  if (t.shutsujouBuri >= 2) return '${t.shutsujouBuri}年ぶり${t.kaime}回目';
+  return '${t.kaime}回目';
+}
+
+/// 出場の回数目と、[yuushou](1位)なら優勝の回数目をつないだ文(1.9.5)
+/// 「初出場初優勝」「5年ぶり3回目の出場・初優勝」「3年連続5回目の出場・2年連続3回目の優勝」
+String _shutsujouYuushouMoji(KoukouKirokuTeam t, bool yuushou) {
+  final String s = _shutsujouMoji(t);
+  if (!yuushou) return s;
+  if (t.kaime == 1 && t.yuushouKaime == 1) return '初出場初優勝';
+  final String y = _yuushouMoji(t);
+  if (s.isEmpty) return y;
+  if (y.isEmpty) return s;
+  return '$sの出場・$y';
+}
+
 /// 高校1校の編集(校名・名門度・タイプ・留学生の有無・紹介文。都道府県は表示だけ。1.9.5)
 class _KoukouHenshuu extends StatefulWidget {
   const _KoukouHenshuu({required this.ban});
@@ -1082,13 +1115,16 @@ class _KoukouPageState extends State<_KoukouPage> {
     } else {
       final int c = z.daihyou - 1;
       final String daihyou = (z.daihyou >= 1 && c < koukouChikuMei.length) ? '　地区代表(${koukouChikuMei[c]})' : '';
+      // 出場の回数目(「初出場」「5年ぶり3回目」など)。優勝したときは優勝の回数目も(1.9.5)
+      final String kaime = _shutsujouYuushouMoji(z, s.zenkokuJuni == 1);
+      final String yuushou = (s.zenkokuJuni == 1 && !kaime.contains('優勝')) ? '　優勝' : '';
       l.add(
         Padding(
           padding: const EdgeInsets.only(left: 12),
           child: _Oritatami(
             key: ValueKey<String>('kp${r.nyuugakuNendo}'),
             midashi: '全国高校駅伝　${s.zenkokuJuni}位(${s.zenkokuSuu}校)　'
-                '${TimeDate.timeToJikanFunByouString(z.time)}${s.zenkokuJuni == 1 ? '　優勝' : ''}$daihyou',
+                '${TimeDate.timeToJikanFunByouString(z.time)}$yuushou$daihyou${kaime.isEmpty ? '' : '　$kaime'}',
             kin: s.zenkokuJuni == 1,
             futoi: false,
             naka: _member(r, z, s.zenkokuJuni),
@@ -1447,30 +1483,16 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
     return '${kk + 1}区(${km}km)';
   }
 
-  /// 優勝校の、その時点の優勝の回数目(「3年連続5回目の優勝」「4年ぶり2回目の優勝」「5回目の優勝」。1.9.5)
-  /// 記録を残し始めてからなので、2回目から出す(1回目と、回数を残す前の記録は空)
-  String _yuushouMoji(KoukouKirokuTeam t) {
-    if (t.yuushouKaime < 2) return '';
-    if (t.yuushouRenzoku >= 2) return '${t.yuushouRenzoku}年連続${t.yuushouKaime}回目の優勝';
-    if (t.yuushouBuri >= 2) return '${t.yuushouBuri}年ぶり${t.yuushouKaime}回目の優勝';
-    return '${t.yuushouKaime}回目の優勝';
-  }
+  // 優勝の回数目(_yuushouMoji)と出場の回数目(_shutsujouMoji)は、高校のページでも使うので外に出した(1.9.5)
 
-  /// チームの見出し(「1位 天馬学園高(栃木) 2時間03分12秒 地区代表(北関東)」)
+  /// チームの見出し(「1位 天馬学園高(栃木) 2時間03分12秒 地区代表(北関東) 初出場初優勝」)
   String _teamMidashi(KoukouTaikaiKiroku kiroku, int j, KoukouKirokuTeam t) {
     final int c = t.daihyou - 1;
     final String daihyou = (t.daihyou >= 1 && c < koukouChikuMei.length) ? '　地区代表(${koukouChikuMei[c]})' : '';
-    // 出場の回数目(記録を残し始めてからなので、2回目から出す。「3年連続5回目」「5回目」)
-    String kaime = '';
-    if (t.kaime >= 2) {
-      kaime = t.renzoku >= 2 ? '　${t.renzoku}年連続${t.kaime}回目' : '　${t.kaime}回目';
-    }
-    // 1位は優勝の回数目も(1.9.5)。出すときは、出場のほうに「の出場」を付けて「・」でつなぐ
-    final String yuushou = j == 0 ? _yuushouMoji(t) : '';
-    if (yuushou.isNotEmpty) {
-      kaime = kaime.isEmpty ? '　$yuushou' : '$kaimeの出場・$yuushou';
-    }
-    return '${j + 1}位　${_teamMei(kiroku, t)}　${TimeDate.timeToJikanFunByouString(t.time)}$daihyou$kaime';
+    // 出場の回数目(「初出場」「3年連続5回目」「5年ぶり3回目」)。1位は優勝の回数目も(1.9.5)
+    final String kaime = _shutsujouYuushouMoji(t, j == 0);
+    return '${j + 1}位　${_teamMei(kiroku, t)}　${TimeDate.timeToJikanFunByouString(t.time)}$daihyou'
+        '${kaime.isEmpty ? '' : '　$kaime'}';
   }
 
   // 走者の区間と区間順位(_kukanJuniMoji)は、高校のページでも使うので外に出した(1.9.5)
@@ -1561,7 +1583,8 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
       // 全国高校駅伝は優勝校だけ(優勝タイムと、その時点の優勝の回数目。下に大学に入った選手と進学先と区間順位)
       if (r.zenkoku.isNotEmpty) {
         final KoukouKirokuTeam yu = r.zenkoku.first;
-        final String yuushou = _yuushouMoji(yu);
+        // 初出場で優勝した高校は「初出場初優勝」(1.9.5)
+        final String yuushou = (yu.kaime == 1 && yu.yuushouKaime == 1) ? '初出場初優勝' : _yuushouMoji(yu);
         chokkin.add(
           const Padding(
             padding: EdgeInsets.only(left: 12, top: 4),

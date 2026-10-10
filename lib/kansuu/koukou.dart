@@ -1679,7 +1679,9 @@ Future<void> _hikitsugiKakikomi(List<_HikitsugiKekka> l, Map<int, SenshuData> se
 //     (目立って残った名前のない1・2年生。翌年以降の新入生に引き継ぐ候補。引き継いだら、その選手の
 //     種類・大学id・名前・選手のidを書き換え、学年はそのまま残す(画面で「(当時2年)」)。1.9.5)
 //     z の優勝校(1位)だけ、出場の回数目と連続出場の後ろに、その時点の優勝の回数目・連続優勝の年数・
-//     何年ぶり(連続でない2回目以上の優勝のとき。ほかは0)を書き足す(1.9.5。書き足す前の記録にはない)
+//     何年ぶり(連続でない2回目以上の優勝のとき。ほかは0)を書き足す(1.9.5。書き足す前の記録にはない)。
+//     ほかの高校のその3つは0。その後ろ([8])に、出場の何年ぶり(連続でない2回目以上の出場のとき。ほかは0)を
+//     全部の高校に書き足す(1.9.5。書き足す前の記録にはない)
 //     yo: [都道府県ごとに[出場校数, [[順位, 高校の番号, タイム(秒)]...]]](都道府県の番号の順。
 //     1.9.5の開発中の記録には、名前のないその他の高校も入っている。残す前の記録にはない)
 //     ch: [地区ごとに[[高校の番号, タイム(秒), 代表(1都道府県代表・2地区代表・0ほか)]...(着順)]]
@@ -2071,25 +2073,30 @@ List<int> _kaisuuList(Map<String, dynamic> kaisuuJson, String kagi, int shoki) {
 }
 
 /// 全国高校駅伝の1回分の出場校で、出場回数・連続出場・最後に出た年度を進める(1.9.5)
-/// [teams] はその回の z(着順の[高校の番号, 代表, タイム])。各チームの後ろに、その時点の回数目と連続を書き足す
+/// [teams] はその回の z(着順の[高校の番号, 代表, タイム])。各チームの後ろに、その時点の回数目と連続と、
+/// 出場の何年ぶり(連続でない2回目以上の出場のとき。ほかは0)を書き足す
+/// (回数目は[3]、連続は[4]、何年ぶりは[8]。[5]〜[7]は優勝校の優勝の回数目など(_yuushouKakitasu)で、ほかの高校は0)
 void _shutsujouSusumeru(int nendo, List<dynamic> teams, List<int> shutsujou, List<int> renzoku, List<int> saigo) {
   for (final dynamic t in teams) {
     if (t is! List || t.length < 3 || t.first is! num) continue;
     final int code = (t.first as num).toInt();
     if (code < 0 || code >= shutsujou.length) continue;
+    final int maeSaigo = saigo[code];
     shutsujou[code]++;
-    renzoku[code] = (saigo[code] == nendo - 1 && renzoku[code] > 0) ? renzoku[code] + 1 : 1;
+    renzoku[code] = (maeSaigo == nendo - 1 && renzoku[code] > 0) ? renzoku[code] + 1 : 1;
     saigo[code] = nendo;
+    // 出場の何年ぶり(1.9.5。「5年ぶり3回目」。回数を0に戻した高校は、最後に出た年度も消えているので0)
+    final int buri = (renzoku[code] == 1 && shutsujou[code] >= 2 && maeSaigo != _mishutsujou && nendo - maeSaigo >= 2)
+        ? nendo - maeSaigo
+        : 0;
     // t は数だけの一覧(List<int>)のこともあるので、1つずつ足す(型の決まらない一覧を addAll すると型のエラーになる)。
     // 優勝校の後ろ(5番目から)にある優勝の回数目などは消さない(数え直すときのため。1.9.5)
-    if (t.length >= 5) {
-      t[3] = shutsujou[code];
-      t[4] = renzoku[code];
-    } else {
-      t.removeRange(3, t.length);
-      t.add(shutsujou[code]);
-      t.add(renzoku[code]);
+    while (t.length < 9) {
+      t.add(0);
     }
+    t[3] = shutsujou[code];
+    t[4] = renzoku[code];
+    t[8] = buri;
   }
 }
 
@@ -2120,13 +2127,13 @@ void _yuushouKakitasu(int nendo, List<dynamic> z, List<int> yuushou, List<int> s
   final int saigo = saigoYuushou[code];
   final int buri = (renzoku == 1 && kaime >= 2 && saigo != _mishutsujou && nendo - saigo >= 2) ? nendo - saigo : 0;
   saigoYuushou[code] = nendo;
-  while (t.length < 5) {
+  // [5]〜[7]に書く([8]の出場の何年ぶりは消さない。1.9.5)
+  while (t.length < 8) {
     t.add(0);
   }
-  t.removeRange(5, t.length);
-  t.add(kaime);
-  t.add(renzoku);
-  t.add(buri);
+  t[5] = kaime;
+  t[6] = renzoku;
+  t[7] = buri;
 }
 
 /// 出場回数がまだないデータで、残っている大会の記録から数え直す(1.9.5。出場回数を足す前に作った記録のため)
@@ -2232,6 +2239,9 @@ class KoukouKirokuTeam {
   final int yuushouRenzoku;
   final int yuushouBuri;
 
+  /// 出場の何年ぶり(連続でない2回目以上の出場のとき。ほかと、書き足す前の記録は0。1.9.5)
+  final int shutsujouBuri;
+
   const KoukouKirokuTeam(
     this.kouCode,
     this.daihyou,
@@ -2242,6 +2252,7 @@ class KoukouKirokuTeam {
     this.yuushouKaime = 0,
     this.yuushouRenzoku = 0,
     this.yuushouBuri = 0,
+    this.shutsujouBuri = 0,
   });
 }
 
@@ -2521,6 +2532,7 @@ List<KoukouTaikaiKiroku> koukouTaikaiKirokuYomu() {
               yuushouKaime: t.length >= 8 && t[5] is num ? (t[5] as num).toInt() : 0,
               yuushouRenzoku: t.length >= 8 && t[6] is num ? (t[6] as num).toInt() : 0,
               yuushouBuri: t.length >= 8 && t[7] is num ? (t[7] as num).toInt() : 0,
+              shutsujouBuri: t.length >= 9 && t[8] is num ? (t[8] as num).toInt() : 0,
             ),
           );
         }

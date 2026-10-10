@@ -785,7 +785,15 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
   /// 選手の行(名前と高校、大学に入った選手は進学先。自分の大学に来た選手は色を変える)
   /// [kouAri] がfalseなら高校の名前を出さない(チームの走者の一覧のとき)
   /// 高校の名前は、その回の当時の名前([kiroku]。あとで校名を変えた高校は前の名前)
-  Widget _soushaGyou(KoukouTaikaiKiroku kiroku, String juni, KoukouKirokuSousha s, String time, {bool kouAri = true}) {
+  /// [chiisai] がtrueなら名前を小さめの字にする(直近の上位校の、優勝校の選手のとき)
+  Widget _soushaGyou(
+    KoukouTaikaiKiroku kiroku,
+    String juni,
+    KoukouKirokuSousha s,
+    String time, {
+    bool kouAri = true,
+    bool chiisai = false,
+  }) {
     final String kou = kiroku.kouMei(s.kouCode);
     String mei;
     String sub = '';
@@ -816,7 +824,7 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
             mei,
             style: TextStyle(
               color: jibun ? Colors.amber : HENSUU.textcolor,
-              fontSize: HENSUU.fontsize_honbun,
+              fontSize: chiisai ? HENSUU.fontsize_honbun - 2 : HENSUU.fontsize_honbun,
               fontWeight: s.namaeAri ? FontWeight.bold : FontWeight.normal,
             ),
           ),
@@ -886,6 +894,44 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
     ];
   }
 
+  /// 直近の上位校の、優勝校の大学に入った選手(区間の順、補欠は最後。1.9.5)
+  /// 名前のない選手(1・2年生、大学に入らなかった3年生、高校の留学生)は出さない。
+  /// 区間賞は、各区間の上位3人の1人目の高校で見る(1校1チームなので、高校と区間で決まる)。
+  /// 走者を残す前の記録では何も出さない
+  List<Widget> _yuushouMember(KoukouTaikaiKiroku kiroku, KoukouKirokuTeam t) {
+    final List<KoukouKirokuSousha>? m = t.member;
+    if (m == null) return const [];
+    final List<KoukouKirokuSousha> jun = [
+      for (final KoukouKirokuSousha s in m)
+        if (s.namaeAri) s,
+    ]..sort((a, b) => (a.kukan == 0 ? 99 : a.kukan).compareTo(b.kukan == 0 ? 99 : b.kukan));
+    if (jun.isEmpty) {
+      return const [
+        Padding(
+          padding: EdgeInsets.only(left: 36, top: 2),
+          child: Text('大学に入った選手はいません。', style: _hosoku),
+        ),
+      ];
+    }
+    final List<Widget> l = [];
+    for (final KoukouKirokuSousha s in jun) {
+      String juni = '補欠';
+      if (s.kukan >= 1) {
+        final int kk = s.kukan - 1;
+        final bool kukanShou =
+            kk < kiroku.kukan.length && kiroku.kukan[kk].isNotEmpty && kiroku.kukan[kk].first.kouCode == t.kouCode;
+        juni = kukanShou ? '${s.kukan}区(区間賞)' : '${s.kukan}区';
+      }
+      l.add(
+        Padding(
+          padding: const EdgeInsets.only(left: 24),
+          child: _soushaGyou(kiroku, juni, s, '', kouAri: false, chiisai: true),
+        ),
+      );
+    }
+    return l;
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_kiroku.isEmpty) {
@@ -905,7 +951,12 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
     final KoukouTaikaiKiroku k = _kiroku[erabu];
 
     // ---- 直近の上位校と優勝者 ----
-    final List<Widget> chokkin = [];
+    final List<Widget> chokkin = [
+      const Text(
+        '優勝校の下に、大学に入った選手と進学先を出しています。全員は下の「大会の結果」で見られます。',
+        style: _hosoku,
+      ),
+    ];
     for (final KoukouTaikaiKiroku r in _kiroku) {
       chokkin.add(_koMidashi(_kaiMei(r)));
       chokkin.add(
@@ -921,6 +972,8 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
             child: Text('${j + 1}位　${_teamMei(r, r.zenkoku[j])}', style: _honbun),
           ),
         );
+        // 優勝校は、大学に入った選手と進学先も(1.9.5)
+        if (j == 0) chokkin.addAll(_yuushouMember(r, r.zenkoku[0]));
       }
       for (int sh = 0; sh < r.soutai.length && sh < _shumokuMei.length; sh++) {
         if (r.soutai[sh].isEmpty) continue;

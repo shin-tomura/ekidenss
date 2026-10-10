@@ -214,7 +214,7 @@ class _MeimonShoukai extends StatelessWidget {
         Text(
           '全国高校駅伝の常連で、県外からも選手が集まる名門${meimon.length}校です。'
           'タイプによって、入ってくる選手の傾向が変わります。'
-          '出場回数と優勝回数は、毎年4月に新入生が入るときに増えます。',
+          '出場回数と優勝回数は、毎年4月上旬に新入生が入るときに増えます。',
           style: _honbun,
         ),
         const SizedBox(height: 12),
@@ -308,7 +308,7 @@ class _KenBetsu extends StatelessWidget {
     final List<Widget> l = [
       const Text(
         '名門度は名門・強豪・中堅・一般の4段階で、名門度が高い高校ほど、名前のない部員も強くなります。'
-        '出場回数と優勝回数は、記録を残し始めてからの回数で、毎年4月に新入生が入るときに増えます。',
+        '出場回数と優勝回数は、記録を残し始めてからの回数で、毎年4月上旬に新入生が入るときに増えます。',
         style: _honbun,
       ),
       const SizedBox(height: 6),
@@ -756,8 +756,8 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
     return '第${k.nyuugakuNendo + 75}回 $jiki($sedai)';
   }
 
-  /// 記録がいつ増えるかの注釈(実在の大会は秋に予選、12月に全国なので、ゲームの中の12月や1月に
-  /// 増えると思われないように、目立つ枠で出す。1.9.5)
+  /// 記録がいつ増えるかの注釈(実在の大会は秋に予選、12月に全国なので、その時期に増えると
+  /// 思われないように、増える時期を「4月上旬だけ」と言い切って、目立つ枠で出す。1.9.5)
   static Widget _jikiChuuki() {
     return Container(
       width: double.infinity,
@@ -767,9 +767,9 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
         borderRadius: BorderRadius.circular(6),
       ),
       child: const Text(
-        '高校の大会の記録は、毎年4月に新入生が入るときに増えます。'
-        'その世代が高校3年だった年度の、夏の高校総体と12月の全国高校駅伝の結果です。'
-        'ゲームの中の12月や1月には増えません。',
+        '高校の大会の記録は、毎年4月上旬に新入生が大学に入るときに、1回分がまとめて増えます。'
+        'ほかの時期には増えません。'
+        '増えるのは、その新入生たちが高校3年だった年度の、夏の高校総体と12月の全国高校駅伝の結果です。',
         style: TextStyle(color: Colors.orangeAccent, fontSize: HENSUU.fontsize_honbun - 1),
       ),
     );

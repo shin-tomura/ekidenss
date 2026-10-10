@@ -465,8 +465,10 @@ class Mode0100Content extends StatelessWidget {
                                   )
                                     if (nyuugakuji5000timejunSenshuData[i]
                                             .gakunen ==
-                                        1)
+                                        1) ...[
                                       Wrap(
+                                        // 小さい字の出身校が浮かないように下にそろえる(1.9.5)
+                                        crossAxisAlignment: WrapCrossAlignment.end,
                                         children: [
                                           Text(
                                             _timeToMinuteSecondString(
@@ -513,11 +515,33 @@ class Mode0100Content extends StatelessWidget {
                                               ),
                                               style: const TextStyle(
                                                 color: HENSUU.textcolor,
+                                                fontSize: HENSUU.fontsize_honbun - 2,
                                               ),
                                             ),
                                           ],
                                         ],
                                       ),
+                                      // 高校時代の一番の実績(1.9.5。なければ出さない)
+                                      if (koukouJissekiHitokoto(
+                                        nyuugakuji5000timejunSenshuData[i].samusataisei,
+                                        nyuugakuji5000timejunSenshuData[i].hirou,
+                                        kantoku,
+                                      ).isNotEmpty)
+                                        Padding(
+                                          padding: const EdgeInsets.only(left: 16, bottom: 4),
+                                          child: Text(
+                                            koukouJissekiHitokoto(
+                                              nyuugakuji5000timejunSenshuData[i].samusataisei,
+                                              nyuugakuji5000timejunSenshuData[i].hirou,
+                                              kantoku,
+                                            ),
+                                            style: const TextStyle(
+                                              color: HENSUU.textcolor,
+                                              fontSize: HENSUU.fontsize_honbun - 2,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
                                   // 全大学の新入生の進学先(交渉・志望・留学生)を見る(1.8.0)
                                   TextButton(
                                     onPressed: () {
@@ -586,6 +610,8 @@ class Mode0100Content extends StatelessWidget {
                                             .gakunen ==
                                         1) ...[
                                       Wrap(
+                                        // 小さい字の出身校が浮かないように下にそろえる(1.9.5)
+                                        crossAxisAlignment: WrapCrossAlignment.end,
                                         children: [
                                           Text(
                                             _timeToMinuteSecondString(
@@ -619,6 +645,7 @@ class Mode0100Content extends StatelessWidget {
                                               ),
                                               style: const TextStyle(
                                                 color: HENSUU.textcolor,
+                                                fontSize: HENSUU.fontsize_honbun - 2,
                                               ),
                                             ),
                                           ],

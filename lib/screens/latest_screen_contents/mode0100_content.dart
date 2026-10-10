@@ -37,6 +37,38 @@ String _dayToString(int day) {
   }
 }
 
+/// 新入生の一覧の、出身校と高校時代の一番の実績の行(1.9.5)
+/// 名前の行の下に、同じ字下げで出身校・実績の順に並べる(どちらもなければ何も出さない)
+List<Widget> _koukouGyou(SenshuData senshu, KantokuData kantoku) {
+  final String koukou = koukouIchiranMoji(
+    senshu.samusataisei,
+    senshu.hirou,
+    kantoku,
+  );
+  final String jisseki = koukouJissekiHitokoto(
+    senshu.samusataisei,
+    senshu.hirou,
+    kantoku,
+  );
+  if (koukou.isEmpty && jisseki.isEmpty) return const <Widget>[];
+  const TextStyle style = TextStyle(
+    color: HENSUU.textcolor,
+    fontSize: HENSUU.fontsize_honbun - 2,
+  );
+  return [
+    Padding(
+      padding: const EdgeInsets.only(left: 16, bottom: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (koukou.isNotEmpty) Text(koukou, style: style),
+          if (jisseki.isNotEmpty) Text(jisseki, style: style),
+        ],
+      ),
+    ),
+  ];
+}
+
 String _getCombinedDifficultyText(KantokuData kantoku, Ghensuu currentGhensuu) {
   // 難易度モードを取得 (0:通常, 1:極, 2:天)
   final int mode = kantoku.yobiint2[0];
@@ -467,8 +499,6 @@ class Mode0100Content extends StatelessWidget {
                                             .gakunen ==
                                         1) ...[
                                       Wrap(
-                                        // 小さい字の出身校が浮かないように下にそろえる(1.9.5)
-                                        crossAxisAlignment: WrapCrossAlignment.end,
                                         children: [
                                           Text(
                                             _timeToMinuteSecondString(
@@ -500,47 +530,13 @@ class Mode0100Content extends StatelessWidget {
                                               color: HENSUU.textcolor,
                                             ),
                                           ),
-                                          // 出身校(1.9.5。表示しない設定のときと留学生は出さない)
-                                          if (koukouIchiranMoji(
-                                            nyuugakuji5000timejunSenshuData[i].samusataisei,
-                                            nyuugakuji5000timejunSenshuData[i].hirou,
-                                            kantoku,
-                                          ).isNotEmpty) ...[
-                                            const SizedBox(width: 8),
-                                            Text(
-                                              koukouIchiranMoji(
-                                                nyuugakuji5000timejunSenshuData[i].samusataisei,
-                                                nyuugakuji5000timejunSenshuData[i].hirou,
-                                                kantoku,
-                                              ),
-                                              style: const TextStyle(
-                                                color: HENSUU.textcolor,
-                                                fontSize: HENSUU.fontsize_honbun - 2,
-                                              ),
-                                            ),
-                                          ],
                                         ],
                                       ),
-                                      // 高校時代の一番の実績(1.9.5。なければ出さない)
-                                      if (koukouJissekiHitokoto(
-                                        nyuugakuji5000timejunSenshuData[i].samusataisei,
-                                        nyuugakuji5000timejunSenshuData[i].hirou,
+                                      // 出身校と高校時代の一番の実績(1.9.5。表示しない設定のときと留学生は出さない)
+                                      ..._koukouGyou(
+                                        nyuugakuji5000timejunSenshuData[i],
                                         kantoku,
-                                      ).isNotEmpty)
-                                        Padding(
-                                          padding: const EdgeInsets.only(left: 16, bottom: 4),
-                                          child: Text(
-                                            koukouJissekiHitokoto(
-                                              nyuugakuji5000timejunSenshuData[i].samusataisei,
-                                              nyuugakuji5000timejunSenshuData[i].hirou,
-                                              kantoku,
-                                            ),
-                                            style: const TextStyle(
-                                              color: HENSUU.textcolor,
-                                              fontSize: HENSUU.fontsize_honbun - 2,
-                                            ),
-                                          ),
-                                        ),
+                                      ),
                                     ],
                                   // 全大学の新入生の進学先(交渉・志望・留学生)を見る(1.8.0)
                                   TextButton(
@@ -610,8 +606,6 @@ class Mode0100Content extends StatelessWidget {
                                             .gakunen ==
                                         1) ...[
                                       Wrap(
-                                        // 小さい字の出身校が浮かないように下にそろえる(1.9.5)
-                                        crossAxisAlignment: WrapCrossAlignment.end,
                                         children: [
                                           Text(
                                             _timeToMinuteSecondString(
@@ -630,47 +624,13 @@ class Mode0100Content extends StatelessWidget {
                                               color: HENSUU.textcolor,
                                             ),
                                           ),
-                                          // 出身校(1.9.5)
-                                          if (koukouIchiranMoji(
-                                            nyuugakuji5000timejununivfilteredsenshudata[i].samusataisei,
-                                            nyuugakuji5000timejununivfilteredsenshudata[i].hirou,
-                                            kantoku,
-                                          ).isNotEmpty) ...[
-                                            const SizedBox(width: 8),
-                                            Text(
-                                              koukouIchiranMoji(
-                                                nyuugakuji5000timejununivfilteredsenshudata[i].samusataisei,
-                                                nyuugakuji5000timejununivfilteredsenshudata[i].hirou,
-                                                kantoku,
-                                              ),
-                                              style: const TextStyle(
-                                                color: HENSUU.textcolor,
-                                                fontSize: HENSUU.fontsize_honbun - 2,
-                                              ),
-                                            ),
-                                          ],
                                         ],
                                       ),
-                                      // 高校時代の一番の実績(1.9.5。なければ出さない)
-                                      if (koukouJissekiHitokoto(
-                                        nyuugakuji5000timejununivfilteredsenshudata[i].samusataisei,
-                                        nyuugakuji5000timejununivfilteredsenshudata[i].hirou,
+                                      // 出身校と高校時代の一番の実績(1.9.5。表示しない設定のときと留学生は出さない)
+                                      ..._koukouGyou(
+                                        nyuugakuji5000timejununivfilteredsenshudata[i],
                                         kantoku,
-                                      ).isNotEmpty)
-                                        Padding(
-                                          padding: const EdgeInsets.only(left: 16, bottom: 4),
-                                          child: Text(
-                                            koukouJissekiHitokoto(
-                                              nyuugakuji5000timejununivfilteredsenshudata[i].samusataisei,
-                                              nyuugakuji5000timejununivfilteredsenshudata[i].hirou,
-                                              kantoku,
-                                            ),
-                                            style: const TextStyle(
-                                              color: HENSUU.textcolor,
-                                              fontSize: HENSUU.fontsize_honbun - 2,
-                                            ),
-                                          ),
-                                        ),
+                                      ),
                                     ],
                                 ] else if (currentGhensuu.mode == 100 &&
                                     currentGhensuu.month == 3 &&

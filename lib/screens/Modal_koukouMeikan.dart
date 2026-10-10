@@ -749,8 +749,11 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
   /// 回の名前(「第78回(3年入学の世代)」。年度に75を足した数を回にする)
   /// 回の名前(「第78回 2年12月(3年入学の世代)」。年度に75を足した数を回にする。
   /// 全国高校駅伝は、その世代が大学に入る前の年の12月。ゲーム開始前の大会は「ゲーム開始前の大会」)
-  String _kaiMei(KoukouTaikaiKiroku k) {
-    final String sedai = k.nyuugakuNendo >= 1 ? '${k.nyuugakuNendo}年入学の世代' : 'ゲーム開始時の在学生の世代';
+  /// [imaGakunen] が1以上なら、かっこの中を今の学年にする(「(今の1年生の世代)」。在学生の世代の欄のとき)
+  String _kaiMei(KoukouTaikaiKiroku k, {int imaGakunen = 0}) {
+    final String sedai = imaGakunen >= 1
+        ? '今の$imaGakunen年生の世代'
+        : (k.nyuugakuNendo >= 1 ? '${k.nyuugakuNendo}年入学の世代' : 'ゲーム開始時の在学生の世代');
     final int taikaiNen = k.nyuugakuNendo - 1;
     final String jiki = taikaiNen >= 1 ? '$taikaiNen年12月' : 'ゲーム開始前の大会';
     return '第${k.nyuugakuNendo + 75}回 $jiki($sedai)';
@@ -872,6 +875,29 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
     return '${j + 1}位　${_teamMei(kiroku, t)}　${TimeDate.timeToJikanFunByouString(t.time)}$daihyou$kaime';
   }
 
+  /// 走者の区間と区間順位(「3区(区間賞)」「3区(区間5位)」。補欠は「補欠」。1.9.5)
+  /// 区間順位を残す前の記録では、各区間の上位3人の記録に、そのチームの高校があれば順位を出す
+  /// (1校1チームなので、高校と区間で決まる)
+  String _kukanJuniMoji(KoukouTaikaiKiroku kiroku, KoukouKirokuTeam t, KoukouKirokuSousha s) {
+    if (s.kukan < 1) return '補欠';
+    int juni = s.kukanJuni;
+    if (juni < 1) {
+      final int kk = s.kukan - 1;
+      if (kk < kiroku.kukan.length) {
+        final List<KoukouKirokuSousha> ue = kiroku.kukan[kk];
+        for (int i = 0; i < ue.length; i++) {
+          if (ue[i].kouCode == t.kouCode) {
+            juni = i + 1;
+            break;
+          }
+        }
+      }
+    }
+    if (juni == 1) return '${s.kukan}区(区間賞)';
+    if (juni >= 2) return '${s.kukan}区(区間$juni位)';
+    return '${s.kukan}区';
+  }
+
   /// チームの走者(区間の順、補欠は最後)
   List<Widget> _teamMember(KoukouTaikaiKiroku kiroku, int j, KoukouKirokuTeam t) {
     final List<KoukouKirokuSousha>? m = t.member;
@@ -886,7 +912,7 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
       for (final KoukouKirokuSousha s in jun)
         _soushaGyou(
           kiroku,
-          s.kukan >= 1 ? '${s.kukan}区' : '補欠',
+          _kukanJuniMoji(kiroku, t, s),
           s,
           s.kukan >= 1 ? TimeDate.timeToFunByouString(s.time) : '',
           kouAri: false,
@@ -894,11 +920,10 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
     ];
   }
 
-  /// 直近の上位校の、優勝校の大学に入った選手(区間の順、補欠は最後。1.9.5)
+  /// 在学生の世代の上位3校の、大学に入った選手(区間の順、補欠は最後。区間と区間順位も。1.9.5)
   /// 名前のない選手(1・2年生、大学に入らなかった3年生、高校の留学生)は出さない。
-  /// 区間賞は、各区間の上位3人の1人目の高校で見る(1校1チームなので、高校と区間で決まる)。
   /// 走者を残す前の記録では何も出さない
-  List<Widget> _yuushouMember(KoukouTaikaiKiroku kiroku, KoukouKirokuTeam t) {
+  List<Widget> _jouiMember(KoukouTaikaiKiroku kiroku, KoukouKirokuTeam t) {
     final List<KoukouKirokuSousha>? m = t.member;
     if (m == null) return const [];
     final List<KoukouKirokuSousha> jun = [
@@ -913,23 +938,13 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
         ),
       ];
     }
-    final List<Widget> l = [];
-    for (final KoukouKirokuSousha s in jun) {
-      String juni = '補欠';
-      if (s.kukan >= 1) {
-        final int kk = s.kukan - 1;
-        final bool kukanShou =
-            kk < kiroku.kukan.length && kiroku.kukan[kk].isNotEmpty && kiroku.kukan[kk].first.kouCode == t.kouCode;
-        juni = kukanShou ? '${s.kukan}区(区間賞)' : '${s.kukan}区';
-      }
-      l.add(
+    return [
+      for (final KoukouKirokuSousha s in jun)
         Padding(
           padding: const EdgeInsets.only(left: 24),
-          child: _soushaGyou(kiroku, juni, s, '', kouAri: false, chiisai: true),
+          child: _soushaGyou(kiroku, _kukanJuniMoji(kiroku, t, s), s, '', kouAri: false, chiisai: true),
         ),
-      );
-    }
-    return l;
+    ];
   }
 
   @override
@@ -950,15 +965,22 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
     final int erabu = _erabu.clamp(0, _kiroku.length - 1).toInt();
     final KoukouTaikaiKiroku k = _kiroku[erabu];
 
-    // ---- 直近の上位校と優勝者 ----
+    // ---- 在学生の世代の上位校と優勝者(1.9.5) ----
+    // 一番新しい記録を今の1年生の世代として、そこから4回分(記録は新入生が入るときに増え、
+    // 同じときに4年生が卒業するので、今の日付を見なくても在学生とずれない。途中の年の記録が
+    // 欠けていても、卒業した世代は出さない)
+    final int saishinNendo = _kiroku.first.nyuugakuNendo;
     final List<Widget> chokkin = [
       const Text(
-        '優勝校の下に、大学に入った選手と進学先を出しています。全員は下の「大会の結果」で見られます。',
+        '上位3校の下に、大学に入った選手と進学先を出しています。'
+        '全員の走者と、それより前の回は、下の「大会の結果」で見られます。',
         style: _hosoku,
       ),
     ];
     for (final KoukouTaikaiKiroku r in _kiroku) {
-      chokkin.add(_koMidashi(_kaiMei(r)));
+      final int imaGakunen = saishinNendo - r.nyuugakuNendo + 1;
+      if (imaGakunen < 1 || imaGakunen > 4) continue;
+      chokkin.add(_koMidashi(_kaiMei(r, imaGakunen: imaGakunen)));
       chokkin.add(
         const Padding(
           padding: EdgeInsets.only(left: 12, top: 4),
@@ -972,8 +994,8 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
             child: Text('${j + 1}位　${_teamMei(r, r.zenkoku[j])}', style: _honbun),
           ),
         );
-        // 優勝校は、大学に入った選手と進学先も(1.9.5)
-        if (j == 0) chokkin.addAll(_yuushouMember(r, r.zenkoku[0]));
+        // 上位3校は、大学に入った選手と進学先と区間順位も(1.9.5)
+        chokkin.addAll(_jouiMember(r, r.zenkoku[j]));
       }
       for (int sh = 0; sh < r.soutai.length && sh < _shumokuMei.length; sh++) {
         if (r.soutai[sh].isEmpty) continue;
@@ -1012,7 +1034,7 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
         style: _honbun,
       ),
       const SizedBox(height: 8),
-      _Oritatami(midashi: '直近の上位校と優勝者', naka: chokkin, hajimeHiraku: true),
+      _Oritatami(midashi: '在学生の世代の上位校と優勝者', naka: chokkin, hajimeHiraku: true),
       if (tsuyoi.isNotEmpty)
         _Oritatami(
           midashi: '全国高校駅伝の優勝回数',

@@ -710,7 +710,19 @@ _Team _haichi(int koukou, List<_Kousei> bu, Random r) {
   return _Team(koukou, hashiru, hoketsu);
 }
 
+/// 並べる前のチームの順(同じタイムのときの最後の決め手。1.9.5)
+Map<_Team, int> _motoJun(List<_Team> teams) => {for (int i = 0; i < teams.length; i++) teams[i]: i};
+
+/// 同じタイムのときのチームの順(1.9.5): 高校の番号の小さい順。それも同じ(同じ都道府県のその他の高校)なら、
+/// 並べる前の順([motoJun]。名簿と都道府県の順なので毎回同じ)。順位が必ず1つに決まるようにする
+int _onajiTimeJun(_Team a, _Team b, Map<_Team, int> motoJun) {
+  final int c = _teamCode(a).compareTo(_teamCode(b));
+  if (c != 0) return c;
+  return (motoJun[a] ?? 0).compareTo(motoJun[b] ?? 0);
+}
+
 /// 駅伝を走らせる(チームの順に並べ替え、区間ごとの順位を返す。区間順位は[kukan][チームの並び])
+/// 同じタイムのときは _onajiTimeJun の順(チームの順位も区間順位も。1.9.5)
 List<List<int>> _ekiden(List<_Team> teams, List<_Kukan> kukan, Random r) {
   for (final _Team t in teams) {
     t.times = [for (int kk = 0; kk < t.ku.length; kk++) _kukanTime(t.ku[kk], kk, kukan, r)];
@@ -718,13 +730,20 @@ List<List<int>> _ekiden(List<_Team> teams, List<_Kukan> kukan, Random r) {
     // 7人そろわないチーム(普通は起きない)は最後にする
     if (t.ku.length < 7) t.goukei += 99999;
   }
-  teams.sort((a, b) => a.goukei.compareTo(b.goukei));
+  final Map<_Team, int> motoJun = _motoJun(teams);
+  teams.sort((a, b) {
+    final int c = a.goukei.compareTo(b.goukei);
+    return c != 0 ? c : _onajiTimeJun(a, b, motoJun);
+  });
   final List<List<int>> kj = [];
   for (int kk = 0; kk < 7; kk++) {
     final List<int> idx = [
       for (int i = 0; i < teams.length; i++)
         if (teams[i].ku.length > kk) i,
-    ]..sort((a, b) => teams[a].times[kk].compareTo(teams[b].times[kk]));
+    ]..sort((a, b) {
+        final int c = teams[a].times[kk].compareTo(teams[b].times[kk]);
+        return c != 0 ? c : _onajiTimeJun(teams[a], teams[b], motoJun);
+      });
     final List<int> juni = List<int>.filled(teams.length, 0);
     for (int j = 0; j < idx.length; j++) {
       juni[idx[j]] = j;
@@ -947,7 +966,12 @@ Map<int, KoukouJouhou> _nendoKeisan(List<SenshuData> shinnyuusei, Random r, [Map
   final Map<_Team, int> chikuDaihyou = {}; // 地区代表の地区の番号(大会の記録に書く。1.9.5)
   for (int c = 0; c < chikuNi.length; c++) {
     if (chikuNi[c].isEmpty) continue;
-    chikuNi[c].sort((a, b) => a.goukei.compareTo(b.goukei));
+    // 同じタイムなら _onajiTimeJun の順(1.9.5)
+    final Map<_Team, int> chikuJun = _motoJun(chikuNi[c]);
+    chikuNi[c].sort((a, b) {
+      final int s = a.goukei.compareTo(b.goukei);
+      return s != 0 ? s : _onajiTimeJun(a, b, chikuJun);
+    });
     zenkoku.add(chikuNi[c].first);
     chikuDaihyou[chikuNi[c].first] = c;
   }
@@ -967,26 +991,32 @@ Map<int, KoukouJouhou> _nendoKeisan(List<SenshuData> shinnyuusei, Random r, [Map
       for (final _Team t in zenkokuTeams)
         <dynamic>[_teamCode(t), daihyou[t] ?? 0, t.goukei.round()],
     ];
+    // 区間の上位3人は、区間順位(zkj)の順に選ぶ(同じタイムのときも、区間順位と同じ順になる。1.9.5)
     kirokuOut['k'] = [
-      for (int kk = 0; kk < _zenkokuKukan.length; kk++)
+      for (int kk = 0; kk < _zenkokuKukan.length && kk < zkj.length; kk++)
         [
-          for (final _Team t in ([
-            for (final _Team t2 in zenkokuTeams)
-              if (t2.ku.length > kk) t2,
-          ]..sort((a, b) => a.times[kk].compareTo(b.times[kk])))
+          for (final int ti in ([
+            for (int i = 0; i < zenkokuTeams.length; i++)
+              if (zenkokuTeams[i].ku.length > kk) i,
+          ]..sort((a, b) => zkj[kk][a].compareTo(zkj[kk][b])))
               .take(3))
-            _soushaKiroku(t.ku[kk], t.times[kk]),
+            _soushaKiroku(zenkokuTeams[ti].ku[kk], zenkokuTeams[ti].times[kk]),
         ],
     ];
     kirokuOut['ky'] = kenYuushou;
     // 各チームの走者(1.9.5): 8位までは7人全員、9位以下は大学に入った選手だけ。
-    // 選手の後ろに区間(1〜7。補欠は0)を付ける。大学に入った補欠も入れる
+    // 選手の後ろに区間(1〜7。補欠は0)を付ける。大学に入った補欠も入れる。
+    // 走った選手は、その後ろに区間順位(zkj から。選手の高校時代の実績と同じ順位)も付ける(1.9.5)
     kirokuOut['m'] = [
       for (int j = 0; j < zenkokuTeams.length; j++)
         [
           for (int kk = 0; kk < zenkokuTeams[j].ku.length; kk++)
             if (j < 8 || zenkokuTeams[j].ku[kk].s != null)
-              [..._soushaKiroku(zenkokuTeams[j].ku[kk], zenkokuTeams[j].times[kk]), kk + 1],
+              [
+                ..._soushaKiroku(zenkokuTeams[j].ku[kk], zenkokuTeams[j].times[kk]),
+                kk + 1,
+                kk < zkj.length ? zkj[kk][j] + 1 : 0,
+              ],
           for (final _Kousei h in zenkokuTeams[j].hoketsu)
             if (h.s != null) [..._soushaKiroku(h, 0), 0],
         ],
@@ -1256,6 +1286,8 @@ Future<int> _koukouJouhouFuyoHontai() async {
 //     選手 = [種類(0大学に入った日本人・1大学に入った留学生・2名前のない日本人・3名前のない留学生),
 //            大学id, 学年, 名前, 高校の番号, タイム(0.1秒), 選手のid]
 //     高校の番号は名簿の番号、その他の高校は1000+都道府県の番号
+//     m: [チームごとに[選手 + 区間(1〜7。補欠は0) + 区間順位(走った選手だけ)]...](z と同じ並び)。
+//     区間順位は、順位を残す前の記録にはない(画面では上位3人の記録から分かる分だけ出す)
 //   ・優勝回数: {z: [全国高校駅伝の優勝回数(名簿の並び)], k: [都道府県予選の優勝回数]}
 // ・大学に入った選手の大学は、見るときに選手のidと名前が合えば今の大学を出す(スカウトで変わるため)。
 //   卒業した選手は、毎年の保存のときに直した大学を出す(_kirokuHozon)
@@ -1659,6 +1691,9 @@ class KoukouKirokuSousha {
   /// 走った区間(1〜7。補欠や区間のない記録は0。チームの走者のとき)
   final int kukan;
 
+  /// 区間順位(1〜。補欠や、順位を残す前の記録は0。チームの走者のとき。1.9.5)
+  final int kukanJuni;
+
   const KoukouKirokuSousha({
     required this.shurui,
     required this.univid,
@@ -1668,6 +1703,7 @@ class KoukouKirokuSousha {
     required this.time,
     required this.id,
     this.kukan = 0,
+    this.kukanJuni = 0,
   });
 
   bool get namaeAri => shurui <= 1;
@@ -1728,6 +1764,7 @@ KoukouKirokuSousha? _soushaYomu(dynamic a) {
     time: (a[5] as num).toDouble() / 10.0,
     id: a.length >= 7 && a[6] is num ? (a[6] as num).toInt() : -1,
     kukan: a.length >= 8 && a[7] is num ? (a[7] as num).toInt() : 0,
+    kukanJuni: a.length >= 9 && a[8] is num ? (a[8] as num).toInt() : 0,
   );
 }
 

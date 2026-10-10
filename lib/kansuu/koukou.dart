@@ -1962,3 +1962,122 @@ String koukouCodeMei(int code) {
 
 /// 全国高校駅伝の区間の距離(m)
 double koukouZenkokuKukanKyori(int kk) => (kk >= 0 && kk < _zenkokuKukan.length) ? _zenkokuKukan[kk].kyori : 0;
+
+// ------------------------------------------------------------
+// スカウト画面の、高校時代(直近の大会)のフィルターと大会の結果(1.9.5)
+// ・スカウトの候補は4月5日に入った新入生で、その世代の大会の記録は同じ日に保存してある(一番新しい回)
+// ・所属高校の全国高校駅伝の順位(走っていない部員も)、区間順位、高校総体の決勝の順位(掛け持ちの種目も)を、
+//   今年度に大学に入った世代の回から読む。その回がなければ(古いデータ)、選手の高校時代の実績から分かる分だけ
+// ------------------------------------------------------------
+
+/// 今の年度(スカウト画面から、今年の新入生の世代の回を探すのに使う。1.9.5)
+int? koukouImaNoNendo() => _imaNoNendo();
+
+/// 高校名のフィルター(1.9.5): 校名か都道府県に[moji]が入っているか(空なら当たり)
+/// (校名は「高」の付いた名前で、都道府県は「県」「府」「都」の付いた名前で見るので、どちらの書き方でも当たる)
+bool koukouMeiAtaru(KoukouJouhou j, String moji) {
+  final String k = moji.trim();
+  if (k.isEmpty) return true;
+  final KoukouMei? m = j.mei;
+  if (m == null) return false;
+  final String ken = (m.ken >= 0 && m.ken < LocationDatabase.allPrefectures.length)
+      ? LocationDatabase.allPrefectures[m.ken]
+      : '';
+  return '${m.mei}高'.contains(k) || ken.contains(k);
+}
+
+/// 今年度に大学に入った世代(スカウトの候補)の、直近の大会の成績(1.9.5)
+class KoukouSaishinSeiseki {
+  /// 今年度の世代の大会の記録があるか
+  final bool kirokuAri;
+
+  /// 全国高校駅伝の高校の順位(名簿の高校の番号 → 順位)
+  final Map<int, int> _teamJuni;
+
+  /// 全国高校駅伝の区間順位(選手id → 順位。区間順位を残す前の記録にはない)
+  final Map<int, int> _kukanJuni;
+
+  /// 高校総体の決勝の順位(種目(0=1500m・1=5000m・2=3000m障害)ごとに、選手id → 順位)
+  final List<Map<int, int>> _soutaiJuni;
+
+  /// 記録の選手の名前(選手id → 名前。別の選手とidが重ならないように、名前も合わせて見る)
+  final Map<int, String> _namae;
+
+  KoukouSaishinSeiseki._(this.kirokuAri, this._teamJuni, this._kukanJuni, this._soutaiJuni, this._namae);
+
+  bool _onaji(SenshuData s) => _namae[s.id] == s.name;
+
+  /// 所属高校の全国高校駅伝の順位(0は出ていない)。
+  /// 記録がなければ、選手がチームにいたときのチームの順位(31位以下は99)
+  int teamJuni(SenshuData s) {
+    final KoukouJouhou j = KoukouJouhou.yomu(s.samusataisei);
+    if (j.koukou < 1) return 0;
+    if (kirokuAri) return _teamJuni[j.koukou - 1] ?? 0;
+    if (!j.ekidenZenkoku || j.ekidenJuni < 1) return 0;
+    return j.ekidenJuni >= 31 ? 99 : j.ekidenJuni;
+  }
+
+  /// 全国高校駅伝の区間順位(0は走っていない)。
+  /// 記録に区間順位がなければ、選手の高校時代の実績から(31位以下は99)
+  int kukanJuni(SenshuData s) {
+    if (kirokuAri && _onaji(s)) {
+      final int? v = _kukanJuni[s.id];
+      if (v != null) return v;
+    }
+    final KoukouJouhou j = KoukouJouhou.yomu(s.samusataisei);
+    if (!j.ekidenZenkoku || j.ekidenKukan < 1 || j.ekidenKukanJuni < 1) return 0;
+    return j.ekidenKukanJuni >= 31 ? 99 : j.ekidenKukanJuni;
+  }
+
+  /// 高校総体の決勝の順位([shumoku] 0=1500m・1=5000m・2=3000m障害。0は決勝に出ていない)。
+  /// 記録がなければ、選手の高校時代の実績(一番良い種目だけ)から
+  int soutaiJuni(SenshuData s, int shumoku) {
+    if (kirokuAri) {
+      if (!_onaji(s) || shumoku < 0 || shumoku >= _soutaiJuni.length) return 0;
+      return _soutaiJuni[shumoku][s.id] ?? 0;
+    }
+    final KoukouJouhou j = KoukouJouhou.yomu(s.samusataisei);
+    if (j.soutaiShumoku == shumoku + 1 && j.soutaiDankai == 3 && j.soutaiJuni >= 1) return j.soutaiJuni;
+    return 0;
+  }
+}
+
+/// 今年度に大学に入った世代の、直近の大会の成績を読む(1.9.5。スカウト画面のフィルター)
+KoukouSaishinSeiseki koukouSaishinSeisekiYomu() {
+  final int? nendo = _imaNoNendo();
+  KoukouTaikaiKiroku? k;
+  if (nendo != null) {
+    for (final KoukouTaikaiKiroku r in koukouTaikaiKirokuYomu()) {
+      if (r.nyuugakuNendo == nendo) {
+        k = r;
+        break;
+      }
+    }
+  }
+  final Map<int, int> team = {};
+  final Map<int, int> kukan = {};
+  final List<Map<int, int>> soutai = [<int, int>{}, <int, int>{}, <int, int>{}];
+  final Map<int, String> namae = {};
+  if (k != null) {
+    for (int i = 0; i < k.zenkoku.length; i++) {
+      final int code = k.zenkoku[i].kouCode;
+      if (code >= 0 && code < 1000) team.putIfAbsent(code, () => i + 1);
+      final List<KoukouKirokuSousha>? m = k.zenkoku[i].member;
+      if (m == null) continue;
+      for (final KoukouKirokuSousha s in m) {
+        if (!s.namaeAri || s.id < 0) continue;
+        namae[s.id] = s.name;
+        if (s.kukan >= 1 && s.kukanJuni >= 1) kukan[s.id] = s.kukanJuni;
+      }
+    }
+    for (int sh = 0; sh < k.soutai.length && sh < soutai.length; sh++) {
+      for (int j = 0; j < k.soutai[sh].length; j++) {
+        final KoukouKirokuSousha s = k.soutai[sh][j];
+        if (!s.namaeAri || s.id < 0) continue;
+        namae[s.id] = s.name;
+        soutai[sh].putIfAbsent(s.id, () => j + 1);
+      }
+    }
+  }
+  return KoukouSaishinSeiseki._(k != null, team, kukan, soutai, namae);
+}

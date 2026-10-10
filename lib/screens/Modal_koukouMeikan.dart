@@ -222,6 +222,7 @@ class _MeimonShoukai extends StatelessWidget {
             meibo[i],
             i < kai.zenkoku.length ? kai.zenkoku[i] : 0,
             i < kai.ken.length ? kai.ken[i] : 0,
+            i < kai.shutsujou.length ? kai.shutsujou[i] : 0,
           ),
         const SizedBox(height: 8),
         const _Chuuki(),
@@ -229,7 +230,7 @@ class _MeimonShoukai extends StatelessWidget {
     );
   }
 
-  Widget _kaadoWidget(KoukouMei m, int zenkokuKai, int kenKai) {
+  Widget _kaadoWidget(KoukouMei m, int zenkokuKai, int kenKai, int shutsujouKai) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
@@ -277,7 +278,11 @@ class _MeimonShoukai extends StatelessWidget {
             style: _hosoku,
           ),
           Text(
-            '優勝回数: 全国高校駅伝 $zenkokuKai回・都道府県予選 $kenKai回',
+            '全国高校駅伝: 出場$shutsujouKai回・優勝$zenkokuKai回',
+            style: _hosoku,
+          ),
+          Text(
+            '都道府県予選優勝: $kenKai回',
             style: _hosoku,
           ),
         ],
@@ -305,7 +310,7 @@ class _KenBetsu extends StatelessWidget {
     final List<Widget> l = [
       const Text(
         '名門度は名門・強豪・中堅・一般の4段階で、名門度が高い高校ほど、名前のない部員も強くなります。'
-        '優勝回数は、記録を残し始めてからの回数です。',
+        '出場回数と優勝回数は、記録を残し始めてからの回数です。',
         style: _honbun,
       ),
       const SizedBox(height: 6),
@@ -355,6 +360,7 @@ class _KenBetsu extends StatelessWidget {
               meibo[i],
               i < kai.zenkoku.length ? kai.zenkoku[i] : 0,
               i < kai.ken.length ? kai.ken[i] : 0,
+              i < kai.shutsujou.length ? kai.shutsujou[i] : 0,
               henkou.contains(i),
             ),
           );
@@ -407,7 +413,7 @@ class _KenBetsu extends StatelessWidget {
     if (kawatta == true) onHenkou();
   }
 
-  Widget _gyou(BuildContext context, int i, KoukouMei m, int zenkokuKai, int kenKai, bool henkouAri) {
+  Widget _gyou(BuildContext context, int i, KoukouMei m, int zenkokuKai, int kenKai, int shutsujouKai, bool henkouAri) {
     final bool meimon = m.meimon == 3;
     return InkWell(
       onTap: () => _henshuu(context, i),
@@ -439,10 +445,11 @@ class _KenBetsu extends StatelessWidget {
             _iroFuda(m.iro),
             if (m.ryuugakusei) _fuda('留学生あり', HENSUU.textcolor),
             if (henkouAri) _fuda('変更', Colors.lightBlueAccent),
-            // 優勝回数(1回以上のときだけ)
+            // 出場回数と優勝回数(1回以上のときだけ)
+            if (shutsujouKai > 0) Text('全国出場$shutsujouKai回', style: _hosoku),
             if (zenkokuKai > 0)
               Text('全国優勝$zenkokuKai回', style: const TextStyle(color: _kin, fontSize: HENSUU.fontsize_honbun - 2)),
-            if (kenKai > 0) Text('予選優勝$kenKai回', style: _hosoku),
+            if (kenKai > 0) Text('都道府県予選優勝$kenKai回', style: _hosoku),
           ],
         ),
       ),
@@ -758,6 +765,8 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
 
   String _teamMei(KoukouKirokuTeam t) => koukouCodeMei(t.kouCode);
 
+  int _kaisuu(List<int> l, int i) => i < l.length ? l[i] : 0;
+
   String _kukanKyori(int kk) {
     final double m = koukouZenkokuKukanKyori(kk);
     final String km = (m / 1000).toStringAsFixed(4).replaceFirst(RegExp(r'0+$'), '').replaceFirst(RegExp(r'\.$'), '');
@@ -768,7 +777,12 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
   String _teamMidashi(int j, KoukouKirokuTeam t) {
     final int c = t.daihyou - 1;
     final String daihyou = (t.daihyou >= 1 && c < koukouChikuMei.length) ? '　地区代表(${koukouChikuMei[c]})' : '';
-    return '${j + 1}位　${_teamMei(t)}　${TimeDate.timeToJikanFunByouString(t.time)}$daihyou';
+    // 出場の回数目(記録を残し始めてからなので、2回目から出す。「3年連続5回目」「5回目」)
+    String kaime = '';
+    if (t.kaime >= 2) {
+      kaime = t.renzoku >= 2 ? '　${t.renzoku}年連続${t.kaime}回目' : '　${t.kaime}回目';
+    }
+    return '${j + 1}位　${_teamMei(t)}　${TimeDate.timeToJikanFunByouString(t.time)}$daihyou$kaime';
   }
 
   /// チームの走者(区間の順、補欠は最後)
@@ -843,6 +857,17 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
         return s2 != 0 ? s2 : a.compareTo(b);
       });
 
+    // ---- 出場回数の多い高校 ----
+    final List<int> ooi = [
+      for (int i = 0; i < _kai.zenkoku.length; i++)
+        if (_kaisuu(_kai.shutsujou, i) > 0) i,
+    ]..sort((a, b) {
+        final int s = _kaisuu(_kai.shutsujou, b).compareTo(_kaisuu(_kai.shutsujou, a));
+        if (s != 0) return s;
+        final int s2 = _kai.zenkoku[b].compareTo(_kai.zenkoku[a]);
+        return s2 != 0 ? s2 : a.compareTo(b);
+      });
+
     final List<Widget> l = [
       const Text(
         '新入生の世代ごとに、高校3年のときの全国高校駅伝と高校総体の結果を、直近10回分残しています。'
@@ -860,7 +885,23 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
               Padding(
                 padding: const EdgeInsets.only(left: 12, top: 4),
                 child: Text(
-                  '${koukouCodeMei(i)}　${_kai.zenkoku[i]}回(都道府県予選 ${_kai.ken[i]}回)',
+                  '${koukouCodeMei(i)}　優勝${_kai.zenkoku[i]}回'
+                  '(出場${_kaisuu(_kai.shutsujou, i)}回・都道府県予選優勝${_kai.ken[i]}回)',
+                  style: _honbun,
+                ),
+              ),
+          ],
+        ),
+      if (ooi.isNotEmpty)
+        _Oritatami(
+          midashi: '全国高校駅伝の出場回数',
+          naka: [
+            const Text('記録を残し始めてからの回数です。', style: _hosoku),
+            for (final int i in ooi.take(10))
+              Padding(
+                padding: const EdgeInsets.only(left: 12, top: 4),
+                child: Text(
+                  '${koukouCodeMei(i)}　出場${_kaisuu(_kai.shutsujou, i)}回(優勝${_kai.zenkoku[i]}回)',
                   style: _honbun,
                 ),
               ),

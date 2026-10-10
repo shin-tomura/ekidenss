@@ -23,10 +23,18 @@ class Prediction {
 }
 
 // 予想陣の予想(1.9.4で、オッシーと王太郎の計算を区間ごとの見込みタイムに変えた)
-// ・オッシー(基本走力重視): 区間の距離を基本走力だけで走ったときの見込みタイム(試走の計算の、能力の補正の前)の合計
-// ・父ちゃん(総合評価): 区間の距離に合った種目の持ちタイムに、登り・下り・アップダウンの能力をコースで重み付けした点の合計(1.9.3まで通り)
-// ・王太郎(持ちタイム重視): 自己ベスト(区間の距離に合った種目。なければほかの種目から換算)を区間の距離に換算したタイムの合計
-//   (1.9.3までは入学時の5000mの合計だったが、成長を見ないので当たらなかった)
+// 1.9.5で、3人の予想が似すぎないよう、それぞれに見方の癖を付けた(父ちゃんが一番当たる役)
+// ・オッシー(基本走力・エース重視): 区間の距離を基本走力だけで走ったときの見込みタイム(試走の計算の、
+//   能力の補正の前)で、区間(組)ごとに全選手の中の順位を出し、順位(0から)の平方根の合計が小さい順。
+//   区間の上位どうしの差を大きく、下位どうしの差を小さく見るので、区間上位の選手がいる大学を高く見る
+//   (1.9.4は見込みタイムの合計)
+// ・父ちゃん(総合評価・層の厚さ重視): 区間の距離に合った種目の持ちタイムに、登り・下り・アップダウンの
+//   能力をコースで重み付けした点の合計(1.9.3まで通り)から、その区間の最高点との差が一番大きい選手の差を引く
+//   (ブレーキになりそうな区間を2回数える)
+// ・王太郎(夏のタイムトライアル重視): 夏の学内タイムトライアル(登り1万・下り1万・ロード1万・クロカン1万)の
+//   持ちタイムを、区間の登り・下り・平らの距離の割合で混ぜ、区間の距離に換算したタイムの合計(_otaroTTMikomiTime)。
+//   秋以降の伸びを見ないので、正月駅伝では秋に伸びた大学を低く見がち
+//   (1.9.3までは入学時の5000mの合計、1.9.4は自己ベストを区間の距離に換算したタイムの合計)
 List<double> kukanshou_bestscore_osshi = List.filled(
   TEISUU.SUU_MAXKUKANSUU,
   TEISUU.DEFAULTTIME,
@@ -78,6 +86,67 @@ double? _otaroMikomiTime(SenshuData s, double kyori) {
   }
   if (moto == null) return null;
   return moto * pow(kyori / motoKyori, 1.06).toDouble();
+}
+
+/// 夏の学内タイムトライアルの持ちタイム(time_bestkiroku の4=登り1万・5=下り1万・6=ロード1万・7=クロカン1万。なければnull)
+double? _natsuTTBest(SenshuData s, int idx) {
+  if (s.time_bestkiroku.length <= idx) return null;
+  final double t = s.time_bestkiroku[idx];
+  return (t > 0 && t < TEISUU.DEFAULTTIME) ? t : null;
+}
+
+/// 王太郎の予想に使う、選手の区間の見込みタイム(夏の学内タイムトライアルの持ちタイムから。1.9.5)
+/// 区間の登り([nobori])・下り([kudari])・平らの距離の割合で、登り1万・下り1万・平らの部分の記録を混ぜた
+/// 1万mのタイムを、距離の比の1.06乗で区間の距離に換算する。
+/// 平らの部分は、試走の計算のロード適性とペース変動対応力の効き方に合わせて、1区(正月駅伝予選は除く)と
+/// 11月駅伝予選はクロカン1万、2・3区と正月駅伝予選はロード1万とクロカン1万の平均、ほかはロード1万。
+/// その記録がない(1年生の最初の夏より前など)ときは、トラックの持ちタイムを1万mに換算した値で代用し、
+/// それもなければnull
+double? _otaroTTMikomiTime(
+  SenshuData s,
+  double kyori,
+  double nobori,
+  double kudari,
+  int race,
+  int kukan,
+) {
+  if (kyori <= 0) return null;
+  final double? track = _otaroMikomiTime(s, 10000.0);
+  double? kiroku(int idx) => _natsuTTBest(s, idx) ?? track;
+  double n = nobori.isNaN ? 0.0 : nobori.abs().clamp(0.0, 1.0).toDouble();
+  double k = kudari.isNaN ? 0.0 : kudari.abs().clamp(0.0, 1.0).toDouble();
+  if (n + k > 1.0) {
+    final double g = n + k;
+    n /= g;
+    k /= g;
+  }
+  final double f = 1.0 - n - k;
+  double ichiman = 0.0; // 1万mのタイム
+  if (n > 0) {
+    final double? t = kiroku(4);
+    if (t == null) return null;
+    ichiman += n * t;
+  }
+  if (k > 0) {
+    final double? t = kiroku(5);
+    if (t == null) return null;
+    ichiman += k * t;
+  }
+  if (f > 0) {
+    final double? road = kiroku(6);
+    final double? kurokan = kiroku(7);
+    double? t;
+    if ((race != 4 && kukan == 0) || race == 3) {
+      t = kurokan;
+    } else if (race == 4 || kukan == 1 || kukan == 2) {
+      t = (road != null && kurokan != null) ? (road + kurokan) / 2.0 : null;
+    } else {
+      t = road;
+    }
+    if (t == null) return null;
+    ichiman += f * t;
+  }
+  return ichiman * pow(kyori / 10000.0, 1.06).toDouble();
 }
 
 class Mode0330Content extends StatelessWidget {
@@ -158,6 +227,11 @@ class Mode0330Content extends StatelessWidget {
       kukanshou_bestscore_otaro[i] = TEISUU.DEFAULTTIME;
       kukanshou_bestscore_tochan[i] = -999999999.0;
     }
+    // オッシーと父ちゃんは、全大学の選手を見てから点を決めるので、選手ごとの値を残しておく(1.9.5)
+    final List<({int u, int k, double t})> osshiSenshu = [];
+    final List<({int u, int k, double t})> tochanSenshu = [];
+    // 出場選手のいる大学(並びは大学id順)と、父ちゃんの今までの合計点
+    final List<({int id, String name, double tochan})> shutsujou = [];
     // 各大学について計算
     for (final univ in sortedUnivData) {
       if (univ.taikaientryflag.length > raceNumber &&
@@ -204,6 +278,7 @@ class Mode0330Content extends StatelessWidget {
                 temp_osshi_score = _NEWaintFromNewbint(1580, senshu).toDouble();
               }
               osshiScore += temp_osshi_score;
+              osshiSenshu.add((u: univ.id, k: osshiKukan, t: temp_osshi_score));
               if (raceNumber == 4) {
                 if (temp_osshi_score > max1_osshiscore) {
                   max2_osshiscore = max1_osshiscore;
@@ -222,9 +297,28 @@ class Mode0330Content extends StatelessWidget {
                         .entrykukan_race[raceNumber][senshu.gakunen - 1]] =
                     senshu.id;
               }
-              // 王太郎：自己ベストを区間の距離に換算した見込みタイム(秒。小さい方が良い。1.9.4)
+              // 王太郎：夏の学内タイムトライアルの持ちタイムを、区間のコースに合わせて混ぜ、
+              // 区間の距離に換算した見込みタイム(秒。小さい方が良い。1.9.5)
               // (どの記録もない選手は、オッシーの見込みタイムで代用する)
-              temp_otaro_score = _otaroMikomiTime(senshu, osshiKyori) ?? temp_osshi_score;
+              final double otaroNobori =
+                  (gh[0].kyoriwariainobori_taikai_kukangoto.length > raceNumber &&
+                      gh[0].kyoriwariainobori_taikai_kukangoto[raceNumber].length > osshiKukan)
+                  ? gh[0].kyoriwariainobori_taikai_kukangoto[raceNumber][osshiKukan]
+                  : 0.0;
+              final double otaroKudari =
+                  (gh[0].kyoriwariaikudari_taikai_kukangoto.length > raceNumber &&
+                      gh[0].kyoriwariaikudari_taikai_kukangoto[raceNumber].length > osshiKukan)
+                  ? gh[0].kyoriwariaikudari_taikai_kukangoto[raceNumber][osshiKukan]
+                  : 0.0;
+              temp_otaro_score = _otaroTTMikomiTime(
+                    senshu,
+                    osshiKyori,
+                    otaroNobori,
+                    otaroKudari,
+                    raceNumber,
+                    osshiKukan,
+                  ) ??
+                  temp_osshi_score;
               otaroScore += temp_otaro_score;
               if (raceNumber == 4) {
                 if (temp_otaro_score > max1_otaroscore) {
@@ -379,6 +473,7 @@ class Mode0330Content extends StatelessWidget {
               }
               // 各選手の合計スコアを父ちゃんのスコアに加算
               tochanScore += totalScore;
+              tochanSenshu.add((u: univ.id, k: kukanIndex, t: totalScore));
               if (raceNumber == 4) {
                 if (temp_tochan_score < min1_tochanscore) {
                   //min2_tochanscore = min1_tochanscore;
@@ -398,19 +493,59 @@ class Mode0330Content extends StatelessWidget {
         }
 
         // 選手が1人以上エントリーしている場合のみ結果に追加
+        // (オッシーと父ちゃんは、全大学を見てから下で決める。1.9.5)
         if (entryCount > 0) {
           //print("${entryCount}人エントリー");
-          allPredictions['osshi']!.add(
-            Prediction(univ.id, univ.name, osshiScore),
-          );
-          allPredictions['tochan']!.add(
-            Prediction(univ.id, univ.name, tochanScore),
-          );
+          shutsujou.add((id: univ.id, name: univ.name, tochan: tochanScore));
           allPredictions['otaro']!.add(
             Prediction(univ.id, univ.name, otaroScore),
           );
         }
       }
+    }
+
+    // オッシー(エース重視。1.9.5): 区間(組)ごとに全選手の中の見込みタイムの順位(0から)を出し、
+    // その平方根を大学ごとに合計する(小さい方が良い)。正月駅伝予選は、点の悪い2人を除く(これまでと同じ)
+    final Map<int, List<double>> osshiTen = {}; // 大学id→選手ごとの点
+    final Map<int, List<({int u, int k, double t})>> osshiKukanGoto = {};
+    for (final x in osshiSenshu) {
+      (osshiKukanGoto[x.k] ??= []).add(x);
+    }
+    for (final List<({int u, int k, double t})> l in osshiKukanGoto.values) {
+      l.sort((a, b) => a.t.compareTo(b.t));
+      for (int r = 0; r < l.length; r++) {
+        // 同じ見込みタイムなら同じ順位
+        int juni = r;
+        while (juni > 0 && l[juni - 1].t == l[r].t) {
+          juni--;
+        }
+        (osshiTen[l[r].u] ??= []).add(sqrt(juni.toDouble()));
+      }
+    }
+    // 父ちゃん(層の厚さ重視。1.9.5): 区間(組)の最高点との差が一番大きい選手の差を、合計点から引く。
+    // 正月駅伝予選は、合計から除いた一番点の低い選手を除いて見る(これまでと同じ)
+    final Map<int, List<double>> tochanSa = {}; // 大学id→選手ごとの最高点との差
+    for (final x in tochanSenshu) {
+      final double saikou = (x.k >= 0 && x.k < kukanshou_bestscore_tochan.length)
+          ? kukanshou_bestscore_tochan[x.k]
+          : x.t;
+      (tochanSa[x.u] ??= []).add(max(0.0, saikou - x.t));
+    }
+    for (final x in shutsujou) {
+      final List<double> ten = List<double>.of(osshiTen[x.id] ?? const <double>[])
+        ..sort((a, b) => b.compareTo(a)); // 悪い順
+      final int nozoku = raceNumber == 4 ? min(2, ten.length) : 0;
+      double osshi = 0.0;
+      for (int i = nozoku; i < ten.length; i++) {
+        osshi += ten[i];
+      }
+      allPredictions['osshi']!.add(Prediction(x.id, x.name, osshi));
+
+      final List<double> sa = List<double>.of(tochanSa[x.id] ?? const <double>[])
+        ..sort((a, b) => b.compareTo(a)); // 差の大きい順
+      final int nozokuSa = raceNumber == 4 ? min(1, sa.length) : 0;
+      final double brake = sa.length > nozokuSa ? sa[nozokuSa] : 0.0;
+      allPredictions['tochan']!.add(Prediction(x.id, x.name, x.tochan - brake));
     }
     return allPredictions;
   }
@@ -488,19 +623,19 @@ class Mode0330Content extends StatelessWidget {
                   final List<KijiYosouJin> kijiYosou = [
                     KijiYosouJin(
                       'オッシー',
-                      '基本走力重視',
+                      '基本走力・エース重視',
                       [for (final p in osshiRanked) p.id],
                       List<int>.of(kukanshou_id_osshi),
                     ),
                     KijiYosouJin(
                       '父ちゃん',
-                      '総合評価',
+                      '総合評価・層の厚さ重視',
                       [for (final p in tochanRanked) p.id],
                       List<int>.of(kukanshou_id_tochan),
                     ),
                     KijiYosouJin(
                       '王太郎',
-                      '持ちタイム重視',
+                      '夏のタイムトライアル重視',
                       [for (final p in otaroRanked) p.id],
                       List<int>.of(kukanshou_id_otaro),
                     ),
@@ -670,7 +805,7 @@ class Mode0330Content extends StatelessWidget {
 
                                 // オッシーの予想
                                 const Text(
-                                  "■ オッシーの予想 (基本走力重視)",
+                                  "■ オッシーの予想 (基本走力・エース重視)",
                                   style: TextStyle(
                                     color: HENSUU.textcolor,
                                     fontWeight: FontWeight.bold,
@@ -692,7 +827,7 @@ class Mode0330Content extends StatelessWidget {
 
                                 // 父ちゃんの予想
                                 const Text(
-                                  "■ 父ちゃんの予想 (持ちタイム+各能力の総合評価)",
+                                  "■ 父ちゃんの予想 (持ちタイム+各能力の総合評価・層の厚さ重視)",
                                   style: TextStyle(
                                     color: HENSUU.textcolor,
                                     fontWeight: FontWeight.bold,
@@ -714,7 +849,7 @@ class Mode0330Content extends StatelessWidget {
 
                                 // 王太郎の予想
                                 const Text(
-                                  "■ 王太郎の予想 (持ちタイム重視)",
+                                  "■ 王太郎の予想 (夏のタイムトライアル重視)",
                                   style: TextStyle(
                                     color: HENSUU.textcolor,
                                     fontWeight: FontWeight.bold,

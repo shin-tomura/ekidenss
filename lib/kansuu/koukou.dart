@@ -418,6 +418,10 @@ class _Kousei {
   int ken = -1;
   int gakunen = 3;
 
+  /// 名前のない高校生の、大会の記録の中だけの番号(-2から下へ。その回の記録の中で同じ選手を見分ける。
+  /// 翌年以降の新入生に引き継いだときに、記録のその選手に名前を付けるのに使う。1.9.5)
+  int kirokuId = -1;
+
   _Kousei({
     required this.s,
     required this.t5,
@@ -871,13 +875,24 @@ int _bukatsuKimeru(SenshuData s, Random r) {
 /// 1学年分(その年の高校3年生)を計算して、新入生の高校の情報を決める
 /// 戻り値は、選手ごとの新しい情報(選手のidから)
 /// [kirokuOut] を渡すと、全国大会の結果(大会の記録に書くもの)を入れて返す(1.9.5)
-Map<int, KoukouJouhou> _nendoKeisan(List<SenshuData> shinnyuusei, Random r, [Map<String, dynamic>? kirokuOut]) {
+/// [hikitsugi] は、去年・2年前の大会で目立った名前のない下級生。力の合う新入生をその高校に入れ、
+/// 引き継いだ組を [hikitsugiOut] に入れて返す(記録のその選手に名前を付けるため。1.9.5)
+Map<int, KoukouJouhou> _nendoKeisan(
+  List<SenshuData> shinnyuusei,
+  Random r, [
+  Map<String, dynamic>? kirokuOut,
+  List<_Hikitsugi>? hikitsugi,
+  List<_HikitsugiKekka>? hikitsugiOut,
+]) {
   // 今の名簿を一度だけ読む(getter の koukouMeibo を、この中だけ同じ名前で置き換える。1.9.5)
   final List<KoukouMei> koukouMeibo = koukouMeiboGenzai();
   final Map<int, KoukouJouhou> kekka = {};
   final int kenSuu = LocationDatabase.allPrefectures.length;
   final List<_Kousei> jitsuzai = []; // 走る新入生
   final List<List<_Kousei>> bu = [for (int i = 0; i < koukouMeibo.length; i++) <_Kousei>[]];
+  // 大会の記録に目立って残った選手(区間の上位3人・8位までの走者・高校総体の決勝。1.9.5)
+  // 名前のない下級生を、翌年以降の新入生に引き継ぐ候補として記録に残すのに使う
+  final Set<_Kousei> medatsu = {};
 
   // 大学に来た留学生(1.9.5): 約半分を、留学生のいる高校のどれかの出身にする(その高校の名前のない留学生の代わりに走る)。
   // 残りは日本の高校に通っていない。どちらも経歴を3にして、決めたしるしにする
@@ -899,7 +914,8 @@ Map<int, KoukouJouhou> _nendoKeisan(List<SenshuData> shinnyuusei, Random r, [Map
     kekka[s.id] = KoukouJouhou(koukou: koukou + 1, keireki: koukouKeirekiRyuugakusei);
   }
 
-  // 新入生の高校と経歴
+  // 新入生の経歴(1.9.5: 高校を決める前に全員分を決め、目立った名前のない下級生を引き継ぐ新入生を選ぶ)
+  final List<_Junbi> junbi = [];
   for (final SenshuData s in shinnyuusei) {
     if (s.hirou == 1) continue; // 留学生は上で決めた
     int ken = PackedIndexHelper.unpackIndices(s.samusataisei)['prefectureIndex'] ?? -1;
@@ -907,10 +923,22 @@ Map<int, KoukouJouhou> _nendoKeisan(List<SenshuData> shinnyuusei, Random r, [Map
     final double t5 = s.kiroku_nyuugakuji_5000;
     final bool kirokuAri = t5 > 0 && t5 < 1200;
     final int keireki = kirokuAri ? _keirekiKimeru(t5, s.spurtryoku, s.paceagesagetaiouryoku, r) : 2;
-    final _Kousei? k = keireki == 2 ? null : _shinnyuusei(s, keireki);
+    junbi.add(_Junbi(s, ken, keireki, keireki == 2 ? null : _shinnyuusei(s, keireki)));
+  }
+  // 引き継ぐ新入生の高校(選手のid → 高校)
+  final Map<int, int> kotei = (hikitsugi == null || hikitsugi.isEmpty)
+      ? <int, int>{}
+      : _hikitsugiKimeru(hikitsugi, junbi, koukouMeibo, hikitsugiOut);
+
+  // 新入生の高校
+  for (final _Junbi jb in junbi) {
+    final SenshuData s = jb.s;
+    final int ken = jb.ken;
+    final int keireki = jb.keireki;
+    final _Kousei? k = jb.k;
     int koukou;
     if (k != null) {
-      koukou = _koukouErabu(k, ken, r);
+      koukou = kotei[s.id] ?? _koukouErabu(k, ken, r);
       k.koukou = koukou;
       k.ken = koukouMeibo[koukou].ken;
       jitsuzai.add(k);
@@ -932,11 +960,14 @@ Map<int, KoukouJouhou> _nendoKeisan(List<SenshuData> shinnyuusei, Random r, [Map
   }
 
   // 名前のない部員(各校9人)と留学生
+  // 大会の記録の中だけの番号を、-2から下へ付ける(1.9.5)
+  int nanashiBan = -2;
   for (int i = 0; i < koukouMeibo.length; i++) {
     for (final int g in const [3, 3, 3, 2, 2, 2, 1, 1, 1]) {
       final _Kousei n = _nanashi(koukouMeibo[i].meimon, g, r);
       n.koukou = i;
       n.ken = koukouMeibo[i].ken;
+      n.kirokuId = nanashiBan--;
       bu[i].add(n);
     }
     // 大学に来る留学生がいる高校には、名前のない留学生を入れない(1.9.5)
@@ -944,6 +975,7 @@ Map<int, KoukouJouhou> _nendoKeisan(List<SenshuData> shinnyuusei, Random r, [Map
       final _Kousei n = _nanashiRyuugakusei(r);
       n.koukou = i;
       n.ken = koukouMeibo[i].ken;
+      n.kirokuId = nanashiBan--;
       bu[i].add(n);
     }
   }
@@ -1030,6 +1062,15 @@ Map<int, KoukouJouhou> _nendoKeisan(List<SenshuData> shinnyuusei, Random r, [Map
             if (h.s != null) [..._soushaKiroku(h, 0), 0],
         ],
     ];
+    // 目立って残った選手(区間の上位3人と、8位までの高校の走者。1.9.5)
+    for (int kk = 0; kk < _zenkokuKukan.length && kk < zkj.length; kk++) {
+      for (int ti = 0; ti < zenkokuTeams.length; ti++) {
+        if (zenkokuTeams[ti].ku.length > kk && zkj[kk][ti] < 3) medatsu.add(zenkokuTeams[ti].ku[kk]);
+      }
+    }
+    for (int j = 0; j < zenkokuTeams.length && j < 8; j++) {
+      medatsu.addAll(zenkokuTeams[j].ku);
+    }
   }
 
   // ---- 高校総体(県大会 → 地区大会 → 全国大会) ----
@@ -1155,6 +1196,7 @@ Map<int, KoukouJouhou> _nendoKeisan(List<SenshuData> shinnyuusei, Random r, [Map
       final List<dynamic> s = (kirokuOut['s'] as List<dynamic>?) ?? <dynamic>[];
       s.add([for (final MapEntry<_Kousei, double> e in finTime) _soushaKiroku(e.key, e.value)]);
       kirokuOut['s'] = s;
+      medatsu.addAll(fin); // 決勝の全員も目立って残った選手(1.9.5)
     }
   }
 
@@ -1189,6 +1231,15 @@ Map<int, KoukouJouhou> _nendoKeisan(List<SenshuData> shinnyuusei, Random r, [Map
       soutaiDankai: sDankai,
       soutaiJuni: sJuni,
     );
+  }
+  // 目立って残った名前のない下級生(名簿の高校の日本人の1・2年生)を、翌年以降の新入生に引き継ぐ候補として
+  // 記録に残す([記録の中だけの番号, 高校, 学年, 内部の持ちタイム(0.1秒)]。1.9.5)
+  if (kirokuOut != null) {
+    kirokuOut['nn'] = [
+      for (final _Kousei k in medatsu)
+        if (k.s == null && !k.ryuugakusei && k.gakunen <= 2 && k.koukou >= 0 && k.kirokuId <= -2)
+          <dynamic>[k.kirokuId, k.koukou, k.gakunen, (k.t5 * 10).round()],
+    ];
   }
   return kekka;
 }
@@ -1267,7 +1318,13 @@ Future<int> _koukouJouhouFuyoHontai() async {
     // 日本人の選手を新しく決める学年だけ、大会の記録に残す(1.9.5。留学生だけを決め直すときは、
     // 日本人の選手の実績を前に別の計算で決めているので、食い違わないように残さない)
     final Map<String, dynamic>? kiroku = list.any((s) => s.hirou != 1) ? <String, dynamic>{} : null;
-    final Map<int, KoukouJouhou> kekka = _nendoKeisan(list, r, kiroku);
+    // この世代が大学に入る年度と、去年・2年前の大会で目立った名前のない下級生(引き継ぐ候補。1.9.5)
+    final int? sedaiNendo = nendo == null ? null : nendo - (gakunen - 1);
+    final List<_Hikitsugi> hikitsugi = (kiroku != null && sedaiNendo != null)
+        ? _hikitsugiKouho(sedaiNendo)
+        : <_Hikitsugi>[];
+    final List<_HikitsugiKekka> hikitsugiKekka = [];
+    final Map<int, KoukouJouhou> kekka = _nendoKeisan(list, r, kiroku, hikitsugi, hikitsugiKekka);
     for (final SenshuData s in list) {
       final KoukouJouhou? j = kekka[s.id];
       if (j == null) continue;
@@ -1277,9 +1334,207 @@ Future<int> _koukouJouhouFuyoHontai() async {
     }
     // この学年が大学に入った年度(1年生なら今年度、2年生なら1年前…)
     if (kiroku != null && nendo != null) await _kirokuHozon(nendo - (gakunen - 1), kiroku);
+    // 引き継いだ名前のない下級生に、去年・2年前の大会の記録で名前を付ける(1.9.5)
+    if (hikitsugiKekka.isNotEmpty) {
+      await _hikitsugiKakikomi(hikitsugiKekka, {for (final SenshuData s in list) s.id: s});
+    }
   }
   print('出身校と高校時代の実績を付けた選手: $kazu人'); // 確認用(1.9.5)
   return kazu;
+}
+
+// ------------------------------------------------------------
+// 名前のない下級生の引き継ぎ(1.9.5)
+// ・大会の記録に目立って残った名前のない1・2年生(区間の上位3人・8位までの高校の走者・高校総体の決勝)を、
+//   記録の nn に残しておく(高校・学年・内部の持ちタイム)
+// ・翌年(2年生)・2年後(1年生)の新入生の高校を決めるときに、持ちタイムがその選手の伸びた力に合う新入生を、
+//   その高校に入れる(高校の都道府県の出身から。名門なら県外からも)。合う新入生がいなければ引き継がない
+//   (ゲームの大学には来なかった選手のまま)。力は入学時の5000mの記録で見る(基本走力は使わない)
+// ・同じ高校の「2年前の1年生」と「去年の2年生」は、1年生のときのほうが遅ければ同じ選手とみなす
+// ・引き継いだら、その回の記録のその選手に名前を付ける(学年はそのまま残し、画面では「(当時2年)」と出す)
+// ・説明書や画面には書かない(気づいた人へのお楽しみ)
+// ------------------------------------------------------------
+
+/// 引き継ぐ候補の、名前のない下級生
+class _Hikitsugi {
+  /// その記録の世代が大学に入った年度
+  final int kirokuNendo;
+
+  /// 記録の中だけの番号(負の数)
+  final int kirokuId;
+
+  /// 名簿の高校の番号
+  final int koukou;
+
+  /// その大会のときの学年(1か2)
+  final int gakunen;
+
+  /// 内部の持ちタイム(秒。その大会のときの力)
+  final double t5;
+
+  const _Hikitsugi(this.kirokuNendo, this.kirokuId, this.koukou, this.gakunen, this.t5);
+}
+
+/// 引き継いだ組(記録の書き換えに使う)
+class _HikitsugiKekka {
+  final int kirokuNendo;
+  final int kirokuId;
+  final int senshuId;
+
+  const _HikitsugiKekka(this.kirokuNendo, this.kirokuId, this.senshuId);
+}
+
+/// 新入生1人分の、高校を決める前の情報
+class _Junbi {
+  final SenshuData s;
+  final int ken;
+  final int keireki;
+
+  /// 走る選手(ほかの競技の出身はnull)
+  final _Kousei? k;
+
+  const _Junbi(this.s, this.ken, this.keireki, this.k);
+}
+
+/// [sedaiNendo] に大学に入る世代へ引き継ぐ候補(去年の回の2年生と、2年前の回の1年生)。
+/// この世代の回がもうあれば(計算し直し)、引き継がない
+List<_Hikitsugi> _hikitsugiKouho(int sedaiNendo) {
+  final List<_Hikitsugi> l = [];
+  final List<dynamic> kiroku = _kirokuYomuMoto();
+  for (final dynamic d in kiroku) {
+    if (_kirokuNen(d) == sedaiNendo) return <_Hikitsugi>[];
+  }
+  for (final dynamic d in kiroku) {
+    if (d is! Map) continue;
+    final int nen = _kirokuNen(d);
+    final int gakunen = sedaiNendo - nen == 1 ? 2 : (sedaiNendo - nen == 2 ? 1 : 0);
+    if (gakunen == 0) continue;
+    final dynamic nn = d['nn'];
+    if (nn is! List) continue;
+    for (final dynamic e in nn) {
+      if (e is! List || e.length < 4) continue;
+      if (e[0] is! num || e[1] is! num || e[2] is! num || e[3] is! num) continue;
+      if ((e[2] as num).toInt() != gakunen) continue;
+      l.add(_Hikitsugi(nen, (e[0] as num).toInt(), (e[1] as num).toInt(), gakunen, (e[3] as num).toDouble() / 10.0));
+    }
+  }
+  return l;
+}
+
+/// 引き継ぐ新入生を選ぶ。戻り値は、選手のid → 入れる高校。引き継いだ組は [out] に入れる
+/// 去年の2年生から、力の高い順に選ぶ(そのあと2年前の1年生)。3年生のときの力の見込み(1年に12秒伸びる)に
+/// 近い持ちタイムの新入生で、当時より遅くない選手にする
+Map<int, int> _hikitsugiKimeru(
+  List<_Hikitsugi> kouho,
+  List<_Junbi> junbi,
+  List<KoukouMei> meibo,
+  List<_HikitsugiKekka>? out,
+) {
+  final Map<int, int> kotei = {};
+  final Map<int, double> niNen = {}; // 2年生のときに引き継いだ選手の、2年生のときの力
+  final Set<int> ichiNen = {}; // 1年生のときも引き継いだ選手
+  final List<_Hikitsugi> jun = List<_Hikitsugi>.of(kouho)
+    ..sort((a, b) {
+      if (a.gakunen != b.gakunen) return b.gakunen.compareTo(a.gakunen);
+      final int c = a.t5.compareTo(b.t5);
+      return c != 0 ? c : b.kirokuId.compareTo(a.kirokuId);
+    });
+  for (final _Hikitsugi h in jun) {
+    if (h.koukou < 0 || h.koukou >= meibo.length) continue;
+    // 1年生は、同じ高校で2年生のときに引き継いだ選手がいて、1年生のときのほうが遅ければ、同じ選手にする
+    if (h.gakunen == 1) {
+      int? onaji;
+      for (final MapEntry<int, int> e in kotei.entries) {
+        if (e.value != h.koukou || ichiNen.contains(e.key)) continue;
+        final double? t2 = niNen[e.key];
+        if (t2 != null && t2 <= h.t5 + 3.0) {
+          onaji = e.key;
+          break;
+        }
+      }
+      if (onaji != null) {
+        ichiNen.add(onaji);
+        out?.add(_HikitsugiKekka(h.kirokuNendo, h.kirokuId, onaji));
+        continue;
+      }
+    }
+    final int nen = 3 - h.gakunen; // 3年生になるまでの年数
+    final double mikomi = h.t5 - 12.0 * nen; // 3年生のときの力の見込み
+    final double haba = 15.0 + 5.0 * nen;
+    final KoukouMei m = meibo[h.koukou];
+    _Junbi? yoi;
+    double yoiSa = double.infinity;
+    for (final _Junbi j in junbi) {
+      final _Kousei? k = j.k;
+      if (k == null || kotei.containsKey(j.s.id)) continue;
+      final bool kenOnaji = j.ken == m.ken;
+      if (!kenOnaji && m.meimon != 3) continue; // 県外からは名門だけ
+      if (k.t5 > h.t5 + 3.0) continue; // 当時より遅い選手にはしない
+      final double sa = (k.t5 - mikomi).abs();
+      if (sa > haba) continue;
+      final double ten = sa + (kenOnaji ? 0.0 : 5.0);
+      if (ten < yoiSa) {
+        yoi = j;
+        yoiSa = ten;
+      }
+    }
+    if (yoi == null) continue; // 合う新入生がいない(ゲームの大学には来なかった)
+    kotei[yoi.s.id] = h.koukou;
+    if (h.gakunen == 2) {
+      niNen[yoi.s.id] = h.t5;
+    } else {
+      ichiNen.add(yoi.s.id);
+    }
+    out?.add(_HikitsugiKekka(h.kirokuNendo, h.kirokuId, yoi.s.id));
+  }
+  return kotei;
+}
+
+/// 引き継いだ名前のない下級生に、その回の記録で名前を付ける(種類・大学・名前・選手のidを書き換える。
+/// 学年はそのまま残す)。引き継いだ選手は、その回の候補(nn)から外す
+Future<void> _hikitsugiKakikomi(List<_HikitsugiKekka> l, Map<int, SenshuData> senshu) async {
+  final UnivData? u = _kirokuUniv(_kirokuUnivId);
+  if (u == null) return;
+  final List<dynamic> kiroku = _kirokuYomuMoto();
+  bool kaeta = false;
+  for (final dynamic d in kiroku) {
+    if (d is! Map) continue;
+    final int nen = _kirokuNen(d);
+    final Map<int, SenshuData> kono = {};
+    for (final _HikitsugiKekka h in l) {
+      final SenshuData? s = senshu[h.senshuId];
+      if (h.kirokuNendo == nen && s != null) kono[h.kirokuId] = s;
+    }
+    if (kono.isEmpty) continue;
+    void naosu(dynamic a) {
+      if (a is! List || a.length < 7 || a[6] is! num) return;
+      final SenshuData? s = kono[(a[6] as num).toInt()];
+      if (s == null) return;
+      a[0] = 0;
+      a[1] = s.univid;
+      a[3] = s.name;
+      a[6] = s.id;
+      kaeta = true;
+    }
+
+    for (final String kagi in const ['k', 's', 'm']) {
+      final dynamic g = d[kagi];
+      if (g is! List) continue;
+      for (final dynamic l2 in g) {
+        if (l2 is! List) continue;
+        for (final dynamic a in l2) {
+          naosu(a);
+        }
+      }
+    }
+    final dynamic nn = d['nn'];
+    if (nn is List) {
+      nn.removeWhere((dynamic e) => e is List && e.isNotEmpty && e.first is num && kono.containsKey((e.first as num).toInt()));
+    }
+  }
+  if (!kaeta) return;
+  u.name_tanshuku = '$_kirokuMidashi\n${jsonEncode(kiroku)}';
+  await u.save();
 }
 
 // ------------------------------------------------------------
@@ -1297,6 +1552,10 @@ Future<int> _koukouJouhouFuyoHontai() async {
 //     高校の番号は名簿の番号、その他の高校は1000+都道府県の番号
 //     m: [チームごとに[選手 + 区間(1〜7。補欠は0) + 区間順位(走った選手だけ)]...](z と同じ並び)。
 //     区間順位は、順位を残す前の記録にはない(画面では上位3人の記録から分かる分だけ出す)
+//     選手のidは、名前のない高校生では記録の中だけの番号(-2から下。それより前の記録は-1)。
+//     nn: [[記録の中だけの番号, 名簿の高校の番号, 学年, 内部の持ちタイム(0.1秒)]...]
+//     (目立って残った名前のない1・2年生。翌年以降の新入生に引き継ぐ候補。引き継いだら、その選手の
+//     種類・大学id・名前・選手のidを書き換え、学年はそのまま残す(画面で「(当時2年)」)。1.9.5)
 //     z の優勝校(1位)だけ、出場の回数目と連続出場の後ろに、その時点の優勝の回数目・連続優勝の年数・
 //     何年ぶり(連続でない2回目以上の優勝のとき。ほかは0)を書き足す(1.9.5。書き足す前の記録にはない)
 //   ・優勝回数: {z: [全国高校駅伝の優勝回数(名簿の並び)], k: [都道府県予選の優勝回数],
@@ -1518,7 +1777,7 @@ List<dynamic> _soushaKiroku(_Kousei k, double time) {
     s?.name ?? '',
     _kouCode(k.koukou, k.ken),
     (time * 10).round(),
-    s?.id ?? -1,
+    s?.id ?? k.kirokuId, // 名前のない高校生は、記録の中だけの番号(負の数。1.9.5)
   ];
 }
 
@@ -1595,6 +1854,7 @@ Future<void> _kirokuHozon(int nyuugakuNendo, Map<String, dynamic> kiroku) async 
       'k': kiroku['k'] ?? [],
       's': kiroku['s'] ?? [],
       'm': kiroku['m'] ?? [],
+      'nn': kiroku['nn'] ?? [], // 目立った名前のない下級生(翌年以降の新入生に引き継ぐ候補。1.9.5)
     },
     ...mae,
   ]..sort((a, b) => _kirokuNen(b).compareTo(_kirokuNen(a)));

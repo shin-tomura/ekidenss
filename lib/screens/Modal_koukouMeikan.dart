@@ -848,8 +848,10 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
     bool jibun = false;
     // スカウト画面から開いたときは、進学先の文字と色をスカウト画面に決めてもらう(1.9.5)
     final String? shingaku = s.namaeAri ? widget.shingakuMoji?.call(s) : null;
+    // 下級生のときの記録に、あとから名前が付いた選手は、当時の学年を添える(1.9.5。koukou.dart の引き継ぎ)
+    final String touji = (s.namaeAri && s.gakunen >= 1 && s.gakunen <= 2) ? '(当時${s.gakunen}年)' : '';
     if (shingaku != null) {
-      mei = s.name;
+      mei = '${s.name}$touji';
       if (kouAri) {
         sub = shingaku.isEmpty ? kou : '$kou　$shingaku';
       } else {
@@ -857,7 +859,7 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
       }
       jibun = widget.jibunHantei?.call(s) ?? false;
     } else if (s.namaeAri) {
-      mei = s.name;
+      mei = '${s.name}$touji';
       final int u = _univId(s);
       final String um = _univMei[u] ?? '';
       if (kouAri) {
@@ -1244,14 +1246,13 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
     ];
   }
 
-  /// スカウト画面から開いたときの画面(今年の新入生の世代の回だけ。1.9.5)
+  /// スカウト画面から開いたときの画面(今年の新入生の世代の回と、閉じた折りたたみで去年の回。1.9.5)
   Widget _scoutBuild() {
     KoukouTaikaiKiroku? k;
+    KoukouTaikaiKiroku? kyonen;
     for (final KoukouTaikaiKiroku r in _kiroku) {
-      if (r.nyuugakuNendo == widget.scoutNendo) {
-        k = r;
-        break;
-      }
+      if (r.nyuugakuNendo == widget.scoutNendo) k = r;
+      if (widget.scoutNendo != null && r.nyuugakuNendo == widget.scoutNendo! - 1) kyonen = r;
     }
     if (k == null) {
       return ListView(
@@ -1266,12 +1267,13 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
       children: [
         const Text(
           '今年の新入生(スカウトの候補)が高校3年だった年度の、全国高校駅伝と高校総体の結果です。'
-          '前の回は、スカウトのあとに説明画面の設定タブの「高校名鑑」で見られます。',
+          '下に去年の回もあります。それより前の回は、スカウトのあとに説明画面の設定タブの「高校名鑑」で見られます。',
           style: _honbun,
         ),
         const SizedBox(height: 4),
         const Text(
-          '名前の出ている選手は今年の新入生で、進学先はスカウトの画面と同じ出し方です。$_namaeNashiSetsumei',
+          '名前の出ている選手は、ゲームの大学に入った選手です。'
+          '今年の新入生の進学先は、スカウトの画面と同じ出し方です。$_namaeNashiSetsumei',
           style: _hosoku,
         ),
         const SizedBox(height: 12),
@@ -1284,6 +1286,15 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
           ),
         ),
         ..._kekka(k, 0, zenkokuHiraku: true),
+        // 去年の回(最初は閉じておく。1.9.5)
+        if (kyonen != null) ...[
+          const SizedBox(height: 16),
+          _Oritatami(
+            key: const ValueKey<String>('kyonen'),
+            midashi: '去年の大会　${_kaiMei(kyonen)}',
+            naka: _kekka(kyonen, 1),
+          ),
+        ],
         const SizedBox(height: 24),
         const Text('架空の高校の大会です。大学のレースや育成には影響しません。', style: _hosoku),
         const SizedBox(height: 24),

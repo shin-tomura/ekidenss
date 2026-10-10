@@ -13,7 +13,7 @@ class UnivData extends HiveObject {
   @HiveField(2)
   String name;
   @HiveField(3)
-  String name_tanshuku; //[12]統計データ表示用、[13]メモ1~[17]メモ5、[18]~[27]名声の履歴(今年度~9年前。1.8.8。kansuu/meisei_rireki.dart)
+  String name_tanshuku; //[12]統計データ表示用、[13]メモ1~[17]メモ5、[18]~[27]名声の履歴(今年度~9年前。1.8.8。kansuu/meisei_rireki.dart)、[28]高校の大会の記録(直近10回)・[29]高校ごとの優勝回数(1.9.5。kansuu/koukou.dart)
   @HiveField(4)
   int meisei_total;
   @HiveField(5)

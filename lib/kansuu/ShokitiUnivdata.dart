@@ -3,6 +3,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/kansuu/meisei_rireki.dart'; // 名声の履歴(1.8.8)
 import 'package:ekiden/kansuu/rekidai_kiroku.dart'; // 歴代10位までの記録(1.8.8)
+import 'package:ekiden/kansuu/koukou.dart'; // 高校の大会の記録と優勝回数(1.9.5)
 
 Future<void> ShokitiUnivdata(
   bool ikuseiryoku_meisei_ijiflag,
@@ -13,6 +14,8 @@ Future<void> ShokitiUnivdata(
   if (ikuseiryoku_meisei_ijiflag == false) {
     await meiseiRirekiZenbuKesu();
   }
+  // 高校の大会の記録と優勝回数は、どちらの新しいゲームでも消す(選手と年を作り直すため。1.9.5)
+  await koukouKirokuZenbuKesu();
   for (final entry in univBox.toMap().entries) {
     final int univId = entry.key;
     final UnivData univ = entry.value;

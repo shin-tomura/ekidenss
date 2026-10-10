@@ -1,6 +1,9 @@
+import 'dart:convert'; // 高校の大会の記録(1.9.5)
 import 'dart:math';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ekiden/constants.dart';
+import 'package:ekiden/ghensuu.dart'; // 高校の大会の記録の年度(1.9.5)
+import 'package:ekiden/univ_data.dart'; // 高校の大会の記録の保存場所(1.9.5)
 import 'package:ekiden/senshu_data.dart';
 import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/kansuu/koukou_meibo.dart';
@@ -408,6 +411,11 @@ class _Kousei {
   final List<int> sDankai = [-1, -1, -1, -1];
   final List<int> sJuni = [0, 0, 0, 0];
 
+  // 大会の記録に書くための、高校(名簿の番号。その他の高校は-1)・都道府県・学年(1.9.5)
+  int koukou = -1;
+  int ken = -1;
+  int gakunen = 3;
+
   _Kousei({
     required this.s,
     required this.t5,
@@ -446,7 +454,7 @@ _Kousei _nanashi(int level, int gakunen, Random r) {
       heikin[(level + 1).clamp(0, 4).toInt()] + (gakunen == 3 ? 0 : (gakunen == 2 ? 12 : 25)) + _gauss(r) * 16;
   final int spurt = _spurtFromT5(t5, r);
   final int pace = _nouryoku(spurt - 10 + r.nextInt(21) - 10);
-  return _Kousei(
+  final _Kousei k = _Kousei(
     s: null,
     t5: t5,
     nobori: 1 + r.nextInt(99),
@@ -458,6 +466,8 @@ _Kousei _nanashi(int level, int gakunen, Random r) {
     ryuugakusei: false,
     keireki: r.nextDouble() < _chuukyoriKakuritsu(spurt, pace) ? 1 : 0,
   );
+  k.gakunen = gakunen;
+  return k;
 }
 
 /// 名前のない留学生
@@ -828,7 +838,8 @@ int _bukatsuKimeru(SenshuData s, Random r) {
 
 /// 1学年分(その年の高校3年生)を計算して、新入生の高校の情報を決める
 /// 戻り値は、選手ごとの新しい情報(選手のidから)
-Map<int, KoukouJouhou> _nendoKeisan(List<SenshuData> shinnyuusei, Random r) {
+/// [kirokuOut] を渡すと、全国大会の結果(大会の記録に書くもの)を入れて返す(1.9.5)
+Map<int, KoukouJouhou> _nendoKeisan(List<SenshuData> shinnyuusei, Random r, [Map<String, dynamic>? kirokuOut]) {
   final Map<int, KoukouJouhou> kekka = {};
   final int kenSuu = LocationDatabase.allPrefectures.length;
   final List<_Kousei> jitsuzai = []; // 走る新入生
@@ -845,6 +856,8 @@ Map<int, KoukouJouhou> _nendoKeisan(List<SenshuData> shinnyuusei, Random r) {
     }
     if (koukou >= 0) {
       final _Kousei k = _ryuugakuseiKousei(s, r);
+      k.koukou = koukou;
+      k.ken = koukouMeibo[koukou].ken;
       ryuugakuseiKoukou.add(koukou);
       jitsuzai.add(k);
       bu[koukou].add(k);
@@ -864,6 +877,8 @@ Map<int, KoukouJouhou> _nendoKeisan(List<SenshuData> shinnyuusei, Random r) {
     int koukou;
     if (k != null) {
       koukou = _koukouErabu(k, ken, r);
+      k.koukou = koukou;
+      k.ken = koukouMeibo[koukou].ken;
       jitsuzai.add(k);
       bu[koukou].add(k);
     } else {
@@ -885,15 +900,24 @@ Map<int, KoukouJouhou> _nendoKeisan(List<SenshuData> shinnyuusei, Random r) {
   // 名前のない部員(各校9人)と留学生
   for (int i = 0; i < koukouMeibo.length; i++) {
     for (final int g in const [3, 3, 3, 2, 2, 2, 1, 1, 1]) {
-      bu[i].add(_nanashi(koukouMeibo[i].meimon, g, r));
+      final _Kousei n = _nanashi(koukouMeibo[i].meimon, g, r);
+      n.koukou = i;
+      n.ken = koukouMeibo[i].ken;
+      bu[i].add(n);
     }
     // 大学に来る留学生がいる高校には、名前のない留学生を入れない(1.9.5)
-    if (koukouMeibo[i].ryuugakusei && !ryuugakuseiKoukou.contains(i)) bu[i].add(_nanashiRyuugakusei(r));
+    if (koukouMeibo[i].ryuugakusei && !ryuugakuseiKoukou.contains(i)) {
+      final _Kousei n = _nanashiRyuugakusei(r);
+      n.koukou = i;
+      n.ken = koukouMeibo[i].ken;
+      bu[i].add(n);
+    }
   }
 
   // ---- 全国高校駅伝(都道府県予選 → 全国) ----
   final List<_Team> zenkoku = [];
   final List<List<_Team>> chikuNi = [for (int c = 0; c < koukouChikuMei.length; c++) <_Team>[]];
+  final List<int> kenYuushou = []; // 都道府県予選で優勝した名簿の高校(大会の記録の優勝回数。1.9.5)
   for (int ken = 0; ken < kenSuu; ken++) {
     final List<_Team> teams = [];
     for (int i = 0; i < koukouMeibo.length; i++) {
@@ -901,23 +925,55 @@ Map<int, KoukouJouhou> _nendoKeisan(List<SenshuData> shinnyuusei, Random r) {
     }
     final int sonota = ken < koukouKenSonota.length ? koukouKenSonota[ken] : 6;
     for (int f = 0; f < sonota; f++) {
-      teams.add(_haichi(-1, [for (final int g in const [3, 3, 3, 2, 2, 2, 1, 1, 1]) _nanashi(-1, g, r)], r));
+      final List<_Kousei> sonotaBu = [for (final int g in const [3, 3, 3, 2, 2, 2, 1, 1, 1]) _nanashi(-1, g, r)];
+      for (final _Kousei n in sonotaBu) {
+        n.ken = ken;
+      }
+      teams.add(_haichi(-1, sonotaBu, r));
     }
     final List<List<int>> kj = _ekiden(teams, _yosenKukan, r);
     _ekidenKekka(teams, kj, zenkoku: false);
     zenkoku.add(teams.first);
+    if (teams.first.koukou >= 0) kenYuushou.add(teams.first.koukou);
     if (teams.length >= 2 && ken < koukouKenChiku.length) chikuNi[koukouKenChiku[ken]].add(teams[1]);
   }
   // 地区代表(各地区の予選2位の高校のうち、予選のタイムが一番良い高校)
-  for (final List<_Team> c in chikuNi) {
-    if (c.isEmpty) continue;
-    c.sort((a, b) => a.goukei.compareTo(b.goukei));
-    zenkoku.add(c.first);
+  final Map<_Team, int> chikuDaihyou = {}; // 地区代表の地区の番号(大会の記録に書く。1.9.5)
+  for (int c = 0; c < chikuNi.length; c++) {
+    if (chikuNi[c].isEmpty) continue;
+    chikuNi[c].sort((a, b) => a.goukei.compareTo(b.goukei));
+    zenkoku.add(chikuNi[c].first);
+    chikuDaihyou[chikuNi[c].first] = c;
   }
   // 全国(予選の区間の並びのまま走る)
-  final List<_Team> zenkokuTeams = [for (final _Team t in zenkoku) _Team(t.koukou, t.ku, t.hoketsu)];
+  final List<_Team> zenkokuTeams = [];
+  final Map<_Team, int> daihyou = {}; // 0は都道府県代表、1〜は地区代表(地区の番号+1)
+  for (final _Team t in zenkoku) {
+    final _Team z = _Team(t.koukou, t.ku, t.hoketsu);
+    daihyou[z] = chikuDaihyou.containsKey(t) ? chikuDaihyou[t]! + 1 : 0;
+    zenkokuTeams.add(z);
+  }
   final List<List<int>> zkj = _ekiden(zenkokuTeams, _zenkokuKukan, r);
   _ekidenKekka(zenkokuTeams, zkj, zenkoku: true);
+  // 大会の記録(1.9.5): 全国の全チームの順位とタイム、各区間の上位3人、都道府県予選の優勝校
+  if (kirokuOut != null) {
+    kirokuOut['z'] = [
+      for (final _Team t in zenkokuTeams)
+        [_teamCode(t), daihyou[t] ?? 0, t.goukei.round()],
+    ];
+    kirokuOut['k'] = [
+      for (int kk = 0; kk < _zenkokuKukan.length; kk++)
+        [
+          for (final _Team t in ([
+            for (final _Team t2 in zenkokuTeams)
+              if (t2.ku.length > kk) t2,
+          ]..sort((a, b) => a.times[kk].compareTo(b.times[kk])))
+              .take(3))
+            _soushaKiroku(t.ku[kk], t.times[kk]),
+        ],
+    ];
+    kirokuOut['ky'] = kenYuushou;
+  }
 
   // ---- 高校総体(県大会 → 地区大会 → 全国大会) ----
   // 種目(1.9.5): 中距離出身は1500m。長距離の選手は、障害への向きが高いほど3000m障害(全体で約15%)、
@@ -983,7 +1039,9 @@ Map<int, KoukouJouhou> _nendoKeisan(List<SenshuData> shinnyuusei, Random r) {
     final int sonota = ken < koukouKenSonota.length ? koukouKenSonota[ken] : 6;
     for (int sh = 1; sh <= 3; sh++) {
       for (int f = 0; f < sonota; f++) {
-        kenEntry[ken][sh].add(_nanashi(-1, 3, r));
+        final _Kousei n = _nanashi(-1, 3, r);
+        n.ken = ken;
+        kenEntry[ken][sh].add(n);
       }
     }
   }
@@ -1030,9 +1088,16 @@ Map<int, KoukouJouhou> _nendoKeisan(List<SenshuData> shinnyuusei, Random r) {
         _soutaiKaku(nokori[j].key, sh, 2, -1);
       }
     }
-    final List<_Kousei> fin = _track(kesshou, sh, r);
+    final List<MapEntry<_Kousei, double>> finTime = _trackKiroku(kesshou, sh, r);
+    final List<_Kousei> fin = [for (final MapEntry<_Kousei, double> e in finTime) e.key];
     for (int j = 0; j < fin.length; j++) {
       _soutaiKaku(fin[j], sh, 3, j);
+    }
+    // 大会の記録(1.9.5): 決勝の全員の順位とタイム(種目の番号-1の順)
+    if (kirokuOut != null) {
+      final List<dynamic> s = (kirokuOut['s'] as List<dynamic>?) ?? <dynamic>[];
+      s.add([for (final MapEntry<_Kousei, double> e in finTime) _soushaKiroku(e.key, e.value)]);
+      kirokuOut['s'] = s;
     }
   }
 
@@ -1073,10 +1138,14 @@ Map<int, KoukouJouhou> _nendoKeisan(List<SenshuData> shinnyuusei, Random r) {
 
 /// トラックのレースを走らせて、着順に並べる
 List<_Kousei> _track(List<_Kousei> sousha, int sh, Random r) {
-  final List<MapEntry<_Kousei, double>> t = [
+  return [for (final MapEntry<_Kousei, double> e in _trackKiroku(sousha, sh, r)) e.key];
+}
+
+/// トラックのレースを走らせて、着順に並べる(タイムつき。1.9.5)
+List<MapEntry<_Kousei, double>> _trackKiroku(List<_Kousei> sousha, int sh, Random r) {
+  return [
     for (final _Kousei k in sousha) MapEntry(k, _trackTime(k, sh, r)),
   ]..sort((a, b) => a.value.compareTo(b.value));
-  return [for (final MapEntry<_Kousei, double> e in t) e.key];
 }
 
 /// 高校総体の結果を新入生に書く(種目ごとに、段階が上がったときだけ上書き)。[juni0] 0が1位、-1は順位なし
@@ -1119,9 +1188,14 @@ Future<int> koukouJouhouFuyo() async {
   }
   if (gakunenGoto.isEmpty) return 0;
   final Random r = Random();
+  final int? nendo = _imaNoNendo();
   int kazu = 0;
-  for (final List<SenshuData> list in gakunenGoto.values) {
-    final Map<int, KoukouJouhou> kekka = _nendoKeisan(list, r);
+  for (final MapEntry<int, List<SenshuData>> e in gakunenGoto.entries) {
+    final List<SenshuData> list = e.value;
+    // 日本人の選手を新しく決める学年だけ、大会の記録に残す(1.9.5。留学生だけを決め直すときは、
+    // 日本人の選手の実績を前に別の計算で決めているので、食い違わないように残さない)
+    final Map<String, dynamic>? kiroku = list.any((s) => s.hirou != 1) ? <String, dynamic>{} : null;
+    final Map<int, KoukouJouhou> kekka = _nendoKeisan(list, r, kiroku);
     for (final SenshuData s in list) {
       final KoukouJouhou? j = kekka[s.id];
       if (j == null) continue;
@@ -1129,7 +1203,312 @@ Future<int> koukouJouhouFuyo() async {
       await s.save();
       kazu++;
     }
+    // この学年が大学に入った年度(1年生なら今年度、2年生なら1年前…)
+    if (kiroku != null && nendo != null) await _kirokuHozon(nendo - (e.key - 1), kiroku);
   }
   print('出身校と高校時代の実績を付けた選手: $kazu人'); // 確認用(1.9.5)
   return kazu;
 }
+
+// ------------------------------------------------------------
+// 高校の大会の記録と優勝回数(1.9.5。高校名鑑の「大会の記録」タブ)
+//
+// ・毎年の計算(koukouJouhouFuyo)で、全国高校駅伝の全チームの順位とタイム(都道府県代表か地区代表か)、
+//   各区間の上位3人、高校総体3種目の決勝の全員を、直近10回分残す。都道府県予選と地区大会は残さない
+// ・高校ごとの優勝回数(全国高校駅伝・都道府県予選)は、記録を残し始めてからの回数を数える
+// ・保存場所は UnivData.name_tanshuku(短縮名は使っていない。meisei_rireki.dart と同じやり方)。
+//   大学id 28 に大会の記録、29 に優勝回数。1行目は見出し、2行目からはJSON
+//   ・大会の記録: [{y: 大学に入った年度, z: [[高校の番号, 代表(0都道府県・1〜地区の番号+1), タイム(秒)]...(着順)],
+//     k: [区間ごとに[選手...](上位3人)], s: [種目ごとに[選手...](決勝の着順)]}...](新しい順)
+//     選手 = [種類(0大学に入った日本人・1大学に入った留学生・2名前のない日本人・3名前のない留学生),
+//            大学id, 学年, 名前, 高校の番号, タイム(0.1秒), 選手のid]
+//     高校の番号は名簿の番号、その他の高校は1000+都道府県の番号
+//   ・優勝回数: {z: [全国高校駅伝の優勝回数(名簿の並び)], k: [都道府県予選の優勝回数]}
+// ・大学に入った選手の大学は、見るときに選手のidと名前が合えば今の大学を出す(スカウトで変わるため)。
+//   卒業した選手は、毎年の保存のときに直した大学を出す(_kirokuHozon)
+// ・新しいゲームの開始時に消す(ShokitiUnivdata.dart。年が1から始まり直すため)
+// ------------------------------------------------------------
+
+const int _kirokuUnivId = 28;
+const int _kaisuuUnivId = 29;
+const int _kirokuHozonSuu = 10;
+const String _kirokuMidashi = '#高校の大会の記録';
+const String _kaisuuMidashi = '#高校の優勝回数';
+
+/// 今の年度(4月から翌年3月まで。年の数は4月の年)
+int? _imaNoNendo() {
+  if (!Hive.isBoxOpen('ghensuuBox')) return null;
+  final Box<Ghensuu> b = Hive.box<Ghensuu>('ghensuuBox');
+  if (b.isEmpty) return null;
+  final Ghensuu? g = b.getAt(0);
+  if (g == null) return null;
+  return g.month >= 4 ? g.year : g.year - 1;
+}
+
+UnivData? _kirokuUniv(int id) {
+  if (!Hive.isBoxOpen('univBox')) return null;
+  for (final UnivData u in Hive.box<UnivData>('univBox').values) {
+    if (u.id == id) return u;
+  }
+  return null;
+}
+
+/// 大会の記録の高校の番号(名簿の高校は番号、その他の高校は1000+都道府県の番号)
+int _kouCode(int koukou, int ken) => koukou >= 0 ? koukou : 1000 + (ken < 0 ? 0 : ken);
+
+int _teamCode(_Team t) => _kouCode(t.koukou, t.ku.isNotEmpty ? t.ku.first.ken : -1);
+
+/// 大会の記録の選手1人
+List<dynamic> _soushaKiroku(_Kousei k, double time) {
+  final SenshuData? s = k.s;
+  return [
+    s == null ? (k.ryuugakusei ? 3 : 2) : (s.hirou == 1 ? 1 : 0),
+    s?.univid ?? -1,
+    s == null ? k.gakunen : 3,
+    s?.name ?? '',
+    _kouCode(k.koukou, k.ken),
+    (time * 10).round(),
+    s?.id ?? -1,
+  ];
+}
+
+/// 保存してある大会の記録(JSONのまま。読めなければ空)
+List<dynamic> _kirokuYomuMoto() {
+  final UnivData? u = _kirokuUniv(_kirokuUnivId);
+  if (u == null || !u.name_tanshuku.startsWith(_kirokuMidashi)) return [];
+  try {
+    final dynamic d = jsonDecode(u.name_tanshuku.substring(_kirokuMidashi.length).trim());
+    if (d is List) return d;
+  } catch (_) {}
+  return [];
+}
+
+int _kirokuNen(dynamic d) => (d is Map && d['y'] is num) ? (d['y'] as num).toInt() : -99999;
+
+/// 1世代分の大会の記録を残し、優勝回数を足す(その世代の記録がもうあれば何もしない)
+Future<void> _kirokuHozon(int nyuugakuNendo, Map<String, dynamic> kiroku) async {
+  final UnivData? u = _kirokuUniv(_kirokuUnivId);
+  final UnivData? uk = _kirokuUniv(_kaisuuUnivId);
+  if (u == null || uk == null) return;
+  final List<dynamic> mae = _kirokuYomuMoto();
+  for (final dynamic d in mae) {
+    if (_kirokuNen(d) == nyuugakuNendo) return;
+  }
+  // 在学中の選手の大学を、今の大学に直しておく(卒業したあとも、最後の大学が出るように)
+  final Map<int, SenshuData> zaigaku = {};
+  if (Hive.isBoxOpen('senshuBox')) {
+    for (final SenshuData s in Hive.box<SenshuData>('senshuBox').values) {
+      zaigaku[s.id] = s;
+    }
+  }
+  void naosu(dynamic sousha) {
+    if (sousha is! List || sousha.length < 7) return;
+    final dynamic id = sousha[6];
+    if (id is! num) return;
+    final SenshuData? s = zaigaku[id.toInt()];
+    if (s != null && s.name == sousha[3]) sousha[1] = s.univid;
+  }
+  for (final dynamic d in mae) {
+    if (d is! Map) continue;
+    for (final String kagi in const ['k', 's']) {
+      final dynamic l = d[kagi];
+      if (l is! List) continue;
+      for (final dynamic g in l) {
+        if (g is! List) continue;
+        for (final dynamic sousha in g) {
+          naosu(sousha);
+        }
+      }
+    }
+  }
+  final List<dynamic> l = [
+    {'y': nyuugakuNendo, 'z': kiroku['z'] ?? [], 'k': kiroku['k'] ?? [], 's': kiroku['s'] ?? []},
+    ...mae,
+  ]..sort((a, b) => _kirokuNen(b).compareTo(_kirokuNen(a)));
+  u.name_tanshuku = '$_kirokuMidashi\n${jsonEncode(l.take(_kirokuHozonSuu).toList())}';
+  await u.save();
+  // 優勝回数
+  final KoukouYuushouKaisuu kai = koukouYuushouKaisuuYomu();
+  final dynamic z = kiroku['z'];
+  if (z is List && z.isNotEmpty && z.first is List && (z.first as List).isNotEmpty) {
+    final dynamic code = (z.first as List).first;
+    if (code is num && code.toInt() >= 0 && code.toInt() < kai.zenkoku.length) kai.zenkoku[code.toInt()]++;
+  }
+  final dynamic ky = kiroku['ky'];
+  if (ky is List) {
+    for (final dynamic code in ky) {
+      if (code is num && code.toInt() >= 0 && code.toInt() < kai.ken.length) kai.ken[code.toInt()]++;
+    }
+  }
+  uk.name_tanshuku = '$_kaisuuMidashi\n${jsonEncode({'z': kai.zenkoku, 'k': kai.ken})}';
+  await uk.save();
+}
+
+/// 大会の記録と優勝回数を消す(新しいゲームの開始時)
+Future<void> koukouKirokuZenbuKesu() async {
+  for (final int id in const [_kirokuUnivId, _kaisuuUnivId]) {
+    final UnivData? u = _kirokuUniv(id);
+    if (u == null) continue;
+    u.name_tanshuku = '';
+    await u.save();
+  }
+}
+
+/// 大会の記録の選手1人(画面用)
+class KoukouKirokuSousha {
+  /// 0大学に入った日本人 1大学に入った留学生 2名前のない日本人 3名前のない留学生
+  final int shurui;
+  final int univid;
+  final int gakunen;
+  final String name;
+  final int kouCode;
+
+  /// タイム(秒)
+  final double time;
+  final int id;
+
+  const KoukouKirokuSousha({
+    required this.shurui,
+    required this.univid,
+    required this.gakunen,
+    required this.name,
+    required this.kouCode,
+    required this.time,
+    required this.id,
+  });
+
+  bool get namaeAri => shurui <= 1;
+}
+
+/// 大会の記録の全国高校駅伝の1チーム(画面用)
+class KoukouKirokuTeam {
+  final int kouCode;
+
+  /// 0は都道府県代表、1〜は地区代表(地区の番号+1)
+  final int daihyou;
+
+  /// タイム(秒)
+  final double time;
+
+  const KoukouKirokuTeam(this.kouCode, this.daihyou, this.time);
+}
+
+/// 1世代分の大会の記録(画面用)
+class KoukouTaikaiKiroku {
+  /// この世代が大学に入った年度
+  final int nyuugakuNendo;
+
+  /// 全国高校駅伝(着順)
+  final List<KoukouKirokuTeam> zenkoku;
+
+  /// 区間ごとの上位3人
+  final List<List<KoukouKirokuSousha>> kukan;
+
+  /// 高校総体の種目ごとの決勝(着順。0=1500m・1=5000m・2=3000m障害)
+  final List<List<KoukouKirokuSousha>> soutai;
+
+  const KoukouTaikaiKiroku(this.nyuugakuNendo, this.zenkoku, this.kukan, this.soutai);
+}
+
+KoukouKirokuSousha? _soushaYomu(dynamic a) {
+  if (a is! List || a.length < 6) return null;
+  return KoukouKirokuSousha(
+    shurui: (a[0] as num).toInt(),
+    univid: (a[1] as num).toInt(),
+    gakunen: (a[2] as num).toInt(),
+    name: a[3] is String ? a[3] as String : '',
+    kouCode: (a[4] as num).toInt(),
+    time: (a[5] as num).toDouble() / 10.0,
+    id: a.length >= 7 && a[6] is num ? (a[6] as num).toInt() : -1,
+  );
+}
+
+List<List<KoukouKirokuSousha>> _soushaListYomu(dynamic l) {
+  if (l is! List) return [];
+  return [
+    for (final dynamic g in l)
+      if (g is List)
+        [
+          for (final dynamic a in g)
+            if (_soushaYomu(a) != null) _soushaYomu(a)!,
+        ],
+  ];
+}
+
+/// 保存してある大会の記録(新しい順。なければ空)
+List<KoukouTaikaiKiroku> koukouTaikaiKirokuYomu() {
+  final List<KoukouTaikaiKiroku> l = [];
+  for (final dynamic d in _kirokuYomuMoto()) {
+    if (d is! Map) continue;
+    try {
+      final dynamic z = d['z'];
+      l.add(
+        KoukouTaikaiKiroku(
+          _kirokuNen(d),
+          [
+            if (z is List)
+              for (final dynamic t in z)
+                if (t is List && t.length >= 3)
+                  KoukouKirokuTeam((t[0] as num).toInt(), (t[1] as num).toInt(), (t[2] as num).toDouble()),
+          ],
+          _soushaListYomu(d['k']),
+          _soushaListYomu(d['s']),
+        ),
+      );
+    } catch (_) {}
+  }
+  l.sort((a, b) => b.nyuugakuNendo.compareTo(a.nyuugakuNendo));
+  return l;
+}
+
+/// 高校ごとの優勝回数(名簿の並び)
+class KoukouYuushouKaisuu {
+  /// 全国高校駅伝
+  final List<int> zenkoku;
+
+  /// 都道府県予選
+  final List<int> ken;
+
+  const KoukouYuushouKaisuu(this.zenkoku, this.ken);
+}
+
+/// 保存してある優勝回数(記録を残し始めてからの回数。なければ全部0)
+KoukouYuushouKaisuu koukouYuushouKaisuuYomu() {
+  final List<int> z = List<int>.filled(koukouMeibo.length, 0);
+  final List<int> k = List<int>.filled(koukouMeibo.length, 0);
+  final UnivData? u = _kirokuUniv(_kaisuuUnivId);
+  if (u != null && u.name_tanshuku.startsWith(_kaisuuMidashi)) {
+    try {
+      final dynamic d = jsonDecode(u.name_tanshuku.substring(_kaisuuMidashi.length).trim());
+      if (d is Map) {
+        final dynamic dz = d['z'];
+        final dynamic dk = d['k'];
+        if (dz is List) {
+          for (int i = 0; i < z.length && i < dz.length; i++) {
+            if (dz[i] is num) z[i] = (dz[i] as num).toInt();
+          }
+        }
+        if (dk is List) {
+          for (int i = 0; i < k.length && i < dk.length; i++) {
+            if (dk[i] is num) k[i] = (dk[i] as num).toInt();
+          }
+        }
+      }
+    } catch (_) {}
+  }
+  return KoukouYuushouKaisuu(z, k);
+}
+
+/// 大会の記録の高校の名前(「天馬学園高(栃木)」。その他の高校は「栃木県の高校」)
+String koukouCodeMei(int code) {
+  if (code >= 0 && code < koukouMeibo.length) {
+    final KoukouMei m = koukouMeibo[code];
+    return '${m.mei}高(${_kenMijikai(m.ken)})';
+  }
+  final int ken = code - 1000;
+  if (ken >= 0 && ken < LocationDatabase.allPrefectures.length) return '${LocationDatabase.allPrefectures[ken]}の高校';
+  return '高校';
+}
+
+/// 全国高校駅伝の区間の距離(m)
+double koukouZenkokuKukanKyori(int kk) => (kk >= 0 && kk < _zenkokuKukan.length) ? _zenkokuKukan[kk].kyori : 0;

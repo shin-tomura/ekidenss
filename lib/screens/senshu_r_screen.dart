@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ekiden/ghensuu.dart'; // Ghensuuクラスをインポート
 import 'package:ekiden/kantoku_data.dart'; //
+import 'package:ekiden/kansuu/koukou.dart'; // 出身校と高校時代の実績(1.9.5)
 import 'package:ekiden/univ_data.dart'; // UnivDataクラスをインポート
 import 'package:ekiden/constants.dart'; // TEISUUクラスをインポート (DEFAULTTIME, DEFAULTJUNIなど)
 import 'package:ekiden/kansuu/time_date.dart';
@@ -553,6 +554,15 @@ class _Senshu_R_ScreenState extends State<Senshu_R_Screen> {
                       '出身: ${LocationDatabase.allPrefectures[extractedPrefectureIndex]}\n趣味: ${HobbyDatabase.allHobbies[extractedHobbyIndex]}';
                 }
               }
+            }
+            // 出身校と高校時代の実績(1.9.5。koukou.dart。表示しない設定のときと留学生は空)
+            final String koukouStr = koukouProfileMoji(
+              currentSenshu.samusataisei,
+              currentSenshu.hirou,
+              kantoku,
+            );
+            if (koukouStr.isNotEmpty) {
+              shumi_str = shumi_str.isEmpty ? koukouStr : '$shumi_str\n$koukouStr';
             }
             // 提示されたコードに基づき、表示用の基本走力(aInt)を計算
             int newbint = 1550;

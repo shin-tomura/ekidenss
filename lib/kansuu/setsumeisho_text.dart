@@ -80,6 +80,7 @@ List<SetsumeishoGroup> setsumeishoGroupList() {
     const SetsumeishoGroup('その他', [
       SetsumeishoKoumoku(_gakunaiKiroku),
       SetsumeishoKoumoku(_kantokuCoach),
+      SetsumeishoKoumoku(_koukouJidai),
       SetsumeishoKoumoku(_pcBan),
       SetsumeishoKoumoku(_saigoni),
       SetsumeishoKoumoku(_privacy),
@@ -171,6 +172,24 @@ const ShiyouSetsu _kantokuCoach = ShiyouSetsu('監督とコーチ', [
   '・監督とコーチは、ゲーム内の計算には一切影響しません。',
   '・OBが就任します。30歳以上でないと就任しないので、最初の10年くらいは不在が続きます。',
   '・はじめのうちは、若い監督・コーチばかりになります。',
+]);
+
+// 出身校と高校時代(1.9.5。lib/kansuu/koukou.dart)
+const ShiyouSetsu _koukouJidai = ShiyouSetsu('出身校と高校時代', [
+  '・日本人の選手には、出身校と高校時代の実績があります。',
+  '・ゲーム内の計算には一切影響しません。選手画面の出身地の下に出ます。',
+  '・高校は架空の学校です。名門校には、県外からも選手が集まります。',
+  '・実績は、その年の新入生全員と名前のない高校生で、高校の大会を実際に計算して決めます。',
+  '　・全国高校駅伝は、都道府県予選の1位と地区代表の58校が走ります。',
+  '　・区間の距離と起伏は、実在の大会の男子のコースに合わせています。',
+  '　・留学生は2区か5区だけを走ります。',
+  '　・高校総体は1500m・5000m・3000m障害で、県大会・地区大会・全国大会の順に進みます。',
+  '・高校では入学時の持ちタイムの力で走り、登りや下りなどの能力も結果に効きます。',
+  '・目立った実績のない選手や、高校までほかの競技をしていた選手もいます。',
+  '・記事や実況でも、出身校と高校時代の実績に触れます。',
+  '　・同じ高校の出身者が同じ区間を走ると、実況が「高校の同期対決」として伝えます。',
+  '・留学生には出ません。',
+  '・設定タブの「趣味・高校時代の表示設定」で、表示しないようにできます。',
 ]);
 
 const ShiyouSetsu _pcBan = ShiyouSetsu('PC版(箱庭小駅伝・箱庭小駅伝2)のプレイ経験のある方へ', [

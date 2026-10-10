@@ -7,6 +7,7 @@ import 'package:ekiden/kansuu/gakuren_kantoku.dart';
 import 'package:ekiden/kansuu/ikku_pace.dart';
 import 'package:ekiden/kansuu/kiji/kiji_kihon.dart';
 import 'package:ekiden/kansuu/kiji/kiji_comment.dart';
+import 'package:ekiden/kansuu/koukou.dart'; // 出身校(高校の同期対決。1.9.5)
 
 // ------------------------------------------------------------
 // 駅伝の実況「箱庭スポーツ中継」(1.9.4。レース画面の「実況」のカードと、結果画面の記事の画面)
@@ -854,6 +855,60 @@ Kiji? _kukanJikkyou(
       }
     } else {
       kai('${saMoji(saSeed)}差は、残り$nokoriKukan区間では簡単ではありません。圏外の大学は、一つでも順位を上げる走りに切り替える場面ですね');
+    }
+  }
+
+  // 本文: 高校の同期対決・先輩と後輩(同じ高校の出身者が、別々の大学からこの区間を走ったとき。1.9.5)
+  // 同じ学年(高校の同期)を先に選び、その中では区間順位の合計が良い組を1組だけ
+  if (!koukouHyoujiNashi(k.kantoku)) {
+    _Koma? koA;
+    _Koma? koB;
+    int koTen = 1 << 30;
+    for (int i = 0; i < jun.length; i++) {
+      final SenshuData? senA = jun[i].s;
+      if (senA == null || senA.hirou == 1) continue;
+      final int kouNo = KoukouJouhou.yomu(senA.samusataisei).koukou;
+      if (kouNo == 0) continue;
+      for (int i2 = i + 1; i2 < jun.length; i2++) {
+        final SenshuData? senB = jun[i2].s;
+        if (senB == null || senB.hirou == 1) continue;
+        if (KoukouJouhou.yomu(senB.samusataisei).koukou != kouNo) continue;
+        final int ten = jun[i].kukanJuni + jun[i2].kukanJuni + (senA.gakunen == senB.gakunen ? 0 : 1000);
+        if (ten < koTen) {
+          koTen = ten;
+          koA = jun[i];
+          koB = jun[i2];
+        }
+      }
+    }
+    final _Koma? ka = koA;
+    final _Koma? kb = koB;
+    if (ka != null && kb != null && ka.s != null && kb.s != null) {
+      final SenshuData senA = ka.s!;
+      final SenshuData senB = kb.s!;
+      final String kou = koukouMeiMoji(KoukouJouhou.yomu(senA.samusataisei));
+      final bool douki = senA.gakunen == senB.gakunen;
+      // 区間順位の良い方を先に書く
+      final _Koma yoi = ka.kukanJuni <= kb.kukanJuni ? ka : kb;
+      final _Koma ato = identical(yoi, ka) ? kb : ka;
+      final String juniBun =
+          '区間順位は${myouji(yoi.s!.name)}が${juniMoji(yoi.kukanJuni)}、${myouji(ato.s!.name)}が${juniMoji(ato.kukanJuni)}です。';
+      if (douki) {
+        w.koMidashi('高校の同期対決');
+        w.danraku(
+          '$kouで同じ学年だった${_yobi(w, yoi)}と${_yobi(w, ato)}が、別々のたすきを背負ってこの区間を走りました。$juniBun',
+        );
+        if (kata == KishaKata.joukei) {
+          kai('高校のころは、同じたすきをつないでいた2人です。今日はお互いが一番意識する相手だったでしょうね');
+        }
+      } else {
+        final _Koma senpai = senA.gakunen > senB.gakunen ? ka : kb;
+        final _Koma kouhai = identical(senpai, ka) ? kb : ka;
+        w.koMidashi('母校の先輩と後輩');
+        w.danraku(
+          '$kouの先輩と後輩が、この区間で顔を合わせました。先輩の${_yobi(w, senpai)}と、後輩の${_yobi(w, kouhai)}です。$juniBun',
+        );
+      }
     }
   }
 

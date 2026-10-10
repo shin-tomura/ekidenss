@@ -9,6 +9,7 @@ import 'package:ekiden/constants.dart'; // HENSUUクラスのパスを適宜修�
 import 'dart:math';
 import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/kansuu/scout_com.dart';
+import 'package:ekiden/kansuu/koukou.dart'; // 出身校と高校時代の実績(1.9.5)
 import 'package:ekiden/kansuu/ShoriGuard.dart';
 import 'package:ekiden/screens/ScoutRoundKekka_screen.dart';
 import 'package:ekiden/screens/Modal_shinnyuuseiShingakusaki.dart';
@@ -223,6 +224,19 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
   }
 
   /// 選手の状態の表示(ONのとき。進路未定・○○大学に確定など)
+  /// 新入生の出身校と高校時代の実績の文(1.9.5。koukou.dart。表示しない設定のときと留学生は空)
+  String _koukouMoji(SenshuData s) {
+    if (s.hirou == 1) return '';
+    final KantokuData? kantoku = Hive.box<KantokuData>(
+      'kantokuBox',
+    ).get('KantokuData');
+    if (kantoku == null || koukouHyoujiNashi(kantoku)) return '';
+    final KoukouJouhou j = KoukouJouhou.yomu(s.samusataisei);
+    if (j.mei == null) return '';
+    final List<String> jisseki = koukouJissekiList(j);
+    return '${koukouMeiKenMoji(j)}${jisseki.isEmpty ? '' : '　${jisseki.join('、')}'}';
+  }
+
   String _jyoutaiMoji(SenshuData s) {
     if (comScoutKotowarareta(s)) return '進路未定(あなたの大学は断った)';
     if (!comScoutKettei(s)) return '進路未定';
@@ -1056,6 +1070,8 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
     // コンピュータスカウトONであなたの大学との交渉を断った選手は「断られた」(もう交渉できない)
     final bool kotowari = _comScoutOn && comScoutKotowarareta(freshman);
     if (kotowari) rateStr = '断られた';
+    // 出身校と高校時代の実績(1.9.5)
+    final String koukouMoji = _koukouMoji(freshman);
 
     return Card(
       // 自校なら濃い紺色、他校なら深いグレー
@@ -1185,6 +1201,17 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
+                      // 出身校と高校時代の実績(1.9.5。長いときは折り返す)
+                      if (koukouMoji.isNotEmpty)
+                        Text(
+                          koukouMoji,
+                          style: TextStyle(
+                            color: isMyUniv
+                                ? Colors.amber.withOpacity(0.8)
+                                : Colors.white60,
+                            fontSize: HENSUU.fontsize_honbun - 2,
+                          ),
+                        ),
                       Text(
                         _comScoutOn
                             ? _jyoutaiMoji(freshman)

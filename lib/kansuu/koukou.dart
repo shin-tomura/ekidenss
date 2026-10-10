@@ -21,8 +21,10 @@ import 'package:ekiden/kansuu/koukou_meibo.dart';
 //   都道府県予選(名簿の5校と名前のない高校)の1位47校と、11地区の代表(各地区の予選2位の高校のうち、
 //   予選のタイムが一番良い高校)の58校が走る。区間の起伏は実在の男子のコースの特徴に合わせた
 //   (1区は前半上り・後半下り、3区は登りが多くアップダウン、4区は下りが多い、5区は前半上り・後半下り)。
-//   区間は高校の監督が決める(エースを1区、2番手を3区、3番手を4区…。中距離出身は3kmの区間へ)。
-//   留学生は2区か5区だけ(2024年からの実在の決まり)
+//   区間は高校の監督が決める。留学生は2区か5区だけ(2024年からの実在の決まり)。中距離出身の選手は
+//   空いている3kmの区間(2区・5区。最初の1人は7割が2区)へ、入りきらなければ5kmの7区・6区へ。
+//   長距離の選手は、力の順に1区・3区・4区・7区・6区・(空いていれば)2区・5区へ。
+//   中距離出身の選手は、3kmの区間では1%速く、8km以上の区間では1.5%遅く走る
 // ・高校総体: 1500m・5000m・3000m障害。県大会の上位6人が地区大会、地区大会の上位6人が全国大会。
 //   全国大会は予選3組(各組4着とタイムで3人)のあと、15人の決勝。選手は1人1種目
 // ・タイムの目安(数年分を試した平均): 全国高校駅伝の優勝は2時間2〜4分、1区の区間賞は29分台前半、
@@ -30,12 +32,16 @@ import 'package:ekiden/kansuu/koukou_meibo.dart';
 //   新入生150人のうち、全国高校駅伝を走るのは毎年60人前後、区間賞は2〜3人、高校総体の決勝は18人前後
 // ・新入生をどの高校に入れるか: 出身地の県の5校から、速い選手ほど名門に入りやすく選ぶ。
 //   速い選手は県外の名門に入ることもある(13分台は35%、14分20秒より速いと20%、ほかは5%)
-// ・経歴: 長距離ひと筋・中距離出身・ほかの競技の出身(遅めの選手ほど多い)。隠れた逸材かどうかとは無関係
+// ・経歴: 長距離ひと筋・中距離出身・ほかの競技の出身。隠れた逸材かどうかとは無関係
+//   ・ほかの競技の出身: 入学時の持ちタイムが遅めの選手ほど多い(14分40秒以上8%、14分15秒以上3%、ほか1%)
+//   ・中距離出身: スパート力とペース変動対応力の平均が高い選手ほど多い(4〜30%。全体で約14%。
+//     スパート力は入学時の持ちタイムで決まるので、速い選手ほど多くなる。13分台は約28%)
+//   ・ほかの競技の部活は、その部活に合った能力が高い選手ほど選ばれやすい(_bukatsuNouryoku。ほのかな手がかり)
 //
 // 保存(SenshuData.samusataisei の、出身地と趣味(下の17ビット)より上。数で詰めるので2の49乗未満)
 //   samusataisei = 下の17ビット + 131072 × 上の値
 //   上の値 = 高校(番号+1、0は未設定。256通り) + 256 × (経歴(4通り) + 4 × (全国か(2通り) + 2 × (区間(8通り。
-//   0は出走なし) + 8 × (区間順位(32通り。1〜31、31は31位以下、0はなし) + 32 × (チーム順位(32通り) +
+//   0は出走なし。ほかの競技の出身の選手は駅伝を走らないので、ここに部活の番号を入れる) + 8 × (区間順位(32通り。1〜31、31は31位以下、0はなし) + 32 × (チーム順位(32通り) +
 //   32 × (総体の種目(4通り。0なし・1=1500m・2=5000m・3=3000m障害) + 4 × (段階(4通り。0県・1地区・
 //   2全国予選・3全国決勝) + 4 × 順位(16通り。1〜15、0は16位以下)))))))
 //   (Webでも正しく動くように、ビット演算ではなく掛け算と割り算で詰める)
@@ -79,7 +85,7 @@ class KoukouJouhou {
   /// その段階の順位(1〜15。0は16位以下か、全国予選)
   final int soutaiJuni;
 
-  /// 下の17ビット(出身地と趣味。ほかの競技の名前を決めるのに使う)
+  /// 下の17ビット(出身地と趣味。1.9.5の開発中は部活の名前を決めるのに使っていたが、今は部活の番号を保存する)
   final int shita;
 
   const KoukouJouhou({
@@ -158,7 +164,7 @@ class KoukouJouhou {
 /// 高校総体の種目の名前(1〜3)
 const List<String> koukouShumokuMei = ['', '1500m', '5000m', '3000m障害'];
 
-/// ほかの競技の出身のときの、部活の名前
+/// ほかの競技の出身のときの、部活の名前(番号を保存するので、並びを変えない。8つまで)
 const List<String> _hokaKyougi = [
   'サッカー部',
   '野球部',
@@ -196,7 +202,7 @@ String koukouKeirekiMoji(KoukouJouhou j) {
     case 1:
       return '高校では中距離が専門';
     case 2:
-      return '高校までは${_hokaKyougi[(j.koukou * 31 + j.shita) % _hokaKyougi.length]}';
+      return '高校までは${koukouHokaKyougi(j)}';
     default:
       return '';
   }
@@ -205,7 +211,7 @@ String koukouKeirekiMoji(KoukouJouhou j) {
 /// 全国高校駅伝・都道府県予選の文(目立たない結果なら空)
 String koukouEkidenMoji(KoukouJouhou j) {
   final KoukouMei? m = j.mei;
-  if (m == null) return '';
+  if (m == null || j.keireki == 2) return ''; // ほかの競技の出身は、駅伝の欄に部活の番号が入っている
   final int kukan = j.ekidenKukan;
   final int kj = j.ekidenKukanJuni;
   final int tj = j.ekidenJuni;
@@ -271,14 +277,16 @@ List<String> koukouJissekiList(KoukouJouhou j) {
 }
 
 /// ほかの競技の出身のときの部活の名前(「サッカー部」。ほかの競技の出身でなければ空)
+/// (部活の番号は、駅伝の区間の欄に入っている)
 String koukouHokaKyougi(KoukouJouhou j) {
   if (j.keireki != 2) return '';
-  return _hokaKyougi[(j.koukou * 31 + j.shita) % _hokaKyougi.length];
+  return _hokaKyougi[j.ekidenKukan.clamp(0, _hokaKyougi.length - 1).toInt()];
 }
 
 /// 記事に書く、高校時代の一番の実績の文(過去形。「全国高校駅伝の1区で区間賞を取った」など。
 /// 目立つものがなければ、経歴(中距離・ほかの競技)。それもなければ空)
 String koukouJissekiBun(KoukouJouhou j) {
+  if (j.keireki == 2) return '${koukouHokaKyougi(j)}に所属していた';
   final int ku = j.ekidenKukan;
   final int kj = j.ekidenKukanJuni;
   final int tj = j.ekidenJuni;
@@ -386,6 +394,7 @@ _Kousei _nanashi(int level, int gakunen, Random r) {
   final double t5 =
       heikin[(level + 1).clamp(0, 4).toInt()] + (gakunen == 3 ? 0 : (gakunen == 2 ? 12 : 25)) + _gauss(r) * 16;
   final int spurt = _spurtFromT5(t5, r);
+  final int pace = _nouryoku(spurt - 10 + r.nextInt(21) - 10);
   return _Kousei(
     s: null,
     t5: t5,
@@ -393,10 +402,10 @@ _Kousei _nanashi(int level, int gakunen, Random r) {
     kudari: 1 + r.nextInt(99),
     updown: 1 + r.nextInt(99),
     road: 1 + r.nextInt(99),
-    pace: _nouryoku(spurt - 10 + r.nextInt(21) - 10),
+    pace: pace,
     spurt: spurt,
     ryuugakusei: false,
-    keireki: r.nextInt(100) < 15 ? 1 : 0,
+    keireki: r.nextDouble() < _chuukyoriKakuritsu(spurt, pace) ? 1 : 0,
   );
 }
 
@@ -473,6 +482,14 @@ const List<_Kukan> _yosenKukan = [
 double _kukanTime(_Kousei k, int kk, List<_Kukan> kukan, Random r) {
   final _Kukan c = kukan[kk];
   double t = k.t5 * pow(c.kyori / 5000.0, 1.06).toDouble() * c.keisuu * _road;
+  // 中距離出身の選手は、3kmの区間では速く、8km以上の区間では遅い
+  if (k.keireki == 1) {
+    if (c.kyori <= 3000) {
+      t *= 0.99;
+    } else if (c.kyori >= 8000) {
+      t *= 1.015;
+    }
+  }
   final double m = 1.0 +
       0.00017 * 0.65 * (k.nobori - 50) * (c.nobori / 0.01) +
       0.00018 * 0.58 * (k.kudari - 50) * (c.kudari / 0.01) +
@@ -518,32 +535,44 @@ class _Team {
   _Team(this.koukou, this.ku, this.hoketsu);
 }
 
-/// 部員から7人を選んで区間に並べる(高校の監督の考え方。エース1区・2番手3区・3番手4区・…)
+/// 部員から7人を選んで区間に並べる(高校の監督の考え方。1.9.5)
+/// 7人は力の順に選ぶ。留学生は2区か5区。中距離出身は空いている3kmの区間(2区・5区)へ、
+/// 入りきらなければ5kmの7区・6区へ。長距離の選手は力の順に1区・3区・4区・7区・6区・2区・5区の空きへ
 _Team _haichi(int koukou, List<_Kousei> bu, Random r) {
   final List<_Kousei> kouho = List<_Kousei>.of(bu);
   final Map<_Kousei, double> mikomi = {for (final _Kousei k in kouho) k: k.t5 * (1.0 + _gauss(r) * 0.004)};
   kouho.sort((a, b) => mikomi[a]!.compareTo(mikomi[b]!));
   final List<_Kousei> ryu = [for (final _Kousei k in kouho) if (k.ryuugakusei) k];
   final List<_Kousei> jp = [for (final _Kousei k in kouho) if (!k.ryuugakusei) k];
-  final List<int> jun = [0, 2, 3, 6, 5, 1, 4]; // 力の順に置く区間
   final List<_Kousei?> ku = List<_Kousei?>.filled(7, null);
+  // 3kmの区間(最初の1人は7割が2区)
+  final List<int> sanKiro = r.nextInt(100) < 70 ? [1, 4] : [4, 1];
   if (ryu.isNotEmpty) {
     final int ryuKukan = r.nextBool() ? 1 : 4; // 留学生は2区か5区
     ku[ryuKukan] = ryu.first;
-    jun.remove(ryuKukan);
+    sanKiro.remove(ryuKukan);
   }
-  for (int i = 0; i < jun.length && i < jp.length; i++) {
-    ku[jun[i]] = jp[i];
+  final List<_Kousei> erabu = jp.take(ryu.isNotEmpty ? 6 : 7).toList();
+  // 中距離出身の選手を、3kmの区間 → 7区・6区の順に
+  final List<int> chuuKukan = [...sanKiro, 6, 5];
+  final Set<_Kousei> oita = {};
+  for (final _Kousei k in erabu) {
+    if (k.keireki != 1) continue;
+    for (final int kk in chuuKukan) {
+      if (ku[kk] == null) {
+        ku[kk] = k;
+        oita.add(k);
+        break;
+      }
+    }
   }
-  // 中距離出身の選手を3kmの区間へ(4区・6区・7区にいれば入れ替える)
-  for (final int sk in const [1, 4]) {
-    final _Kousei? a = ku[sk];
-    if (a == null || a.ryuugakusei || a.keireki == 1) continue;
-    for (final int j in const [3, 5, 6]) {
-      final _Kousei? b = ku[j];
-      if (b != null && b.keireki == 1) {
-        ku[sk] = b;
-        ku[j] = a;
+  // 長距離の選手(と、入りきらなかった中距離出身の選手)を、力の順に空いている区間へ
+  for (final _Kousei k in erabu) {
+    if (oita.contains(k)) continue;
+    for (final int kk in const [0, 2, 3, 6, 5, 1, 4]) {
+      if (ku[kk] == null) {
+        ku[kk] = k;
+        oita.add(k);
         break;
       }
     }
@@ -638,12 +667,47 @@ int _koukouErabu(_Kousei k, int ken, Random r) {
   return kouho.last;
 }
 
-/// 経歴を決める(遅めの選手ほど、中距離出身・ほかの競技の出身が多い)
-int _keirekiKimeru(double t5, Random r) {
+/// 中距離出身になる確率(スパート力とペース変動対応力の平均が高いほど高い。4〜30%。1.9.5)
+double _chuukyoriKakuritsu(int spurt, int pace) {
+  return (0.06 + 0.0045 * ((spurt + pace) / 2.0 - 20)).clamp(0.04, 0.30).toDouble();
+}
+
+/// 経歴を決める(ほかの競技の出身は遅めの選手ほど多く、中距離出身はスピード系の能力が高い選手ほど多い)
+int _keirekiKimeru(double t5, int spurt, int pace, Random r) {
   final int x = r.nextInt(100);
-  if (t5 >= 880) return x < 8 ? 2 : (x < 23 ? 1 : 0);
-  if (t5 >= 855) return x < 3 ? 2 : (x < 18 ? 1 : 0);
-  return x < 1 ? 2 : (x < 13 ? 1 : 0);
+  final int hoka = t5 >= 880 ? 8 : (t5 >= 855 ? 3 : 1);
+  if (x < hoka) return 2;
+  return r.nextDouble() < _chuukyoriKakuritsu(spurt, pace) ? 1 : 0;
+}
+
+/// ほかの競技の部活に合った能力(1.9.5。その能力が高い選手ほど、その部活が選ばれやすい)
+int _bukatsuNouryoku(SenshuData s, int bukatsu) {
+  switch (bukatsu) {
+    case 1:
+      return s.spurtryoku; // 野球部: 瞬発力
+    case 3:
+      return s.choukyorinebari; // 水泳部: 心肺の強さ
+    case 5:
+      return s.noboritekisei; // スキー部(クロスカントリー): 登り
+    case 6:
+      return s.noborikudarikirikaenouryoku; // ラグビー部: 体の強さ(アップダウン)
+    default:
+      return s.paceagesagetaiouryoku; // サッカー・バスケットボール・ハンドボール・バドミントン: 止まって走っての繰り返し
+  }
+}
+
+/// ほかの競技の部活を決める(番号。合った能力が高いほど選ばれやすい)
+int _bukatsuKimeru(SenshuData s, Random r) {
+  final List<double> omomi = [
+    for (int i = 0; i < _hokaKyougi.length; i++) exp((_nouryoku(_bukatsuNouryoku(s, i)) - 50) / 15.0),
+  ];
+  final double goukei = omomi.fold<double>(0, (a, b) => a + b);
+  double x = r.nextDouble() * goukei;
+  for (int i = 0; i < omomi.length; i++) {
+    x -= omomi[i];
+    if (x <= 0) return i;
+  }
+  return omomi.length - 1;
 }
 
 /// 1学年分(その年の高校3年生)を計算して、新入生の高校の情報を決める
@@ -660,7 +724,7 @@ Map<int, KoukouJouhou> _nendoKeisan(List<SenshuData> shinnyuusei, Random r) {
     if (ken < 0 || ken >= kenSuu) ken = r.nextInt(kenSuu);
     final double t5 = s.kiroku_nyuugakuji_5000;
     final bool kirokuAri = t5 > 0 && t5 < 1200;
-    final int keireki = kirokuAri ? _keirekiKimeru(t5, r) : 2;
+    final int keireki = kirokuAri ? _keirekiKimeru(t5, s.spurtryoku, s.paceagesagetaiouryoku, r) : 2;
     final _Kousei? k = keireki == 2 ? null : _shinnyuusei(s, keireki);
     int koukou;
     if (k != null) {
@@ -675,7 +739,12 @@ Map<int, KoukouJouhou> _nendoKeisan(List<SenshuData> shinnyuusei, Random r) {
       ];
       koukou = kouho.isEmpty ? r.nextInt(koukouMeibo.length) : kouho[r.nextInt(kouho.length)];
     }
-    kekka[s.id] = KoukouJouhou(koukou: koukou + 1, keireki: keireki);
+    // ほかの競技の出身は、駅伝の区間の欄に部活の番号を入れる
+    kekka[s.id] = KoukouJouhou(
+      koukou: koukou + 1,
+      keireki: keireki,
+      ekidenKukan: keireki == 2 ? _bukatsuKimeru(s, r) : 0,
+    );
   }
 
   // 名前のない部員(各校9人)と留学生

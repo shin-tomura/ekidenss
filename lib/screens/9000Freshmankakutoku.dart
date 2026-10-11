@@ -100,6 +100,8 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
   // 地区めぐり(1.9.6。コンピュータスカウトONで、今年のスカウトを地区めぐりで始めたとき。scout_com.dart)
   // 地区ごとに1ラウンド。何地区目かは、今までのラウンドと同じく scoutChances(残りの地区の数)で数える
   bool _chikuMeguri = false;
+  // 地区めぐり(声かけ)か(1.9.6。falseなら地区めぐり(交渉))。声かけには成功率がなく、失敗(保留)もない
+  bool _koekake = false;
   List<int> _chikuJunban = []; // その年の地区の順番(新入生のいない地区を除く)
   Map<int, int> _chikuBetsu = {}; // 選手id → 地区
   Map<int, int> _zenkokuJuni = {}; // 選手id → 新入生(留学生を除く)全体の中での持ちタイムの順位
@@ -127,12 +129,14 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
         _roundSuu = _ghensuu!.scoutChances;
       }
       // 地区めぐり(1.9.6。スカウトを始めたときの形で決まる。途中で設定を変えても、今年はそのまま)
-      if (_comScoutOn &&
-          _ghensuu != null &&
-          comScoutKotoshiChikuMeguri(kantoku, _ghensuu!.year)) {
-        _chikuMeguri = true;
-        _chikuJunban = comScoutChikuJunban(_ghensuu!.year);
-        _roundSuu = _chikuJunban.length;
+      if (_comScoutOn && _ghensuu != null) {
+        final int katachi = comScoutKotoshiKatachi(kantoku, _ghensuu!.year);
+        if (katachi != comScoutKatachiZenkoku) {
+          _chikuMeguri = true;
+          _koekake = katachi == comScoutKatachiKoekake;
+          _chikuJunban = comScoutChikuJunban(_ghensuu!.year);
+          _roundSuu = _chikuJunban.length;
+        }
       }
     }
 
@@ -235,11 +239,15 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
 
     // 進路未定の選手の成功率をkegaflagに入れる(決まった選手と、あなたの大学に断った選手は目印のまま)
     // (地区めぐりでは、成功率に下限を入れる。1.9.6)
-    final Map<int, double> seikouritsu = comScoutSeikouritsuIchiran(
-      univid: myUnivId,
-      nen: _ghensuu!.year, // 変わり者を決めるのに使う(1.9.0)
-      chikuMeguriGh: _chikuMeguri ? _ghensuu : null,
-    );
+    // (地区めぐり(声かけ)は成功率がないので計算しない。kegaflagには100%を入れておき、
+    //  成功率の絞り込みで外れないようにする。画面には成功率を出さない。1.9.6)
+    final Map<int, double> seikouritsu = _koekake
+        ? const <int, double>{}
+        : comScoutSeikouritsuIchiran(
+            univid: myUnivId,
+            nen: _ghensuu!.year, // 変わり者を決めるのに使う(1.9.0)
+            chikuMeguriGh: _chikuMeguri ? _ghensuu : null,
+          );
     // 地区めぐりの地区と順位(1.9.6)
     if (_chikuMeguri) {
       _chikuBetsu = comScoutChikuBetsu(shinnyuusei);
@@ -249,7 +257,7 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
     for (final SenshuData s in _targetFreshmen) {
       if (comScoutKettei(s)) continue;
       if (comScoutKotowarareta(s)) continue;
-      final double r = seikouritsu[s.id] ?? 0.001;
+      final double r = _koekake ? 1.0 : (seikouritsu[s.id] ?? 0.001);
       // 0.1%単位で入れる(1%未満も0.1%単位。1.8.8。scout_com.dart)
       s.kegaflag = scoutSeikouritsuKegaflag(r);
       await s.save();
@@ -333,13 +341,18 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('地区めぐり', style: TextStyle(color: Colors.black)),
+          title: Text(
+            _koekake ? '地区めぐり(声かけ)' : '地区めぐり(交渉)',
+            style: const TextStyle(color: Colors.black),
+          ),
           content: SingleChildScrollView(
             child: Text(
               '${hajimete ? '今年から、コンピュータスカウトONの新入生スカウトが「地区めぐり」になりました。'
-                        '大学画面の「コンピュータスカウト」で、今までの「全国一斉」に戻せます。\n\n' : ''}'
-              '新入生は出身校の地区ごとに分かれていて、地区ごとに1ラウンドずつ交渉します。'
-              'どの大学も、今の地区の選手に1人まで交渉できます(見送ることもできます)。'
+                        '大学画面の「コンピュータスカウト」で、今までの「全国一斉」などに変えられます。\n\n' : ''}'
+              '${_koekake ? '新入生は出身校の地区ごとに分かれていて、地区ごとに1ラウンドずつ声をかけます。'
+                        'どの大学も、今の地区の選手に1人まで声をかけられます(見送ることもできます)。'
+                        'ほかに声をかけた大学がなければ確定し、重なれば争奪戦になります。' : '新入生は出身校の地区ごとに分かれていて、地区ごとに1ラウンドずつ交渉します。'
+                        'どの大学も、今の地区の選手に1人まで交渉できます(見送ることもできます)。'}'
               'ほかの地区の選手は、上の地区の切り替え(左右の矢印か、地区の名前を押す)で見られます。\n\n'
               '今年の地区の順番\n${narabi.join('\n')}',
               style: const TextStyle(color: Colors.black),
@@ -413,6 +426,7 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
   Future<void> _chikuRound(SenshuData? freshman) async {
     final int? chiku = _imaChiku;
     if (chiku == null || _ghensuu!.scoutChances <= 0) return;
+    // (声かけでは成功率を使わない。1.9.6)
     final double successRate = freshman == null
         ? 0.0
         : scoutSeikouritsuFromKegaflag(freshman.kegaflag);
@@ -434,6 +448,7 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
         playerSeikouritsu: successRate,
         koudou: koudou,
         chiku: chiku,
+        koekake: _koekake,
       );
       _ghensuu!.scoutChances--;
       await _ghensuu!.save();
@@ -451,12 +466,14 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
     await _showKekkaDialog(
       '$chikuMeiの結果',
       [
-        if (freshman == null) '$chikuMeiでは交渉しませんでした。',
+        if (freshman == null)
+          _koekake ? '$chikuMeiでは声をかけませんでした。' : '$chikuMeiでは交渉しませんでした。',
         ...comScoutKekkaBun(
           kekka,
           _ghensuu!.MYunivid,
           jibunNomi: true,
-          horyuu: true,
+          horyuu: !_koekake,
+          koekake: _koekake,
         ),
         _chikuKakuteiBun(kekka),
       ],
@@ -557,7 +574,8 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
     if (hyouji == null) {
       sub = ima == null ? '全部の地区の交渉が終わりました' : '今の地区は${comScoutChikuMei(ima)}';
     } else if (hyouji == ima) {
-      sub = '今の地区(${_chikuJunban.indexOf(ima!) + 1}/${_chikuJunban.length})・交渉は1人まで';
+      sub = '今の地区(${_chikuJunban.indexOf(ima!) + 1}/${_chikuJunban.length})・'
+          '${_koekake ? '声かけ' : '交渉'}は1人まで';
     } else {
       sub = ima == null
           ? 'この地区は終わりました'
@@ -1094,7 +1112,8 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
                     i + 1: comScoutChikuMei(_chikuJunban[i]),
                 }
               : const <int, String>{},
-          horyuu: _chikuMeguri,
+          horyuu: _chikuMeguri && !_koekake,
+          koekake: _koekake,
         ),
       ),
     );
@@ -1107,12 +1126,39 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
     );
   }
 
-  /// コンピュータスカウトONで、地区めぐりのときの説明(1.9.6)
+  /// コンピュータスカウトONで、地区めぐり(声かけ)のときの説明(1.9.6)
+  String _koekakeSetsumei() {
+    return 'コンピュータスカウトONは、コンピュータの大学との真剣勝負です'
+        '(大学画面の「コンピュータスカウト」で、スカウトの形を変えたり、OFFにしたりできます)。\n\n'
+        '新入生は全員「進路未定」です(あなたの大学も含め、どの大学にも分かりません)。\n\n'
+        '今年のスカウトは「地区めぐり(声かけ)」です。新入生は出身校の地区(北海道・東北など11地区)ごとに分かれていて、'
+        '地区ごとに1ラウンドずつ声をかけます。地区の順番は毎年変わります。'
+        'どの大学も、今の地区の選手に1人まで声をかけられ、見送ることもできます。'
+        'ほかの地区の選手は、上の地区の切り替え(左右の矢印か、地区の名前を押す)で見られます。'
+        '声をかけられるのは、その地区の番のときだけです。\n\n'
+        '声かけに成功率はありません。ほかに声をかけた大学がなければ、その大学に確定します。'
+        '同じ選手に複数の大学が声をかけた場合は争奪戦になり、選手が進学先を選びます'
+        '(名声の高い大学ほど選ばれやすく、設定タブの「入学時名声影響度設定」で強さが変わります)。'
+        'まれに、大学の名声をあまり気にしない新入生もいます。'
+        'コンピュータの大学は、自校の基準を満たす選手の中で、評価の高い選手に声をかけます。\n\n'
+        'カードの「全国12位(未定で5位)」は、新入生全体と、まだ進路未定の選手の中での、持ちタイムの順位です。\n\n'
+        '確定できるのは、日本人の新入生の枠(5人。留学生が入学する大学は4人)までです。'
+        'あなたの大学の枠は$_waku人で、確定しているのは$_kakuteiSuu人です。'
+        '${_ryuugakuseiSuu > 0 ? 'あなたの大学には留学生が$_ryuugakuseiSuu人入学します。' : ''}\n\n'
+        '全部の地区が終わってスカウトを終えると(途中で終えたときは、残りの地区をコンピュータの大学だけで行います)、'
+        '確定しなかった選手が自ら志望して進学先を選びます'
+        '(名声の高い大学ほど選ばれやすく、どの大学も枠がちょうど埋まります)。\n\n'
+        '「ラウンドの結果」では、全大学の地区ごとの動きを見られます(スカウト画面を開いている間だけ記録しています)。\n\n'
+        'スカウトを終えると、全大学の新入生の進学先(声かけ・志望・留学生)を見られます'
+        '(大学画面の「新入生の進学先(全大学)」からも、翌年のスカウトまで見られます)。';
+  }
+
+  /// コンピュータスカウトONで、地区めぐり(交渉)のときの説明(1.9.6)
   String _chikuMeguriSetsumei() {
     return 'コンピュータスカウトONは、コンピュータの大学との真剣勝負です。名声の低い大学ほど成功率は低くなります'
-        '(大学画面の「コンピュータスカウト」で、今までの「全国一斉」にしたり、OFFにしたりできます)。\n\n'
+        '(大学画面の「コンピュータスカウト」で、スカウトの形を変えたり、OFFにしたりできます)。\n\n'
         '新入生は全員「進路未定」です(あなたの大学も含め、どの大学にも分かりません)。\n\n'
-        '今年のスカウトは「地区めぐり」です。新入生は出身校の地区(北海道・東北など11地区)ごとに分かれていて、'
+        '今年のスカウトは「地区めぐり(交渉)」です。新入生は出身校の地区(北海道・東北など11地区)ごとに分かれていて、'
         '地区ごとに1ラウンドずつ交渉します。地区の順番は毎年変わります。'
         'どの大学も、今の地区の選手に1人まで交渉でき、見送ることもできます。'
         'ほかの地区の選手は、上の地区の切り替え(左右の矢印か、地区の名前を押す)で見られます。交渉できるのは、その地区の番のときだけです。\n\n'
@@ -1141,12 +1187,18 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
       builder: (context) {
         return AlertDialog(
           title: Text(
-            _chikuMeguri ? 'コンピュータスカウトON(地区めぐり)' : 'コンピュータスカウトON',
+            _koekake
+                ? 'コンピュータスカウトON・地区めぐり(声かけ)'
+                : _chikuMeguri
+                ? 'コンピュータスカウトON・地区めぐり(交渉)'
+                : 'コンピュータスカウトON',
             style: const TextStyle(color: Colors.black),
           ),
           content: SingleChildScrollView(
             child: Text(
-              _chikuMeguri
+              _koekake
+                  ? _koekakeSetsumei()
+                  : _chikuMeguri
                   ? _chikuMeguriSetsumei()
                   : 'コンピュータスカウトONは、コンピュータの大学との真剣勝負です。名声の低い大学ほど成功率は低くなります'
               '(大学画面の「コンピュータスカウト」でOFFにすると、今まで通りのスカウトになります)。\n\n'
@@ -1211,6 +1263,7 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
             roundBangou: hajime + i,
             koudou: koudou,
             chiku: _chikuMeguri ? _chikuJunban[idx] : null,
+            koekake: _koekake,
           );
           nokoriKiroku.add(MapEntry(hajime + i, koudou));
         }
@@ -1221,13 +1274,14 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
         final Set<int> horyuu = {};
         final Map<int, int> shigan = await comScoutShigan(
           gh: _ghensuu!,
-          horyuuJiko: _chikuMeguri ? horyuu : null,
+          horyuuJiko: _chikuMeguri && !_koekake ? horyuu : null,
         );
         bun.addAll(
           comScoutNyuugakuBun(
             myUnivid: _ghensuu!.MYunivid,
             shigan: shigan,
             horyuu: horyuu,
+            koekake: _koekake,
           ),
         );
         await ShoriGuard.end();
@@ -1623,6 +1677,8 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
     // (地区めぐりでは「保留」。1.9.6)
     final bool kotowari = _comScoutOn && comScoutKotowarareta(freshman);
     if (kotowari) rateStr = _chikuMeguri ? '保留' : '断られた';
+    // 地区めぐり(声かけ)には成功率がないので、進路未定の選手は「未定」(1.9.6)
+    if (_koekake && !kettei) rateStr = '未定';
     // 出身校と高校時代の実績(1.9.5)
     final String koukouMoji = _koukouMoji(freshman);
     // 地区めぐりの地区と順位、交渉できる地区か(1.9.6)
@@ -1631,7 +1687,7 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
         : '';
     final int? senshuChiku = _chikuBetsu[freshman.id];
     final bool chikuOk = !_chikuMeguri || senshuChiku == _imaChiku;
-    String kousyouLabel = '交渉';
+    String kousyouLabel = _koekake ? '声をかける' : '交渉';
     if (!chikuOk && senshuChiku != null) {
       final int i = _chikuJunban.indexOf(senshuChiku);
       final int? ima = _imaChiku;
@@ -1724,7 +1780,7 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
                         ),
                       ] else ...[
                         Text(
-                          kettei || kotowari ? '状態' : '成功率',
+                          kettei || kotowari || _koekake ? '状態' : '成功率',
                           style: const TextStyle(
                             color: Colors.white54,
                             fontSize: HENSUU.fontsize_honbun - 2,
@@ -2200,8 +2256,10 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
         _buildSortButton('ペース変動', SortCriterion.paceagesagetaiouryoku),
       );
     }
-    // ★交渉成功確率のボタンを追加
-    sortButtons.add(_buildSortButton('成功率', SortCriterion.successRate));
+    // ★交渉成功確率のボタンを追加(地区めぐり(声かけ)は成功率がないので出さない。1.9.6)
+    if (!_koekake) {
+      sortButtons.add(_buildSortButton('成功率', SortCriterion.successRate));
+    }
     sortButtons.add(_buildSortButton('安定感', SortCriterion.anteikan));
     sortButtons.add(_buildSortButton('大学ID', SortCriterion.univid));
     return SingleChildScrollView(
@@ -2392,8 +2450,12 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
                             ),
                           ]),
 
-                          _buildSectionLabel('交渉・メンタル条件'),
+                          _buildSectionLabel(
+                            _koekake ? 'メンタル条件' : '交渉・メンタル条件',
+                          ),
                           _buildCard([
+                            // 地区めぐり(声かけ)は成功率がないので出さない(1.9.6)
+                            if (!_koekake)
                             _buildInputRow(
                               icon: Icons.handshake_outlined,
                               label: '最低成功率',
@@ -2409,7 +2471,7 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
                                 width: 80,
                               ),
                             ),
-                            const Divider(height: 1),
+                            if (!_koekake) const Divider(height: 1),
                             _buildInputRow(
                               icon: Icons.trending_up,
                               label: '最低安定感',
@@ -2774,9 +2836,15 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('交渉確認', style: TextStyle(color: Colors.black)),
+          title: Text(
+            _koekake ? '声かけの確認' : '交渉確認',
+            style: const TextStyle(color: Colors.black),
+          ),
           content: Text(
-            '本当に${freshman.name}選手と交渉しますか？',
+            _koekake
+                ? '本当に${freshman.name}選手に声をかけますか？\n'
+                      '(ほかの大学も声をかけたら争奪戦になり、名声の高い大学ほど選ばれやすくなります)'
+                : '本当に${freshman.name}選手と交渉しますか？',
             style: const TextStyle(color: Colors.black),
           ),
           actions: [

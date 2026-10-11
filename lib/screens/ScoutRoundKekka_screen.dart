@@ -18,8 +18,11 @@ class ScoutRoundKekkaScreen extends StatefulWidget {
   /// ラウンドの番号 → 地区の名前(地区めぐり。「ラウンド3(近畿)」のように添える。1.9.6)
   final Map<int, String> roundMei;
 
-  /// まとまらなかった交渉を「保留」と出すか(地区めぐり。1.9.6)
+  /// まとまらなかった交渉を「保留」と出すか(地区めぐり(交渉)。1.9.6)
   final bool horyuu;
+
+  /// 「交渉」ではなく「声かけ」と出すか(地区めぐり(声かけ)。1.9.6)
+  final bool koekake;
 
   const ScoutRoundKekkaScreen({
     super.key,
@@ -28,6 +31,7 @@ class ScoutRoundKekkaScreen extends StatefulWidget {
     this.hajimeRound,
     this.roundMei = const <int, String>{},
     this.horyuu = false,
+    this.koekake = false,
   });
 
   @override
@@ -201,6 +205,7 @@ class _ScoutRoundKekkaScreenState extends State<ScoutRoundKekkaScreen> {
                     k,
                     soudatsusen: soudatsusen,
                     horyuu: widget.horyuu,
+                    koekake: widget.koekake,
                   ),
                   style: TextStyle(
                     color: kakutei ? Colors.cyanAccent : HENSUU.textcolor,

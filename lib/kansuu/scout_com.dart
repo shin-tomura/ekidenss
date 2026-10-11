@@ -1792,10 +1792,12 @@ String comScoutKoudouBun(
 /// スカウトの最後に出す、プレイヤーの大学に入学する新入生の一覧
 /// [shigan] 最後の志望で決まった選手(選手id → 大学)
 /// [horyuu] あなたの大学に返事を保留していて、志望であなたの大学を選んだ選手(地区めぐり。1.9.6)
+/// [koekake] がtrue(地区めぐり(声かけ))なら、確定した選手を【声かけ】と書く(1.9.6)
 List<String> comScoutNyuugakuBun({
   required int myUnivid,
   required Map<int, int> shigan,
   Set<int> horyuu = const <int>{},
+  bool koekake = false,
 }) {
   final List<SenshuData> jiko =
       comScoutShinnyuusei().where((s) => s.univid == myUnivid).toList()
@@ -1814,7 +1816,7 @@ List<String> comScoutNyuugakuBun({
       hoka.add('【留学生】${s.name}選手が入学します');
     } else if (comScoutKakutei(s)) {
       // スカウト後は全員の進学先が決まっているので、「確定」ではなく入り方(交渉・志望)で出す(1.8.0)
-      kakutei.add('【交渉】${s.name}選手(5000m $time)');
+      kakutei.add('【${koekake ? '声かけ' : '交渉'}】${s.name}選手(5000m $time)');
     } else if (horyuu.contains(s.id)) {
       shiganBun.add(
         '【志望】交渉で返事を保留していた${s.name}選手が、自ら志望して入学します(5000m $time)',

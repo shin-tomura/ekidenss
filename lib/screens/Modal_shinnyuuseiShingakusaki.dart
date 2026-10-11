@@ -64,6 +64,11 @@ class _ModalShinnyuuseiShingakusakiState
     extends State<ModalShinnyuuseiShingakusaki> {
   _HyoujiShurui _hyouji = _HyoujiShurui.daigakuGoto;
   _UnivNarabi _narabi = _UnivNarabi.idJun;
+  // その年のスカウトが地区めぐり(声かけ)なら、確定した選手を【交渉】ではなく【声かけ】と出す(1.9.6)
+  bool _koekakeNen = false;
+
+  /// 確定した選手の入り方の名前(交渉か声かけ。1.9.6)
+  String get _kakuteiMei => _koekakeNen ? '声かけ' : '交渉';
 
   @override
   Widget build(BuildContext context) {
@@ -72,6 +77,10 @@ class _ModalShinnyuuseiShingakusakiState
       'kantokuBox',
     ).get('KantokuData');
     final int myUnivid = gh?.MYunivid ?? -1;
+    _koekakeNen =
+        gh != null &&
+        kantoku != null &&
+        comScoutKotoshiKatachi(kantoku, gh.year) == comScoutKatachiKoekake;
 
     final List<UnivData> univs = Hive.box<UnivData>('univBox').values.toList()
       ..sort((a, b) => a.id.compareTo(b.id));
@@ -195,7 +204,7 @@ class _ModalShinnyuuseiShingakusakiState
   String _joutaiMei(_Joutai j) {
     switch (j) {
       case _Joutai.kakutei:
-        return '交渉';
+        return _kakuteiMei;
       case _Joutai.shigan:
         return '志望';
       case _Joutai.ryuugakusei:
@@ -384,7 +393,7 @@ class _ModalShinnyuuseiShingakusakiState
         .where((s) => joutai[s.id] == _Joutai.ryuugakusei)
         .length;
     final String ninzuu = kubetsuAri
-        ? '交渉$kakutei 志望$shigan${ryuugakusei > 0 ? ' 留学生$ryuugakusei' : ''}'
+        ? '$_kakuteiMei$kakutei 志望$shigan${ryuugakusei > 0 ? ' 留学生$ryuugakusei' : ''}'
         : '新入生${senshu.length}人${ryuugakusei > 0 ? '(留学生$ryuugakusei人)' : ''}';
 
     return Card(

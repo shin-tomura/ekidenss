@@ -5,6 +5,7 @@ import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/kansuu/ikku_pace.dart';
 import 'package:ekiden/kansuu/kiji/kiji_kihon.dart';
 import 'package:ekiden/kansuu/kiji/kiji_comment.dart';
+import 'package:ekiden/kansuu/kiji/kiji_kimochi.dart' show kimochiTokuhitsu; // 駅伝男の特集(1.9.7)
 
 // ------------------------------------------------------------
 // 展望の記事(1.9.2。直前順位予想の画面の「展望記事」)
@@ -29,13 +30,14 @@ import 'package:ekiden/kansuu/kiji/kiji_comment.dart';
 //
 // 記事(出せるものだけ並べる)
 //  駅伝: 1.優勝争い 2.自分の大学 3.区間の見どころ(1区のペース予想も)
-//        4.シード権争い(11月駅伝は上位8校、正月駅伝は上位10校) 5.当日変更の読み(全体の持ちタイム上位の選手が補欠のとき)
+//        4.「駅伝男」の特集(駅伝男が特に高い選手が2人以上のとき。1人なら区間の見どころで触れる。1.9.7)
+//        5.シード権争い(11月駅伝は上位8校、正月駅伝は上位10校) 6.当日変更の読み(全体の持ちタイム上位の選手が補欠のとき)
 //  予選: 1.通過争い 2.注目選手(組ごと・個人) 3.自分の大学
 //
 // スタート直前号(1.9.2。目標順位の確認の画面の「スタート直前号」。駅伝の1区のスタート前だけ)
 //  当日変更(コンピュータの大学の戦略的変更を含む)のあとの、実際に走る選手で書く。
 //  チームの平均は走る選手で出し、1区のペース予想には当日の調子を入れる。言い回しの乱数は展望と分ける
-//  記事: 1.当日変更の結果 2.優勝争い 3.自分の大学 4.区間の見どころ 5.シード権争い
+//  記事: 1.当日変更の結果 2.優勝争い 3.自分の大学 4.区間の見どころ 5.「駅伝男」の特集 6.シード権争い
 //
 // 1.9.4: 選手の因縁(kiji_kihon.dart の senshuInnen。レース前は kekka: false)を、自分の大学の
 //  注目選手・エースのコメント・各区間の持ちタイム1位の紹介に入れる。当日変更の記事と自分の大学の
@@ -472,6 +474,8 @@ List<Kiji> tenbouKiji(
     final Kiji? jibun = _jibunTenbou(t, yosou);
     if (jibun != null) list.add(jibun);
     list.add(_kukanTenbou(t, yosou));
+    final Kiji? otoko = _ekidenOtokoTenbou(t);
+    if (otoko != null) list.add(otoko);
     final Kiji? seed = _seedTenbou(t, yosou);
     if (seed != null) list.add(seed);
   } else if (k.ekiden) {
@@ -479,6 +483,8 @@ List<Kiji> tenbouKiji(
     final Kiji? jibun = _jibunTenbou(t, yosou);
     if (jibun != null) list.add(jibun);
     list.add(_kukanTenbou(t, yosou));
+    final Kiji? otoko = _ekidenOtokoTenbou(t);
+    if (otoko != null) list.add(otoko);
     final Kiji? seed = _seedTenbou(t, yosou);
     if (seed != null) list.add(seed);
     final Kiji? henkou = _toujitsuTenbou(t);
@@ -919,6 +925,9 @@ Kiji _kukanTenbou(Tenbou t, List<KijiYosouJin> yosou) {
           chousiIreru: t.chokuzen,
         )
       : null;
+  // 駅伝男が特に高い選手が1人だけなら、ここで触れる(2人以上は特集記事。1.9.7)
+  final List<({SenshuData s, int kk})> otokoList = _ekidenOtoko(t);
+  final ({SenshuData s, int kk})? otoko = otokoList.length == 1 ? otokoList.first : null;
 
   // 見出し
   String midashi;
@@ -980,6 +989,7 @@ Kiji _kukanTenbou(Tenbou t, List<KijiYosouJin> yosou) {
     } else if (pace.midashi <= 1) {
       sb.write('力のある選手には物足りない流れになりそうで、仕掛けどころが注目される。');
     }
+    if (otoko != null && otoko.kk == 0) sb.write(_otokoIkkuBun(t, w, otoko.s));
     w.danraku(sb.toString());
   }
 
@@ -1040,6 +1050,10 @@ Kiji _kukanTenbou(Tenbou t, List<KijiYosouJin> yosou) {
         );
       }
     }
+    // 駅伝男が特に高い選手(1人だけのとき。1区で「1区の流れ」に書いたときは書かない。1.9.7)
+    if (otoko != null && otoko.kk == kk && !(kk == 0 && pace != null)) {
+      sb.write(kk == 0 ? _otokoIkkuBun(t, w, otoko.s) : _otokoKukanBun(t, w, otoko.s));
+    }
     w.danraku(sb.toString());
   }
 
@@ -1074,6 +1088,219 @@ Kiji _kukanTenbou(Tenbou t, List<KijiYosouJin> yosou) {
         gyou,
       ),
     ],
+  );
+}
+
+// ------------------------------------------------------------
+// 駅伝 「駅伝男」の特集(1.9.7)
+// 駅伝男が特に高い(90以上)、走る予定の大学の選手を取り上げる。2人以上なら特集記事、
+// 1人なら区間の見どころの本文で触れる。駅伝男は最初から見える能力なので、値は書かずに言葉で書く
+// (kiji_kimochi.dart)。コンピュータの大学は駅伝男の高い選手に前半突っ込みを指示することが多いので
+// 「攻めてくるはず」と書き、1区は指示なしでも自分から飛び出すことがあるので「かもしれない」と書く。
+// 自分の大学の選手は、総監督の判断を決めつけず「指示が出れば」と書く。学連選抜の選手は学連選抜通信に任せる
+// ------------------------------------------------------------
+
+/// 駅伝男が特に高い、走る予定の大学の選手(区間の順。区間の中は持ちタイムの順)
+List<({SenshuData s, int kk})> _ekidenOtoko(Tenbou t) {
+  if (!t.k.ekiden) return [];
+  return [
+    for (int kk = 0; kk < t.ks && kk < t.kukanJun.length; kk++)
+      for (final SenshuData s in t.kukanJun[kk])
+        if (s.konjou >= kimochiTokuhitsu) (s: s, kk: kk),
+  ];
+}
+
+/// 1区の駅伝男の文(1人だけのとき。自分の大学の選手は「指示が出れば」)
+String _otokoIkkuBun(Tenbou t, KijiKakite w, SenshuData s) {
+  final String mei = w.senshu(s, daigaku: true);
+  return s.univid == t.k.gh.MYunivid
+      ? '「駅伝男」の資質が際立つ$meiに飛び出しの指示が出れば、流れは一変するかもしれない。'
+      : '「駅伝男」の資質が際立つ$meiが号砲と同時に飛び出せば、流れは一変するかもしれない。';
+}
+
+/// 2区以降の駅伝男の文(1人だけのとき。自分の大学の選手は「指示が出れば」)
+String _otokoKukanBun(Tenbou t, KijiKakite w, SenshuData s) {
+  final String mei = w.senshu(s, daigaku: true);
+  return s.univid == t.k.gh.MYunivid
+      ? '「駅伝男」の資質が際立つ$meiは、前半から攻める指示が出れば、持ち味が生きる。'
+      : '「駅伝男」の資質が際立つ$meiは、前半から攻めてくるはずだ。';
+}
+
+/// スタート直前号で、当日変更で区間[kk]に入った選手[s]の事情(当日変更で入っていなければnull)
+ToujituJijou? _otokoToujitsu(Tenbou t, SenshuData s, int kk) {
+  if (!t.chokuzen) return null;
+  final TenbouUniv? x = t.univ(s.univid);
+  if (x == null) return null;
+  final List<SenshuData?> kukan = List<SenshuData?>.filled(t.ks, null);
+  for (final SenshuData h in x.hashiru) {
+    final int e = t.k.entry(h);
+    if (e >= 0 && e < t.ks) kukan[e] = h;
+  }
+  final ToujituJijou? j = toujituJijou(t.k, x.u, kukan)[kk];
+  return (j != null && j.hairi.id == s.id) ? j : null;
+}
+
+Kiji? _ekidenOtokoTenbou(Tenbou t) {
+  final List<({SenshuData s, int kk})> list = _ekidenOtoko(t);
+  if (list.length < 2) return null;
+  final KijiKankyou k = t.k;
+  const int no = 7;
+  final KijiKakite w = KijiKakite(k, kijiTane(k.gh, k.race, _taneNo(t, no)));
+  final KishaKata kata = k.kishaKata(_taneNo(t, no));
+  final int race = k.race;
+  final int n = list.length;
+  // 1区のペース予想(区間の見どころと同じ。スタート直前号は当日の調子を入れる)
+  final IkkuPaceYosou? pace = (ikkuPaceTaishou(race) && list.any((x) => x.kk == 0))
+      ? ikkuPaceYosou(
+          gh: k.gh,
+          racebangou: race,
+          sortedSenshu: k.senshu,
+          sortedUniv: k.univ,
+          kantoku: k.kantoku,
+          chousiIreru: t.chokuzen,
+        )
+      : null;
+
+  // 見出し(1区に駅伝男がいれば、ときどき1区から)
+  ({SenshuData s, int kk})? ikku;
+  for (final ({SenshuData s, int kk}) x in list) {
+    if (x.kk == 0) {
+      ikku = x;
+      break;
+    }
+  }
+  final String midashi = (ikku != null && w.r.kakuritsu(50))
+      ? '号砲と同時に飛び出すか　1区に「駅伝男」${myouji(ikku.s.name)}(${t.univMei(ikku.s.univid)})'
+      : w.erabu([
+          '「駅伝男」たちの競演　勝負強さが際立つ$n人',
+          '前半から攻めるのは誰だ　「駅伝男」の資質が際立つ$n人',
+          '勝負どころに強い$n人　今大会の「駅伝男」たち',
+        ]);
+
+  // リード
+  final StringBuffer lead = StringBuffer();
+  lead.write(
+    t.chokuzen
+        ? '${k.taikaiMei}は当日変更を終えた。走る選手の中には、「駅伝男」の資質が際立つ選手が$n人いる。'
+        : '${k.taikaiMei}の区間エントリーには、「駅伝男」の資質が際立つ選手が$n人名を連ねた。',
+  );
+  lead.write(
+    w.erabu([
+      '勝負どころで力を出す彼らの走りが、レースの流れを左右しそうだ。',
+      '前半から攻める走りで、レースを動かすのはどの選手か。',
+    ]),
+  );
+
+  // 選手ごと
+  final List<List<String>> gyou = [];
+  int jouiKazu = 0; // 持ちタイムでも区間の上位3分の1にいる選手の数
+  bool jibunAri = false;
+  for (int i = 0; i < list.length; i++) {
+    final SenshuData s = list[i].s;
+    final int kk = list[i].kk;
+    final bool jibun = s.univid == k.gh.MYunivid;
+    if (jibun) jibunAri = true;
+    final String kukan = t.kukanMei(kk);
+    final String mei = w.senshu(s, daigaku: true);
+    final StringBuffer sb = StringBuffer();
+    // 入り(スタート直前号で当日変更で入った選手は、そのことから)
+    final ToujituJijou? tj = _otokoToujitsu(t, s, kk);
+    if (tj != null) {
+      sb.write(
+        tj.onzonAce
+            ? '$kukanの$meiは、補欠に温存されていた主力で、当日変更で投入された。'
+            : '$kukanの$meiは、当日変更で入った。',
+      );
+    } else {
+      sb.write(
+        [
+          '$kukanを走るのは$mei。',
+          '$kukanには$meiが入った。',
+          '$kukanを任されたのは$meiだ。',
+          '$kukanは$mei。',
+        ][i % 4],
+      );
+    }
+    // 持ちタイムの区間内の位置(数字で語る記者は順位をそのまま出す)
+    final int idx = t.shumoku[kk];
+    final String ma = t.mochiMoji(s, idx);
+    final int r = t.kukanNoJuni(s, kk);
+    final int m = t.kukanJun[kk].length;
+    final String seme = kk == 0 ? '飛び出し' : '前半の攻め';
+    if (ma.isNotEmpty && r >= 0 && m >= 3) {
+      final int dan = r * 3 < m ? 0 : (r * 3 >= m * 2 ? 2 : 1);
+      if (dan == 0) jouiKazu++;
+      final bool suuji = kata == KishaKata.suuji;
+      if (suuji) sb.write('持ちタイム($ma)は区間${r + 1}番目。');
+      if (dan == 0) {
+        sb.write(
+          suuji
+              ? '区間賞争いに絡みそうだ。'
+              : w.erabu(['持ちタイムでも区間の上位で、区間賞争いに絡みそうだ。', '持ちタイムでも区間の上位に名を連ねる。']),
+        );
+      } else if (dan == 2) {
+        sb.write(suuji ? '$seme次第で食い下がれるか。' : '持ちタイムでは区間の下位だが、$seme次第で食い下がれるか。');
+      } else {
+        sb.write(suuji ? '$semeが決まれば、順位を押し上げられる。' : '持ちタイムは区間の中ほど。$semeが決まれば、順位を押し上げられる。');
+      }
+    }
+    // どう走りそうか
+    if (kk == 0) {
+      if (jibun) {
+        sb.write(w.erabu(['飛び出しの指示が出れば、高い確率で決めてくるだろう。', 'スタート直後の飛び出しを指示されれば、その資質が生きる。']));
+      } else {
+        final IkkuAishou? ai = pace?.aishou(s.id);
+        if (ai == IkkuAishou.osokuSon) {
+          sb.write('予想される1区の流れは物足りないペースになりそうで、自分から飛び出す場面があるかもしれない。');
+        } else if (ai == IkkuAishou.daiShissoku) {
+          sb.write('予想される速い流れに付き合わず、飛び出す場面があるかもしれない。');
+        } else {
+          sb.write(w.erabu(['号砲と同時に、自分から前へ出る場面があるかもしれない。', 'スタート直後から前に出て、レースを動かす可能性もある。']));
+        }
+      }
+    } else {
+      sb.write(
+        jibun
+            ? w.erabu(['前半から攻める指示が出れば、高い確率で決めてくるだろう。', '前半突っ込みの指示が出れば、その資質がそのまま走りになる。'])
+            : w.erabu(['前半から攻めてくるはずだ。', '前半から突っ込む走りで、流れを変えにくるだろう。', '序盤から前を追う、積極的な走りが予想される。']),
+      );
+    }
+    w.danraku(sb.toString());
+    gyou.add([
+      '${kk + 1}区',
+      '${fullMei(s.name)}(${s.gakunen})',
+      t.univMei(s.univid),
+      ma.isEmpty ? '-' : ma,
+      (r >= 0 && m > 0) ? '${r + 1}/$m' : '-',
+    ]);
+  }
+
+  // 本紙の見立て(記者の型で見方が変わる)
+  final String me = switch (kata) {
+    KishaKata.suuji =>
+      '「駅伝男」の資質が際立つ$n人のうち、持ちタイムでも区間の上位にいるのは$jouiKazu人。'
+          '${jouiKazu < n ? '残りの${n - jouiKazu}人が、前半の攻めでどこまで順位を押し上げるかも見どころになる。' : '前半の攻めが決まれば、区間賞が見えてくる。'}',
+    KishaKata.joukei => '襷を受けた瞬間に、前を追う。その姿勢が、駅伝の流れを変える。$n人の走りから目が離せない。',
+    KishaKata.karakuchi => '前半の攻めは、決まれば大きな武器だが、外れれば後半に跳ね返る。資質があっても、結果が約束されているわけではない。',
+  };
+  w.kishaNoMe(me, midashi: '本紙の見立て');
+
+  return _kansei(
+    k,
+    no,
+    w,
+    chokuzen: t.chokuzen,
+    category: '駅伝・展望',
+    midashi: midashi,
+    lead: lead.toString(),
+    hyou: [
+      KijiHyou(
+        '「駅伝男」の資質が際立つ選手',
+        ['区間', '選手', '大学', '持ちタイム', '区間内'],
+        gyou,
+      ),
+    ],
+    jibun: jibunAri,
   );
 }
 
@@ -2593,6 +2820,7 @@ Kiji? _chuumokuTenbou(Tenbou t, List<KijiYosouJin> yosou) {
       '${k.taikaiMei}は全$ks組で行われ、各校が1組に2人ずつ選手を送り込む。'
       '組ごとの持ちタイムから、注目選手を探った。',
     );
+    int otokoBan = 0; // 駅伝男の文の言い回しを回す(1.9.7)
     for (int kk = 0; kk < ks; kk++) {
       final List<SenshuData> j = t.kukanJun[kk];
       if (j.isEmpty) continue;
@@ -2610,6 +2838,22 @@ Kiji? _chuumokuTenbou(Tenbou t, List<KijiYosouJin> yosou) {
       final int? soroi = _soroiKukanshou(t, yosou, kk);
       if (soroi != null) {
         sb.write('予想陣は3人そろって${w.senshu(k.senshu[soroi], daigaku: true)}の組トップを予想した。');
+      }
+      // 駅伝男が特に高い選手(1組に2人まで。指示なしでも自分から飛び出すことがある。1.9.7)
+      int otokoKumi = 0;
+      for (final SenshuData os in j) {
+        if (os.konjou < kimochiTokuhitsu || otokoKumi >= 2) continue;
+        final String mei = w.senshu(os, daigaku: true);
+        sb.write(
+          os.univid == k.gh.MYunivid
+              ? '$meiは「駅伝男」の資質が際立ち、飛び出しの指示が出れば、高い確率で決めてくるだろう。'
+              : [
+                  '$meiは「駅伝男」の資質が際立ち、号砲と同時に飛び出す場面があるかもしれない。',
+                  '「駅伝男」の資質が際立つ$meiが、スタートから前に出る可能性もある。',
+                ][otokoBan % 2],
+        );
+        otokoKumi++;
+        otokoBan++;
       }
       if (kk == ks - 1) sb.write('最終組は各校のエースがそろい、通過争いの行方を決める。');
       w.danraku(sb.toString());

@@ -871,6 +871,38 @@ Kiji? _kukanJikkyou(
     }
   }
 
+  // 本文: 展望で取り上げた「駅伝男」(駅伝男が特に高い他大学の選手の、前半の攻めの成否。2区以降。1.9.7。
+  // 1区の飛び出しは飛び出しの段落で、自分の大学の選手は自分の大学の段落で伝える。2人まで)
+  if (kk > 0) {
+    final List<String> otokoBun = [];
+    for (final _Koma ox in kjJun) {
+      if (otokoBun.length >= 2) break;
+      final SenshuData? os = ox.s;
+      if (os == null || os.konjou < kimochiTokuhitsu) continue;
+      if (my != null && ox.u.id == my.u.id) continue;
+      final _Hashiri oh = _hashiriYomu(os, kk);
+      final bool? okime = oh.seikou;
+      if (oh.siji != 1 || okime == null) continue;
+      final String oy = _yobi(w, ox);
+      final String okj = juniMoji(ox.kukanJuni);
+      otokoBun.add(
+        okime
+            ? w.erabu([
+                '展望で注目された「駅伝男」、$oyは前半から積極的に突っ込み、区間$okj。狙いどおりの走りでした。',
+                '「駅伝男」の$oyは、予想どおり前半から攻めて、区間$okjにまとめました。',
+              ])
+            : w.erabu([
+                '展望で注目された「駅伝男」、$oyは前半から攻めましたが、後半に苦しみ、区間$okjに終わりました。',
+                '「駅伝男」の$oyは前半から突っ込みましたが、その分が後半に響き、区間$okjでした。',
+              ]),
+      );
+    }
+    if (otokoBun.isNotEmpty) {
+      w.koMidashi('「駅伝男」の走り');
+      w.danraku(otokoBun.join());
+    }
+  }
+
   // 本文: 当落線上(最終区の前の2区間。シード権のライン前後の順位と差、出入り)
   if (touraku && nokori != null && morashi != null) {
     final _Koma nk = nokori;

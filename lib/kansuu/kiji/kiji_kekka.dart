@@ -6,6 +6,7 @@ import 'package:ekiden/kansuu/gakuren_kantoku.dart';
 import 'package:ekiden/kansuu/ikku_pace.dart';
 import 'package:ekiden/kansuu/kiji/kiji_kihon.dart';
 import 'package:ekiden/kansuu/kiji/kiji_comment.dart';
+import 'package:ekiden/kansuu/kiji/kiji_kimochi.dart' show kimochiTokuhitsu; // 「駅伝男」たちの走り(1.9.7)
 
 // ------------------------------------------------------------
 // 駅伝(10月・11月・正月・カスタム)の結果の記事(1.9.2。結果画面の「ニュース記事」)
@@ -2193,6 +2194,56 @@ Kiji? _kukanshouKiji(EkidenKekka e) {
         '(${daigakuMeiMoji(g.shozoku)})が区間トップ相当の走りを見せた。',
       );
     }
+  }
+
+  // 本文: 展望で取り上げた「駅伝男」たちの走り(駅伝男が特に高い大学の選手。1.9.7)
+  // 前半の攻め(1区は飛び出し)の成否を添える。自分の大学の選手に指示が出なかったときは、
+  // 総監督の判断を評することになるので、区間順位だけを書く
+  final List<String> otokoBun = [];
+  int otokoKazu = 0;
+  int semeKazu = 0;
+  int kimeKazu = 0;
+  for (int kk = 0; kk < ks; kk++) {
+    for (int i = 0; i < e.kukanJun[kk].length; i++) {
+      final SenshuData? os = e.kukanJun[kk][i].senshu[kk];
+      if (os == null || os.konjou < kimochiTokuhitsu) continue;
+      otokoKazu++;
+      final bool seme = kk == 0 ? os.startchokugotobidasiflag == 1 : os.sijiflag == 1;
+      final bool kime = kk == 0 ? os.startchokugotobidasiseikouflag == 1 : os.sijiseikouflag == 1;
+      String semeBun = '';
+      if (seme) {
+        semeKazu++;
+        if (kime) kimeKazu++;
+        semeBun = kk == 0
+            ? (kime ? 'スタート直後の飛び出しを決めた。' : 'スタート直後に飛び出したが、後半に失速した。')
+            : (kime ? '前半からの攻めを決めた。' : '前半から攻めたが、後半に失速した。');
+      }
+      if (otokoBun.length < 5) {
+        otokoBun.add('${e.kukanMei(kk)}の${w.senshu(os, daigaku: true)}は区間${juniMoji(i)}。$semeBun');
+      }
+    }
+  }
+  if (otokoKazu > 0) {
+    w.koMidashi('「駅伝男」たちの走り');
+    final StringBuffer ob = StringBuffer();
+    if (otokoKazu == 1) {
+      ob.write('展望で取り上げた「駅伝男」、${otokoBun.first}');
+    } else {
+      ob.write('展望で取り上げた「駅伝男」は$otokoKazu人。');
+      if (semeKazu == 1) {
+        ob.write('前半の攻め(1区は飛び出し)に出たのは1人で、${kimeKazu == 1 ? '決めてみせた' : '決めきれなかった'}。');
+      } else if (semeKazu >= 2) {
+        ob.write(
+          kimeKazu == semeKazu
+              ? '前半の攻め(1区は飛び出し)に出た$semeKazu人は、全員が決めた。'
+              : (kimeKazu == 0
+                    ? '前半の攻め(1区は飛び出し)に出た$semeKazu人は、誰も決められなかった。'
+                    : '前半の攻め(1区は飛び出し)に出た$semeKazu人のうち、決めたのは$kimeKazu人だった。'),
+        );
+      }
+      ob.write(otokoBun.join());
+    }
+    w.danraku(ob.toString());
   }
 
   // 記者の目(記者の型で見方が変わる。1.9.4)

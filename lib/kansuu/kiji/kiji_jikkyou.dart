@@ -10,6 +10,7 @@ import 'package:ekiden/kansuu/kiji/kiji_comment.dart';
 import 'package:ekiden/kansuu/koukou.dart'; // 出身校(高校の同期対決。1.9.5)
 import 'package:ekiden/kansuu/kiji/kiji_gakunai.dart' show gakunaiSiteMei, gakunaiKishaMei; // 学内メディアの速報(1.9.7)
 import 'package:ekiden/kansuu/kiji/kiji_tokuchou.dart'; // 次の走者の特徴の文(1.9.7)
+import 'package:ekiden/kansuu/kiji/kiji_kimochi.dart'; // 駅伝男・平常心の持ち味(1.9.7)
 
 // ------------------------------------------------------------
 // 駅伝の実況「箱庭スポーツ中継」(1.9.4。レース画面の「実況」のカードと、結果画面の記事の画面)
@@ -2200,6 +2201,25 @@ Kiji? _gakunaiSokuhou(
       nb.write(
         TokuchouKaki(k, w, mochiHyou, suuji: gKata == KishaKata.suuji, hajime: kk)
             .bun(t, kk + 1, hashiru: kukanHashiru(k, kk + 1)),
+      );
+      // 駅伝男・平常心の持ち味(1.9.7。目標と比べて襷を受ける位置は、一番新しい区間の速報だけで書く。
+      // 学内メディアは辛口にしないので、辛口の記者は情景に直す)
+      final UkeIchi ichi = !(saishin && mokuhyouAri)
+          ? UkeIchi.shiranai
+          : (my.tuuka > mokuhyou ? UkeIchi.ushiro : (my.tuuka == mokuhyou ? UkeIchi.choudo : UkeIchi.mae));
+      nb.write(
+        KimochiKaki(
+          w,
+          kata: gKata == KishaKata.karakuchi ? KishaKata.joukei : gKata,
+          hajime: kk,
+        ).sokuhou(
+          konjou: t.konjou,
+          heijousin: t.heijousin,
+          race: race,
+          kk: kk + 1,
+          yobi: w.senshu(t),
+          ichi: ichi,
+        ),
       );
     }
     w.danraku(nb.toString());

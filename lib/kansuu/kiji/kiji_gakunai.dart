@@ -5,6 +5,8 @@ import 'package:ekiden/screens/Modal_courseshoukai.dart'; // 大会の名前(cou
 import 'package:ekiden/kansuu/kiji/kiji_kihon.dart';
 import 'package:ekiden/kansuu/kiji/kiji_comment.dart';
 import 'package:ekiden/kansuu/kiji/kiji_tokuchou.dart'; // 選手の特徴の文(1.9.7)
+import 'package:ekiden/kansuu/kiji/kiji_kimochi.dart'; // 駅伝男・平常心の持ち味(1.9.7)
+import 'package:ekiden/kansuu/ikku_pace.dart'; // 1区の集団のペースの予想(駅伝男の持ち味。1.9.7)
 import 'package:ekiden/kansuu/kiji/kiji_kekka.dart' show EkidenKekka, EkidenUnivKekka;
 import 'package:ekiden/kansuu/kiji/kiji_yosen.dart'
     show YosenKekka, YosenUnivKekka, YosenSenshuKekka;
@@ -368,7 +370,13 @@ String _maeNoShussouBun(KijiKankyou k, SenshuData s, int kk, String yobi) {
 /// 選手[s]を区間[kk]の選手として紹介する段落(持ちタイム・出走歴・4年生・出身地と趣味)
 /// 戻り値は、紹介に添えた因縁(コメントの事実に使う。なければnull。1.9.4)
 /// [tk] 選手の特徴の文を作る道具(持ちタイムの順位から、区間に合うかを書く。1.9.7)
-Innen? _shoukai(KijiKakite w, SenshuData s, int kk, {TokuchouKaki? tk}) {
+Innen? _shoukai(
+  KijiKakite w,
+  SenshuData s,
+  int kk, {
+  TokuchouKaki? tk,
+  KimochiBun kb = KimochiBun.nashi,
+}) {
   final KijiKankyou k = w.k;
   final String yobi = myouji(s.name);
   final StringBuffer sb = StringBuffer();
@@ -385,7 +393,15 @@ Innen? _shoukai(KijiKakite w, SenshuData s, int kk, {TokuchouKaki? tk}) {
   }
   w.danraku(sb.toString());
   // 選手の特徴(持ちタイムの順位から見た、距離・区間の型・区間内順位・坂との合い。1.9.7)
-  if (tk != null) w.danraku(tk.bun(s, kk, hashiru: kukanHashiru(k, kk)));
+  final String toku = tk == null ? '' : tk.bun(s, kk, hashiru: kukanHashiru(k, kk));
+  // 駅伝男・平常心の持ち味(1.9.7。特徴の段落に続けるか、独立した段落にする。
+  // 本人のコメントで語らせるときは、呼ぶ側でコメントに入れる)
+  if (kb.tsuzukeru) {
+    w.danraku('$toku${kb.bun}');
+  } else {
+    w.danraku(toku);
+    w.danraku(kb.bun);
+  }
   w.danraku(shusshinShumiBun(k, s, w.r, yobi));
   return innen;
 }
@@ -946,17 +962,49 @@ Kiji _meikan(
       '選手の特徴は、今季ベスト(ない種目は自己ベスト)の持ちタイムの順位から見た。';
   // 選手の特徴の文(1.9.7。記者の型で、順位をそのまま出すか言葉にするかが変わる)
   final TokuchouKaki tk = TokuchouKaki(k, w, MochiHyou(k), suuji: _gakunaiKata(k, site, no) == KishaKata.suuji);
+  // 駅伝男・平常心の持ち味(1.9.7)。1区の選手は、1区の集団のペースの予想(直前順位予想の画面と同じ。
+  // 当日の調子は入れない)との相性も添える
+  final KimochiKaki kc = KimochiKaki(w, kata: _gakunaiKata(k, site, no));
+  final int tokuhitsuSuu = hashiru
+      .where((x) => x != null && x.konjou >= kimochiTokuhitsu)
+      .length;
+  IkkuAishou? ikkuAi;
+  final SenshuData? ikkuSenshu = hashiru.isEmpty ? null : hashiru[0];
+  if (ikkuSenshu != null && ikkuSenshu.konjou >= kimochiKijun && ikkuPaceTaishou(k.race)) {
+    final IkkuPaceYosou? pace = ikkuPaceYosou(
+      gh: k.gh,
+      racebangou: k.race,
+      sortedSenshu: k.senshu,
+      sortedUniv: k.univ,
+      kantoku: k.kantoku,
+      chousiIreru: false,
+    );
+    ikkuAi = pace?.aishou(ikkuSenshu.id);
+  }
   for (int kk = 0; kk < ks; kk++) {
     final SenshuData? s = hashiru[kk];
     if (s == null) continue;
     w.koMidashi('${kukanYobikata(k.gh, k.race, kk, ks)}　${w.senshu(s)}');
-    final Innen? innen = _shoukai(w, s, kk, tk: tk);
+    final KimochiBun kb = kc.meikan(
+      konjou: s.konjou,
+      heijousin: s.heijousin,
+      race: k.race,
+      kk: kk,
+      yobi: myouji(s.name),
+      ikku: kk == 0 ? ikkuAi : null,
+      tokuhitsuSuu: tokuhitsuSuu,
+      hani: 'チーム',
+    );
+    final Innen? innen = _shoukai(w, s, kk, tk: tk, kb: kb);
     w.comment(
       senshuCommentJijitsu(
         w,
         _ikigomiBamen(k, s),
         myouji(s.name),
-        jijitsu: [if (innen != null) innen.kotoba],
+        jijitsu: [
+          if (kb.kotoba.isNotEmpty) kb.kotoba,
+          if (innen != null) innen.kotoba,
+        ],
       ),
     );
   }
@@ -1974,6 +2022,9 @@ Kiji _yosenMeikan(
           : '前回の予選は${juniMoji(mae)}で、通過ラインに届かなかった。',
     );
   }
+  // 駅伝男・平常心の持ち味(1.9.7。11月駅伝予選は飛び出し、正月駅伝予選はフリー走と集団走)
+  final KimochiKaki kc = KimochiKaki(w, kata: _gakunaiKata(k, site, no));
+  final int tokuhitsuSuu = hashiru.where((x) => x.konjou >= kimochiTokuhitsu).length;
   for (final SenshuData s in hashiru) {
     final int kk = k.entry(s);
     w.koMidashi(kumiAri ? '${kk + 1}組　${w.senshu(s)}' : w.senshu(s));
@@ -2007,7 +2058,18 @@ Kiji _yosenMeikan(
         kumiAri ? '4年生にとっては、これが最後の11月駅伝予選だ。' : '最後の正月駅伝予選。本戦へのラストチャンスに挑む。',
       );
     }
+    final KimochiBun kb = kc.meikan(
+      konjou: s.konjou,
+      heijousin: s.heijousin,
+      race: k.race,
+      kk: kk,
+      yobi: yobi,
+      tokuhitsuSuu: tokuhitsuSuu,
+      hani: 'チーム',
+    );
+    if (kb.tsuzukeru) sb.write(kb.bun);
     w.danraku(sb.toString());
+    if (!kb.tsuzukeru) w.danraku(kb.bun);
     w.danraku(shusshinShumiBun(k, s, w.r, yobi));
     final List<Innen> yi = yosenInnen(k, s, kekka: false);
     w.comment(
@@ -2015,7 +2077,10 @@ Kiji _yosenMeikan(
         w,
         s.gakunen == 4 ? CommentBamen.gakunaiYonenIkigomi : CommentBamen.gakunaiYosenIkigomi,
         yobi,
-        jijitsu: [if (yi.isNotEmpty) yi.first.kotoba],
+        jijitsu: [
+          if (kb.kotoba.isNotEmpty) kb.kotoba,
+          if (yi.isNotEmpty) yi.first.kotoba,
+        ],
       ),
     );
   }

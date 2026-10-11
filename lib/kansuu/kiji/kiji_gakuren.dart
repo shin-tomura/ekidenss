@@ -9,6 +9,7 @@ import 'package:ekiden/kansuu/gakuren_kantoku.dart';
 import 'package:ekiden/kansuu/kiji/kiji_kihon.dart';
 import 'package:ekiden/kansuu/kiji/kiji_comment.dart';
 import 'package:ekiden/kansuu/kiji/kiji_tokuchou.dart'; // 選手の特徴の文(1.9.7)
+import 'package:ekiden/kansuu/kiji/kiji_kimochi.dart'; // 駅伝男・平常心の持ち味(1.9.7)
 
 // ------------------------------------------------------------
 // 学連選抜を追う専門メディア「学連選抜通信」(1.9.7。正月駅伝だけ)
@@ -590,6 +591,10 @@ Kiji _tenbouMeikan(KijiKankyou k, List<_GSenshu> list) {
       '選手の特徴は、今季ベスト(ない種目は自己ベスト)の持ちタイムの${kukannai ? '順位' : '学生全体の順位'}から見た。';
   final KishaKata kata = kishaKataKara(_kishaMei(k, no));
   final TokuchouKaki tk = TokuchouKaki(k, w, MochiHyou(k), suuji: kata != KishaKata.joukei);
+  // 駅伝男・平常心の持ち味(1.9.7。コンピュータが監督のときは指示が出ないので、1区で自分から飛び出すことだけ)
+  final KimochiKaki kc = KimochiKaki(w, kata: kata);
+  final bool sijiAri = _kantokuChuu(k);
+  final int tokuhitsuSuu = list.where((x) => x.g.konjou >= kimochiTokuhitsu).length;
   for (final _GSenshu x in list) {
     final int kk = x.kukan;
     w.koMidashi('${kk + 1}区　${_mei(w, x)}・${x.shozoku}');
@@ -620,7 +625,23 @@ Kiji _tenbouMeikan(KijiKankyou k, List<_GSenshu> list) {
     }
     w.danraku(sb.toString());
     // 選手の特徴(持ちタイムの順位から見た、距離・区間の型・区間内順位相当・坂との合い。1.9.7)
-    w.danraku(tk.bunGakuren(x.g, kk, hashiru: kukannai ? kukanHashiru(k, kk) : null));
+    final String toku = tk.bunGakuren(x.g, kk, hashiru: kukannai ? kukanHashiru(k, kk) : null);
+    final KimochiBun kb = kc.meikan(
+      konjou: x.g.konjou,
+      heijousin: x.g.heijousin,
+      race: _race,
+      kk: kk,
+      yobi: myouji(x.g.name),
+      sijiAri: sijiAri,
+      tokuhitsuSuu: tokuhitsuSuu,
+      hani: '学連選抜',
+    );
+    if (kb.tsuzukeru) {
+      w.danraku('$toku${kb.bun}');
+    } else {
+      w.danraku(toku);
+      w.danraku(kb.bun);
+    }
     final SenshuData? s = x.s;
     if (s != null) w.danraku(shusshinShumiBun(k, s, w.r, myouji(s.name)));
     // 意気込み(因縁があれば、その事実を入れる)
@@ -636,7 +657,7 @@ Kiji _tenbouMeikan(KijiKankyou k, List<_GSenshu> list) {
         w,
         CommentBamen.gakurenIkigomi,
         myouji(x.g.name),
-        jijitsu: [jijitsu],
+        jijitsu: [if (kb.kotoba.isNotEmpty) kb.kotoba, jijitsu],
       ),
     );
   }
@@ -821,8 +842,25 @@ Kiji? _sokuhou(
       final ({int juni, double time})? ty = _yosenKekka(tsugi.g);
       if (ty != null) nb.write('予選会は全体${juniMoji(ty.juni)}だった。');
       // 次の走者の特徴(1.9.7)
-      final TokuchouKaki tk = TokuchouKaki(k, w, mochiHyou, suuji: kishaKataKara(_kishaMei(k, 320)) != KishaKata.joukei, hajime: kk);
+      final KishaKata sKata = kishaKataKara(_kishaMei(k, 320));
+      final TokuchouKaki tk = TokuchouKaki(k, w, mochiHyou, suuji: sKata != KishaKata.joukei, hajime: kk);
       nb.write(tk.bunGakuren(tsugi.g, kk + 1, hashiru: kukanHashiru(k, kk + 1)));
+      // 駅伝男・平常心の持ち味(1.9.7。監督をしているときだけ。目標と比べて襷を受ける位置は、
+      // 一番新しい区間の速報だけで書く)
+      final UkeIchi ichi = !(saishin && kantoku && mk >= 0 && mk < n)
+          ? UkeIchi.shiranai
+          : (t > mk ? UkeIchi.ushiro : (t == mk ? UkeIchi.choudo : UkeIchi.mae));
+      nb.write(
+        KimochiKaki(w, kata: sKata, hajime: kk).sokuhou(
+          konjou: tsugi.g.konjou,
+          heijousin: tsugi.g.heijousin,
+          race: _race,
+          kk: kk + 1,
+          yobi: _mei(w, tsugi),
+          ichi: ichi,
+          sijiAri: kantoku,
+        ),
+      );
     }
     w.danraku(nb.toString());
   } else {

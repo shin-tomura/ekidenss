@@ -4,6 +4,7 @@ import 'package:ekiden/senshu_data.dart';
 import 'package:ekiden/senshu_gakuren_data.dart';
 import 'package:ekiden/kansuu/konki_best.dart';
 import 'package:ekiden/kansuu/kiji/kiji_kihon.dart';
+import 'package:ekiden/kansuu/kiji/kiji_kimochi.dart'; // 駅伝男・平常心の持ち味(振り返り。1.9.7)
 
 // ------------------------------------------------------------
 // 選手の特徴の文(1.9.7)
@@ -35,7 +36,8 @@ import 'package:ekiden/kansuu/kiji/kiji_kihon.dart';
 //    (差が3つ以上、または出場校数の4分の1以上で言い切る)
 //  ・展望号の見立て(強み・不安材料・坂)が当たったか外れたか
 //  ・なぜそうなったか(指示の成否・目標順位を下回っての焦り・ほっと一息・1区の集団のペース・
-//    区間順位の画面の「分析」で際立った能力。実況と同じく数字なし)
+//    区間順位の画面の「分析」で際立った能力。実況と同じく数字なし)。駅伝男・平常心の高い選手は、
+//    展望号の名鑑で書いた持ち味と指示の成否を結びつける(kiji_kimochi.dart)
 //  ・区間賞やすぐ上の順位との差、チームの中での位置、前後の区間との流れ
 //  ・小見出しに添える寸評も作る。見立てとの差が大きい選手や区間賞は厚く、ほかは短く
 // ------------------------------------------------------------
@@ -647,6 +649,9 @@ class TokuchouKaki {
     hitoketaDake: hitoketaDake,
     jijou: HashiriJijou.yomuSenshu(s, kk),
     soutou: false,
+    konjou: s.konjou,
+    heijousin: s.heijousin,
+    jibunKara: kk == 0 && s.sijiflag != 1 && s.startchokugotobidasiflag == 1,
   );
 
   /// 学連選抜の選手[g]の振り返り(区間順位は相当。学連選抜通信の結果号で使う)
@@ -674,12 +679,17 @@ class TokuchouKaki {
     hitoketaDake: hitoketaDake,
     jijou: HashiriJijou.yomuGakuren(g, kk),
     soutou: true,
+    konjou: g.konjou,
+    heijousin: g.heijousin,
+    jibunKara: kk == 0 && g.sijiflag != 1 && g.startchokugotobidasiflag == 1,
   );
 
   /// 振り返りの本体
   /// [kj] 実際の区間順位(0が1位)。[myTime] 区間タイム。[hashiru] その区間を走った大学の選手。
   /// [d] この区間での順位の上げ下げ(正なら上げた。1区は0)。[maeD] 前の区間、[tsugiD] 次の区間の上げ下げ(なければnull)。
   /// [teamBest] チームで一番良い区間順位か。[hitoketaDake] チームで唯一の区間一桁か
+  /// [konjou]・[heijousin] 駅伝男・平常心(指示の成否を持ち味に結びつける)。
+  /// [jibunKara] 1区で、飛び出しの指示なしに自分から飛び出したか
   ({String sunpyou, String bun}) _furikaeri(
     List<double> t,
     int kk, {
@@ -693,6 +703,9 @@ class TokuchouKaki {
     required bool hitoketaDake,
     required HashiriJijou jijou,
     required bool soutou,
+    required int konjou,
+    required int heijousin,
+    required bool jibunKara,
   }) {
     final int ban = _ban++;
     final int n = hashiru.length;
@@ -772,7 +785,19 @@ class TokuchouKaki {
 
     // S3 なぜそうなったか(指示・焦り・集団のペース・際立った能力)
     final StringBuffer sb3 = StringBuffer();
-    if (kk == 0) {
+    // 駅伝男・平常心の高い選手は、指示の成否を持ち味に結びつける(1.9.7)
+    final String? kimochi = kimochiFurikaeri(
+      w,
+      konjou: konjou,
+      heijousin: heijousin,
+      kk: kk,
+      siji: jijou.siji,
+      seikou: jijou.seikou,
+      jibunKara: jibunKara,
+    );
+    if (kimochi != null) {
+      sb3.write(kimochi);
+    } else if (kk == 0) {
       if (jijou.siji == 1 && jijou.seikou != null) {
         sb3.write(jijou.seikou! ? 'スタート直後の飛び出しが、狙いどおり決まった。' : 'スタート直後に飛び出したが、後半に代償を払った。');
       } else if (jijou.shuudan.isNotEmpty) {

@@ -102,6 +102,8 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
   bool _chikuMeguri = false;
   // 地区めぐり(声かけ)か(1.9.6。falseなら地区めぐり(交渉))。声かけには成功率がなく、失敗(保留)もない
   bool _koekake = false;
+  // 地区めぐり(声かけ)の今年の周回数(1.9.6。ほかの形は1)。ラウンドの数は地区の数×周回数
+  int _shuukai = 1;
   List<int> _chikuJunban = []; // その年の地区の順番(新入生のいない地区を除く)
   Map<int, int> _chikuBetsu = {}; // 選手id → 地区
   Map<int, int> _zenkokuJuni = {}; // 選手id → 新入生(留学生を除く)全体の中での持ちタイムの順位
@@ -109,6 +111,7 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
   // 表示する地区(-2=今の地区(初期値。地区が進むと次の地区になる)・-1=全地区・0〜10=その地区)
   int _hyoujiSentaku = -2;
   bool _junbanDialogZumi = false; // 地区の順番のダイアログを、この画面で出したか
+  bool _wakuIppaiKiitaZumi = false; // 自校の枠が埋まったときに、残りを進めるかをこの画面で聞いたか(1.9.6)
 
   @override
   void initState() {
@@ -135,7 +138,8 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
           _chikuMeguri = true;
           _koekake = katachi == comScoutKatachiKoekake;
           _chikuJunban = comScoutChikuJunban(_ghensuu!.year);
-          _roundSuu = _chikuJunban.length;
+          _shuukai = comScoutKotoshiShuukai(kantoku, _ghensuu!.year);
+          _roundSuu = _chikuJunban.length * _shuukai;
         }
       }
     }
@@ -218,6 +222,11 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
   /// 新入生は全員「進路未定」として出し、仮の振り分けの大学は見せない(自大学の分も)
   /// 交渉で確定した選手だけ、確定した大学を出す。留学生は交渉の対象外なので出さない
   Future<void> _initializeScoutingDataOn(int myUnivId) async {
+    // 地区めぐりで、全員の進路が決まっていれば終わりにし、周回の2周目からは進路未定の選手が
+    // いない地区を飛ばす(1.9.6)
+    if (_chikuMeguri) {
+      await _karaChikuTobasu();
+    }
     final List<SenshuData> shinnyuusei = _senshuBox.values
         .where((s) => s.gakunen == 1)
         .toList();
@@ -299,11 +308,78 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
   }
 
   /// 今の地区(地区めぐりで、まだ地区が残っているとき。なければnull)
+  /// (周回するときは、地区の順番を何周もする。1.9.6)
   int? get _imaChiku {
     if (!_chikuMeguri || _ghensuu == null || _chikuJunban.isEmpty) return null;
     if (_ghensuu!.scoutChances <= 0) return null;
-    final int i = (_roundBangou() - 1).clamp(0, _chikuJunban.length - 1).toInt();
-    return _chikuJunban[i];
+    final int i = (_roundBangou() - 1).clamp(0, _roundSuu - 1).toInt();
+    return _chikuJunban[i % _chikuJunban.length];
+  }
+
+  /// 今が何周目か(1から。周回は地区めぐり(声かけ)だけ。1.9.6)
+  int get _imaShuu {
+    if (_chikuJunban.isEmpty) return 1;
+    return (_roundBangou() - 1).clamp(0, _roundSuu - 1).toInt() ~/
+            _chikuJunban.length +
+        1;
+  }
+
+  /// 全員の進路が決まっていれば終わりにし、周回の2周目からは、進路未定の選手がいない地区を飛ばす(1.9.6)
+  /// (その地区には、どの大学も声をかけられないので、ラウンドを行わずに次へ進める)
+  Future<void> _karaChikuTobasu() async {
+    final List<SenshuData> shinnyuusei = comScoutShinnyuusei();
+    bool kawatta = false;
+    if (_ghensuu!.scoutChances > 0 && !comScoutMiteiAri(shinnyuusei)) {
+      _ghensuu!.scoutChances = 0;
+      kawatta = true;
+    }
+    while (_ghensuu!.scoutChances > 0 && _imaShuu >= 2) {
+      final int? ima = _imaChiku;
+      if (ima == null || comScoutChikuMiteiAri(shinnyuusei, ima)) break;
+      _ghensuu!.scoutChances--;
+      kawatta = true;
+    }
+    if (kawatta) await _ghensuu!.save();
+  }
+
+  /// 地区めぐりで自校の枠が埋まったら、残りをコンピュータの大学だけで進めるか聞く(1.9.6)
+  Future<void> _wakuIppaiNaraKiku() async {
+    if (!_chikuMeguri || _ghensuu!.scoutChances <= 0) return;
+    if (_wakuIppaiKiitaZumi) return; // 「このまま見る」を選んだら、もう聞かない
+    final List<SenshuData> shinnyuusei = comScoutShinnyuusei();
+    final int myUnivid = _ghensuu!.MYunivid;
+    if (comScoutKetteiSuu(shinnyuusei, myUnivid) <
+        comScoutWaku(shinnyuusei, myUnivid)) {
+      return;
+    }
+    _wakuIppaiKiitaZumi = true;
+    final bool? susumeru = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('枠が埋まりました', style: TextStyle(color: Colors.black)),
+          content: const Text(
+            'あなたの大学の日本人の新入生の枠が埋まりました。\n'
+            '残りの地区は、コンピュータの大学だけで進めますか？\n'
+            '(このまま残りの地区の動きを見ることもできます)',
+            style: TextStyle(color: Colors.black),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('このまま見る'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('残りを進める'),
+            ),
+          ],
+        );
+      },
+    );
+    if (susumeru == true && mounted) {
+      await _scoutShuuryou();
+    }
   }
 
   /// 表示している地区(nullなら全地区)
@@ -354,6 +430,7 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
                         'ほかに声をかけた大学がなければ確定し、重なれば争奪戦になります。' : '新入生は出身校の地区ごとに分かれていて、地区ごとに1ラウンドずつ交渉します。'
                         'どの大学も、今の地区の選手に1人まで交渉できます(見送ることもできます)。'}'
               'ほかの地区の選手は、上の地区の切り替え(左右の矢印か、地区の名前を押す)で見られます。\n\n'
+              '${_shuukai > 1 ? '今年は、この順番で最大$_shuukai周します(全員の進学先が決まれば、そこで終わります)。\n\n' : ''}'
               '今年の地区の順番\n${narabi.join('\n')}',
               style: const TextStyle(color: Colors.black),
             ),
@@ -479,16 +556,21 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
       ],
       hajimeRound: roundBangou,
     );
+    if (!mounted) return;
+    // 自校の枠が埋まったら、残りを進めるか聞く(1.9.6)
+    await _wakuIppaiNaraKiku();
   }
 
   /// 地区の状態の文(今の地区・終わった地区・これからの地区)
+  /// (周回するときは、今の周で終わった地区は、次の周があれば「次の周」。1.9.6)
   String _chikuJoutaiMoji(int chiku) {
     final int i = _chikuJunban.indexOf(chiku);
     final int? ima = _imaChiku;
     if (ima == null) return '終了';
     if (chiku == ima) return '今の地区';
     final int imaIdx = _chikuJunban.indexOf(ima);
-    return i < imaIdx ? '終了' : '${i + 1}地区目';
+    if (i > imaIdx) return '${i + 1}地区目';
+    return _imaShuu < _shuukai ? '次の周' : '終了';
   }
 
   /// 表示する地区を、地区の順番(先頭は全地区)で前後に動かす([idou] は -1 か 1)
@@ -574,7 +656,8 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
     if (hyouji == null) {
       sub = ima == null ? '全部の地区の交渉が終わりました' : '今の地区は${comScoutChikuMei(ima)}';
     } else if (hyouji == ima) {
-      sub = '今の地区(${_chikuJunban.indexOf(ima!) + 1}/${_chikuJunban.length})・'
+      sub = '${_shuukai > 1 ? '$_imaShuu周目・' : ''}'
+          '今の地区(${_chikuJunban.indexOf(ima!) + 1}/${_chikuJunban.length})・'
           '${_koekake ? '声かけ' : '交渉'}は1人まで';
     } else {
       sub = ima == null
@@ -1108,8 +1191,10 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
           hajimeRound: hajimeRound,
           roundMei: _chikuMeguri
               ? {
-                  for (int i = 0; i < _chikuJunban.length; i++)
-                    i + 1: comScoutChikuMei(_chikuJunban[i]),
+                  for (int i = 0; i < _roundSuu; i++)
+                    i + 1:
+                        '${_shuukai > 1 ? '${i ~/ _chikuJunban.length + 1}周目・' : ''}'
+                        '${comScoutChikuMei(_chikuJunban[i % _chikuJunban.length])}',
                 }
               : const <int, String>{},
           horyuu: _chikuMeguri && !_koekake,
@@ -1135,12 +1220,14 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
         '地区ごとに1ラウンドずつ声をかけます。地区の順番は毎年変わります。'
         'どの大学も、今の地区の選手に1人まで声をかけられ、見送ることもできます。'
         'ほかの地区の選手は、上の地区の切り替え(左右の矢印か、地区の名前を押す)で見られます。'
-        '声をかけられるのは、その地区の番のときだけです。\n\n'
+        '声をかけられるのは、その地区の番のときだけです。'
+        '${_shuukai > 1 ? '今年は、この順番で最大$_shuukai周します(全員の進学先が決まれば、そこで終わり、進路未定の選手がいない地区は飛ばします)。' : ''}\n\n'
         '声かけに成功率はありません。ほかに声をかけた大学がなければ、その大学に確定します。'
         '同じ選手に複数の大学が声をかけた場合は争奪戦になり、選手が進学先を選びます'
         '(名声の高い大学ほど選ばれやすく、設定タブの「入学時名声影響度設定」で強さが変わります)。'
         'まれに、大学の名声をあまり気にしない新入生もいます。'
-        'コンピュータの大学は、自校の基準を満たす選手の中で、評価の高い選手に声をかけます。\n\n'
+        'コンピュータの大学は、自校の基準を満たす選手の中で、評価の高い選手に声をかけます'
+        '(毎回動きますが、基準を満たす選手が今の地区にいなければ見送ります)。\n\n'
         'カードの「全国12位(未定で5位)」は、新入生全体と、まだ進路未定の選手の中での、持ちタイムの順位です。\n\n'
         '確定できるのは、日本人の新入生の枠(5人。留学生が入学する大学は4人)までです。'
         'あなたの大学の枠は$_waku人で、確定しているのは$_kakuteiSuu人です。'
@@ -1255,14 +1342,25 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
         for (int i = 0; i < nokori; i++) {
           final List<ComScoutKoudou> koudou = [];
           final int idx = hajime + i - 1;
-          if (_chikuMeguri && (idx < 0 || idx >= _chikuJunban.length)) {
-            continue; // 地区の数を超えた分(通常は起こらない)
+          int? chiku;
+          if (_chikuMeguri) {
+            if (idx < 0 || idx >= _roundSuu || _chikuJunban.isEmpty) {
+              continue; // ラウンドの数を超えた分(通常は起こらない)
+            }
+            // 周回では、全員の進路が決まれば終わり、2周目からは進路未定の選手がいない地区を飛ばす(1.9.6)
+            final List<SenshuData> shinnyuusei = comScoutShinnyuusei();
+            if (!comScoutMiteiAri(shinnyuusei)) break;
+            chiku = _chikuJunban[idx % _chikuJunban.length];
+            if (idx >= _chikuJunban.length &&
+                !comScoutChikuMiteiAri(shinnyuusei, chiku)) {
+              continue;
+            }
           }
           await comScoutRound(
             gh: _ghensuu!,
             roundBangou: hajime + i,
             koudou: koudou,
-            chiku: _chikuMeguri ? _chikuJunban[idx] : null,
+            chiku: chiku,
             koekake: _koekake,
           );
           nokoriKiroku.add(MapEntry(hajime + i, koudou));
@@ -1689,12 +1787,8 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
     final bool chikuOk = !_chikuMeguri || senshuChiku == _imaChiku;
     String kousyouLabel = _koekake ? '声をかける' : '交渉';
     if (!chikuOk && senshuChiku != null) {
-      final int i = _chikuJunban.indexOf(senshuChiku);
-      final int? ima = _imaChiku;
-      final int imaIdx = ima == null
-          ? _chikuJunban.length
-          : _chikuJunban.indexOf(ima);
-      kousyouLabel = i >= 0 && i > imaIdx ? '${i + 1}地区目' : '終了';
+      // 「3地区目」「次の周」「終了」(1.9.6)
+      kousyouLabel = _chikuJoutaiMoji(senshuChiku);
     }
 
     return Card(

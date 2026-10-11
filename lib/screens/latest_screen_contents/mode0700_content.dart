@@ -1393,7 +1393,8 @@ class _Mode0700ContentState extends State<Mode0700Content> {
                                                 tsukuru: kijiKekkaIchiran,
                                                 hiraku: kijiKekkaHiraku,
                                                 // 駅伝なら、学内メディアの結果号も記事の画面で切り替えて読める(1.9.3)
-                                                annai: kijiGakunaiAnnai(),
+                                                // 正月駅伝は学連選抜通信の結果号と速報も(1.9.7)
+                                                annai: kijiGakunaiAnnai(gakuren: true),
                                               ),
                                             if (currentGhensuu
                                                     .hyojiracebangou <=

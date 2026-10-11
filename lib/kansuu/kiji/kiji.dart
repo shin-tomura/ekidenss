@@ -10,11 +10,14 @@ import 'package:ekiden/kansuu/kiji/kiji_taikousen.dart';
 import 'package:ekiden/kansuu/kiji/kiji_gakunai.dart';
 import 'package:ekiden/kansuu/kiji/kiji_jikkyou.dart'; // 駅伝の実況「箱庭スポーツ中継」(1.9.4)
 import 'package:ekiden/kansuu/kiji/kiji_nenkan.dart'; // 年間表彰と学内表彰(3月25日。1.9.4)
+import 'package:ekiden/kansuu/kiji/kiji_gakuren.dart'; // 学連選抜通信(正月駅伝。1.9.7)
+import 'package:ekiden/kansuu/gakuren_text.dart' show gakurenKonnenAri;
 
 export 'package:ekiden/kansuu/kiji/kiji_kihon.dart'
     show Kiji, KijiBlock, KijiBlockShurui, KijiHyou, kijiSiteMei;
 export 'package:ekiden/kansuu/kiji/kiji_jikkyou.dart' show jikkyouSiteMei;
 export 'package:ekiden/kansuu/kiji/kiji_tenbou.dart' show KijiYosouJin;
+export 'package:ekiden/kansuu/kiji/kiji_gakuren.dart' show gakurenSiteMei;
 
 // ------------------------------------------------------------
 // ニュース記事(箱庭スポーツ)の入口(1.9.2)
@@ -32,6 +35,9 @@ export 'package:ekiden/kansuu/kiji/kiji_tenbou.dart' show KijiYosouJin;
 // 対校戦は、種目ごとの結果画面のカードから結果号だけを読める
 // 1.9.4から、駅伝の実況「箱庭スポーツ中継」もある(kiji_jikkyou.dart)。レース画面(区間が終わるたびの
 // 指示の画面)のカードと、結果画面の記事の画面の切り替えで読める
+// 1.9.7から、正月駅伝では学連選抜を追う「学連選抜通信」もある(kiji_gakuren.dart)。展望号は学連選抜編成の
+// 画面のカードと直前順位予想の展望記事の切り替え、区間ごとの速報はレース画面の「実況・速報」のカード、
+// 結果号と速報は結果画面の記事の画面の切り替えで読める
 // ------------------------------------------------------------
 
 /// 表示中の大会の結果の記事
@@ -154,10 +160,26 @@ bool kijiGakunaiShutsujou() {
 
 /// 入口のカードに添える、学内メディアの案内(駅伝と駅伝予選のときだけ。それ以外はnull)
 /// [kekka] 結果画面のカード(対校戦の結果画面にも案内を出す)
-String? kijiGakunaiAnnai({bool kekka = false}) {
+/// [gakuren] 学連選抜通信の記事も切り替えに入るカード(直前順位予想の展望記事と結果画面)。
+///   正月駅伝で今年の学連選抜がいれば、学連選抜通信のことも添える(1.9.7)
+String? kijiGakunaiAnnai({bool kekka = false, bool gakuren = false}) {
   if (!kijiGakunaiTaikai(kekka: kekka)) return null;
   final String? site = kijiGakunaiSiteMei();
-  return site == null ? null : '学内メディア「$site」の記事も、記事の画面の上で切り替えて読めます';
+  if (site == null) return null;
+  if (gakuren && _gakurenAri()) {
+    return '学内メディア「$site」と「$gakurenSiteMei」の記事も、記事の画面の上で切り替えて読めます';
+  }
+  return '学内メディア「$site」の記事も、記事の画面の上で切り替えて読めます';
+}
+
+/// 表示中の大会が正月駅伝で、今年の学連選抜がいるか(1.9.7)
+bool _gakurenAri() {
+  try {
+    final Ghensuu? gh = Hive.box<Ghensuu>('ghensuuBox').getAt(0);
+    return gh != null && gakurenKonnenAri(gh);
+  } catch (e) {
+    return false;
+  }
 }
 
 /// 学内メディアの、表示中の駅伝・駅伝予選・対校戦の結果号
@@ -216,6 +238,41 @@ List<Kiji> kijiGakunaiHyoushouIchiran() {
   }
 }
 
+// ------------------------------------------------------------
+// 学連選抜通信(1.9.7。kiji_gakuren.dart。正月駅伝だけ)
+// ------------------------------------------------------------
+
+/// 学連選抜通信の展望号(学連選抜編成の画面と、直前順位予想の画面の展望記事)
+List<Kiji> kijiGakurenTenbouIchiran() => _gakuren('展望号', gakurenTenbouKiji);
+
+/// 学連選抜通信の結果号(結果画面)
+List<Kiji> kijiGakurenKekkaIchiran() =>
+    _gakuren('結果号', gakurenKekkaKiji, kekka: true);
+
+/// 学連選抜通信の区間ごとの速報(終わったばかりの区間が先頭。結果画面(mode 700)では大会が終わっている)
+List<Kiji> kijiGakurenSokuhouIchiran() {
+  final Ghensuu? gh = Hive.box<Ghensuu>('ghensuuBox').getAt(0);
+  if (gh == null) return [];
+  return _gakuren('速報', gakurenSokuhouKiji, kekka: gh.mode == 700);
+}
+
+List<Kiji> _gakuren(
+  String mei,
+  List<Kiji> Function(KijiKankyou k) tsukuru, {
+  bool kekka = false,
+}) {
+  try {
+    final KijiKankyou? k = KijiKankyou.yomu(kekka: kekka);
+    if (k == null) return [];
+    final List<Kiji> list = tsukuru(k);
+    _log(list);
+    return list;
+  } catch (e, st) {
+    debugPrint('[ニュース記事] 学連選抜通信の$meiを作れませんでした: $e\n$st');
+    return [];
+  }
+}
+
 /// [kekka] 結果号(大会のあと)のとき
 List<Kiji> _gakunai(
   String mei,
@@ -247,7 +304,40 @@ void _log(List<Kiji> list) {
 
 /// 生成AIに記事を渡すときの依頼文
 /// [gakunai] 学内メディアの記事のとき([site] はそのサイトの名前。1.9.3)
-String kijiIraibun(bool kekka, {bool gakunai = false, String site = kijiSiteMei}) {
+/// [sokuhou] 区間ごとの速報のとき(学内メディアと学連選抜通信。1.9.7)
+String kijiIraibun(
+  bool kekka, {
+  bool gakunai = false,
+  String site = kijiSiteMei,
+  bool sokuhou = false,
+}) {
+  // 区間ごとの速報(1.9.7)
+  if (sokuhou) {
+    final String dare = site == gakurenSiteMei
+        ? '学連選抜を追う架空の専門メディア「$site」の、区間ごとの速報です。あなたは学連選抜を担当する記者として、'
+        : '大学の陸上競技部を追う架空の学内メディア「$site」の、区間ごとの速報です。あなたは陸上競技部を担当する学生記者として、';
+    return '以下は、駅伝ゲーム「箱庭小駅伝SS」のレースの途中経過をもとにした、$dare'
+        '速報の臨場感を残した、選手に寄り添う記事に書き直してください。'
+        '順位・タイム差・選手名・大学名などの事実は変えないでください。'
+        'まだ走っていない区間の結果は決めつけないでください。'
+        'コメントは記事の中のものだけを使い、新しい発言は作らないでください。\n\n';
+  }
+  // 学連選抜通信(1.9.7)
+  if (site == gakurenSiteMei) {
+    if (kekka) {
+      return '以下は、駅伝ゲーム「箱庭小駅伝SS」の大会結果をもとにした、学連選抜を追う架空の専門メディア'
+          '「$site」の記事です。あなたは学連選抜を担当する記者として、'
+          'それぞれの大学の思いを背負って走った選手に寄り添う、読みごたえのある記事に書き直してください。'
+          '順位(○位相当)・タイム・選手名・大学名などの事実は変えないでください。'
+          'コメントは記事の中のものだけを使い、新しい発言は作らないでください。\n\n';
+    }
+    return '以下は、駅伝ゲーム「箱庭小駅伝SS」のレース前のデータをもとにした、学連選抜を追う架空の専門メディア'
+        '「$site」の展望記事です。あなたは学連選抜を担当する記者として、'
+        'それぞれの大学の思いを背負って走る選手を応援したくなる記事に書き直してください。'
+        'まだレースは行われていないので、結果を決めつけないでください。'
+        '持ちタイム・区間・選手名・大学名などの事実は変えないでください。'
+        'コメントは記事の中のものだけを使い、新しい発言は作らないでください。\n\n';
+  }
   // 駅伝の実況(1.9.4)
   if (site == jikkyouSiteMei) {
     return '以下は、駅伝ゲーム「箱庭小駅伝SS」のレースの途中経過をもとにした、架空のテレビ中継'

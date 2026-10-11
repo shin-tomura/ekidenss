@@ -12,6 +12,7 @@ import 'package:ekiden/screens/ai_copy_matome.dart';
 // ・1.9.3から、自分の大学の学内メディア「○○スポーツ」の記事もある(kiji_gakunai.dart)。
 //   同じ場面に箱庭スポーツの記事もあるときは、一覧の画面の上で切り替える(入口のカードは1枚のまま)。
 //   学内メディアは緑の印にして、箱庭スポーツ(赤い印)と見分けられるようにした
+// ・1.9.7から、正月駅伝では学連選抜を追う「学連選抜通信」(青い印。kiji_gakuren.dart)もある
 // ------------------------------------------------------------
 
 // 色(黒い背景に合わせた落ち着いた色)
@@ -24,9 +25,19 @@ const Color _aka = Color(0xFFE53935); // サイトの印の色
 const Color _jibunIro = Color(0xFFFFB300); // 自分の大学の印
 const Color _commentIro = Color(0xFF4FC3F7);
 const Color _gakunaiIro = Color(0xFF43A047); // 学内メディアの印(1.9.3)
+const Color _gakurenIro = Color(0xFF1E88E5); // 学連選抜通信の印(1.9.7)
 
 /// サイトの印の色(学内メディアは緑、箱庭スポーツは赤)
 Color _iro(bool gakunai) => gakunai ? _gakunaiIro : _aka;
+
+/// 記事のサイトの印の色(学連選抜通信は青。1.9.7)
+Color _iroKiji(Kiji kiji) => kiji.site == gakurenSiteMei ? _gakurenIro : _iro(kiji.gakunai);
+
+/// サイト1つ分の印の色(学連選抜通信は青。1.9.7)
+Color _iroBan(KijiBan ban) => ban.site == gakurenSiteMei ? _gakurenIro : _iro(ban.gakunai);
+
+/// 区間ごとの速報の記事か(生成AIに渡すときの依頼文を変える。1.9.7)
+bool _sokuhou(List<Kiji> list) => list.isNotEmpty && list.first.category.endsWith('速報');
 
 /// 記事の一覧の、サイト1つ分(1.9.3。箱庭スポーツと学内メディアを切り替える)
 class KijiBan {
@@ -47,6 +58,9 @@ class KijiBan {
   /// 記事がないときの文
   final String nashiMoji;
 
+  /// 切り替えのボタンの名前(なければサイトの名前。同じサイトの記事と速報を分けるとき。1.9.7)
+  final String? kirikaeMei;
+
   const KijiBan({
     required this.site,
     required this.sub,
@@ -54,6 +68,7 @@ class KijiBan {
     required this.kekka,
     this.gakunai = false,
     this.nashiMoji = 'この大会の記事はまだありません',
+    this.kirikaeMei,
   });
 }
 
@@ -75,8 +90,28 @@ List<KijiBan> _gakunaiBan(
   ];
 }
 
+/// 学連選抜通信の記事を、サイト1つ分にする(記事がなければ空。ほかのサイトと並べるとき。1.9.7)
+List<KijiBan> _gakurenBan(
+  List<Kiji> list, {
+  required String sub,
+  required bool kekka,
+  String? kirikaeMei,
+}) {
+  if (list.isEmpty) return [];
+  return [
+    KijiBan(
+      site: gakurenSiteMei,
+      sub: sub,
+      list: list,
+      kekka: kekka,
+      kirikaeMei: kirikaeMei,
+    ),
+  ];
+}
+
 /// 結果の記事の一覧を開く(結果画面から。駅伝・駅伝予選・対校戦なら学内メディアの結果号も。
-/// 駅伝なら実況「箱庭スポーツ中継」も切り替えて読める。1.9.4)
+/// 駅伝なら実況「箱庭スポーツ中継」も切り替えて読める。1.9.4。
+/// 正月駅伝なら学連選抜通信の結果号と区間ごとの速報も。1.9.7)
 void kijiKekkaHiraku(BuildContext context) {
   final List<Kiji> list = kijiKekkaIchiran();
   // 対校戦の記事は駅伝ではないので、サイト名の横を「陸上ニュース・対校戦」にする(1.9.2)
@@ -98,7 +133,15 @@ void kijiKekkaHiraku(BuildContext context) {
           : (gakunaiCategory == '対校戦' ? '陸上競技部・対校戦' : '陸上競技部・駅伝'),
       kekka: true,
     ),
+    ..._gakurenBan(kijiGakurenKekkaIchiran(), sub: '学連選抜・結果号', kekka: true),
     if (jikkyou.isNotEmpty) _jikkyouBan(jikkyou),
+    if (jikkyou.isNotEmpty)
+      ..._gakurenBan(
+        kijiGakurenSokuhouIchiran(),
+        sub: '学連選抜・区間ごとの速報',
+        kekka: true,
+        kirikaeMei: '$gakurenSiteMei・速報',
+      ),
   ]);
 }
 
@@ -114,8 +157,30 @@ KijiBan _jikkyouBan(List<Kiji> list) {
 }
 
 /// 駅伝の実況を開く(レース画面の、区間が終わったあとの指示の画面から。1.9.4)
+/// 正月駅伝なら、学連選抜通信の区間ごとの速報も切り替えて読める(最初に開く。1.9.7)
 void kijiJikkyouHiraku(BuildContext context) {
-  _hiraku(context, [_jikkyouBan(kijiJikkyouIchiran())]);
+  _hiraku(context, [
+    ..._gakurenBan(
+      kijiGakurenSokuhouIchiran(),
+      sub: '学連選抜・区間ごとの速報',
+      kekka: true,
+      kirikaeMei: '$gakurenSiteMei・速報',
+    ),
+    _jikkyouBan(kijiJikkyouIchiran()),
+  ]);
+}
+
+/// 学連選抜通信の展望号を開く(学連選抜編成の画面から。1.9.7)
+void kijiGakurenTenbouHiraku(BuildContext context) {
+  _hiraku(context, [
+    KijiBan(
+      site: gakurenSiteMei,
+      sub: '学連選抜・展望号',
+      list: kijiGakurenTenbouIchiran(),
+      kekka: false,
+      nashiMoji: '今年の学連選抜の記事はまだありません',
+    ),
+  ]);
 }
 
 /// 展望の記事の一覧を開く(直前順位予想の画面から。駅伝なら学内メディアの展望号も)
@@ -128,6 +193,8 @@ void kijiTenbouHiraku(BuildContext context, List<KijiYosouJin> yosou) {
       kekka: false,
     ),
     ..._gakunaiBan(kijiGakunaiTenbouIchiran(), sub: '陸上競技部・展望号', kekka: false),
+    // 正月駅伝なら、学連選抜通信の展望号も(1.9.7)
+    ..._gakurenBan(kijiGakurenTenbouIchiran(), sub: '学連選抜・展望号', kekka: false),
   ]);
 }
 
@@ -233,6 +300,9 @@ class KijiLinkCard extends StatefulWidget {
   /// 学内メディアだけのカードか(印を緑にする。1.9.3)
   final bool gakunai;
 
+  /// 学連選抜通信だけのカードか(印を青にする。1.9.7)
+  final bool gakuren;
+
   const KijiLinkCard({
     super.key,
     required this.namae,
@@ -240,6 +310,7 @@ class KijiLinkCard extends StatefulWidget {
     required this.hiraku,
     this.annai,
     this.gakunai = false,
+    this.gakuren = false,
   });
 
   @override
@@ -253,6 +324,16 @@ class _KijiLinkCardState extends State<KijiLinkCard> {
   /// 記事の本数(作る前は0)
   int _honsuu = 0;
 
+  /// 一番上の記事(作る前や、記事がないときはnull。印の色をその記事のサイトに合わせる。1.9.7)
+  Kiji? _top;
+
+  /// 印の色(記事を作ったあとは一番上の記事のサイトの色)
+  Color get _cardIro {
+    final Kiji? top = _top;
+    if (top != null) return _iroKiji(top);
+    return widget.gakuren ? _gakurenIro : _iro(widget.gakunai);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -263,6 +344,7 @@ class _KijiLinkCardState extends State<KijiLinkCard> {
       setState(() {
         _honsuu = list.length;
         _midashi = list.isEmpty ? null : list.first.midashi;
+        _top = list.isEmpty ? null : list.first;
       });
     });
   }
@@ -281,7 +363,7 @@ class _KijiLinkCardState extends State<KijiLinkCard> {
             child: Container(
               decoration: BoxDecoration(
                 border: Border(
-                  left: BorderSide(color: _iro(widget.gakunai), width: 5),
+                  left: BorderSide(color: _cardIro, width: 5),
                   top: const BorderSide(color: _sen),
                   right: const BorderSide(color: _sen),
                   bottom: const BorderSide(color: _sen),
@@ -294,7 +376,7 @@ class _KijiLinkCardState extends State<KijiLinkCard> {
                   Text(
                     '📰 ${widget.namae}${_honsuu > 0 ? '・$_honsuu本' : ''}',
                     style: TextStyle(
-                      color: _iro(widget.gakunai),
+                      color: _cardIro,
                       fontSize: 13,
                       fontWeight: FontWeight.bold,
                     ),
@@ -339,9 +421,9 @@ class _KijiLinkCardState extends State<KijiLinkCard> {
 class _SiteMei extends StatelessWidget {
   final String site;
   final String sub;
-  final bool gakunai;
+  final Color iro;
 
-  const _SiteMei({required this.site, required this.sub, this.gakunai = false});
+  const _SiteMei({required this.site, required this.sub, required this.iro});
 
   @override
   Widget build(BuildContext context) {
@@ -351,7 +433,7 @@ class _SiteMei extends StatelessWidget {
       spacing: 8,
       runSpacing: 4,
       children: [
-        Container(width: 6, height: 22, color: _iro(gakunai)),
+        Container(width: 6, height: 22, color: iro),
         Text(
           site,
           style: const TextStyle(
@@ -393,7 +475,7 @@ Widget _fudaNarabi(Kiji kiji) {
     spacing: 6,
     runSpacing: 4,
     children: [
-      _Fuda(kiji.category, _iro(kiji.gakunai)),
+      _Fuda(kiji.category, _iroKiji(kiji)),
       // 学内メディアの記事はどれも自分の大学のことなので、印は付けない(1.9.3)
       if (kiji.jibun && !kiji.gakunai) const _Fuda('自分の大学', _jibunIro),
       if (!kiji.kekka) const _Fuda('展望', _commentIro),
@@ -476,7 +558,7 @@ class _KijiIchiranGamenState extends State<KijiIchiranGamen> {
             _kirikae(),
             const SizedBox(height: 12),
           ],
-          _SiteMei(site: ban.site, sub: ban.sub, gakunai: ban.gakunai),
+          _SiteMei(site: ban.site, sub: ban.sub, iro: _iroBan(ban)),
           const SizedBox(height: 12),
           const Divider(color: _sen, height: 1),
           const SizedBox(height: 16),
@@ -521,7 +603,7 @@ class _KijiIchiranGamenState extends State<KijiIchiranGamen> {
       children: [
         for (int i = 0; i < widget.bans.length; i++)
           ChoiceChip(
-            label: Text(widget.bans[i].site),
+            label: Text(widget.bans[i].kirikaeMei ?? widget.bans[i].site),
             selected: _erabi == i,
             onSelected: (selected) {
               if (!selected || _erabi == i) return;
@@ -529,7 +611,7 @@ class _KijiIchiranGamenState extends State<KijiIchiranGamen> {
                 _erabi = i;
               });
             },
-            selectedColor: _iro(widget.bans[i].gakunai),
+            selectedColor: _iroBan(widget.bans[i]),
             backgroundColor: Colors.grey.shade800,
             labelStyle: const TextStyle(color: Colors.white),
           ),
@@ -546,7 +628,7 @@ class _KijiIchiranGamenState extends State<KijiIchiranGamen> {
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: _waku,
-          border: Border(left: BorderSide(color: _iro(kiji.gakunai), width: 4)),
+          border: Border(left: BorderSide(color: _iroKiji(kiji), width: 4)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -615,7 +697,7 @@ class _KijiIchiranGamenState extends State<KijiIchiranGamen> {
     return OutlinedButton.icon(
       onPressed: () => _copy(
         context,
-        kijiIraibun(ban.kekka, gakunai: ban.gakunai, site: ban.site) +
+        kijiIraibun(ban.kekka, gakunai: ban.gakunai, site: ban.site, sokuhou: _sokuhou(list)) +
             list.map((k) => k.zenbun()).join('\n\n'),
         'すべての記事(依頼文つき)',
       ),
@@ -686,7 +768,7 @@ class KijiGamen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          for (final KijiBlock b in kiji.honbun) _block(b, kiji.gakunai),
+          for (final KijiBlock b in kiji.honbun) _block(b, _iroKiji(kiji)),
           for (final KijiHyou h in kiji.hyou) _hyou(h),
           const SizedBox(height: 28),
           _aiWaku(context, kiji),
@@ -715,14 +797,14 @@ class KijiGamen extends StatelessWidget {
   }
 
   // 本文の1かたまり
-  Widget _block(KijiBlock b, bool gakunai) {
+  Widget _block(KijiBlock b, Color iro) {
     switch (b.shurui) {
       case KijiBlockShurui.koMidashi:
         return Padding(
           padding: const EdgeInsets.only(top: 22, bottom: 6),
           child: Row(
             children: [
-              Container(width: 4, height: 18, color: _iro(gakunai)),
+              Container(width: 4, height: 18, color: iro),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -841,8 +923,12 @@ class KijiGamen extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            kiji.gakunai
+            kiji.category.endsWith('速報')
+                ? 'この速報を依頼文つきでコピーして生成AIに貼り付けると、記者になりきって書き直してくれます。'
+                : kiji.gakunai
                 ? 'この記事を依頼文つきでコピーして生成AIに貼り付けると、学生記者になりきって書き直してくれます。'
+                : kiji.site == gakurenSiteMei
+                ? 'この記事を依頼文つきでコピーして生成AIに貼り付けると、学連選抜を担当する記者になりきって書き直してくれます。'
                 : kiji.site == jikkyouSiteMei
                 ? 'この実況を依頼文つきでコピーして生成AIに貼り付けると、実況アナと解説者になりきって書き直してくれます。'
                 : kiji.kekka
@@ -860,7 +946,12 @@ class KijiGamen extends StatelessWidget {
               OutlinedButton.icon(
                 onPressed: () => _copy(
                   context,
-                  kijiIraibun(kiji.kekka, gakunai: kiji.gakunai, site: kiji.site) +
+                  kijiIraibun(
+                        kiji.kekka,
+                        gakunai: kiji.gakunai,
+                        site: kiji.site,
+                        sokuhou: kiji.category.endsWith('速報'),
+                      ) +
                       kiji.zenbun(),
                   'この記事(依頼文つき)',
                 ),

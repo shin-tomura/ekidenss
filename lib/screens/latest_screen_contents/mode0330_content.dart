@@ -729,7 +729,8 @@ class Mode0330Content extends StatelessWidget {
                                   tsukuru: () => kijiTenbouIchiran(kijiYosou),
                                   hiraku: (c) => kijiTenbouHiraku(c, kijiYosou),
                                   // 学内メディアの展望号も、記事の画面で切り替えて読める(1.9.3)
-                                  annai: kijiGakunaiAnnai(),
+                                  // 正月駅伝は学連選抜通信の展望号も(1.9.7)
+                                  annai: kijiGakunaiAnnai(gakuren: true),
                                 ),
                                 TextButton(
                                   onPressed: () {

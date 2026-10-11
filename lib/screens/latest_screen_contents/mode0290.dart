@@ -9,6 +9,8 @@ import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/kansuu/gakuren_kantoku.dart';
 import 'package:ekiden/screens/gakuren_copy_button.dart';
 import 'package:ekiden/screens/ai_copy_matome.dart';
+import 'package:ekiden/kansuu/kiji/kiji.dart'; // 学連選抜通信の展望号(1.9.7)
+import 'package:ekiden/screens/kiji_screen.dart'; // 学連選抜通信の展望号の画面(1.9.7)
 
 class Mode0290Content extends StatefulWidget {
   final Ghensuu ghensuu;
@@ -283,6 +285,20 @@ class _Mode0290ContentState extends State<Mode0290Content> {
                         ),
 
                         const SizedBox(height: 20),
+
+                        // 学連選抜通信の展望号(1.9.7)。自分の大学が正月駅伝に出られない年は
+                        // 直前順位予想の画面を通らないので、毎年必ず通るこの画面にカードを置く。
+                        // 区間配置を変えたら、開いたときの配置で書く(見出しの予告は画面を出したときのもの)
+                        KijiLinkCard(
+                          key: ValueKey(
+                            'kijiGakurenTenbou_${widget.ghensuu.year}',
+                          ),
+                          namae: '展望号($gakurenSiteMei)',
+                          tsukuru: kijiGakurenTenbouIchiran,
+                          hiraku: kijiGakurenTenbouHiraku,
+                          gakuren: true,
+                        ),
+                        const SizedBox(height: 12),
 
                         // 自分の大学が正月駅伝に出場できない年は、学連選抜の監督ができる(1.8.2)
                         ..._gakurenKantokuBubun(),

@@ -766,8 +766,9 @@ class _ModalDaigakuKoseiState extends State<ModalDaigakuKosei> {
                             ),
                           ),
                         ),
+                  // (地区めぐり(声かけ)では積極性を使わないので、全国一斉のときだけと書く。1.9.6)
                   _koumoku(
-                    '積極性',
+                    '積極性(全国一斉)',
                     _hamidasanaiDropdown(
                       value:
                           comScoutSekkyokuseiUnivSettei(kantoku, _univid) ??

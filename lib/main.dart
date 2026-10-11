@@ -1030,9 +1030,9 @@ Future<void> main() async {
     //save_load_screenの中の _importFromSlot の中にもあるので、そちらも変更すること！
     final versionValue = int.tryParse(sortedUnivData[7].name_tanshuku);
     if (versionValue == null ||
-        versionValue < 21951 ||
+        versionValue < 21960 ||
         versionValue > 999999999) {
-      sortedUnivData[7].name_tanshuku = "21951"; //バージョン番号
+      sortedUnivData[7].name_tanshuku = "21960"; //バージョン番号
       await sortedUnivData[7].save();
     }
 
@@ -2983,8 +2983,13 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     // 8. gh[0].mode=8888 の設定
     //ghensuu.mode = 8888;
     if (skip.skipflag == 0) {
-      // 新入生スカウトの回数(コンピュータスカウトONなら設定のラウンド回数、OFFなら今まで通り3回)
-      ghensuu.scoutChances = comScoutChances(kantoku);
+      // 新入生スカウトの回数(コンピュータスカウトONなら、地区めぐりは新入生のいる地区の数、
+      // 全国一斉は設定のラウンド回数。OFFなら今まで通り3回)
+      // ONなら、今年のスカウトの形もここで覚える(途中で設定を変えても、今年は始めた形のまま。1.9.6)
+      ghensuu.scoutChances = await comScoutKaishi(
+        gh: ghensuu,
+        kantoku: kantoku,
+      );
       ghensuu.mode = 9000;
     } else {
       // スキップ中は、コンピュータスカウトがONならコンピュータの大学だけで全ラウンドを行う

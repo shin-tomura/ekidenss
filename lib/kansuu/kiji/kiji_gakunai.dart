@@ -692,15 +692,38 @@ Kiji _kekkaZenin(EkidenKekka e, EkidenUnivKekka m, String site) {
     '$ks人がつないだたすき　${k.raceMei}全区間リポート',
   ]);
   final String lead =
-      '${k.taikaiMei}でたすきをつないだ$ks人の走りを、1区から順に振り返る。';
+      '${k.taikaiMei}でたすきをつないだ$ks人の走りを、1区から順に振り返る。'
+      '展望号で書いた持ちタイムの見立てと、実際の区間順位も照らし合わせた。';
+  // 見立てと結果の照合(1.9.7。展望号の選手名鑑と同じ見方で、結果と比べる)
+  final TokuchouKaki tk = TokuchouKaki(k, w, MochiHyou(k), suuji: _gakunaiKata(k, site, no) == KishaKata.suuji);
+  int teamBestJ = TEISUU.DEFAULTJUNI;
+  int hitoketaSuu = 0;
+  for (int kk = 0; kk < ks; kk++) {
+    if (m.senshu[kk] == null) continue;
+    if (m.kukanJuni[kk] < teamBestJ) teamBestJ = m.kukanJuni[kk];
+    if (m.kukanJuni[kk] < 9) hitoketaSuu++;
+  }
 
   for (int kk = 0; kk < ks; kk++) {
     final SenshuData? s = m.senshu[kk];
     if (s == null) continue;
-    w.koMidashi('${kk + 1}区　${w.senshu(s)}');
-    final String yobi = w.senshu(s);
     final int kj = m.kukanJuni[kk];
     final int ima = m.tuuka[kk];
+    // 見立てと結果の照合(寸評は小見出しに添える。1.9.7)
+    final ({String sunpyou, String bun}) fk = tk.furikaeriSenshu(
+      s,
+      kk,
+      kj: kj,
+      myTime: m.kukanTime[kk],
+      hashiru: kukanHashiru(k, kk),
+      d: kk == 0 ? 0 : m.tuuka[kk - 1] - ima,
+      maeD: kk >= 2 ? m.tuuka[kk - 2] - m.tuuka[kk - 1] : null,
+      tsugiD: kk + 1 < ks ? ima - m.tuuka[kk + 1] : null,
+      teamBest: kj == teamBestJ && ks >= 3,
+      hitoketaDake: kj < 9 && hitoketaSuu == 1 && ks >= 3,
+    );
+    w.koMidashi('${kk + 1}区　${w.senshu(s)}　― ${fk.sunpyou}');
+    final String yobi = w.senshu(s);
     final StringBuffer sb = StringBuffer();
     final ToujituJijou? j = jijou[kk];
     if (j != null) {
@@ -775,6 +798,8 @@ Kiji _kekkaZenin(EkidenKekka e, EkidenUnivKekka m, String site) {
       sb.write('苦しい走りになったが、最後までたすきを運び切った。');
     }
     w.danraku(sb.toString());
+    // 見立てと結果の照合(1.9.7)
+    w.danraku(fk.bun);
     w.danraku(shusshinShumiBun(k, s, w.r, myouji(s.name)));
     // コメント
     CommentBamen bamen;

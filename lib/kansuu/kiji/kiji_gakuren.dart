@@ -1070,14 +1070,43 @@ Kiji _kekkaZenin(
     '学連選抜、${list.length}人の走りを振り返る',
     'たすきをつないだ${list.length}人　学連選抜の全区間',
   ]);
-  final String lead = '総合${juniMoji(sougou)}相当だった学連選抜の${list.length}人の走りを、区間の順に振り返る。';
+  final String lead =
+      '総合${juniMoji(sougou)}相当だった学連選抜の${list.length}人の走りを、区間の順に振り返る。'
+      '展望号で書いた持ちタイムの見立てと、実際の区間順位相当も照らし合わせた。';
+  // 見立てと結果の照合(1.9.7。展望号の選手名鑑と同じ見方で、結果と比べる)
+  final TokuchouKaki tk = TokuchouKaki(k, w, MochiHyou(k), suuji: kishaKataKara(_kishaMei(k, no)) != KishaKata.joukei);
+  int teamBestJ = TEISUU.DEFAULTJUNI;
+  int hitoketaSuu = 0;
+  for (final GakurenKukanKekka? r in kekka) {
+    if (r == null) continue;
+    if (r.kukanJuni < teamBestJ) teamBestJ = r.kukanJuni;
+    if (r.kukanJuni < 9) hitoketaSuu++;
+  }
+  int? ageSage(int kk) {
+    final GakurenKukanKekka? r = kk >= 0 && kk < ks ? kekka[kk] : null;
+    final int? mae = r?.maeTuukaJuni;
+    return (r == null || mae == null) ? null : mae - r.tuukaJuni;
+  }
+
   for (int kk = 0; kk < ks; kk++) {
     final GakurenKukanKekka? r = kekka[kk];
     final _GSenshu? x = _kukanNoSenshu(list, kk);
     if (r == null || x == null) continue;
     final Senshu_Gakuren_Data g = x.g;
     final bool saigo = kk == ks - 1;
-    w.koMidashi('${kk + 1}区　${_mei(w, x)}・${x.shozoku}');
+    final ({String sunpyou, String bun}) fk = tk.furikaeriGakuren(
+      g,
+      kk,
+      kj: r.kukanJuni,
+      myTime: r.kukanTime,
+      hashiru: kukanHashiru(k, kk),
+      d: ageSage(kk) ?? 0,
+      maeD: kk >= 1 ? ageSage(kk - 1) : null,
+      tsugiD: ageSage(kk + 1),
+      teamBest: r.kukanJuni == teamBestJ && ks >= 3,
+      hitoketaDake: r.kukanJuni < 9 && hitoketaSuu == 1 && ks >= 3,
+    );
+    w.koMidashi('${kk + 1}区　${_mei(w, x)}・${x.shozoku}　― ${fk.sunpyou}');
     final String yobi = myouji(g.name);
     final StringBuffer sb = StringBuffer();
     sb.write('区間${juniMoji(r.kukanJuni)}相当、${jikanMoji(r.kukanTime)}。');
@@ -1117,6 +1146,8 @@ Kiji _kekkaZenin(
     if (r.kukanJuni == 0) sb.write('区間1位相当で、${x.shozoku}に名声をもたらした。');
     if (g.gakunen == 4) sb.write('4年生として、最後の正月駅伝だった。');
     w.danraku(sb.toString());
+    // 見立てと結果の照合(1.9.7)
+    w.danraku(fk.bun);
     // コメント(区間順位相当の上位・中位・下位で変える。1.9.7)
     final int? m = r.maeTuukaJuni;
     final int d = m == null ? 0 : m - r.tuukaJuni;

@@ -29,6 +29,15 @@ import 'package:ekiden/kansuu/kiji/kiji_kihon.dart';
 // 飽きさせない工夫: 観点ごとに言い回しを数通り持ち(同じ記事では重ねない)、選手ごとに入り方を
 // 回し、文の数も書けることの多さで1〜3文に変える。記者の型で、数字で語る(順位をそのまま出す)か
 // 情景で語る(上位・下位などの言葉にする)かを変える
+//
+// 振り返り(結果号の「全員の走り」。furikaeri): レース前と同じ見立てを結果と照らす
+//  ・区間の距離に合った種目の持ちタイム区間内順位と、実際の区間順位を比べて、期待以上・どおり・以下
+//    (差が3つ以上、または出場校数の4分の1以上で言い切る)
+//  ・展望号の見立て(強み・不安材料・坂)が当たったか外れたか
+//  ・なぜそうなったか(指示の成否・目標順位を下回っての焦り・ほっと一息・1区の集団のペース・
+//    区間順位の画面の「分析」で際立った能力。実況と同じく数字なし)
+//  ・区間賞やすぐ上の順位との差、チームの中での位置、前後の区間との流れ
+//  ・小見出しに添える寸評も作る。見立てとの差が大きい選手や区間賞は厚く、ほかは短く
 // ------------------------------------------------------------
 
 /// 区間内順位を書いてよい場面か(区間エントリーが公開されたあと。学連選抜編成(290)と
@@ -120,6 +129,106 @@ class MochiHyou {
     }
     return mae + 1;
   }
+}
+
+/// 分析(区間順位の画面の「分析」)の項目の呼び方(kiji_jikkyou.dart と同じ)
+const Map<int, String> _bunsekiYobikata = {
+  3: '走力そのもの',
+  4: '登りの強さ',
+  5: '下りの巧みさ',
+  6: 'アップダウンへの対応',
+  7: '経験',
+  8: 'ロードへの適性',
+  9: 'ペースの変化への対応',
+  10: '長い距離での粘り',
+  11: 'スパートの切れ味',
+};
+
+/// 走り終えた区間の、補正の説明と分析から読める事情(数字は読まず、何があったかだけ。
+/// kiji_jikkyou.dart の _Hashiri と同じ読み方で、学連選抜の選手にも使えるようにした。1.9.7)
+class HashiriJijou {
+  /// 指示(0なし、1前半突っ込み(1区はスタート直後飛び出し)、2前半抑え)
+  int siji = 0;
+
+  /// 指示の結果(nullなら判定なし)
+  bool? seikou;
+
+  /// 目標順位を下回って焦った・上回ってほっと一息
+  bool aseri = false;
+  bool hitoiki = false;
+
+  /// 1区の集団のペースとの関係の行(なければ空)
+  String shuudan = '';
+
+  /// 分析で良い方・悪い方に際立っていた能力(なければnull)
+  String? kiwaYoi;
+  String? kiwaWarui;
+
+  HashiriJijou._();
+
+  static HashiriJijou yomu({
+    required int sijiflag,
+    required int sijiseikouflag,
+    required int tobidashi,
+    required int tobidashiSeikou,
+    required String setsumei,
+    required int bunseki,
+    required int kk,
+  }) {
+    final HashiriJijou h = HashiriJijou._();
+    h.siji = sijiflag.clamp(0, 2).toInt();
+    if (kk == 0) {
+      if (tobidashi == 1) {
+        h.siji = 1;
+        h.seikou = tobidashiSeikou == 1;
+      }
+    } else if (h.siji >= 1) {
+      h.seikou = sijiseikouflag == 1;
+    }
+    for (final String gyou in setsumei.split('\n')) {
+      final String g = gyou.trim();
+      if (g.isEmpty) continue;
+      if (g.startsWith('目標順位下回って')) h.aseri = true;
+      if (g.startsWith('目標順位上回って')) h.hitoiki = true;
+      if (h.shuudan.isEmpty && g.contains('集団のペース')) h.shuudan = g;
+    }
+    if (bunseki != 0) {
+      int yoiTen = 0;
+      int waruiTen = 0;
+      for (final MapEntry<int, String> e in _bunsekiYobikata.entries) {
+        final int ten = ((bunseki >> (e.key * 4)) & 0xF) - 7;
+        if (ten <= -5 && ten < yoiTen) {
+          yoiTen = ten;
+          h.kiwaYoi = e.value;
+        }
+        if (ten >= 5 && ten > waruiTen) {
+          waruiTen = ten;
+          h.kiwaWarui = e.value;
+        }
+      }
+    }
+    return h;
+  }
+
+  static HashiriJijou yomuSenshu(SenshuData s, int kk) => yomu(
+    sijiflag: s.sijiflag,
+    sijiseikouflag: s.sijiseikouflag,
+    tobidashi: s.startchokugotobidasiflag,
+    tobidashiSeikou: s.startchokugotobidasiseikouflag,
+    setsumei: s.string_racesetumei,
+    bunseki: s.racechuukakuseiflag,
+    kk: kk,
+  );
+
+  static HashiriJijou yomuGakuren(Senshu_Gakuren_Data g, int kk) => yomu(
+    sijiflag: g.sijiflag,
+    sijiseikouflag: g.sijiseikouflag,
+    tobidashi: g.startchokugotobidasiflag,
+    tobidashiSeikou: g.startchokugotobidasiseikouflag,
+    setsumei: g.string_racesetumei,
+    bunseki: g.racechuukakuseiflag,
+    kk: kk,
+  );
 }
 
 /// 順位[r](1始まり)が[n]人の中でどの段か(0: 上位3分の1、1: 中ほど、2: 下位3分の1。人数が少なければ1)
@@ -363,8 +472,14 @@ class TokuchouKaki {
     return _Kansatsu(1, '$hikaku$ai');
   }
 
-  /// C 区間内順位の善戦・苦戦(区間の距離と型に合った種目で見る)
-  _Kansatsu? _kukannai(List<double> t, int kk, List<SenshuData> hashiru, bool soutou) {
+  /// 区間の距離と型に合った種目で見た、区間内順位の見立て
+  /// (moji: 順位の文の部品、tsuyoi: 上位だった種目で問われるもの、yowai: 下位だった種目で問われるもの)
+  ({List<String> moji, List<String> tsuyoi, List<String> yowai}) _kukannaiMitate(
+    List<double> t,
+    int kk,
+    List<SenshuData> hashiru,
+    bool soutou,
+  ) {
     final double kyori = k.gh.kyori_taikai_kukangoto[k.race][kk];
     final bool ikku = kk == 0;
     final bool nisan = kk == 1 || kk == 2;
@@ -399,6 +514,15 @@ class TokuchouKaki {
       if (d == 0) tsuyoi.add(motome(ev));
       if (d == 2) yowai.add(motome(ev));
     }
+    return (moji: moji, tsuyoi: tsuyoi, yowai: yowai);
+  }
+
+  /// C 区間内順位の善戦・苦戦(区間の距離と型に合った種目で見る)
+  _Kansatsu? _kukannai(List<double> t, int kk, List<SenshuData> hashiru, bool soutou) {
+    final ({List<String> moji, List<String> tsuyoi, List<String> yowai}) m = _kukannaiMitate(t, kk, hashiru, soutou);
+    final List<String> moji = m.moji;
+    final List<String> tsuyoi = m.tsuyoi;
+    final List<String> yowai = m.yowai;
     if (moji.isEmpty) return null;
     final String junbun = '${moji.join('、')}。';
     final String handan;
@@ -428,6 +552,18 @@ class TokuchouKaki {
       ]);
     }
     return _Kansatsu(2, '$junbun$handan');
+  }
+
+  /// 坂の見立て(区間の起伏に合った種目の区間内の段。平坦な区間や記録がなければnull)
+  ({int dan, String michi})? _sakaDan(List<double> t, int kk, List<SenshuData>? hashiru) {
+    final KukanTokuchou tok = kukanTokuchou(k.gh, k.race, kk);
+    if (tok == KukanTokuchou.heitan || hashiru == null) return null;
+    final bool nobori = tok == KukanTokuchou.yamaNobori || tok == KukanTokuchou.nobori;
+    final bool kudari = tok == KukanTokuchou.yamaKudari || tok == KukanTokuchou.kudari;
+    final int ev = nobori ? 4 : (kudari ? 5 : 7);
+    final int r = hyou.kukannai(t[ev], ev, hashiru);
+    if (r <= 0) return null;
+    return (dan: _dan(r, hashiru.length), michi: nobori ? '登り' : (kudari ? '下り' : 'アップダウン'));
   }
 
   /// D 坂とアップダウン(登り1万・下り1万・クロカン1万)
@@ -482,6 +618,279 @@ class TokuchouKaki {
       sb.write(w.erabu(['起伏でどこまで粘れるかが課題だ。', '坂で脚を使いすぎないことが鍵になる。', 'このコースの起伏は、正直に言えば不安材料だ。']));
     }
     return _Kansatsu(3, sb.toString());
+  }
+
+  // ---- 振り返り(結果号) ----
+
+  /// 選手[s]の、走り終えた区間[kk]の振り返り(寸評と本文。学内メディアの結果号で使う)
+  ({String sunpyou, String bun}) furikaeriSenshu(
+    SenshuData s,
+    int kk, {
+    required int kj,
+    required double myTime,
+    required List<SenshuData> hashiru,
+    required int d,
+    int? maeD,
+    int? tsugiD,
+    required bool teamBest,
+    required bool hitoketaDake,
+  }) => _furikaeri(
+    hyou.times(s),
+    kk,
+    kj: kj,
+    myTime: myTime,
+    hashiru: hashiru,
+    d: d,
+    maeD: maeD,
+    tsugiD: tsugiD,
+    teamBest: teamBest,
+    hitoketaDake: hitoketaDake,
+    jijou: HashiriJijou.yomuSenshu(s, kk),
+    soutou: false,
+  );
+
+  /// 学連選抜の選手[g]の振り返り(区間順位は相当。学連選抜通信の結果号で使う)
+  ({String sunpyou, String bun}) furikaeriGakuren(
+    Senshu_Gakuren_Data g,
+    int kk, {
+    required int kj,
+    required double myTime,
+    required List<SenshuData> hashiru,
+    required int d,
+    int? maeD,
+    int? tsugiD,
+    required bool teamBest,
+    required bool hitoketaDake,
+  }) => _furikaeri(
+    MochiHyou.timesGakuren(g),
+    kk,
+    kj: kj,
+    myTime: myTime,
+    hashiru: hashiru,
+    d: d,
+    maeD: maeD,
+    tsugiD: tsugiD,
+    teamBest: teamBest,
+    hitoketaDake: hitoketaDake,
+    jijou: HashiriJijou.yomuGakuren(g, kk),
+    soutou: true,
+  );
+
+  /// 振り返りの本体
+  /// [kj] 実際の区間順位(0が1位)。[myTime] 区間タイム。[hashiru] その区間を走った大学の選手。
+  /// [d] この区間での順位の上げ下げ(正なら上げた。1区は0)。[maeD] 前の区間、[tsugiD] 次の区間の上げ下げ(なければnull)。
+  /// [teamBest] チームで一番良い区間順位か。[hitoketaDake] チームで唯一の区間一桁か
+  ({String sunpyou, String bun}) _furikaeri(
+    List<double> t,
+    int kk, {
+    required int kj,
+    required double myTime,
+    required List<SenshuData> hashiru,
+    required int d,
+    required int? maeD,
+    required int? tsugiD,
+    required bool teamBest,
+    required bool hitoketaDake,
+    required HashiriJijou jijou,
+    required bool soutou,
+  }) {
+    final int ban = _ban++;
+    final int n = hashiru.length;
+    final int actual = kj + 1;
+    final String st = soutou ? '相当' : '';
+    final String kukanJ = '区間$actual位$st';
+    final bool kurushii = n >= 6 && kj >= (n * 3) ~/ 4;
+    final bool yoi = kj <= n ~/ 3;
+    // 持ちタイム(区間の距離に合った種目)の区間内順位と比べる
+    final int idx = kukanKihonShumoku(k.gh, k.race, kk);
+    final int r = hyou.kukannai(t[idx], idx, hashiru);
+    final int margin = n ~/ 4 < 3 ? 3 : n ~/ 4;
+    // 0: 持ちタイムがない、1: 期待以上、2: 期待どおり、3: 期待以下
+    final int hantei = r <= 0 ? 0 : (r - actual >= margin ? 1 : (actual - r >= margin ? 3 : 2));
+    final String rMoji = r <= 0 ? '' : _kukannaiMoji(r, n, soutou);
+    final String rMei = '${_shumoku[idx]}の持ちタイムは$rMoji';
+
+    // S1 結果と期待の照合
+    final String s1;
+    switch (hantei) {
+      case 1:
+        s1 = w.erabu([
+          '$rMei。それを$kukanJまで押し上げた。',
+          '$kukanJ。$rMeiだったことを思えば、期待を上回る走りだ。',
+          '展望の見立てを超えた。$rMeiで、結果は$kukanJ。',
+        ]);
+      case 2:
+        s1 = w.erabu([
+          '持ちタイムどおりの$kukanJ。計算できる走りだった。',
+          '$kukanJは、$rMeiだったこととほぼ一致する。見立てどおりだ。',
+          '$rMeiで、結果は$kukanJ。順当な走りと言える。',
+        ]);
+      case 3:
+        s1 = w.erabu([
+          '$rMeiだったが、$kukanJ。本来の力は出せなかった。',
+          '$kukanJ。$rMeiだったことを思うと、物足りない結果だ。',
+          '見立てより下の$kukanJに終わった。$rMeiだった。',
+        ]);
+      default:
+        s1 = '$kukanJだった。';
+    }
+
+    // S2 見立ての照合(展望号で書いた強み・不安材料・坂)
+    final ({List<String> moji, List<String> tsuyoi, List<String> yowai}) mt = _kukannaiMitate(t, kk, hashiru, soutou);
+    final String tsuyoi = mt.tsuyoi.join('と');
+    final String yowai = mt.yowai.join('と');
+    String? s2;
+    if (hantei == 1 && yowai.isNotEmpty) {
+      s2 = w.erabu(['展望号では$yowaiを不安材料に挙げたが、杞憂だった。', '不安と見ていた$yowaiを、走りで打ち消した。']);
+    } else if (hantei == 1 && tsuyoi.isNotEmpty) {
+      s2 = w.erabu(['$tsuyoiの強さは見立てどおりで、それ以上の走りだった。', '展望号で強みに挙げた$tsuyoiが、そのまま結果になった。']);
+    } else if (hantei == 3 && tsuyoi.isNotEmpty) {
+      s2 = w.erabu(['展望号では$tsuyoiを強みと見ていたが、生かせなかった。', '$tsuyoiは上位のはずだったが、この日は数字どおりにいかなかった。']);
+    } else if (hantei == 3 && yowai.isNotEmpty) {
+      s2 = w.erabu(['展望号で課題に挙げた$yowaiが、そのまま結果に出た。', '懸念していた$yowaiのところで、やはり差がついた。']);
+    } else if (hantei == 2 && tsuyoi.isNotEmpty) {
+      s2 = w.erabu(['$tsuyoiの強みがそのまま出た、見立てどおりの走りだった。', '展望号で強みに挙げた$tsuyoiで、きっちり順位を守った。']);
+    } else if (hantei == 2 && yowai.isNotEmpty) {
+      s2 = '$yowaiの不安は残ったが、持ちタイムの位置は守った。';
+    }
+    final ({int dan, String michi})? sk = _sakaDan(t, kk, hashiru);
+    if (sk != null) {
+      final String sakaBun;
+      if (sk.dan == 0 && yoi) {
+        sakaBun = w.erabu(['${sk.michi}の強さも見立てどおりで、起伏を味方にした。', '展望号で頼りになると書いた${sk.michi}で、やはり差をつけた。']);
+      } else if (sk.dan == 2 && kurushii) {
+        sakaBun = w.erabu(['不安材料だった${sk.michi}で、やはり脚を使った。', '展望号で課題に挙げた${sk.michi}が、そのまま響いた。']);
+      } else if (sk.dan == 0 && kurushii) {
+        sakaBun = '${sk.michi}は強いはずだったが、この日は起伏で差を詰められなかった。';
+      } else if (sk.dan == 2 && yoi) {
+        sakaBun = '不安材料だった${sk.michi}を、持ち前の走りでしのいだ。';
+      } else {
+        sakaBun = '';
+      }
+      if (sakaBun.isNotEmpty) s2 = s2 == null ? sakaBun : '$s2$sakaBun';
+    }
+
+    // S3 なぜそうなったか(指示・焦り・集団のペース・際立った能力)
+    final StringBuffer sb3 = StringBuffer();
+    if (kk == 0) {
+      if (jijou.siji == 1 && jijou.seikou != null) {
+        sb3.write(jijou.seikou! ? 'スタート直後の飛び出しが、狙いどおり決まった。' : 'スタート直後に飛び出したが、後半に代償を払った。');
+      } else if (jijou.shuudan.isNotEmpty) {
+        if (jijou.shuudan.contains('速すぎた')) {
+          sb3.write('速い集団のペースについていき、後半に大きく失速した。');
+        } else if (jijou.shuudan.contains('遅かった')) {
+          sb3.write('集団のペースが遅く、持ち味を出し切れなかった。');
+        } else if (jijou.shuudan.contains('少しタイム得')) {
+          sb3.write('集団の流れにうまく乗った。');
+        } else if (jijou.shuudan.contains('免れた')) {
+          sb3.write('速い流れに最後まで食らいついた。');
+        } else if (jijou.shuudan.contains('自分で作った')) {
+          sb3.write('自ら集団を引っ張った。');
+        }
+      }
+    } else if (jijou.siji == 1 && jijou.seikou != null) {
+      sb3.write(jijou.seikou! ? '前半から突っ込む指示に、しっかり応えた。' : '前半から突っ込む指示だったが、後半に失速した。');
+    } else if (jijou.siji == 2 && jijou.seikou != null) {
+      sb3.write(jijou.seikou! ? '前半を抑える指示どおり、後半に伸びた。' : '前半を抑える指示だったが、思うように上げられなかった。');
+    } else if (jijou.aseri) {
+      sb3.write('目標順位を下回ってたすきを受け、前半から突っ込んだ分が後半に響いた。');
+    } else if (jijou.hitoiki) {
+      sb3.write('目標を上回る位置でたすきを受け、少し気持ちが緩んだか。');
+    }
+    if ((hantei == 1 || yoi) && jijou.kiwaYoi != null) {
+      sb3.write(w.erabu(['${jijou.kiwaYoi}が、この区間の選手の中で際立っていた。', '順位を押し上げたのは、${jijou.kiwaYoi}だ。']));
+    } else if ((hantei == 3 || kurushii) && jijou.kiwaWarui != null) {
+      sb3.write(w.erabu(['${jijou.kiwaWarui}で差をつけられた。', 'この区間の選手の中では、${jijou.kiwaWarui}が見劣りした。']));
+    }
+    final String? s3 = sb3.isEmpty ? null : sb3.toString();
+
+    // S4 区間賞やすぐ上の順位との差
+    String? s4;
+    {
+      final List<double> times = [
+        for (final SenshuData x in hashiru)
+          if (x.kukantime_race.length > k.race && x.kukantime_race[k.race].length >= x.gakunen && x.gakunen >= 1)
+            x.kukantime_race[k.race][x.gakunen - 1],
+      ]..removeWhere((x) => x <= 0 || x >= TEISUU.DEFAULTTIME);
+      if (soutou) times.add(myTime);
+      times.sort();
+      if (times.length >= 2 && myTime > 0 && myTime < TEISUU.DEFAULTTIME) {
+        if (kj == 0) {
+          final double ni = times.firstWhere((x) => x > myTime, orElse: () => myTime);
+          final int sa = saByou(ni, myTime);
+          if (sa >= 30) {
+            s4 = w.erabu(['2位に${saMoji(sa)}差をつける、圧巻の区間賞$stだった。', '区間2位との差は${saMoji(sa)}。文句のつけようがない走りだ。']);
+          } else if (sa <= 3) {
+            s4 = w.erabu(['2位とは${kinsaMoji(sa)}。競り合いを制しての区間賞$stだった。', '区間賞$stといっても、2位とは${kinsaMoji(sa)}の紙一重だった。']);
+          }
+        } else {
+          final int saTop = saByou(myTime, times.first);
+          double? ue;
+          for (final double x in times.reversed) {
+            if (x < myTime) {
+              ue = x;
+              break;
+            }
+          }
+          final int? saUe = ue == null ? null : saByou(myTime, ue);
+          if (kj >= 3 && saTop <= 15) {
+            s4 = w.erabu(['区間賞とは${kinsaMoji(saTop)}。順位ほど悪くない、密集の中の$kukanJだった。', '順位は$kukanJだが、区間賞との差はわずか${saMoji(saTop)}。紙一重の争いだった。']);
+          } else if (kj <= 2 && saTop >= 60) {
+            s4 = '$kukanJでも、区間賞とは${saMoji(saTop)}の差があった。';
+          } else if (saUe != null && saUe <= 2) {
+            s4 = '区間${actual - 1}位$stとは${kinsaMoji(saUe)}。あと一歩だった。';
+          }
+        }
+      }
+    }
+
+    // S5 チームの中での位置
+    String? s5;
+    if (teamBest && kj > 0) {
+      s5 = w.erabu(['この日のチームで、一番良い区間順位$stだった。', 'チームの中では、この区間が一番の走りだった。']);
+    } else if (hitoketaDake) {
+      s5 = 'チームで唯一の区間一桁$stだった。';
+    }
+
+    // S6 前後の区間との流れ
+    String? s6;
+    if (d > 0 && maeD != null && maeD < 0) {
+      s6 = w.erabu(['前の区間で落とした順位を、ここで取り戻した。', '前の区間の遅れを、${d}つ順位を上げて埋めた。']);
+    } else if (d > 0 && tsugiD != null && tsugiD > 0) {
+      s6 = w.erabu(['ここで作った流れが、次の走者にそのままつながった。', '上げた順位を、次の区間がさらに押し上げた。']);
+    } else if (d < 0 && tsugiD != null && tsugiD > 0) {
+      s6 = '落とした順位は、次の走者が取り戻した。';
+    } else if (d >= 3) {
+      s6 = 'チームの流れが変わった区間だった。';
+    }
+
+    // 寸評(小見出しに添える)
+    final String sunpyou;
+    if (kj == 0) {
+      sunpyou = w.erabu(['区間賞${st}の快走', '区間賞$stでチームを押し上げ']);
+    } else if (hantei == 1 && d >= 3) {
+      sunpyou = '見立てを超えた$d人抜き';
+    } else if (hantei == 1) {
+      sunpyou = w.erabu(['期待を超える$kukanJ', '持ちタイムを覆す走り']);
+    } else if (hantei == 3) {
+      sunpyou = kurushii ? w.erabu(['本来の力を出せず', '苦しい$kukanJ']) : '見立てに届かず';
+    } else if (hantei == 2) {
+      sunpyou = w.erabu(['計算どおりの走り', '持ちタイムどおりの$kukanJ']);
+    } else {
+      sunpyou = d >= 3 ? '$d人抜き' : kukanJ;
+    }
+
+    // 並べる(入り方を回し、見立てとの差が大きい選手や区間賞・チーム一番は厚く)
+    final List<String> hoka = [
+      for (final String? x in [s2, s3, s4, s5, s6])
+        if (x != null && x.isNotEmpty) x,
+    ];
+    final int kazu = (hantei == 1 || hantei == 3 || kj == 0 || teamBest) ? 4 : 2;
+    final List<String> erabi = hoka.take(kazu).toList();
+    // 入り方: 結果から(S1が先)か、見立て・場面・流れから(ほかの文を先に置く)
+    final bool kekkaKara = erabi.isEmpty || ban % 3 == 0;
+    final String bun = kekkaKara ? '$s1${erabi.join()}' : '${erabi.first}$s1${erabi.skip(1).join()}';
+    return (sunpyou: sunpyou, bun: bun);
   }
 
   /// 特徴の文(入り方を選手ごとに回し、最大3文。区間内順位の観点は書けるときは必ず入れる)

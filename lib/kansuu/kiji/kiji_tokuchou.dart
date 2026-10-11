@@ -605,7 +605,7 @@ class TokuchouKaki {
         final bool au = noboriTokui == nobori;
         sb.write(
           au
-              ? w.erabu(['下りより${michi}のほうが得意で、区間の起伏とかみ合う。', '登りと下りでは${michi}で順位が上がるタイプで、この区間向きだ。'])
+              ? w.erabu(['${nobori ? '下り' : '登り'}より${michi}のほうが得意で、区間の起伏とかみ合う。', '登りと下りでは${michi}で順位が上がるタイプで、この区間向きだ。'])
               : w.erabu(['ただ、登りと下りでは${noboriTokui ? '登り' : '下り'}のほうが得意で、${michi}基調のこのコースは本来の得意とは違う。', '登りと下りでは${noboriTokui ? '登り' : '下り'}で順位が上がるタイプなので、${michi}の多いこの区間は持ち味と少しずれる。']),
         );
         kaita = true;

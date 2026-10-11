@@ -193,6 +193,10 @@ class SettingsQrProcessor {
       data['cg_seichou_type_wariai'] = seichouTypeWariai(currentGhensuu);
       // 13分台の新入生の限界突破の優遇(int) [85] (1.9.3で追加。成長タイプ設定の画面にある設定。joukai.dart)
       data['k_yobiint2_85'] = genkaitoppaYuuguuSettei(kantoku);
+      // コンピュータスカウトONのときのスカウトの形(int) [87] (1.9.6で追加。0=地区めぐり(初期値)・1=全国一斉。scout_com.dart)
+      data['k_yobiint2_87'] = kantoku.yobiint2.length > comScoutKatachiIndex
+          ? kantoku.yobiint2[comScoutKatachiIndex]
+          : 0;
     } else if (department == SettingsDepartment.octoberTime) {
       //区間ごとタイム調整(int)
       data['k_yobiint5_30_39_time'] = kantoku.yobiint5.sublist(30, 40);
@@ -672,6 +676,14 @@ class SettingsQrProcessor {
       final dynamic yobiint2_85 = dataMap['k_yobiint2_85'];
       if (yobiint2_85 is int && genkaitoppaYuuguuAtaiTadashii(yobiint2_85)) {
         genkaitoppaYuuguuIreru(kantoku, yobiint2_85);
+      }
+      // コンピュータスカウトONのときのスカウトの形(int) kantoku.yobiint2[87] (1.9.6)
+      //   0=地区めぐり(初期値)・1=全国一斉(古いQRコードには含まれていないので、そのときは今の設定のまま)
+      final dynamic yobiint2_87 = dataMap['k_yobiint2_87'];
+      if (yobiint2_87 is int &&
+          comScoutKatachiTadashii(yobiint2_87) &&
+          kantoku.yobiint2.length > comScoutKatachiIndex) {
+        kantoku.yobiint2[comScoutKatachiIndex] = yobiint2_87;
       }
       // 金銀支給量設定の難易度ごとの割合(int) kantoku.yobiint3[70]〜[73] (1.9.1)
       //   鬼・難しい・普通・易しいの順。0なら100%(初期値)、1〜50なら値×10%

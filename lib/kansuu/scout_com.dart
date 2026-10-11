@@ -62,6 +62,9 @@ import 'package:ekiden/kansuu/koukou_meibo.dart'; // 地区めぐりの地区(1.
 //       0自動: 長距離粘り・ロード適性(重み2)、ペース変動対応力(重み1)と、チーム事情による
 //         補強ポイント(重み2)。来年も残る2・3年生と自校に確定した新入生に、登り適性・
 //         下り適性・アップダウン対応力が70以上の選手が2人いなければ、その能力を補強ポイントにする
+//         駅伝男は、85以上の選手が1人もいなければ補強ポイントにする(1.9.6。コンピュータの大学が
+//         駅伝男をスタート直後の飛び出しや前半突っ込みに使うのは85以上のときなので。地区めぐり(声かけ)で、
+//         駅伝男だけ見て選ぶと誰とも取り合いにならず、名声最下位でも駅伝男90以上を5人そろえられたため)
 //       1スピード重視(スパート力・ペース変動対応力)、2距離重視(長距離粘り・ロード適性)、
 //       3登り重視、4下り重視、5アップダウン重視、6駅伝男重視(駅伝男だけ)、
 //       7タイム重視
@@ -136,6 +139,12 @@ const int _houshinTime = 7; // タイム重視
 
 const int _tokuiSakaime = 70; // 補強ポイントの判定で「得意」とみなす能力値
 const int _tokuiNinzuu = 2; // 得意な選手がこの人数に届かなければ補強ポイント
+
+/// 補強ポイントの駅伝男の番号(スカウト方針の「駅伝男重視」と同じ6。1.9.6)
+const int _hokyouEkidenOtoko = 6;
+
+/// 駅伝男の補強ポイントの判定で「得意」とみなす値(コンピュータの大学が駅伝男を使う境目と同じ。1.9.6)
+const int _ekidenOtokoSakaime = 85;
 
 int _juu(int n) {
   int p = 1;
@@ -379,7 +388,7 @@ class _Mekiki {
   final int univid;
   final int houshin; // スカウト方針(0〜7)
   final int seikaku; // 性格(1〜3。自動は名声順位で決めたもの)
-  final List<int> hokyou; // 自動のときの補強ポイント(3登り・4下り・5アップダウン)
+  final List<int> hokyou; // 自動のときの補強ポイント(3登り・4下り・5アップダウン・6駅伝男(1.9.6))
   final int timeWariai; // 評価のタイムの割合(0〜100%。大学ごとの設定がなければ全大学共通の設定)
   // 能力のタイムへの影響度(全大学共通の設定。自動のときの重みに掛ける。1.8.2)
   final NouryokuEikyodo eikyodo;
@@ -454,7 +463,7 @@ class _Mekiki {
   String get riyuu => '$houshinRiyuu・${comScoutSeikakuMei[seikaku]}';
 }
 
-/// 山の能力(3登り・4下り・5アップダウン)の値
+/// 補強ポイントの能力(3登り・4下り・5アップダウン・6駅伝男(1.9.6))の値
 int _menuNouryoku(SenshuData s, int menu) {
   switch (menu) {
     case 3:
@@ -463,12 +472,15 @@ int _menuNouryoku(SenshuData s, int menu) {
       return s.kudaritekisei;
     case 5:
       return s.noborikudarikirikaenouryoku;
+    case _hokyouEkidenOtoko:
+      return s.konjou;
     default:
       return 0;
   }
 }
 
 /// 山の能力(3登り・4下り・5アップダウン)の、能力のタイムへの影響度
+/// (駅伝男はタイムに直接効かないので、影響度の設定は掛けない(1.0)。1.9.6)
 double _menuEikyodo(NouryokuEikyodo eikyodo, int menu) {
   switch (menu) {
     case 3:
@@ -490,6 +502,8 @@ String _menuMei(int menu) {
       return '下り';
     case 5:
       return 'アップダウン';
+    case _hokyouEkidenOtoko:
+      return '駅伝男';
     default:
       return '';
   }
@@ -535,6 +549,10 @@ _Mekiki _mekikiTsukuru(
       if (tokui < _tokuiNinzuu && _menuEikyodo(eikyodo, menu) > 0) {
         hokyou.add(menu);
       }
+    }
+    // 駅伝男が85以上の選手が1人もいなければ、駅伝男も補強ポイントにする(1.9.6)
+    if (!nokoru.any((s) => s.konjou >= _ekidenOtokoSakaime)) {
+      hokyou.add(_hokyouEkidenOtoko);
     }
   }
   return _Mekiki(

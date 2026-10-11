@@ -21,7 +21,10 @@ import 'package:ekiden/kansuu/kiji/kiji_kimochi.dart'; // 駅伝男・平常心�
 //    (15km以上の1区ならハーフと1万m、7.5km未満の後半区間なら5000mとロード1万、など)。
 //    上位3分の1なら善戦、下位3分の1なら苦戦、間は言い切らない
 //  D 坂とアップダウン: 登り・下りがきつい区間は登り1万・下り1万、アップダウンの多い区間は
-//    クロカン1万の区間内順位。登り基調・下り基調の区間では、登り1万と下り1万の順位の比べも添える
+//    クロカン1万の区間内順位。登り基調・下り基調の区間では、登り1万と下り1万の順位の比べも添える。
+//    山の区間とアップダウンが50回以上の区間は必ず入れて先頭に置き、平坦でもアップダウンが30回以上の
+//    区間は最後に短く添える(1.9.7。アップダウンの補正は、距離に関係なく回数に比例した割合で
+//    区間全体のタイムにかかるので、1kmあたりではなく回数で見る)
 //
 // 持ちタイムは今季ベスト(ない種目は自己ベスト。コンピュータの大学の判断と同じ hikakuMochiTime)。
 // 区間内順位は、区間エントリーが公開されたあとの場面だけ書く(kukannaiKoukai)。
@@ -41,6 +44,15 @@ import 'package:ekiden/kansuu/kiji/kiji_kimochi.dart'; // 駅伝男・平常心�
 //  ・区間賞やすぐ上の順位との差、チームの中での位置、前後の区間との流れ
 //  ・小見出しに添える寸評も作る。見立てとの差が大きい選手や区間賞は厚く、ほかは短く
 // ------------------------------------------------------------
+
+/// アップダウンが細かく続く区間とみなす回数(平坦な区間でも、これ以上なら選手の特徴でアップダウンに触れる。1.9.7)
+/// (区間の特徴の「アップダウン」(kukanTokuchou)は50回以上で、区間の呼び方などはそちらで決める)
+const int updownKaruKaisuu = 30;
+
+/// 平坦な区間だが、アップダウンが細かく続く区間か(選手の特徴で最後に短く触れる)
+bool _updownKaru(Ghensuu gh, int race, int kk) =>
+    kukanTokuchou(gh, race, kk) == KukanTokuchou.heitan &&
+    gh.noborikudarikirikaekaisuu_taikai_kukangoto[race][kk] >= updownKaruKaisuu;
 
 /// 区間内順位を書いてよい場面か(区間エントリーが公開されたあと。学連選抜編成(290)と
 /// 区間エントリー(300)の画面では、ほかの大学の区間配置を伏せているので書かない)
@@ -571,14 +583,18 @@ class TokuchouKaki {
   /// D 坂とアップダウン(登り1万・下り1万・クロカン1万)
   _Kansatsu? _saka(List<double> t, int kk, List<SenshuData>? hashiru, bool soutou) {
     final KukanTokuchou tok = kukanTokuchou(k.gh, k.race, kk);
-    if (tok == KukanTokuchou.heitan) return null;
+    if (tok == KukanTokuchou.heitan) {
+      return _updownKaru(k.gh, k.race, kk) ? _updownSoe(t, hashiru, soutou) : null;
+    }
     final bool nobori = tok == KukanTokuchou.yamaNobori || tok == KukanTokuchou.nobori;
     final bool kudari = tok == KukanTokuchou.yamaKudari || tok == KukanTokuchou.kudari;
     final int ev = nobori ? 4 : (kudari ? 5 : 7);
     final String evMoji = _shumoku[ev];
     final String michi = nobori ? '登り' : (kudari ? '下り' : 'アップダウン');
-    // 山の区間(登り・下りがきつい区間)は、山登り・山下りの言い方を混ぜる(1.9.7)
+    // 山の区間(登り・下りがきつい区間)は山登り・山下りの言い方を、アップダウンが50回以上の区間は
+    // 起伏の言い方を混ぜる(1.9.7)
     final bool yama = tok == KukanTokuchou.yamaNobori || tok == KukanTokuchou.yamaKudari;
+    final bool updown = tok == KukanTokuchou.updown;
     final String yamaMei = nobori ? '山登り' : '山下り';
     String iri(String juni) => yama
         ? w.erabu([
@@ -586,7 +602,13 @@ class TokuchouKaki {
             '$yamaMeiのこの区間でカギを握る$evMojiは、$juni。',
             '$yamaMeiへの適性を測る$evMojiは、$juni。',
           ])
-        : '${michi}が続くこの区間で頼りになる$evMojiは、$juni。';
+        : (updown
+              ? w.erabu([
+                  '${michi}が続くこの区間で頼りになる$evMojiは、$juni。',
+                  'アップダウンの連続するこの区間でカギを握る$evMojiは、$juni。',
+                  '起伏への対応力を測る$evMojiは、$juni。',
+                ])
+              : '${michi}が続くこの区間で頼りになる$evMojiは、$juni。');
     final StringBuffer sb = StringBuffer();
     // 区間内(公開されていれば)か、学生全体の順位
     int d = 1;
@@ -608,12 +630,14 @@ class TokuchouKaki {
         kaita = true;
       }
     }
-    // 山の区間で記録がなければ、そのことを書く(山の区間は坂の観点を必ず入れるので、何も書かないと不自然。1.9.7)
-    if (!kaita && yama && t[ev] >= TEISUU.DEFAULTTIME) {
+    // 山の区間とアップダウンの区間で記録がなければ、そのことを書く(坂の観点を必ず入れるので、
+    // 何も書かないと不自然。1.9.7)
+    if (!kaita && (yama || updown) && t[ev] >= TEISUU.DEFAULTTIME) {
+      final String tekisei = yama ? '$yamaMeiへの適性' : '起伏への適性';
       sb.write(
         w.erabu([
-          '$evMojiの記録がなく、$yamaMeiへの適性は未知数だ。',
-          '$evMojiの記録がなく、$yamaMeiへの適性は走ってみるまで分からない。',
+          '$evMojiの記録がなく、$tekiseiは未知数だ。',
+          '$evMojiの記録がなく、$tekiseiは走ってみるまで分からない。',
         ]),
       );
       kaita = true;
@@ -640,6 +664,49 @@ class TokuchouKaki {
       sb.write(w.erabu(['起伏でどこまで粘れるかが課題だ。', '坂で脚を使いすぎないことが鍵になる。', 'このコースの起伏は、正直に言えば不安材料だ。']));
     }
     return _Kansatsu(3, sb.toString());
+  }
+
+  /// 平坦だがアップダウンが細かく続く区間の、最後に添える短い一文(クロカン1万。1.9.7)
+  _Kansatsu _updownSoe(List<double> t, List<SenshuData>? hashiru, bool soutou) {
+    const int ev = 7;
+    String? juni;
+    int d = 1;
+    if (hashiru != null) {
+      final int r = hyou.kukannai(t[ev], ev, hashiru);
+      if (r > 0) {
+        d = _dan(r, hashiru.length);
+        juni = _kukannaiMoji(r, hashiru.length, soutou);
+      }
+    }
+    if (juni == null) {
+      final int z = hyou.zentai(t[ev], ev);
+      if (z > 0) {
+        d = _dan(z, hyou.zentaiSuu(ev));
+        juni = _zentaiMoji(z, ev);
+      }
+    }
+    final String? j = juni;
+    if (j == null) {
+      return const _Kansatsu(3, '細かなアップダウンもあるが、クロカン1万の記録はなく、起伏への適性は未知数だ。');
+    }
+    final String bun;
+    if (d == 0) {
+      bun = w.erabu([
+        '細かなアップダウンもあり、クロカン1万が$jなのは心強い。',
+        'クロカン1万が$jなので、細かなアップダウンは味方になりそうだ。',
+      ]);
+    } else if (d == 2) {
+      bun = w.erabu([
+        '細かなアップダウンもあり、クロカン1万が$jなのは少し気がかりだ。',
+        'クロカン1万が$jなので、細かなアップダウンで脚を使わないようにしたい。',
+      ]);
+    } else {
+      bun = w.erabu([
+        '細かなアップダウンもある区間で、クロカン1万は$j。',
+        'アップダウンも細かく続き、クロカン1万は$j。',
+      ]);
+    }
+    return _Kansatsu(3, bun);
   }
 
   // ---- 振り返り(結果号) ----
@@ -954,13 +1021,34 @@ class TokuchouKaki {
     ];
     final int ban = _ban++;
     if (all.isEmpty) return '';
-    // 山の区間(登り・下りがきつい区間)は、坂の観点を必ず入れて先頭に置く(1.9.7。
-    // 回すだけだと、名鑑の5区・6区や、往路を終えたときの6区の紹介で、坂が毎回落ちる並びになっていた)
+    // 山の区間(登り・下りがきつい区間)とアップダウンが50回以上の区間は、坂の観点を必ず入れて先頭に置く
+    // (1.9.7。回すだけだと、名鑑の5区・6区や、往路を終えたときの6区の紹介で、坂が毎回落ちる並びになっていた)
     final KukanTokuchou tok = kukanTokuchou(k.gh, k.race, kk);
+    final _Kansatsu? sakaKanten = all.where((x) => x.kanten == 3).firstOrNull;
     final _Kansatsu? yamaSaka =
-        (tok == KukanTokuchou.yamaNobori || tok == KukanTokuchou.yamaKudari)
-        ? all.where((x) => x.kanten == 3).firstOrNull
+        (tok == KukanTokuchou.yamaNobori ||
+            tok == KukanTokuchou.yamaKudari ||
+            tok == KukanTokuchou.updown)
+        ? sakaKanten
         : null;
+    // 平坦でもアップダウンが30回以上の区間は、ほかの観点を回したうえで、最後に短く添える(1.9.7)
+    if (sakaKanten != null && yamaSaka == null && _updownKaru(k.gh, k.race, kk)) {
+      final List<_Kansatsu> hoka = [
+        for (final _Kansatsu x in all)
+          if (x != sakaKanten) x,
+      ];
+      if (hoka.isEmpty) return teinei ? _teineiNi(sakaKanten.bun) : sakaKanten.bun;
+      final int karuKazu = (all.length >= 3 ? (ban % 3 == 2 ? 2 : 3) : all.length) - 1;
+      final int karuStart = ban % hoka.length;
+      final List<_Kansatsu> karuJun = [...hoka.sublist(karuStart), ...hoka.sublist(0, karuStart)];
+      List<_Kansatsu> karuErabi = karuJun.take(karuKazu < 1 ? 1 : karuKazu).toList();
+      final _Kansatsu? karuKukannai = hoka.where((x) => x.kanten == 2).firstOrNull;
+      if (karuKukannai != null && !karuErabi.contains(karuKukannai)) {
+        karuErabi = [...karuErabi.sublist(0, karuErabi.length - 1), karuKukannai];
+      }
+      final String karuBun = [...karuErabi, sakaKanten].map((x) => x.bun).join();
+      return teinei ? _teineiNi(karuBun) : karuBun;
+    }
     if (yamaSaka != null) {
       final int yamaKazu = all.length >= 3 ? (ban % 3 == 2 ? 2 : 3) : all.length;
       final _Kansatsu? yamaKukannai = all.where((x) => x.kanten == 2).firstOrNull;

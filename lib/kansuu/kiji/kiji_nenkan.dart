@@ -34,6 +34,9 @@ class _Seiseki {
   int ekiden = 0;
   int kukanshou = 0;
 
+  /// そのうち1区で取った区間賞の数(1区はたすきを受けないので、コメントの言い方を変える。1.9.7)
+  int ikkuKukanshou = 0;
+
   /// 対校戦の8位以内の数
   int nyuushou = 0;
 
@@ -76,6 +79,7 @@ _Seiseki _seiseki(SenshuData s) {
     if (gakurenShussouJuni(r, a.juni)) continue;
     x.ekiden++;
     if (a.juni == 0) x.kukanshou++;
+    if (a.juni == 0 && a.entry == 0) x.ikkuKukanshou++;
     x.ten += _kukanTen(a.juni, r);
     if (a.juni <= 7) {
       x.naiyou.add('${courseRaceTitle(r)}${a.entry + 1}区で${a.juni == 0 ? '区間賞' : '区間${juniMoji(a.juni)}'}');
@@ -297,7 +301,13 @@ List<Kiji> nenkanHyoushouKiji(KijiKankyou k) {
       CommentBamen.hyoushou,
       myouji(mvp.s.name),
       jijitsu: [
-        if (mvp.kukanshou >= 2) '区間賞を${mvp.kukanshou}度取れたのは、仲間がいい位置でつないでくれたから',
+        // 区間賞をどの区間で取ったかで言い方を変える(1区はたすきを受けないので「つないでくれた」と言わない。1.9.7)
+        if (mvp.kukanshou >= 2)
+          mvp.ikkuKukanshou == mvp.kukanshou
+              ? '区間賞を${mvp.kukanshou}度、どれも1区で取れた。スタートを任されたことに応えられてうれしい'
+              : (mvp.ikkuKukanshou > 0
+                    ? '区間賞を${mvp.kukanshou}度取れたのは、仲間と一緒に積み上げてきたから'
+                    : '区間賞を${mvp.kukanshou}度取れたのは、仲間がいい位置でつないでくれたから'),
         if (mvp.s.gakunen == 4) '最後の年に選んでもらえて、4年間が報われた気がする',
         if (mvpNobi != null && mvp.s.gakunen >= 2) '入学したころの自分には、想像もできなかった賞',
       ],

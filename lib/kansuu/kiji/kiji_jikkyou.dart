@@ -1094,7 +1094,13 @@ Kiji? _kukanJikkyou(
     } else if (kata == KishaKata.karakuchi && warui && mokuhyouAri && my.tuuka > mokuhyou) {
       kai('区間${juniMoji(my.kukanJuni)}は厳しいですね。目標の${juniMoji(mokuhyou)}まで、残りの区間で取り返せる差かどうか');
     } else if (yoi) {
-      kai(w.erabu(['落ち着いた走りでしたね。たすきを受けたときの位置より前で渡せたのは大きいです', '区間${juniMoji(my.kukanJuni)}。チームに流れを持ってきましたね']));
+      // 「受けたときの位置より前で渡せた」は、2区以降で順位を上げ、アンカーでないときだけ(1.9.7)
+      kai(
+        w.erabu([
+          if (kk > 0 && d > 0 && !saigo) '落ち着いた走りでしたね。たすきを受けたときの位置より前で渡せたのは大きいです',
+          '区間${juniMoji(my.kukanJuni)}。チームに流れを持ってきましたね',
+        ]),
+      );
     }
   }
 
@@ -1841,9 +1847,17 @@ void _sanshouToInterview(
       case KishaKata.suuji:
         kai('三賞は、人抜きの数や2位との差の数字で選びました。数字は、走りの価値を正直に映しますね');
       case KishaKata.joukei:
-        kai('3人とも、たすきを受けた瞬間の表情が違いました。賞は、その顔に贈られたものだと思います');
+        // 1区の選手はたすきを受けないので、そのときは「走り出した瞬間」にする(1.9.7)
+        {
+          final String shunkan = shou.any((x) => x.kukan == 0) ? '走り出した瞬間' : 'たすきを受けた瞬間';
+          kai(
+            shou.length >= 2
+                ? '${shou.length}人とも、$shunkanの表情が違いました。賞は、その顔に贈られたものだと思います'
+                : '$shunkanの表情が印象に残りました。賞は、その顔に贈られたものだと思います',
+          );
+        }
       case KishaKata.karakuchi:
-        kai('賞は結果に対して出るものです。この3人は、気持ちではなく走りで選ばれました');
+        kai('賞は結果に対して出るものです。${shou.length >= 2 ? 'この${shou.length}人' : 'この選手'}は、気持ちではなく走りで選ばれました');
     }
   }
 
@@ -1854,7 +1868,13 @@ void _sanshouToInterview(
   w.koMidashi('ヒーローインタビュー');
   w.danraku('${hero.mei}の${_yobi(w, hero.x)}に、ゴール地点で話を聞きました。');
   w.danraku('――おめでとうございます。今の気持ちは？');
-  w.comment('$hy「${senshuKimochi(w, hero.x.u.id == win.id ? CommentBamen.yuushouKetteiSenshu : (hero.x.kukanJuni == 0 ? CommentBamen.kukanshou : CommentBamen.oinuki))}」');
+  // 「優勝を決めた選手」の言葉(ゴールテープなど)は、優勝校のアンカーだけ。ほかは区間賞・人を抜いた・表彰の言葉(1.9.7)
+  final CommentBamen heroBamen = (hero.x.u.id == win.id && hero.kukan == ks - 1)
+      ? CommentBamen.yuushouKetteiSenshu
+      : (hero.x.kukanJuni == 0
+            ? CommentBamen.kukanshou
+            : (hero.kukan > 0 && hero.x.tuukaMae > hero.x.tuuka ? CommentBamen.oinuki : CommentBamen.hyoushou));
+  w.comment('$hy「${senshuKimochi(w, heroBamen)}」');
   // 2問目: その場面を振り返る
   final List<Innen> hi = senshuInnen(k, hs, hero.kukan, kj: hero.x.kukanJuni, kekka: owatta);
   if (hero.x.u.id == win.id && lastLead > 0 && leadMae != null) {
@@ -1871,7 +1891,12 @@ void _sanshouToInterview(
     w.comment(
       '$hy「${w.erabu([
         '後ろは気にせず、自分のペースを守ることだけを考えました。区間${juniMoji(hero.x.kukanJuni)}は、結果としてついてきたものです',
-        'たすきを受けた瞬間に、今日は行けると感じました。前で渡すことだけを考えて走りました',
+        // 1区はたすきを受けず、アンカーは渡さないので、区間で言い方を変える(1.9.7)
+        hero.kukan == 0
+            ? 'スタートの号砲から、今日は行けると感じました。いい流れで渡すことだけを考えて走りました'
+            : (hero.kukan == ks - 1
+                  ? 'たすきを受けた瞬間に、今日は行けると感じました。ゴールまで前だけを見て走りました'
+                  : 'たすきを受けた瞬間に、今日は行けると感じました。前で渡すことだけを考えて走りました'),
         '苦しくなってからが勝負だと思っていました。最後まで脚が動いてくれて、よかったです',
       ])}」',
     );

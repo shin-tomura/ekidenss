@@ -167,12 +167,12 @@ KijiBan _jikkyouBan(List<Kiji> list) {
   );
 }
 
-/// 駅伝の実況を開く(レース画面の、区間が終わったあとの指示の画面の「実況・速報」から。1.9.4)
+/// 駅伝の実況を開く(レース画面の、区間が終わったあとの指示の画面から。1.9.4)
 /// 1.9.7から、学内メディアと学連選抜通信の区間ごとの速報も切り替えて読める。
-/// 自分に関係のある記事がすぐ読めるように、最初に開くのは、自分の大学が走っていれば学内メディアの速報、
-/// 正月駅伝で学連選抜がいれば学連選抜通信の速報、それ以外は箱庭スポーツ中継(記事のある最初のサイト)
+/// 最初に開くのは、いつも俯瞰した箱庭スポーツ中継(速報は切り替えで読む)
 void kijiJikkyouHiraku(BuildContext context) {
   _hiraku(context, [
+    _jikkyouBan(kijiJikkyouIchiran()),
     ..._gakunaiBan(
       kijiGakunaiSokuhouIchiran(),
       sub: '陸上競技部・区間ごとの速報',
@@ -185,7 +185,6 @@ void kijiJikkyouHiraku(BuildContext context) {
       kekka: true,
       kirikaeMei: '$gakurenSiteMei・速報',
     ),
-    _jikkyouBan(kijiJikkyouIchiran()),
   ]);
 }
 

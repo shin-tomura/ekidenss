@@ -535,16 +535,17 @@ class _Mode0350ContentState extends State<Mode0350Content> {
                               // 1区の集団のペースの結果(駅伝の2区の指示のとき。1.9.2)
                               const IkkuPaceKekkaBox(),
                               // 駅伝の実況「箱庭スポーツ中継」(区間が終わるたびに、その区間の実況を読める。1.9.4)
-                              // 1.9.7から学内メディア・学連選抜通信の区間ごとの速報も読めるので「実況・速報」にした。
-                              // 見出しの予告は、記事の画面で最初に開くサイトの記事
+                              // 1.9.7から学内メディア・学連選抜通信の区間ごとの速報も、記事の画面で切り替えて読める
+                              // (カードの予告と最初に開くのは、俯瞰した箱庭スポーツ中継のまま)
                               if (_jikkyouAri(currentGhensuu))
                                 KijiLinkCard(
                                   key: ValueKey(
                                     'kijiJikkyou_${currentGhensuu.year}_${currentGhensuu.hyojiracebangou}_${currentGhensuu.nowracecalckukan}',
                                   ),
-                                  namae: '実況・速報',
-                                  tsukuru: kijiJikkyouSokuhouIchiran,
+                                  namae: '実況(箱庭スポーツ中継)',
+                                  tsukuru: kijiJikkyouIchiran,
                                   hiraku: kijiJikkyouHiraku,
+                                  annai: kijiSokuhouAnnai(),
                                 ),
                               // 生成AIに渡すテキストのまとめボタン(1.8.2)
                               const AiCopyMatomeButton(),
@@ -1332,15 +1333,16 @@ class _Mode0350ContentState extends State<Mode0350Content> {
                   Text(saBun),
                   // 1区の集団のペースの結果(2区の指示のとき。学連選抜の選手の分を出す。1.9.2)
                   const IkkuPaceKekkaBox(gakurenKantoku: true),
-                  // 駅伝の実況「箱庭スポーツ中継」(1.9.4)と、学連選抜通信の区間ごとの速報(1.9.7)
+                  // 駅伝の実況「箱庭スポーツ中継」(1.9.4)。学連選抜通信の区間ごとの速報も、記事の画面で切り替えて読める(1.9.7)
                   if (_jikkyouAri(currentGhensuu))
                     KijiLinkCard(
                       key: ValueKey(
                         'kijiJikkyouG_${currentGhensuu.year}_${currentGhensuu.hyojiracebangou}_${currentGhensuu.nowracecalckukan}',
                       ),
-                      namae: '実況・速報',
-                      tsukuru: kijiJikkyouSokuhouIchiran,
+                      namae: '実況(箱庭スポーツ中継)',
+                      tsukuru: kijiJikkyouIchiran,
                       hiraku: kijiJikkyouHiraku,
+                      annai: kijiSokuhouAnnai(),
                     ),
                   // 正月駅伝の6区のスタート前は、大学と同じく復路の目標順位を決め直せる
                   // (6区は判定せず、7区から効く。1.8.2)

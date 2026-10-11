@@ -406,12 +406,49 @@ Kiji? _kukanJikkyou(
   final IkkuPaceKekka? pace = kk == 0 ? ikkuPaceKekkaYomu(k.kantoku, k.gh) : null;
   // 集団のペース(1区のタイムに換算した秒。引っ張った選手がいなければnull)
   final double? shuudanPace = (pace != null && pace.pacemakerId != null && pace.pace > 0) ? pace.pace : null;
+  // 学連選抜(オープン参加)の、この区間の結果(正月駅伝で今年の学連選抜がいるとき)と、
+  // 大学の首位を上回るタイムで通過(1位相当)したか(最終区なら総合1位相当のゴール。1.9.7)
+  final GakurenKukanKekka? gk = gakurenKonnenAri(k.gh) ? gakurenKukanKekka(k.gh, kk) : null;
+  final bool gTop = gk != null && gk.tuukaJuni == 0;
+  // 学連選抜の段落(1.9.7で関数にした。1位相当のときは、首位の攻防のすぐ後ろに上げて解説も付ける)
+  void gakurenDanraku() {
+    final GakurenKukanKekka? g = gk;
+    if (g == null) return;
+    final bool kantoku = k.jibunUniv != null && gakurenKantokuChuu(k.kantoku, k.jibunUniv!);
+    w.koMidashi('学連選抜');
+    final String gy = w.hito('G${g.senshu.id}', g.senshu.name, '${g.senshu.gakunen}年', '');
+    // 1区でスタート直後に飛び出していれば、そのことも
+    final String gTobidashi = (kk == 0 && g.senshu.startchokugotobidasiflag == 1)
+        ? (g.senshu.startchokugotobidasiseikouflag == 1 ? 'スタート直後に飛び出し、狙いどおりの展開に持ち込みました。' : 'スタート直後に飛び出しましたが、後半に苦しみました。')
+        : '';
+    w.danraku(
+      'オープン参加の学連選抜は$gy(${daigakuMeiMoji(g.shozoku)})が区間${juniMoji(g.kukanJuni)}相当。'
+      '$gTobidashi'
+      '通過は${juniMoji(g.tuukaJuni)}相当です。'
+      '${kantoku && g.kukanJuni == 0 ? '監督の采配が光りました！' : ''}',
+    );
+    if (gTop) {
+      kai(
+        saigo
+            ? w.erabu([
+                '予選会で敗れた大学の選手たちが、ここまでの走りを見せるとは。大学の枠を超えたチームの力ですね',
+                '順位はつきませんが、このタイムは誇っていい。それぞれの大学に持ち帰ってほしい走りです',
+              ])
+            : w.erabu([
+                '学連選抜がこの位置を走っているのは見事です。このまま最後まで行けるか、注目ですね',
+                '順位はつかないチームですが、この流れは本物です。大学のチームにとっても刺激になりますよ',
+              ]),
+      );
+    }
+  }
 
   // 見出し
   String midashi;
   if (saigo) {
     midashi = w.erabu(['${shui.mei}が優勝のゴール！', '${shui.mei}、歓喜のフィニッシュ']);
     if (sa12 <= ks * 3) midashi += '　2位と${kinsaMoji(sa12)}';
+    // 学連選抜が総合1位相当なら、見出しにも(1.9.7)
+    if (gTop) midashi += '　学連選抜は1位相当';
     // シード権争いがもつれたときは、見出しにも
     if (nokori != null && (saSeed <= ks * 3 || saSeed <= 30)) {
       midashi += '　シード権は${nokori.mei}が${kinsaMoji(saSeed)}で確保';
@@ -429,6 +466,8 @@ Kiji? _kukanJikkyou(
   } else {
     midashi = '${kk + 1}区を終えて${shui.mei}が首位';
   }
+  // 学連選抜が大学の首位を上回るタイムで通過したら、見出しにも(1.9.7)
+  if (gTop && !saigo) midashi += '　学連選抜がトップ相当で通過';
 
   // リード(実況の入り)
   final StringBuffer lead = StringBuffer();
@@ -467,6 +506,10 @@ Kiji? _kukanJikkyou(
     }
     if (saigo && nokori != null && morashi != null && (saSeed <= ks * 3 || saSeed <= 30)) {
       lead.write('優勝争いと並んで、上位$seedSuu校のシード権の最後の1枠も、${nokori.mei}と${morashi.mei}の${kinsaMoji(saSeed)}の争いになりました。');
+    }
+    // 学連選抜が総合1位相当のゴール(1.9.7)
+    if (saigo && gTop) {
+      lead.write('そして、オープン参加の学連選抜が、${shui.mei}を上回るタイムで1位相当のゴールです！');
     }
   }
 
@@ -586,6 +629,15 @@ Kiji? _kukanJikkyou(
   if (saigo) {
     sb.write('${shui.mei}、${jikanMoji(shui.ruikei)}で優勝のゴールです！ 2位の${ni.mei}とは${kinsaMoji(sa12)}でした。');
   }
+  // 学連選抜が大学の首位を上回るタイムで通過・ゴール(1.9.7)
+  final GakurenKukanKekka? gkTop = gTop ? gk : null;
+  if (gkTop != null) {
+    sb.write(
+      saigo
+          ? '記録上の優勝は${shui.mei}ですが、オープン参加の学連選抜は${jikanMoji(gkTop.tuukaTime)}で、それを上回る1位相当でした！'
+          : '記録上の首位は${shui.mei}ですが、オープン参加の学連選抜がそれを上回るタイムで、トップ相当の通過です！',
+    );
+  }
   w.danraku(sb.toString());
   // 解説(首位について)
   if (kk > 0 && shuiMae != null && shuiMae.u.id != shui.u.id && shui.s != null) {
@@ -606,6 +658,9 @@ Kiji? _kukanJikkyou(
           : '${myouji(shui.s!.name)}は後ろを気にせず、自分の走りに徹しましたね。差が広がったのは、その落ち着きです',
     );
   }
+
+  // 本文: 学連選抜が1位相当なら、首位の攻防のすぐ後ろで伝える(1.9.7)
+  if (gTop) gakurenDanraku();
 
   // 本文: シード権争い(最終区。優勝争いと同じ重さで伝える)
   if (saigo && nokori != null && morashi != null) {
@@ -1043,25 +1098,8 @@ Kiji? _kukanJikkyou(
     }
   }
 
-  // 本文: 学連選抜(走っていれば)
-  if (gakurenKonnenAri(k.gh)) {
-    final GakurenKukanKekka? g = gakurenKukanKekka(k.gh, kk);
-    if (g != null) {
-      final bool kantoku = k.jibunUniv != null && gakurenKantokuChuu(k.kantoku, k.jibunUniv!);
-      w.koMidashi('学連選抜');
-      final String gy = w.hito('G${g.senshu.id}', g.senshu.name, '${g.senshu.gakunen}年', '');
-      // 1区でスタート直後に飛び出していれば、そのことも
-      final String gTobidashi = (kk == 0 && g.senshu.startchokugotobidasiflag == 1)
-          ? (g.senshu.startchokugotobidasiseikouflag == 1 ? 'スタート直後に飛び出し、狙いどおりの展開に持ち込みました。' : 'スタート直後に飛び出しましたが、後半に苦しみました。')
-          : '';
-      w.danraku(
-        'オープン参加の学連選抜は$gy(${daigakuMeiMoji(g.shozoku)})が区間${juniMoji(g.kukanJuni)}相当。'
-        '$gTobidashi'
-        '通過は${juniMoji(g.tuukaJuni)}相当です。'
-        '${kantoku && g.kukanJuni == 0 ? '監督の采配が光りました！' : ''}',
-      );
-    }
-  }
+  // 本文: 学連選抜(走っていれば。1位相当のときは、首位の攻防のすぐ後ろで書いた)
+  if (!gTop) gakurenDanraku();
 
   // 本文: 次の区間の見どころ(最終区のあとは、総括を記事に任せる)
   // 1.9.5: コースと区間記録・前回の区間賞、持ちタイムの顔ぶれ、当日変更で温存していたエースの投入、
@@ -1863,7 +1901,7 @@ void _sanshouToInterview(
 // ------------------------------------------------------------
 // 学内メディアの区間ごとの速報(1.9.7)
 // ・自分の大学の学内メディア「○○スポーツ」が、自分の大学の選手を追う速報。区間が終わるたびに1本
-//   (レース画面の「実況・速報」のカードと、結果画面の記事の画面の切り替えで読める)
+//   (レース画面の実況のカードから開く記事の画面と、結果画面の記事の画面の切り替えで読める)
 // ・実況と同じ途中経過(_kukanKoma)と補正の説明の読み取り(_hashiriYomu)を使い、学生記者が書く常体の速報にする。
 //   見出し・区間の走り(指示の成否・1区の集団のペース・順位の上げ下げ・見えている能力)・差・因縁・
 //   中継所での一言・次の走者・ここまでの区間成績の表

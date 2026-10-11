@@ -36,7 +36,7 @@ export 'package:ekiden/kansuu/kiji/kiji_gakuren.dart' show gakurenSiteMei;
 // 1.9.4から、駅伝の実況「箱庭スポーツ中継」もある(kiji_jikkyou.dart)。レース画面(区間が終わるたびの
 // 指示の画面)のカードと、結果画面の記事の画面の切り替えで読める
 // 1.9.7から、正月駅伝では学連選抜を追う「学連選抜通信」もある(kiji_gakuren.dart)。展望号は学連選抜編成の
-// 画面のカードと直前順位予想の展望記事の切り替え、区間ごとの速報はレース画面の「実況・速報」のカード、
+// 画面のカードと直前順位予想の展望記事の切り替え、区間ごとの速報はレース画面の実況のカードから開く記事の画面、
 // 結果号と速報は結果画面の記事の画面の切り替えで読める
 // ------------------------------------------------------------
 
@@ -107,15 +107,16 @@ List<Kiji> kijiGakunaiSokuhouIchiran() {
   }
 }
 
-/// レース画面の「実況・速報」のカードで、見出しを予告する記事(1.9.7)
-/// 記事の画面で最初に開くサイトと同じ順(自分の大学が走っていれば学内メディアの速報、
-/// 正月駅伝で学連選抜がいれば学連選抜通信の速報、それ以外は箱庭スポーツ中継)
-List<Kiji> kijiJikkyouSokuhouIchiran() {
-  final List<Kiji> gakunai = kijiGakunaiSokuhouIchiran();
-  if (gakunai.isNotEmpty) return gakunai;
-  final List<Kiji> gakuren = kijiGakurenSokuhouIchiran();
-  if (gakuren.isNotEmpty) return gakuren;
-  return kijiJikkyouIchiran();
+/// レース画面の実況のカードに添える、区間ごとの速報の案内(1.9.7。読める速報がなければnull)
+/// カードの見出しの予告と、記事の画面で最初に開くのは、いつも俯瞰した箱庭スポーツ中継にする
+/// (自分のチームが見出しに載ったときの喜びが大きくなるように)。速報は記事の画面の上で切り替えて読む
+String? kijiSokuhouAnnai() {
+  final List<String> mei = [
+    if (kijiGakunaiShutsujou() && kijiGakunaiSiteMei() != null) '学内メディア「${kijiGakunaiSiteMei()}」',
+    if (_gakurenAri()) '「$gakurenSiteMei」',
+  ];
+  if (mei.isEmpty) return null;
+  return '${mei.join('と')}の区間ごとの速報も、記事の画面の上で切り替えて読めます';
 }
 
 /// 表示中の大会のスタート直前号(当日変更のあと。駅伝だけ)

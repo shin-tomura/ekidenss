@@ -205,10 +205,12 @@ List<Kiji> ekidenKekkaKiji(KijiKankyou k) {
   list.add(_topKiji(e));
   final Kiji? jibun = _jibunKiji(e);
   final Kiji? gakuren = _gakurenKiji(e);
+  // 学連選抜が総合3位相当以内なら、学連選抜の記事を2番目に(1.9.7)
+  if (gakuren != null && _gakurenJoui(e)) list.add(gakuren);
   // 自分の大学が出ていないときは、学連選抜の監督をしていれば学連選抜の記事を上に
   if (jibun != null) {
     list.add(jibun);
-  } else if (gakuren != null && _gakurenKantokuShita(k)) {
+  } else if (gakuren != null && _gakurenKantokuShita(k) && !list.contains(gakuren)) {
     list.add(gakuren);
   }
   final Kiji? kukanshou = _kukanshouKiji(e);
@@ -221,6 +223,19 @@ List<Kiji> ekidenKekkaKiji(KijiKankyou k) {
   final Kiji? sandai = _sandaiKiji(e);
   if (sandai != null) list.add(sandai);
   return list;
+}
+
+/// 学連選抜(オープン参加)の総合の結果(正月駅伝で今年の学連選抜が最終区まで走ったとき。なければnull。1.9.7)
+GakurenKukanKekka? _gakurenSaigo(EkidenKekka e) {
+  final KijiKankyou k = e.k;
+  if (k.race != 2 || !gakurenKonnenAri(k.gh)) return null;
+  return gakurenKukanKekka(k.gh, e.ks - 1);
+}
+
+/// 学連選抜が総合3位相当以内か(1.9.7。学連選抜の記事を2番目に置き、優勝の記事のリードにも書く)
+bool _gakurenJoui(EkidenKekka e) {
+  final GakurenKukanKekka? g = _gakurenSaigo(e);
+  return g != null && g.tuukaJuni <= 2;
 }
 
 bool _gakurenKantokuShita(KijiKankyou k) {
@@ -365,6 +380,8 @@ Kiji _topKiji(EkidenKekka e) {
     }
     return null;
   }
+  // 学連選抜(オープン参加)の総合の結果(1.9.7。1位相当なら見出しに、3位相当以内ならリードに書く)
+  final GakurenKukanKekka? gSaigo = _gakurenSaigo(e);
 
   // 見出し(一番ニュース価値の高い切り口)
   String midashi1;
@@ -409,7 +426,10 @@ Kiji _topKiji(EkidenKekka e) {
     midashi1 = w.erabu(['${win.mei}が$kaisuu度目のV', '${win.mei}、$kaisuu度目の優勝']);
   }
   String midashi2 = '';
-  if (sankanNogashi != null) {
+  if (gSaigo != null && gSaigo.tuukaJuni == 0) {
+    // 学連選抜が優勝校を上回るタイムで1位相当(1.9.7。ほかの切り口より優先する)
+    midashi2 = '学連選抜が1位相当';
+  } else if (sankanNogashi != null) {
     midashi2 = '${daigakuMei(sankanNogashi)}の三冠阻む';
   } else if (taikaiShin) {
     midashi2 = '大会新記録';
@@ -570,6 +590,26 @@ Kiji _topKiji(EkidenKekka e) {
         '${ni.mei}が${saMoji(sa)}差の2位に入った。',
       ]),
     );
+  }
+  // 学連選抜の好成績(1.9.7。1位相当は見出しにも出している)
+  if (gSaigo != null && gSaigo.tuukaJuni <= 2) {
+    final UnivData? my = k.jibunUniv;
+    final String myMei = my == null ? '' : daigakuMei(my);
+    final bool gKantoku = _gakurenKantokuShita(k) && my != null;
+    if (gSaigo.tuukaJuni == 0) {
+      lead.write(
+        'オープン参加の学連選抜は、${win.mei}を上回る${jikanMoji(gSaigo.tuukaTime)}で1位相当となり、'
+        '大学の中に入れば優勝にあたる快挙を見せた。',
+      );
+      if (my != null && gakurenYuushouKantoku(k.gh, k.kantoku, my)) {
+        lead.write('学連選抜を率いた$myMeiの総監督の手腕が評価され、$myMeiの名声も大きく高まった。');
+      } else if (gKantoku) {
+        lead.write('学連選抜は、$myMeiの総監督が指揮を執った。');
+      }
+    } else {
+      lead.write('オープン参加の学連選抜も、総合${juniMoji(gSaigo.tuukaJuni)}相当の好成績を残した。');
+      if (gKantoku) lead.write('学連選抜は、$myMeiの総監督が指揮を執った。');
+    }
   }
 
   // 本文: 序盤(1区のペースと1区の区間賞)

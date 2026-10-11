@@ -15,11 +15,19 @@ class ScoutRoundKekkaScreen extends StatefulWidget {
   /// 最初に出すラウンドの番号(nullなら最後のラウンド)
   final int? hajimeRound;
 
+  /// ラウンドの番号 → 地区の名前(地区めぐり。「ラウンド3(近畿)」のように添える。1.9.6)
+  final Map<int, String> roundMei;
+
+  /// まとまらなかった交渉を「保留」と出すか(地区めぐり。1.9.6)
+  final bool horyuu;
+
   const ScoutRoundKekkaScreen({
     super.key,
     required this.kiroku,
     required this.myUnivid,
     this.hajimeRound,
+    this.roundMei = const <int, String>{},
+    this.horyuu = false,
   });
 
   @override
@@ -87,7 +95,8 @@ class _ScoutRoundKekkaScreenState extends State<ScoutRoundKekkaScreen> {
                       ),
                       Expanded(
                         child: Text(
-                          'ラウンド${widget.kiroku[_erabi].key}',
+                          'ラウンド${widget.kiroku[_erabi].key}'
+                          '${(widget.roundMei[widget.kiroku[_erabi].key] ?? '').isEmpty ? '' : '(${widget.roundMei[widget.kiroku[_erabi].key]})'}',
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             color: Colors.white,
@@ -188,7 +197,11 @@ class _ScoutRoundKekkaScreenState extends State<ScoutRoundKekkaScreen> {
                   ),
                 const SizedBox(height: 4),
                 Text(
-                  comScoutKoudouBun(k, soudatsusen: soudatsusen),
+                  comScoutKoudouBun(
+                    k,
+                    soudatsusen: soudatsusen,
+                    horyuu: widget.horyuu,
+                  ),
                   style: TextStyle(
                     color: kakutei ? Colors.cyanAccent : HENSUU.textcolor,
                     fontSize: HENSUU.fontsize_honbun,

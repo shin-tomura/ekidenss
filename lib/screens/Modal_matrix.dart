@@ -52,6 +52,39 @@ const List<String> _eventLabels = [
 
 const List<int> _raceIndices = [6, 7, 8, 10, 11, 12, 13, 14, 15, 16];
 
+// ------------------------------------------------------------
+// 表示する列を選ぶ(1.9.7。画面の表だけ。画像・テキストのコピー・CSVはいつも全部の列)
+// ・KantokuData.yobiint3[74] に、隠す列の印をビットで保存する(0なら全部表示。初期値)
+// ・ビットは列ごとに決めた番号: 1駅伝男・2平常心・3〜12の10種目(_eventLabels の3〜12)・
+//   13〜22の年間強化と能力(_extraCols)・23所属大学・24正月駅伝予選(23と24は学連選抜の表だけ)
+//   (学連選抜の表と大学の表で列の並びがずれても取り違えないように、画面の列の番号では持たない)
+// ・どの画面から開いても同じ選び方になる。各種設定のQRコードには入れない(表示の好みのため)
+// ・画面の列は「列の記号」で持つ: 0選手名・1〜22は上の番号と同じ・-1所属大学・-2正月駅伝予選
+// ------------------------------------------------------------
+
+/// 隠す列の印を保存する番号(KantokuData.yobiint3)
+const int konkiRetsuIndex = 74;
+
+/// 列の記号[code]の、保存するビットの番号
+int _retsuBit(int code) => code == -1 ? 23 : (code == -2 ? 24 : code);
+
+/// 隠す列の印を読む(なければ0=全部表示)
+int _kakushiYomu() {
+  final KantokuData? kantoku = Hive.box<KantokuData>('kantokuBox').get('KantokuData');
+  if (kantoku == null || kantoku.yobiint3.length <= konkiRetsuIndex) return 0;
+  return kantoku.yobiint3[konkiRetsuIndex];
+}
+
+/// 隠す列の印を保存する(変更をHiveに保存するために、List全体を更新)
+Future<void> _kakushiHozon(int atai) async {
+  final KantokuData? kantoku = Hive.box<KantokuData>('kantokuBox').get('KantokuData');
+  if (kantoku == null || kantoku.yobiint3.length <= konkiRetsuIndex) return;
+  final List<int> updated = List.from(kantoku.yobiint3);
+  updated[konkiRetsuIndex] = atai;
+  kantoku.yobiint3 = updated;
+  await kantoku.save();
+}
+
 // 追加列（表の右端に追加。画像出力には含めない）
 final List<_ExtraColDef> _extraCols = [
   _ExtraColDef(
@@ -321,6 +354,11 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
 
   final double _rowHeight = 75.0;
 
+  // 表示する列(1.9.7)。隠す列の印と、画面に出す列の記号の並び、右に区切り線を引く列の記号
+  int _kakushi = 0;
+  List<int> _retsu = [];
+  Set<int> _migiSenRetsu = {};
+
   @override
   void initState() {
     super.initState();
@@ -328,8 +366,135 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
   }
 
   // シリーズの境界線（右側）を引くべきカラムインデックスを定義
+  // (画像の表で使う。画像はいつも全部の列なので、列の番号で決めたまま。画面の表は _migiSen)
   bool _shouldHasSeriesBorder(int colIdx) {
     return colIdx == 2 || colIdx == 5 || colIdx == 8;
+  }
+
+  // ---- 表示する列(1.9.7) ----
+
+  /// この表で選べる列の記号(表の並び順。選手名は選べない)
+  List<int> get _sentakuKouho => [
+    if (widget.gakuren) ...[-1, -2],
+    for (int c = 1; c < _eventLabels.length + _extraCols.length; c++) c,
+  ];
+
+  /// 列の記号[code]を、今の印で表示するか
+  bool _mieru(int code, int kakushi) => (kakushi & (1 << _retsuBit(code))) == 0;
+
+  /// 列のまとまり(右の区切り線は、次に表示する列とまとまりが違うときに引く)
+  /// 0選手名・1駅伝男と平常心・2対校戦・3記録会・4夏のタイムトライアル・5年間強化と能力・6学連選抜の2列
+  int _matomari(int code) {
+    if (code < 0) return 6;
+    if (code == 0) return 0;
+    if (code <= 2) return 1;
+    if (code <= 5) return 2;
+    if (code <= 8) return 3;
+    if (code < _eventLabels.length) return 4;
+    return 5;
+  }
+
+  /// 画面に出す列の並びと、右に区切り線を引く列を作る
+  void _retsuTsukuru() {
+    List<int> mieru = [
+      for (final int c in _sentakuKouho)
+        if (_mieru(c, _kakushi)) c,
+    ];
+    // 学連選抜の表だけの列しか選んでいなかったときなど、選べる列が1つもなければ全部出す
+    if (mieru.isEmpty) mieru = _sentakuKouho;
+    _retsu = [0, ...mieru];
+    _migiSenRetsu = {
+      for (int i = 1; i + 1 < _retsu.length; i++)
+        if (_matomari(_retsu[i]) != _matomari(_retsu[i + 1])) _retsu[i],
+    };
+  }
+
+  /// 画面の表で、列の記号[code]の右に区切り線を引くか
+  bool _migiSen(int code) => _migiSenRetsu.contains(code);
+
+  /// 列の記号[code]の名前
+  String _retsuMei(int code) {
+    if (code == -1) return '所属大学';
+    if (code == -2) return '正月駅伝予選';
+    if (code < _eventLabels.length) return _eventLabels[code];
+    return _extraCols[code - _eventLabels.length].label;
+  }
+
+  /// 表示する列を選ぶ画面(チップで選ぶ。最後の1列は外せない)
+  Future<void> _retsuSentaku() async {
+    await showDialog<void>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setDialog) {
+            final List<int> kouho = _sentakuKouho;
+            // 大学の表と共通の列(学連選抜の表だけの2列を除く)で、表示している数。
+            // 共通の列を最低1つ残すので、大学の表が選手名だけになることはない
+            final int mieruSuu = kouho.where((c) => c > 0 && _mieru(c, _kakushi)).length;
+            Future<void> kaeru(int atai) async {
+              setState(() {
+                _kakushi = atai;
+                _retsuTsukuru();
+              });
+              setDialog(() {});
+              await _kakushiHozon(atai);
+            }
+
+            return AlertDialog(
+              title: const Text(
+                '表示する列を選ぶ',
+                style: TextStyle(color: Colors.black),
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '選んだ列を、表の並び順で詰めて表示します。どの画面から開いても同じ選び方になります。'
+                      '画像・テキストのコピー・CSVは、いつも全部の列です。',
+                      style: TextStyle(color: Colors.black87, fontSize: 12),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      children: [
+                        for (final int c in kouho)
+                          FilterChip(
+                            label: Text(_retsuMei(c)),
+                            selected: _mieru(c, _kakushi),
+                            onSelected: (bool v) {
+                              // 共通の列の最後の1列は外せない(選手名だけの表になるため)
+                              if (!v && c > 0 && mieruSuu <= 1) return;
+                              final int bit = 1 << _retsuBit(c);
+                              kaeru(v ? (_kakushi & ~bit) : (_kakushi | bit));
+                            },
+                            labelStyle: const TextStyle(color: Colors.black, fontSize: 12),
+                            selectedColor: Colors.lightBlue.shade100,
+                            backgroundColor: Colors.grey.shade200,
+                            checkmarkColor: Colors.black,
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: _kakushi == 0 ? null : () => kaeru(0),
+                  child: const Text('すべて表示に戻す'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: const Text('閉じる'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   final Color _seriesBorderColor = Colors.white.withOpacity(0.5);
@@ -726,6 +891,9 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
       univId: widget.targetUnivId,
       gakuren: widget.gakuren,
     );
+    // 表示する列(1.9.7)
+    _kakushi = _kakushiYomu();
+    _retsuTsukuru();
     _isInitialized = true;
   }
 
@@ -747,6 +915,12 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
             foregroundColor: Colors.white,
             elevation: 0,
             actions: [
+              // 表示する列を選ぶ(画面の表だけ。1.9.7)
+              IconButton(
+                icon: const Icon(Icons.view_column),
+                tooltip: '列を選ぶ',
+                onPressed: _isExporting ? null : _retsuSentaku,
+              ),
               // テキストでコピー(CSV形式の文をクリップボードに入れる。1.8.2)
               IconButton(
                 icon: const Icon(Icons.copy),
@@ -767,18 +941,19 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
             child: TableView.builder(
               pinnedColumnCount: 1,
               pinnedRowCount: 1,
-              columnCount:
-                  _eventLabels.length + _extraCols.length + _gakurenRetsuSuu,
+              // 表示する列だけを出す(1.9.7。_retsu の記号の並び)
+              columnCount: _retsu.length,
               rowCount: _sortedSenshu.length + 1,
               columnBuilder: (index) {
+                final int code = _retsu[index];
                 // 学連選抜の表の所属大学と正月駅伝予選の列
-                if (_gakurenRetsu(index) == 1) {
+                if (code == -1) {
                   return TableSpan(extent: FixedTableSpanExtent(100));
                 }
-                if (_gakurenRetsu(index) == 2) {
+                if (code == -2) {
                   return TableSpan(extent: FixedTableSpanExtent(80));
                 }
-                final int col = _ronriRetsu(index);
+                final int col = code;
                 return TableSpan(
                   extent: FixedTableSpanExtent(
                     col >= _eventLabels.length
@@ -791,22 +966,22 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
                 extent: FixedTableSpanExtent(index == 0 ? 55 : _rowHeight),
               ),
               cellBuilder: (context, vicinity) {
+                final int code = _retsu[vicinity.column];
                 // 学連選抜の表の所属大学と正月駅伝予選の列(1.8.2)
-                final int gakurenRetsu = _gakurenRetsu(vicinity.column);
-                if (gakurenRetsu > 0) {
+                if (code < 0) {
                   if (vicinity.row == 0) {
                     return _buildGakurenHeaderCell(
-                      gakurenRetsu == 1 ? '所属大学' : '正月駅伝予選',
-                      gakurenRetsu == 2,
+                      code == -1 ? '所属大学' : '正月駅伝予選',
+                      _migiSen(code),
                     );
                   }
                   final senshu = _sortedSenshu[vicinity.row - 1];
-                  return gakurenRetsu == 1
-                      ? _buildShozokuCell(senshu, vicinity.row)
-                      : _buildYosenCell(senshu, vicinity.row);
+                  return code == -1
+                      ? _buildShozokuCell(senshu, vicinity.row, _migiSen(code))
+                      : _buildYosenCell(senshu, vicinity.row, _migiSen(code));
                 }
-                // ここから下は、学連選抜の列を除いた列の番号で作る
-                final int col = _ronriRetsu(vicinity.column);
+                // ここから下は、学連選抜の列を除いた列の番号(列の記号と同じ)で作る
+                final int col = code;
                 if (vicinity.row == 0)
                   return _buildHeaderCell(
                     col < _eventLabels.length
@@ -871,20 +1046,7 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
   }
 
   // 学連選抜の表では、選手名の右に所属大学と正月駅伝予選の2列を入れる(1.8.2)
-  int get _gakurenRetsuSuu => widget.gakuren ? 2 : 0;
-
-  // 画面の列[index]が学連選抜の列なら1(所属大学)か2(正月駅伝予選)、そうでなければ0
-  int _gakurenRetsu(int index) {
-    if (!widget.gakuren) return 0;
-    if (index == 1 || index == 2) return index;
-    return 0;
-  }
-
-  // 画面の列[index]を、学連選抜の列を除いた列の番号にする
-  int _ronriRetsu(int index) {
-    if (widget.gakuren && index >= 3) return index - _gakurenRetsuSuu;
-    return index;
-  }
+  // (1.9.7から、列の並びは _retsu の記号で持つ。-1所属大学・-2正月駅伝予選)
 
   // 学連選抜の列の見出し([migiSen]がtrueなら右に区切り線を引く)
   TableViewCell _buildGakurenHeaderCell(String label, bool migiSen) {
@@ -918,8 +1080,8 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
     );
   }
 
-  // 学連選抜の選手の所属大学のセル
-  TableViewCell _buildShozokuCell(SenshuData senshu, int rowIdx) {
+  // 学連選抜の選手の所属大学のセル([migiSen] 右に区切り線を引くか。1.9.7)
+  TableViewCell _buildShozokuCell(SenshuData senshu, int rowIdx, bool migiSen) {
     return TableViewCell(
       child: Container(
         padding: const EdgeInsets.all(6),
@@ -930,6 +1092,9 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
               : Colors.white.withOpacity(0.02),
           border: Border(
             bottom: BorderSide(color: Colors.white.withOpacity(0.05)),
+            right: migiSen
+                ? BorderSide(color: _seriesBorderColor, width: _seriesBorderWidth)
+                : BorderSide.none,
           ),
         ),
         child: AutoSizeText(
@@ -943,11 +1108,14 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
   }
 
   // 学連選抜の選手の正月駅伝予選のセル(タイムと、予選に出た選手全体の中での個人順位)
-  TableViewCell _buildYosenCell(SenshuData senshu, int rowIdx) {
+  // [migiSen] 右に区切り線を引くか(1.9.7。それまではいつも引いていた)
+  TableViewCell _buildYosenCell(SenshuData senshu, int rowIdx, bool migiSen) {
     final int? juni = _yosenJuni(senshu);
     final Border border = Border(
       bottom: BorderSide(color: Colors.white.withOpacity(0.05)),
-      right: BorderSide(color: _seriesBorderColor, width: _seriesBorderWidth),
+      right: migiSen
+          ? BorderSide(color: _seriesBorderColor, width: _seriesBorderWidth)
+          : BorderSide.none,
     );
     final Color rowBg = rowIdx.isEven
         ? Colors.transparent
@@ -1017,21 +1185,16 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
               : (colIdx % 2 == 0
                     ? Colors.white12
                     : Colors.white.withOpacity(0.07)),
-          border: _shouldHasSeriesBorder(colIdx)
+          // 区切り線は、次に表示する列とまとまりが違うときに右に引く(1.9.7。それまでは決まった列の右と、
+          // 年間強化の列の左に引いていた)
+          border: _migiSen(colIdx)
               ? Border(
                   right: BorderSide(
                     color: _seriesBorderColor,
                     width: _seriesBorderWidth,
                   ),
                 )
-              : (colIdx == _eventLabels.length
-                    ? Border(
-                        left: BorderSide(
-                          color: _seriesBorderColor,
-                          width: _seriesBorderWidth,
-                        ),
-                      )
-                    : null),
+              : null,
         ),
         padding: const EdgeInsets.all(4),
         alignment: Alignment.center,
@@ -1099,7 +1262,7 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
     final Color baseColor = isKonjou
         ? Colors.pinkAccent
         : Colors.lightBlueAccent;
-    final bool hasSeriesBorder = _shouldHasSeriesBorder(colIdx);
+    final bool hasSeriesBorder = _migiSen(colIdx); // 画面の表は、表示する列で決める(1.9.7)
 
     if (value >= 90) {
       bgColor = baseColor.withOpacity(0.35);
@@ -1176,7 +1339,7 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
     final Color rowBg = rowIdx.isEven
         ? Colors.transparent
         : Colors.white.withOpacity(0.02);
-    final bool hasSeriesBorder = _shouldHasSeriesBorder(colIdx);
+    final bool hasSeriesBorder = _migiSen(colIdx); // 画面の表は、表示する列で決める(1.9.7)
 
     if (time <= 0 || time >= TEISUU.DEFAULTTIME) {
       return TableViewCell(
@@ -1304,10 +1467,11 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
     final Color rowBg = rowIdx.isEven
         ? Colors.transparent
         : Colors.white.withOpacity(0.02);
-    final bool isFirstExtraCol = colIdx == _eventLabels.length;
+    // 区切り線は、次に表示する列とまとまりが違うときに右に引く(1.9.7。それまでは年間強化の列の左に引いていた。
+    // 年間強化と能力の列は一番右のまとまりなので、ふつうは引かない)
     final Border border = Border(
       bottom: BorderSide(color: Colors.white.withOpacity(0.05)),
-      left: isFirstExtraCol
+      right: _migiSen(colIdx)
           ? BorderSide(color: _seriesBorderColor, width: _seriesBorderWidth)
           : BorderSide.none,
     );

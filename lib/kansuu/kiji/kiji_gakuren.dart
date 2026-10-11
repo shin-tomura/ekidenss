@@ -664,10 +664,10 @@ List<Kiji> gakurenSokuhouKiji(KijiKankyou k) {
   final int done = k.gh.nowracecalckukan < ks ? k.gh.nowracecalckukan : ks;
   if (done <= 0) return [];
   final UnivGakurenData? gu = _gakurenUniv();
-  final MochiHyou hyou = MochiHyou(k); // 次の走者の特徴の文に使う(1.9.7)
+  final MochiHyou mochiHyou = MochiHyou(k); // 次の走者の特徴の文に使う(1.9.7)
   final List<Kiji> out = [];
   for (int kk = done - 1; kk >= 0; kk--) {
-    final Kiji? kiji = _sokuhou(k, list, gu, kk, saishin: kk == done - 1, hyou: hyou);
+    final Kiji? kiji = _sokuhou(k, list, gu, kk, saishin: kk == done - 1, mochiHyou: mochiHyou);
     if (kiji != null) out.add(kiji);
   }
   return out;
@@ -680,7 +680,7 @@ Kiji? _sokuhou(
   UnivGakurenData? gu,
   int kk, {
   required bool saishin,
-  required MochiHyou hyou,
+  required MochiHyou mochiHyou,
 }) {
   final GakurenKukanKekka? r = gakurenKukanKekka(k.gh, kk);
   final _GSenshu? x = _kukanNoSenshu(list, kk);
@@ -821,7 +821,7 @@ Kiji? _sokuhou(
       final ({int juni, double time})? ty = _yosenKekka(tsugi.g);
       if (ty != null) nb.write('予選会は全体${juniMoji(ty.juni)}だった。');
       // 次の走者の特徴(1.9.7)
-      final TokuchouKaki tk = TokuchouKaki(k, w, hyou, suuji: kishaKataKara(_kishaMei(k, 320)) != KishaKata.joukei, hajime: kk);
+      final TokuchouKaki tk = TokuchouKaki(k, w, mochiHyou, suuji: kishaKataKara(_kishaMei(k, 320)) != KishaKata.joukei, hajime: kk);
       nb.write(tk.bunGakuren(tsugi.g, kk + 1, hashiru: kukanHashiru(k, kk + 1)));
     }
     w.danraku(nb.toString());

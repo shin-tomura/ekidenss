@@ -577,6 +577,16 @@ class TokuchouKaki {
     final int ev = nobori ? 4 : (kudari ? 5 : 7);
     final String evMoji = _shumoku[ev];
     final String michi = nobori ? '登り' : (kudari ? '下り' : 'アップダウン');
+    // 山の区間(登り・下りがきつい区間)は、山登り・山下りの言い方を混ぜる(1.9.7)
+    final bool yama = tok == KukanTokuchou.yamaNobori || tok == KukanTokuchou.yamaKudari;
+    final String yamaMei = nobori ? '山登り' : '山下り';
+    String iri(String juni) => yama
+        ? w.erabu([
+            '${michi}が続くこの区間で頼りになる$evMojiは、$juni。',
+            '$yamaMeiのこの区間でカギを握る$evMojiは、$juni。',
+            '$yamaMeiへの適性を測る$evMojiは、$juni。',
+          ])
+        : '${michi}が続くこの区間で頼りになる$evMojiは、$juni。';
     final StringBuffer sb = StringBuffer();
     // 区間内(公開されていれば)か、学生全体の順位
     int d = 1;
@@ -586,7 +596,7 @@ class TokuchouKaki {
       final int n = hashiru.length;
       if (r > 0) {
         d = _dan(r, n);
-        sb.write('${michi}が続くこの区間で頼りになる$evMojiは、${_kukannaiMoji(r, n, soutou)}。');
+        sb.write(iri(_kukannaiMoji(r, n, soutou)));
         kaita = true;
       }
     }
@@ -594,9 +604,19 @@ class TokuchouKaki {
       final int z = hyou.zentai(t[ev], ev);
       if (z > 0) {
         d = _dan(z, hyou.zentaiSuu(ev));
-        sb.write('${michi}が続くこの区間で頼りになる$evMojiは、${_zentaiMoji(z, ev)}。');
+        sb.write(iri(_zentaiMoji(z, ev)));
         kaita = true;
       }
+    }
+    // 山の区間で記録がなければ、そのことを書く(山の区間は坂の観点を必ず入れるので、何も書かないと不自然。1.9.7)
+    if (!kaita && yama && t[ev] >= TEISUU.DEFAULTTIME) {
+      sb.write(
+        w.erabu([
+          '$evMojiの記録がなく、$yamaMeiへの適性は未知数だ。',
+          '$evMojiの記録がなく、$yamaMeiへの適性は走ってみるまで分からない。',
+        ]),
+      );
+      kaita = true;
     }
     // 登り基調・下り基調では、登りと下りのどちらが得意かも添える
     if (nobori || kudari) {
@@ -934,6 +954,32 @@ class TokuchouKaki {
     ];
     final int ban = _ban++;
     if (all.isEmpty) return '';
+    // 山の区間(登り・下りがきつい区間)は、坂の観点を必ず入れて先頭に置く(1.9.7。
+    // 回すだけだと、名鑑の5区・6区や、往路を終えたときの6区の紹介で、坂が毎回落ちる並びになっていた)
+    final KukanTokuchou tok = kukanTokuchou(k.gh, k.race, kk);
+    final _Kansatsu? yamaSaka =
+        (tok == KukanTokuchou.yamaNobori || tok == KukanTokuchou.yamaKudari)
+        ? all.where((x) => x.kanten == 3).firstOrNull
+        : null;
+    if (yamaSaka != null) {
+      final int yamaKazu = all.length >= 3 ? (ban % 3 == 2 ? 2 : 3) : all.length;
+      final _Kansatsu? yamaKukannai = all.where((x) => x.kanten == 2).firstOrNull;
+      // 坂と区間内順位のほかの観点は、何人目かで回す
+      final List<_Kansatsu> nokori = [
+        for (final _Kansatsu x in all)
+          if (x != yamaSaka && x != yamaKukannai) x,
+      ];
+      final int yamaStart = nokori.isEmpty ? 0 : ban % nokori.length;
+      final List<_Kansatsu> yamaJun = [...nokori.sublist(yamaStart), ...nokori.sublist(0, yamaStart)];
+      final int hokaKazu = yamaKazu - 1 - (yamaKukannai != null ? 1 : 0);
+      final List<_Kansatsu> yamaErabi = [
+        yamaSaka,
+        ...yamaJun.take(hokaKazu < 0 ? 0 : hokaKazu),
+        if (yamaKukannai != null) yamaKukannai,
+      ];
+      final String yamaBun = yamaErabi.map((x) => x.bun).join();
+      return teinei ? _teineiNi(yamaBun) : yamaBun;
+    }
     // 入り方を回す(何人目かで最初に置く観点を変える)
     final int start = ban % all.length;
     final List<_Kansatsu> jun = [...all.sublist(start), ...all.sublist(0, start)];

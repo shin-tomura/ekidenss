@@ -81,8 +81,8 @@ import 'package:ekiden/kansuu/koukou_meibo.dart'; // 地区めぐりの地区(1.
 //       割合のコード + 積極性のコード×100 を入れる。どちらも0なら全大学共通の設定(初期値)、
 //       1〜11なら(値−1)×10%。ラウンド回数は全大学共通のまま(大学ごとにすると分かりにくいため)
 // ・デバッグ実行時は、VS Codeのデバッグコンソールに「[COMスカウト]」で始まるログを出す
-// ・1.9.6から、ONのときのスカウトの形に「地区めぐり」(初期値)を足した。ここまでの説明は
-//   「全国一斉」(1.9.5までの形)のもの。地区めぐりの違いは、下の「地区めぐり(1.9.6)」に書いた
+// ・1.9.6から、ONのときのスカウトの形に「地区めぐり(声かけ)」(初期値)と「地区めぐり(交渉)」を足した。
+//   ここまでの説明は「全国一斉」(1.9.5までの形)のもの。地区めぐりの違いは、下の「地区めぐり(1.9.6)」に書いた
 // ------------------------------------------------------------
 
 /// KantokuData.yobiint2 の使用番号: コンピュータスカウトの設定
@@ -790,61 +790,113 @@ Map<int, double> comScoutSeikouritsuIchiran({
 // ------------------------------------------------------------
 // 地区めぐり(1.9.6)
 //
-// ・コンピュータスカウトONのときのスカウトの形を2つにした
-//   ・地区めぐり(初期値。yobiint2[87]が0): 新入生(留学生を除く)を、出身校の都道府県の地区
+// ・コンピュータスカウトONのときのスカウトの形を3つにした(yobiint2[87])
+//   ・地区めぐり(声かけ)(初期値。0): 新入生(留学生を除く)を、出身校の都道府県の地区
 //     (全国高校駅伝の地区代表と同じ11地区。koukou_meibo.dart の koukouKenChiku)に分け、地区ごとに
-//     1ラウンドずつ交渉する。どの大学も、その地区の選手にだけ、1人まで交渉できる(見送りもできる)
-//   ・全国一斉(yobiint2[87]が1): 1.9.5までの形。何も変えていない
-// ・既存のセーブデータも0なので地区めぐりになる(一度はみんなに試してほしいという開発者の希望で、
-//   初期値にした。OFFの人はOFFのまま)
+//     1ラウンドずつ声をかける。どの大学も、その地区の選手に1人まで声をかけられる(見送りもできる)。
+//     成功率はなく、声をかけた大学が1つならその大学に確定、2つ以上なら争奪戦。
+//     争奪戦は、最後の志望と同じ重み(入学時名声影響度設定の重み。shozokuChuusenOmomi)で決める
+//     (変わり者は等しい確率)。失敗がないので「保留」は起きない
+//   ・地区めぐり(交渉)(2): 地区の分け方と順番は声かけと同じで、1地区に1人まで成功率で交渉する
+//   ・全国一斉(1): 1.9.5までの形。何も変えていない
+// ・既存のセーブデータも0なので地区めぐり(声かけ)になる(一度はみんなに試してほしいという開発者の
+//   希望で、初期値にした。OFFの人はOFFのまま)。1.9.6の開発中は、0が地区めぐり(交渉)だった
+// ・声かけの人数は、名声順位で変える案(3人・2人・1人など)も模擬計算で試したが、名声の効き目は争奪戦の
+//   重みと最後の志望で十分に出ていて、1人のほうが一手一手に重みが出て分かりやすいので、各地区1人にした
+// ・声かけのコンピュータの大学は、要件(性格の上位何%)を満たすその地区の選手の中から、点数の高い順の
+//   上から3人を3:2:1の重みで選ぶ(交渉と違い、要件ぎりぎりの選手からは選ばない。取り合いを避けて
+//   要件ぎりぎりから選ぶと、地区の一番良い選手に誰も声をかけず、プレイヤーが取り放題になるため)
 // ・地区は高校の名簿の初期値の都道府県で決める(高校名鑑の編集では都道府県を変えられないので、
 //   Hiveを読まずに済む)。高校が未設定の選手は、念のため出身地の都道府県の地区にする
 // ・地区の順番は年から決める(保存しない。開き直しても同じ順番)。その年に新入生のいない地区は飛ばす
 //   (出身地は47都道府県から等しく選ぶので、北海道は約4%の年に0人になる)。
 //   何地区目かは、今までのラウンドと同じく Ghensuu.scoutChances(残りの地区の数)で数える
-// ・成功率は全国一斉と同じ式に、下限を足す(全大学同じ):
+// ・交渉の成功率は全国一斉と同じ式に、下限を足す(全大学同じ):
 //     下限 = 名声の重み(最後の志望の抽選と同じ。shozokuChuusenOmomi)の、全大学の合計の中での割合(75%まで)
 //   (名声が十分高い大学は、交渉しなくても最後の志望で持ちタイムの良い選手が来やすいので、
 //    交渉の成功率がそれより低いと「交渉した方が損」になるため。1.9.6の開発中の相談で決めた)
 //   持ちタイムの順位は、全国一斉と同じく全国の中での順位
 // ・コンピュータの大学の要件(性格の上位何%)は、全国の進路未定の中で決め、そのうち今の地区にいる
-//   選手から選ぶ(いなければ見送り)。選び方は全国一斉と同じ
-// ・争奪戦・変わり者・最後の志望は、全国一斉と同じ
+//   選手から選ぶ(いなければ見送り)。交渉の選び方は全国一斉と同じ(声かけは上に書いた)
+// ・交渉の争奪戦・変わり者と、最後の志望は、全国一斉と同じ
 // ・交渉がまとまらなかったことを「保留」と呼ぶ(返事を保留した。今年はもう交渉できないが、最後の志望で
 //   その大学を選ぶこともある)。保留していた選手が最後の志望であなたの大学を選んだら、入学の一覧に書く
 // ・その年のスカウトの形は、スカウトを始めるときに yobiint2[88] に覚える(途中で設定を変えても、
 //   その年は始めた形のまま)。0(記録なし)は1.9.6より前に始めたスカウトなので、全国一斉として扱う。
+//   形のコードは1=地区めぐり(交渉)・2=全国一斉・3=地区めぐり(声かけ)([87]の値とは違う。1.9.6の開発中の
+//   データで、スカウトの途中の年の形が変わらないように、交渉と全国一斉のコードはそのまま残した)。
 //   地区めぐりのお知らせ(初めての地区めぐりで一度だけ出す)を出したかどうかも、ここに入れる
-// ・模擬計算(1.9.6の開発中。持ちタイムの順位だけで見た簡単なもの): 交渉で決まる新入生は全大学で
-//   年38人前後(全国一斉は13人前後)、争奪戦は年17回前後(全国一斉は5回前後)。交渉しないと全国一斉より
-//   悪くなり、全国の上位の選手がいる地区だけ交渉すると良くなる。上手に交渉しても全国一斉より少し難しい
+// ・模擬計算(1.9.6の開発中。持ちタイムの順位だけで見た簡単なもの):
+//   交渉: 交渉で決まる新入生は全大学で年38人前後(全国一斉は13人前後)、争奪戦は年17回前後(全国一斉は5回前後)。
+//     交渉しないと全国一斉より悪くなり、全国の上位の選手がいる地区だけ交渉すると良くなる。上手に交渉しても
+//     全国一斉より少し難しい
+//   声かけ: 声かけで決まる新入生は年36人前後、争奪戦は年30回前後。声をかけないと大きく悪くなる。
+//     名声の高い大学は交渉より少し難しく(上手にして名声1位で9位前後、交渉は7.5位前後)、名声の低い大学は
+//     どのコンピュータの要件にも入らない選手を拾えるので、交渉より少し這い上がりやすい
 // ------------------------------------------------------------
 
 /// KantokuData.yobiint2 の使用番号: コンピュータスカウトONのときのスカウトの形(1.9.6)
-/// 0=地区めぐり(初期値)・1=全国一斉
+/// 0=地区めぐり(声かけ)(初期値)・1=全国一斉・2=地区めぐり(交渉)
 const int comScoutKatachiIndex = 87;
 
+/// スカウトの形(yobiint2[87]の値)
+const int comScoutKatachiKoekake = 0; // 地区めぐり(声かけ)
+const int comScoutKatachiZenkoku = 1; // 全国一斉
+const int comScoutKatachiKousyou = 2; // 地区めぐり(交渉)
+
+/// スカウトの形の名前(yobiint2[87]の値の順)
+const List<String> comScoutKatachiMei = ['地区めぐり(声かけ)', '全国一斉', '地区めぐり(交渉)'];
+
 /// KantokuData.yobiint2 の使用番号: その年のスカウトの形の記録(1.9.6)
-/// 年×100 + 地区めぐりのお知らせを出したなら10 + 形(1=地区めぐり・2=全国一斉)。0は記録なし
+/// 年×100 + 地区めぐりのお知らせを出したなら10 + 形(1=地区めぐり(交渉)・2=全国一斉・3=地区めぐり(声かけ))。
+/// 0は記録なし
 const int comScoutNendoIndex = 88;
 
 /// 地区めぐりの成功率の下限の上限(タイム順位による上限の一番大きい値と同じ)
 const double _kagenJougen = 0.75;
 
-/// スカウトの形の設定が地区めぐりか(全国一斉ならfalse。ONかどうかは見ない)
-bool comScoutChikuMeguriSettei(KantokuData kantoku) {
-  if (kantoku.yobiint2.length <= comScoutKatachiIndex) return true;
-  return kantoku.yobiint2[comScoutKatachiIndex] != 1;
+/// スカウトの形の設定(0=地区めぐり(声かけ)・1=全国一斉・2=地区めぐり(交渉)。ONかどうかは見ない)
+int comScoutKatachiSettei(KantokuData kantoku) {
+  if (kantoku.yobiint2.length <= comScoutKatachiIndex) {
+    return comScoutKatachiKoekake;
+  }
+  final int v = kantoku.yobiint2[comScoutKatachiIndex];
+  return comScoutKatachiTadashii(v) ? v : comScoutKatachiKoekake;
 }
 
 /// スカウトの形をyobiint2のリストに書き込む(保存は呼び出し側で行う)
-void comScoutKatachiKaku(List<int> yobiint2, {required bool chikuMeguri}) {
+void comScoutKatachiKaku(List<int> yobiint2, int katachi) {
   if (yobiint2.length <= comScoutKatachiIndex) return;
-  yobiint2[comScoutKatachiIndex] = chikuMeguri ? 0 : 1;
+  if (!comScoutKatachiTadashii(katachi)) return;
+  yobiint2[comScoutKatachiIndex] = katachi;
 }
 
 /// 各種設定のQRコードから読んだスカウトの形の値が、正しい形かどうか
-bool comScoutKatachiTadashii(int v) => v == 0 || v == 1;
+bool comScoutKatachiTadashii(int v) => v >= 0 && v <= 2;
+
+/// その年の形の記録のコード(1=交渉・2=全国一斉・3=声かけ)を、スカウトの形(yobiint2[87]の値)にする
+int _nendoCodeKatachi(int code) {
+  switch (code) {
+    case 1:
+      return comScoutKatachiKousyou;
+    case 3:
+      return comScoutKatachiKoekake;
+    default:
+      return comScoutKatachiZenkoku;
+  }
+}
+
+/// スカウトの形(yobiint2[87]の値)を、その年の形の記録のコードにする
+int _katachiNendoCode(int katachi) {
+  switch (katachi) {
+    case comScoutKatachiKousyou:
+      return 1;
+    case comScoutKatachiKoekake:
+      return 3;
+    default:
+      return 2;
+  }
+}
 
 int _nendoKiroku(KantokuData kantoku) {
   if (kantoku.yobiint2.length <= comScoutNendoIndex) return 0;
@@ -852,12 +904,17 @@ int _nendoKiroku(KantokuData kantoku) {
   return v < 0 ? 0 : v;
 }
 
-/// 今年の新入生スカウトが地区めぐりか(スカウトを始めたときの形。記録がなければ全国一斉)
-bool comScoutKotoshiChikuMeguri(KantokuData kantoku, int nen) {
-  if (!isComScoutOn(kantoku)) return false;
+/// 今年の新入生スカウトの形(スカウトを始めたときの形。記録がなければ全国一斉。OFFのときも全国一斉)
+int comScoutKotoshiKatachi(KantokuData kantoku, int nen) {
+  if (!isComScoutOn(kantoku)) return comScoutKatachiZenkoku;
   final int v = _nendoKiroku(kantoku);
-  return v ~/ 100 == nen && v % 10 == 1;
+  if (v ~/ 100 != nen) return comScoutKatachiZenkoku;
+  return _nendoCodeKatachi(v % 10);
 }
+
+/// 今年の新入生スカウトが地区めぐり(声かけか交渉)か
+bool comScoutKotoshiChikuMeguri(KantokuData kantoku, int nen) =>
+    comScoutKotoshiKatachi(kantoku, nen) != comScoutKatachiZenkoku;
 
 /// 地区めぐりのお知らせ(初めての地区めぐりで一度だけ出す)を、もう出したか
 bool comScoutOshiraseZumi(KantokuData kantoku) =>
@@ -871,7 +928,7 @@ void comScoutOshiraseKaku(KantokuData kantoku) {
 }
 
 /// 新入生スカウトを始めるときの回数(4月5日の処理で、スカウトの画面を出す前に呼ぶ。1.9.6)
-/// ONなら今年のスカウトの形を覚えて保存し、地区めぐりなら新入生のいる地区の数、
+/// ONなら今年のスカウトの形を覚えて保存し、地区めぐり(声かけ・交渉)なら新入生のいる地区の数、
 /// 全国一斉なら設定のラウンド回数を返す。OFFなら今まで通り3回
 Future<int> comScoutKaishi({
   required Ghensuu gh,
@@ -881,12 +938,12 @@ Future<int> comScoutKaishi({
       kantoku.yobiint2.length <= comScoutNendoIndex) {
     return comScoutChances(kantoku);
   }
-  final bool chiku = comScoutChikuMeguriSettei(kantoku);
+  final int katachi = comScoutKatachiSettei(kantoku);
   final int oshirase = comScoutOshiraseZumi(kantoku) ? 10 : 0;
   kantoku.yobiint2[comScoutNendoIndex] =
-      gh.year * 100 + oshirase + (chiku ? 1 : 2);
+      gh.year * 100 + oshirase + _katachiNendoCode(katachi);
   await kantoku.save();
-  if (!chiku) return comScoutKaisuu(kantoku);
+  if (katachi == comScoutKatachiZenkoku) return comScoutKaisuu(kantoku);
   return comScoutChikuJunban(gh.year).length;
 }
 
@@ -1111,6 +1168,8 @@ List<SenshuData> _sortedSenshuData() {
 /// [koudou] を渡すと、全大学のこのラウンドの行動(見送りなども含む)を大学id順に入れて返す
 /// [chiku] を渡すと地区めぐりのラウンド(1.9.6): その地区の選手にだけ交渉し、成功率に下限を入れる
 /// (プレイヤーの成功率 [playerSeikouritsu] は、画面に出している値(下限を入れたもの)を渡す)
+/// [koekake] がtrueなら地区めぐり(声かけ)(1.9.6。[chiku] と一緒に使う): 成功率はなく、声をかけた大学が
+/// 1つなら確定、2つ以上なら最後の志望と同じ重みの争奪戦。コンピュータの大学は要件の中の点数の高い順から選ぶ
 Future<List<ComScoutKekka>> comScoutRound({
   required Ghensuu gh,
   required int roundBangou, // ラウンドの番号(1から。1ならコンピュータの大学の断られた記憶を忘れてから始める)
@@ -1119,6 +1178,7 @@ Future<List<ComScoutKekka>> comScoutRound({
   Random? random,
   List<ComScoutKoudou>? koudou,
   int? chiku,
+  bool koekake = false,
 }) async {
   final Random rnd = random ?? Random();
   if (roundBangou <= 1) {
@@ -1155,7 +1215,8 @@ Future<List<ComScoutKekka>> comScoutRound({
       !comScoutKotowarareta(playerTarget) &&
       (chiku == null || chikuBetsu[playerTarget.id] == chiku) &&
       !playerWakuIppai) {
-    final bool seikou = rnd.nextDouble() < playerSeikouritsu;
+    // 声かけでは成功率がなく、声をかければ成立(ほかの大学と重なれば争奪戦。1.9.6)
+    final bool seikou = koekake || rnd.nextDouble() < playerSeikouritsu;
     kousyouList.add(
       _Kousyou(
         univid: myUnivid,
@@ -1258,17 +1319,21 @@ Future<List<ComScoutKekka>> comScoutRound({
         continue;
       }
       // 成功率の高い順。同じ成功率なら点数の低い順(要件ぎりぎりで、取り合いになりにくい選手から)
-      kouho.sort((a, b) {
-        int c = b.p.compareTo(a.p);
-        if (c != 0) return c;
-        c = a.ten.compareTo(b.ten);
-        return c != 0 ? c : a.senshu.id.compareTo(b.senshu.id);
-      });
+      // (声かけでは成功率がないので、点数の高い順のまま。要件ぎりぎりから選ぶと、地区の一番良い選手に
+      //  誰も声をかけず、プレイヤーが取り放題になるため。1.9.6)
+      if (!koekake) {
+        kouho.sort((a, b) {
+          int c = b.p.compareTo(a.p);
+          if (c != 0) return c;
+          c = a.ten.compareTo(b.ten);
+          return c != 0 ? c : a.senshu.id.compareTo(b.senshu.id);
+        });
+      }
       // 上から3人を、3:2:1の重みの抽選で選ぶ
       final List<_Kouho> jouI = kouho.take(3).toList();
       final _Kouho nerai =
           jouI[_omomiChuusen(_jouiOmomi.take(jouI.length).toList(), rnd)];
-      final bool seikou = rnd.nextDouble() < nerai.p;
+      final bool seikou = koekake || rnd.nextDouble() < nerai.p;
       kousyouList.add(
         _Kousyou(
           univid: univ.id,
@@ -1303,6 +1368,11 @@ Future<List<ComScoutKekka>> comScoutRound({
   // 成功した交渉を選手ごとにまとめ、名声の重みを付けた抽選で1校に決めて確定させる
   // (画面では「争奪戦」として、選手が進学先を選んだ形で出す。
   //  変わり者は名声にこだわらないので、成功した大学から等しい確率で選ぶ。1.9.0)
+  // 声かけでは、最後の志望と同じ重み(入学時名声影響度設定の重み)にする(1.9.6。成功率がない分、
+  // 名声の差を争奪戦で効かせるため。交渉と全国一斉は今まで通り名声そのものの重み)
+  final List<int> shiganOmomi = koekake
+      ? shozokuChuusenOmomi(sortedunivdata: sortedUnivData, ghensuu: gh)
+      : const <int>[];
   final Map<int, List<_Kousyou>> seikouBetsu = {};
   for (final _Kousyou k in kousyouList) {
     if (!k.seikou) continue;
@@ -1319,6 +1389,13 @@ Future<List<ComScoutKekka>> comScoutRound({
                 .map(
                   (k) => kawari
                       ? 1.0
+                      : koekake
+                      ? max(
+                          1,
+                          k.univid < shiganOmomi.length
+                              ? shiganOmomi[k.univid]
+                              : 0,
+                        ).toDouble()
                       : max(1, sortedUnivData[k.univid].meisei_total)
                             .toDouble(),
                 )
@@ -1478,14 +1555,15 @@ Future<Map<int, int>> comScoutShigan({
 
 /// スキップ中のスカウト(ONなら、コンピュータだけで全ラウンドを行い、最後の志望まで済ませる)
 /// 4月5日の処理(年度替わり)の最後に呼ぶ
-/// 地区めぐりなら、その年の地区の順番に1ラウンドずつ行う(1.9.6。形は設定のものを使う)
+/// 地区めぐり(声かけ・交渉)なら、その年の地区の順番に1ラウンドずつ行う(1.9.6。形は設定のものを使う)
 Future<void> comScoutSkip({required Ghensuu gh}) async {
   final KantokuData? kantoku = Hive.box<KantokuData>(
     'kantokuBox',
   ).get('KantokuData');
   if (kantoku == null || !isComScoutOn(kantoku)) return;
   final Random rnd = Random();
-  if (comScoutChikuMeguriSettei(kantoku)) {
+  final int katachi = comScoutKatachiSettei(kantoku);
+  if (katachi != comScoutKatachiZenkoku) {
     final List<int> junban = comScoutChikuJunban(gh.year);
     for (int i = 0; i < junban.length; i++) {
       await comScoutRound(
@@ -1493,6 +1571,7 @@ Future<void> comScoutSkip({required Ghensuu gh}) async {
         roundBangou: i + 1,
         random: rnd,
         chiku: junban[i],
+        koekake: katachi == comScoutKatachiKoekake,
       );
     }
   } else {
@@ -1546,11 +1625,13 @@ String _univMeiNarabe(List<UnivData> sortedUnivData, Iterable<int> univids) =>
 /// 同じ選手に複数の大学が成立したときは「争奪戦」として、選手が進学先を選んだ形で出す
 /// (中は名声の重みの抽選だが、「抽選」という言葉は使わない。1.9.0)
 /// [horyuu] がtrue(地区めぐり)なら、交渉がまとまらなかったことを「保留」と書く(1.9.6)
+/// [koekake] がtrue(地区めぐり(声かけ))なら、「交渉」ではなく「声をかける」と書く(1.9.6。失敗はない)
 List<String> comScoutKekkaBun(
   List<ComScoutKekka> kekka,
   int myUnivid, {
   bool jibunNomi = false,
   bool horyuu = false,
+  bool koekake = false,
 }) {
   final List<UnivData> sortedUnivData = _sortedUnivData();
   final List<String> jibun = []; // プレイヤーの交渉
@@ -1570,9 +1651,14 @@ List<String> comScoutKekkaBun(
       if (k.seikou && k.kimariUnivid == myUnivid) {
         if (hokaSeikou.isNotEmpty) {
           jibun.add(
-            '【争奪戦を制した】$nameは${_univMeiNarabe(sortedUnivData, hokaSeikou)}とも'
-            '交渉が成立していましたが、$kodawarazuあなたの大学を選びました！',
+            koekake
+                ? '【争奪戦を制した】$nameには${_univMeiNarabe(sortedUnivData, hokaSeikou)}も'
+                      '声をかけていましたが、$kodawarazuあなたの大学を選びました！'
+                : '【争奪戦を制した】$nameは${_univMeiNarabe(sortedUnivData, hokaSeikou)}とも'
+                      '交渉が成立していましたが、$kodawarazuあなたの大学を選びました！',
           );
+        } else if (koekake) {
+          jibun.add('【確定】ほかに声をかけた大学はなく、$nameがあなたの大学に確定しました！');
         } else {
           jibun.add('【確定】$nameがあなたの大学に確定しました！');
           if (hokaKousyou.isNotEmpty) {
@@ -1584,8 +1670,11 @@ List<String> comScoutKekkaBun(
       } else if (k.seikou) {
         final String mei = _univMei(sortedUnivData, k.kimariUnivid);
         jibun.add(
-          '【争奪戦に敗れた】$nameは${_univMeiNarabe(sortedUnivData, hokaSeikou)}とも'
-          '交渉が成立していて、$kodawarazu$meiを選びました',
+          koekake
+              ? '【争奪戦に敗れた】$nameには${_univMeiNarabe(sortedUnivData, hokaSeikou)}も'
+                    '声をかけていて、$kodawarazu$meiを選びました'
+              : '【争奪戦に敗れた】$nameは${_univMeiNarabe(sortedUnivData, hokaSeikou)}とも'
+                    '交渉が成立していて、$kodawarazu$meiを選びました',
         );
       } else if (k.kimariUnivid >= 0) {
         // 失敗したが、同じラウンドでほかの大学との交渉が成立した
@@ -1669,10 +1758,12 @@ List<String> comScoutSoudatsusenBun(List<ComScoutKoudou> koudou, int myUnivid) {
 /// 「ラウンドの結果」の画面に出す、大学の行動の文
 /// [soudatsusen] を渡すと、争奪戦になった交渉は「争奪戦を制した」「争奪戦の末△△大学へ」と出す(1.9.0)
 /// [horyuu] がtrue(地区めぐり)なら、まとまらなかった交渉を「保留」と書く(1.9.6)
+/// [koekake] がtrue(地区めぐり(声かけ))なら、「交渉」ではなく「声かけ」と書く(1.9.6)
 String comScoutKoudouBun(
   ComScoutKoudou k, {
   Map<int, List<int>> soudatsusen = const {},
   bool horyuu = false,
+  bool koekake = false,
 }) {
   switch (k.shurui) {
     case comScoutKoudouKousyou:
@@ -1684,9 +1775,9 @@ String comScoutKoudouBun(
         kekka = soudatsu ? '確定(争奪戦を制した)' : '確定';
       } else {
         final String mei = _univMei(_sortedUnivData(), k.kimariUnivid);
-        kekka = '成立したが、争奪戦の末$meiへ';
+        kekka = koekake ? '争奪戦の末$meiへ' : '成立したが、争奪戦の末$meiへ';
       }
-      return '${k.senshuName}選手(5000m ${_timeMoji(k.senshuTime)})に交渉 → $kekka';
+      return '${k.senshuName}選手(5000m ${_timeMoji(k.senshuTime)})に${koekake ? '声かけ' : '交渉'} → $kekka';
     case comScoutKoudouMiokuri:
       return '狙う選手なし(見送り)';
     case comScoutKoudouUgokazu:

@@ -193,7 +193,7 @@ class SettingsQrProcessor {
       data['cg_seichou_type_wariai'] = seichouTypeWariai(currentGhensuu);
       // 13分台の新入生の限界突破の優遇(int) [85] (1.9.3で追加。成長タイプ設定の画面にある設定。joukai.dart)
       data['k_yobiint2_85'] = genkaitoppaYuuguuSettei(kantoku);
-      // コンピュータスカウトONのときのスカウトの形(int) [87] (1.9.6で追加。0=地区めぐり(初期値)・1=全国一斉。scout_com.dart)
+      // コンピュータスカウトONのときのスカウトの形(int) [87] (1.9.6で追加。0=地区めぐり(声かけ)(初期値)・1=全国一斉・2=地区めぐり(交渉)。scout_com.dart)
       data['k_yobiint2_87'] = kantoku.yobiint2.length > comScoutKatachiIndex
           ? kantoku.yobiint2[comScoutKatachiIndex]
           : 0;
@@ -678,7 +678,7 @@ class SettingsQrProcessor {
         genkaitoppaYuuguuIreru(kantoku, yobiint2_85);
       }
       // コンピュータスカウトONのときのスカウトの形(int) kantoku.yobiint2[87] (1.9.6)
-      //   0=地区めぐり(初期値)・1=全国一斉(古いQRコードには含まれていないので、そのときは今の設定のまま)
+      //   0=地区めぐり(声かけ)(初期値)・1=全国一斉・2=地区めぐり(交渉)(古いQRコードには含まれていないので、そのときは今の設定のまま)
       final dynamic yobiint2_87 = dataMap['k_yobiint2_87'];
       if (yobiint2_87 is int &&
           comScoutKatachiTadashii(yobiint2_87) &&

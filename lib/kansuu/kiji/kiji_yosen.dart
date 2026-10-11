@@ -1321,7 +1321,12 @@ Kiji? _yosenKojinKiji(YosenKekka e) {
   } else if (maeJ != null) {
     w.danraku('前回は個人${juniMoji(maeJ)}だった${myouji(t.s.name)}が、大きく順位を上げた。');
   } else if (t.s.gakunen == 1) {
-    w.danraku('${myouji(t.s.name)}は1年生。初めての予選で、いきなり頂点に立った。');
+    // 6月の11月駅伝予選を走った1年生は、正月駅伝予選が初めての予選ではない(1.9.7)
+    w.danraku(
+      yosenShussouKaisuu(k, t.s) == 0
+          ? '${myouji(t.s.name)}は1年生。初めての予選で、いきなり頂点に立った。'
+          : '${myouji(t.s.name)}は1年生。上級生を抑えて、予選の頂点に立った。',
+    );
   }
   // 因縁(1.9.4)
   final List<Innen> ti = yosenInnen(k, t.s, juni: 0, time: t.time);

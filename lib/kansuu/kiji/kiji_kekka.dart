@@ -1815,7 +1815,10 @@ Kiji? _jibunKiji(EkidenKekka e) {
             jijitsu: [
               w.erabu([
                 '最後の区間は区間${kj + 1}位。${kj <= n ~/ 3 ? '納得の走りで終われた' : '満足はしていないけど、出し切った'}',
-                '${ekidenShussouKaisuu(k, saigo).kaisuu + 1}回目の駅伝が、最後の駅伝になった',
+                // 前の学年の記録が欠けている選手は、回数が少なく出るので数を言わない(1.9.7)
+                kirokuKaketeiru(saigo)
+                    ? '最後の正月駅伝を、このチームで走れてよかった'
+                    : '${ekidenShussouKaisuu(k, saigo).kaisuu + 1}回目の駅伝が、最後の駅伝になった',
               ]),
             ],
           ),

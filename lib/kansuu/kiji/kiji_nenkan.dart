@@ -601,8 +601,12 @@ List<Kiji> gakunaiHyoushouKiji(KijiKankyou k) {
   if (kourou != null) {
     final SenshuData kr = kourou;
     w.koMidashi('功労賞　${w.senshu(kr)}');
+    // 前の学年の記録が欠けている選手(ゲームを始めた年の4年生など)は、回数が少なく出るので数を書かない(1.9.7)
+    final String kaisuuBun = kirokuKaketeiru(kr)
+        ? '駅伝でたすきをつなぎ${kourouKukanshou > 0 ? '、区間賞も取った' : '続けた'}'
+        : '4年間で駅伝を$kourouShussou度走り${kourouKukanshou > 0 ? '、区間賞を$kourouKukanshou度取った' : '、たすきをつなぎ続けた'}';
     w.danraku(
-      '功労賞は、この春卒業する${w.senshu(kr)}。4年間で駅伝を$kourouShussou度走り${kourouKukanshou > 0 ? '、区間賞を$kourouKukanshou度取った' : '、たすきをつなぎ続けた'}。'
+      '功労賞は、この春卒業する${w.senshu(kr)}。$kaisuuBun。'
       'レースの日も練習の日も、チームの中心にいた4年間だった。',
     );
     w.comment(senshuComment(w, CommentBamen.sotsugyou, myouji(kr.name)));

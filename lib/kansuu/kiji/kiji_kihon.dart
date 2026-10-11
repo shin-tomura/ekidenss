@@ -306,6 +306,29 @@ class Innen {
 /// 年度の中の大会の順(11月駅伝予選・10月駅伝・正月駅伝予選・11月駅伝・正月駅伝・カスタム駅伝)
 const List<int> _innenRaceJun = [3, 0, 4, 1, 2, 5];
 
+/// 選手[s]の前の学年に、記録の残っていない学年があるか(1.9.7)
+/// ゲームを始めた年の2〜4年生(2年目の3・4年生、3年目の4年生)や、QRコードでほかのデータから
+/// 迎えた選手は、ゲームを始める前の学年の出走の記録がない。そのような選手に「初めての駅伝」
+/// 「初めての予選」「○年目でやっと」と言い切ったり、駅伝を走った回数を少なく書いたりしないために使う。
+/// 対校戦(5000m・1万m・ハーフ)は毎年、全大学の全員が走るので、前の学年に対校戦の順位が
+/// 1つも残っていなければ、その学年の記録はないと見る(1年生は前の学年がないのでfalse)
+bool kirokuKaketeiru(SenshuData s) {
+  for (int g = 1; g < s.gakunen; g++) {
+    bool ari = false;
+    for (int race = 6; race <= 8; race++) {
+      if (s.kukanjuni_race.length <= race) continue;
+      if (s.kukanjuni_race[race].length < g) continue;
+      final int j = s.kukanjuni_race[race][g - 1];
+      if (j >= 0 && j < TEISUU.DEFAULTJUNI) {
+        ari = true;
+        break;
+      }
+    }
+    if (!ari) return true;
+  }
+  return false;
+}
+
 /// 選手[s]が、記事にする大会より前に駅伝(本戦。予選は除く)の区間を走った回数と、
 /// そのうち区間賞の回数(今の学年の、記事にする大会とそれより後の大会は除く)
 /// 学連選抜(オープン参加)で走った正月駅伝は、大学のチームの出走ではないので数えない(1.9.5)
@@ -435,8 +458,10 @@ List<Innen> senshuInnen(
     );
   }
   // 初めての駅伝(1年生だけの大会では、全員が初めてなので出さない)
+  // 前の学年の記録が欠けている選手(ゲームを始めた年の2〜4年生など)は、初めてか分からないので出さない(1.9.7)
   final ({int kaisuu, int kukanshou}) reki = ekidenShussouKaisuu(k, s);
-  if (reki.kaisuu == 0 && !k.ichinenDake) {
+  final bool kaketeiru = kirokuKaketeiru(s);
+  if (reki.kaisuu == 0 && !k.ichinenDake && !kaketeiru) {
     list.add(
       s.gakunen == 1
           ? Innen(
@@ -460,14 +485,22 @@ List<Innen> senshuInnen(
     );
   }
   // 区間賞を何度も取っている(今回も区間賞のとき)
+  // 前の学年の記録が欠けている選手は、回数が少なく出るので数を書かない(1.9.7)
   if (kj == 0 && reki.kukanshou >= 1) {
     list.add(
-      Innen(
-        InnenShurui.kukanshouTsuusan,
-        45,
-        '区間賞は通算${reki.kukanshou + 1}度目となった。',
-        '区間賞は${reki.kukanshou + 1}度目になるけど、毎回違う苦しさがある',
-      ),
+      kaketeiru
+          ? const Innen(
+              InnenShurui.kukanshouTsuusan,
+              45,
+              'これまでにも区間賞を取っており、また区間の頂点に立った。',
+              '区間賞は前にも取ったけど、毎回違う苦しさがある',
+            )
+          : Innen(
+              InnenShurui.kukanshouTsuusan,
+              45,
+              '区間賞は通算${reki.kukanshou + 1}度目となった。',
+              '区間賞は${reki.kukanshou + 1}度目になるけど、毎回違う苦しさがある',
+            ),
     );
   }
   // 4年生の最後の大会
@@ -677,19 +710,25 @@ List<Innen> yosenInnen(
     }
   }
   // 駅伝の本戦の出走歴
+  // 前の学年の記録が欠けている選手(ゲームを始めた年の2〜4年生など)は、回数が少なく出るので数を書かない(1.9.7)
+  final bool kaketeiru = kirokuKaketeiru(s);
   final ({int kaisuu, int kukanshou}) reki = ekidenShussouKaisuu(k, s);
   if (reki.kaisuu >= 1) {
     list.add(
       Innen(
         InnenShurui.honsenKeiken,
         40 + (reki.kukanshou >= 1 ? 10 : 0),
-        '駅伝の本戦は${reki.kaisuu}度走っている${reki.kukanshou >= 1 ? '(区間賞${reki.kukanshou}度)' : ''}。',
+        kaketeiru
+            ? '駅伝の本戦も走っている${reki.kukanshou >= 1 ? '(区間賞も獲得)' : ''}。'
+            : '駅伝の本戦は${reki.kaisuu}度走っている${reki.kukanshou >= 1 ? '(区間賞${reki.kukanshou}度)' : ''}。',
         kekka ? '本戦の舞台を知っている分、予選で終わるわけにはいかなかった' : '本戦の舞台を知っている分、予選で終わるわけにはいかない',
       ),
     );
   }
   // 初めての予選
-  if (yosenShussouKaisuu(k, s) == 0) {
+  // 前の学年の記録が欠けている選手は、初めてか分からないので出さない。2年生以上は、前の年にチームが
+  // 予選に出ていなかった(シード校だった)だけのこともあるので、選ばれなかったことを前提にしない言い方にする(1.9.7)
+  if (yosenShussouKaisuu(k, s) == 0 && !kaketeiru) {
     list.add(
       s.gakunen == 1
           ? Innen(
@@ -703,7 +742,7 @@ List<Innen> yosenInnen(
               InnenShurui.debut,
               50,
               kekka ? '${s.gakunen}年目で初めて走った駅伝予選だった。' : '${s.gakunen}年目で初めて走る駅伝予選になる。',
-              kekka ? '${s.gakunen}年目でやっと予選のメンバーに入れた。走れたこと自体がうれしい' : '${s.gakunen}年目でやっと予選のメンバーに入れた。全部出し切りたい',
+              kekka ? '初めての予選だったけど、本戦への切符のことだけを考えて走った' : '初めての予選。本戦への切符を、自分の走りでつかみたい',
               '${s.gakunen}年目で初めての予選で',
             ),
     );
@@ -1417,23 +1456,10 @@ int kukanHikakuShumoku(KijiKankyou k, int kk, List<SenshuData> hashiru) {
   return null;
 }
 
-/// 選手[s]が、記事にする対校戦より前に対校戦(5000m・1万m・ハーフ)を走った回数
-/// (学年ごとに残る順位から数える。今の学年の分は数えない)
-int taikousenShussouKaisuu(SenshuData s) {
-  int kaisuu = 0;
-  for (int g = 1; g < s.gakunen; g++) {
-    for (int race = 6; race <= 8; race++) {
-      if (s.kukanjuni_race.length <= race) continue;
-      if (s.kukanjuni_race[race].length < g) continue;
-      final int j = s.kukanjuni_race[race][g - 1];
-      if (j >= 0 && j < TEISUU.DEFAULTJUNI) kaisuu++;
-    }
-  }
-  return kaisuu;
-}
-
 /// 対校戦(5000m・1万m・ハーフ)の選手[s]の因縁(点の高い順。1.9.4)
 /// [juni] この種目の全体の順位(0が1位)。[kekka] 結果の記事ならtrue(文の時制が変わる)
+/// 対校戦は全大学の全員が毎年走るので、「初めての対校戦」は因縁にしない(1年生はみな初めてで、
+/// 2年生以上で初めてになるのは、ゲームを始める前の学年の記録がないときだけのため。1.9.7)
 List<Innen> taikousenInnen(KijiKankyou k, SenshuData s, {int? juni, bool kekka = true}) {
   final List<Innen> list = [];
   final int race = k.race;
@@ -1473,35 +1499,18 @@ List<Innen> taikousenInnen(KijiKankyou k, SenshuData s, {int? juni, bool kekka =
     }
   }
   // 駅伝の本戦の出走歴
+  // 前の学年の記録が欠けている選手(ゲームを始めた年の2〜4年生など)は、回数が少なく出るので数を書かない(1.9.7)
   final ({int kaisuu, int kukanshou}) reki = ekidenShussouKaisuu(k, s);
   if (reki.kaisuu >= 1) {
     list.add(
       Innen(
         InnenShurui.honsenKeiken,
         35 + (reki.kukanshou >= 1 ? 10 : 0),
-        '駅伝では${reki.kaisuu}度の本戦出走${reki.kukanshou >= 1 ? '(区間賞${reki.kukanshou}度)' : ''}がある。',
+        kirokuKaketeiru(s)
+            ? '駅伝では本戦を走った経験がある${reki.kukanshou >= 1 ? '(区間賞も獲得)' : ''}。'
+            : '駅伝では${reki.kaisuu}度の本戦出走${reki.kukanshou >= 1 ? '(区間賞${reki.kukanshou}度)' : ''}がある。',
         kekka ? '駅伝とは違うトラックの勝負。個人の戦いも楽しめた' : '駅伝とは違う個人の勝負。楽しみたい',
       ),
-    );
-  }
-  // 初めての対校戦
-  if (taikousenShussouKaisuu(s) == 0 && !k.ichinenDake) {
-    list.add(
-      s.gakunen == 1
-          ? Innen(
-              InnenShurui.debut,
-              40,
-              kekka ? 'これが初めての対校戦だった。' : 'これが初めての対校戦になる。',
-              kekka ? '初めての対校戦。上級生と一緒に走れて、自分の位置が分かった' : '初めての対校戦。怖がらずに上級生に挑みたい',
-              '初めての対校戦で',
-            )
-          : Innen(
-              InnenShurui.debut,
-              45,
-              kekka ? '${s.gakunen}年目で初めて走った対校戦だった。' : '${s.gakunen}年目で初めて走る対校戦になる。',
-              kekka ? '${s.gakunen}年目でやっと対校戦に出られた。走れたこと自体がうれしい' : '${s.gakunen}年目でやっと対校戦に出られる。全部出し切りたい',
-              '${s.gakunen}年目で初めての対校戦で',
-            ),
     );
   }
   // 4年生の最後の対校戦

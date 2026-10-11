@@ -854,11 +854,25 @@ Map<int, double> comScoutSeikouritsuIchiran({
 //   声かけ: 声かけで決まる新入生は年36人前後、争奪戦は年30回前後。声をかけないと大きく悪くなる。
 //     名声の高い大学は交渉より少し難しく(上手にして名声1位で9位前後、交渉は7.5位前後)、名声の低い大学は
 //     どのコンピュータの要件にも入らない選手を拾えるので、交渉より少し這い上がりやすい
+// ・地区めぐり(声かけ)の周回(1.9.6): 地区を1周したあと、設定の周回数(1周(初期値)・2周・3周・10周)まで、
+//   同じ地区の順番でもう一度回る。全員の進学先が決まれば、そこで終わる。進路未定の選手がいない地区は飛ばす。
+//   周回数のぶん回っても決まらなかった選手は、今までどおり最後に自ら志望する
+//   (積極性0%の大学などで終わらないことがないように、最大10周にした)。
+//   模擬計算では、全員が決まるまで回すと平均9周あまりかかり、最後の志望がなくなる分、上手に遊んでも
+//   少し難しくなる(名声1位で9.2位→9.7位、名声13位くらいで81位→95位前後)。目利き(裏をかく)の効き方は同じ
+// ・地区めぐり(声かけ)では、積極性(ラウンドごとに動く確率)を使わず、コンピュータの大学は毎回動く
+//   (1.9.6。成功率のない読み合いに、動くかどうかのさいころはなじまないため。お目当ての選手がいなければ
+//   見送り、枠がいっぱいなら動かないのは同じ)。積極性とラウンド回数は、全国一斉のときだけ使う
 // ------------------------------------------------------------
 
-/// KantokuData.yobiint2 の使用番号: コンピュータスカウトONのときのスカウトの形(1.9.6)
-/// 0=地区めぐり(声かけ)(初期値)・1=全国一斉・2=地区めぐり(交渉)
+/// KantokuData.yobiint2 の使用番号: コンピュータスカウトONのときのスカウトの形と、地区めぐり(声かけ)の周回数(1.9.6)
+/// 形 + 10 × 周回数のコード
+///   形: 0=地区めぐり(声かけ)(初期値)・1=全国一斉・2=地区めぐり(交渉)
+///   周回数のコード: 0=1周(初期値)・1=2周・2=3周・3=10周(comScoutShuukaiSuu)
 const int comScoutKatachiIndex = 87;
+
+/// 地区めぐり(声かけ)の周回数(周回数のコードの順。全員の進学先が決まれば、そこで終わる)
+const List<int> comScoutShuukaiSuu = [1, 2, 3, 10];
 
 /// スカウトの形(yobiint2[87]の値)
 const int comScoutKatachiKoekake = 0; // 地区めぐり(声かけ)
@@ -874,36 +888,64 @@ const bool comScoutKousyouEraberu = false;
 const List<String> comScoutKatachiMei = ['地区めぐり(声かけ)', '全国一斉', '地区めぐり(交渉)'];
 
 /// KantokuData.yobiint2 の使用番号: その年のスカウトの形の記録(1.9.6)
-/// 年×100 + 地区めぐりのお知らせを出したなら10 + 形(1=地区めぐり(交渉)・2=全国一斉・3=地区めぐり(声かけ))。
-/// 0は記録なし
+/// 周回数のコード×1億 + 年×100 + 地区めぐりのお知らせを出したなら10 + 形(1=地区めぐり(交渉)・2=全国一斉・
+/// 3=地区めぐり(声かけ))。0は記録なし(周回数は上の桁にしたので、周回数を入れる前の開発中の記録もそのまま読める)
 const int comScoutNendoIndex = 88;
+
+/// その年の形の記録で、周回数のコードの位
+const int _nendoShuukaiKurai = 100000000;
 
 /// 地区めぐりの成功率の下限の上限(タイム順位による上限の一番大きい値と同じ)
 const double _kagenJougen = 0.75;
 
+/// スカウトの形が選べる形かどうか(地区めぐり(交渉)を選べないときは、0と1だけ)
+bool _katachiEraberu(int katachi) =>
+    katachi == comScoutKatachiKoekake ||
+    katachi == comScoutKatachiZenkoku ||
+    (katachi == comScoutKatachiKousyou && comScoutKousyouEraberu);
+
+/// yobiint2[87]の値(0未満は0)
+int _katachiAtai(List<int> yobiint2) {
+  if (yobiint2.length <= comScoutKatachiIndex) return 0;
+  final int v = yobiint2[comScoutKatachiIndex];
+  return v < 0 ? 0 : v;
+}
+
 /// スカウトの形の設定(0=地区めぐり(声かけ)・1=全国一斉・2=地区めぐり(交渉)。ONかどうかは見ない)
 /// (地区めぐり(交渉)を選べないときは、2なら声かけを返す)
 int comScoutKatachiSettei(KantokuData kantoku) {
-  if (kantoku.yobiint2.length <= comScoutKatachiIndex) {
-    return comScoutKatachiKoekake;
-  }
-  final int v = kantoku.yobiint2[comScoutKatachiIndex];
-  return comScoutKatachiTadashii(v) ? v : comScoutKatachiKoekake;
+  final int katachi = _katachiAtai(kantoku.yobiint2) % 10;
+  return _katachiEraberu(katachi) ? katachi : comScoutKatachiKoekake;
 }
 
-/// スカウトの形をyobiint2のリストに書き込む(保存は呼び出し側で行う)
+/// 地区めぐり(声かけ)の周回数のコードの設定(0=1周(初期値)・1=2周・2=3周・3=10周)
+int comScoutShuukaiCodeSettei(KantokuData kantoku) {
+  final int code = (_katachiAtai(kantoku.yobiint2) ~/ 10) % 10;
+  return code < comScoutShuukaiSuu.length ? code : 0;
+}
+
+/// スカウトの形をyobiint2のリストに書き込む(周回数はそのまま。保存は呼び出し側で行う)
 void comScoutKatachiKaku(List<int> yobiint2, int katachi) {
   if (yobiint2.length <= comScoutKatachiIndex) return;
-  if (!comScoutKatachiTadashii(katachi)) return;
-  yobiint2[comScoutKatachiIndex] = katachi;
+  if (!_katachiEraberu(katachi)) return;
+  final int v = _katachiAtai(yobiint2);
+  yobiint2[comScoutKatachiIndex] = (v ~/ 10) * 10 + katachi;
 }
 
-/// スカウトの形の値が、正しい形かどうか(各種設定のQRコードから読んだ値にも使う)
-/// (地区めぐり(交渉)を選べないときは、0と1だけ)
+/// 地区めぐり(声かけ)の周回数のコードをyobiint2のリストに書き込む(形はそのまま。保存は呼び出し側で行う)
+void comScoutShuukaiCodeKaku(List<int> yobiint2, int code) {
+  if (yobiint2.length <= comScoutKatachiIndex) return;
+  if (code < 0 || code >= comScoutShuukaiSuu.length) return;
+  final int v = _katachiAtai(yobiint2);
+  yobiint2[comScoutKatachiIndex] = code * 10 + v % 10;
+}
+
+/// yobiint2[87]の値(形+10×周回数のコード)が、正しい形かどうか(各種設定のQRコードから読んだ値に使う)
+/// (地区めぐり(交渉)を選べないときは、形は0と1だけ)
 bool comScoutKatachiTadashii(int v) =>
-    v == comScoutKatachiKoekake ||
-    v == comScoutKatachiZenkoku ||
-    (v == comScoutKatachiKousyou && comScoutKousyouEraberu);
+    v >= 0 &&
+    v < 10 * comScoutShuukaiSuu.length &&
+    _katachiEraberu(v % 10);
 
 /// その年の形の記録のコード(1=交渉・2=全国一斉・3=声かけ)を、スカウトの形(yobiint2[87]の値)にする
 int _nendoCodeKatachi(int code) {
@@ -938,9 +980,18 @@ int _nendoKiroku(KantokuData kantoku) {
 /// 今年の新入生スカウトの形(スカウトを始めたときの形。記録がなければ全国一斉。OFFのときも全国一斉)
 int comScoutKotoshiKatachi(KantokuData kantoku, int nen) {
   if (!isComScoutOn(kantoku)) return comScoutKatachiZenkoku;
-  final int v = _nendoKiroku(kantoku);
+  final int v = _nendoKiroku(kantoku) % _nendoShuukaiKurai;
   if (v ~/ 100 != nen) return comScoutKatachiZenkoku;
   return _nendoCodeKatachi(v % 10);
+}
+
+/// 今年の新入生スカウトの周回数(地区めぐり(声かけ)で、スカウトを始めたときの周回数。ほかの形は1)
+int comScoutKotoshiShuukai(KantokuData kantoku, int nen) {
+  if (comScoutKotoshiKatachi(kantoku, nen) != comScoutKatachiKoekake) return 1;
+  final int code = _nendoKiroku(kantoku) ~/ _nendoShuukaiKurai;
+  return (code >= 0 && code < comScoutShuukaiSuu.length)
+      ? comScoutShuukaiSuu[code]
+      : 1;
 }
 
 /// 今年の新入生スカウトが地区めぐり(声かけか交渉)か
@@ -959,8 +1010,8 @@ void comScoutOshiraseKaku(KantokuData kantoku) {
 }
 
 /// 新入生スカウトを始めるときの回数(4月5日の処理で、スカウトの画面を出す前に呼ぶ。1.9.6)
-/// ONなら今年のスカウトの形を覚えて保存し、地区めぐり(声かけ・交渉)なら新入生のいる地区の数、
-/// 全国一斉なら設定のラウンド回数を返す。OFFなら今まで通り3回
+/// ONなら今年のスカウトの形(と周回数)を覚えて保存し、地区めぐりなら新入生のいる地区の数
+/// (声かけは、それに周回数を掛けた数)、全国一斉なら設定のラウンド回数を返す。OFFなら今まで通り3回
 Future<int> comScoutKaishi({
   required Ghensuu gh,
   required KantokuData kantoku,
@@ -971,12 +1022,32 @@ Future<int> comScoutKaishi({
   }
   final int katachi = comScoutKatachiSettei(kantoku);
   final int oshirase = comScoutOshiraseZumi(kantoku) ? 10 : 0;
+  final int shuukaiCode = katachi == comScoutKatachiKoekake
+      ? comScoutShuukaiCodeSettei(kantoku)
+      : 0;
   kantoku.yobiint2[comScoutNendoIndex] =
-      gh.year * 100 + oshirase + _katachiNendoCode(katachi);
+      shuukaiCode * _nendoShuukaiKurai +
+      gh.year * 100 +
+      oshirase +
+      _katachiNendoCode(katachi);
   await kantoku.save();
   if (katachi == comScoutKatachiZenkoku) return comScoutKaisuu(kantoku);
-  return comScoutChikuJunban(gh.year).length;
+  return comScoutChikuJunban(gh.year).length *
+      comScoutShuukaiSuu[shuukaiCode];
 }
+
+/// 地区めぐりで、その地区に進路未定の日本人の新入生がいるか(周回の2周目から、いない地区は飛ばす。1.9.6)
+bool comScoutChikuMiteiAri(List<SenshuData> shinnyuusei, int chiku) =>
+    shinnyuusei.any(
+      (s) =>
+          s.hirou != 1 &&
+          !comScoutKettei(s) &&
+          comScoutSenshuChiku(s) == chiku,
+    );
+
+/// 進路未定の日本人の新入生がいるか(いなければ、周回の途中でもスカウトは終わり。1.9.6)
+bool comScoutMiteiAri(List<SenshuData> shinnyuusei) =>
+    shinnyuusei.any((s) => s.hirou != 1 && !comScoutKettei(s));
 
 /// 地区の名前(0〜10)
 String comScoutChikuMei(int chiku) =>
@@ -1296,7 +1367,8 @@ Future<List<ComScoutKekka>> comScoutRound({
         );
         continue; // 枠がいっぱい
       }
-      if (rnd.nextInt(100) >= sekkyoku) {
+      // (地区めぐり(声かけ)では積極性を使わず、毎回動く。1.9.6)
+      if (!koekake && rnd.nextInt(100) >= sekkyoku) {
         memo[univ.id] = _KoudouMemo(
           shurui: comScoutKoudouUgokazu,
           riyuu: m.riyuu,
@@ -1586,7 +1658,8 @@ Future<Map<int, int>> comScoutShigan({
 
 /// スキップ中のスカウト(ONなら、コンピュータだけで全ラウンドを行い、最後の志望まで済ませる)
 /// 4月5日の処理(年度替わり)の最後に呼ぶ
-/// 地区めぐり(声かけ・交渉)なら、その年の地区の順番に1ラウンドずつ行う(1.9.6。形は設定のものを使う)
+/// 地区めぐり(声かけ・交渉)なら、その年の地区の順番に1ラウンドずつ行う(1.9.6。形は設定のものを使う。
+/// 声かけは設定の周回数まで回る)
 Future<void> comScoutSkip({required Ghensuu gh}) async {
   final KantokuData? kantoku = Hive.box<KantokuData>(
     'kantokuBox',
@@ -1595,14 +1668,25 @@ Future<void> comScoutSkip({required Ghensuu gh}) async {
   final Random rnd = Random();
   final int katachi = comScoutKatachiSettei(kantoku);
   if (katachi != comScoutKatachiZenkoku) {
+    final bool koekake = katachi == comScoutKatachiKoekake;
     final List<int> junban = comScoutChikuJunban(gh.year);
-    for (int i = 0; i < junban.length; i++) {
+    // 声かけは設定の周回数まで回る(全員が決まれば終わり、進路未定の選手がいない地区は飛ばす。1.9.6)
+    final int shuukai = koekake
+        ? comScoutShuukaiSuu[comScoutShuukaiCodeSettei(kantoku)]
+        : 1;
+    for (int i = 0; i < junban.length * shuukai; i++) {
+      final List<SenshuData> shinnyuusei = comScoutShinnyuusei();
+      if (!comScoutMiteiAri(shinnyuusei)) break;
+      final int chiku = junban[i % junban.length];
+      if (i >= junban.length && !comScoutChikuMiteiAri(shinnyuusei, chiku)) {
+        continue;
+      }
       await comScoutRound(
         gh: gh,
         roundBangou: i + 1,
         random: rnd,
-        chiku: junban[i],
-        koekake: katachi == comScoutKatachiKoekake,
+        chiku: chiku,
+        koekake: koekake,
       );
     }
   } else {

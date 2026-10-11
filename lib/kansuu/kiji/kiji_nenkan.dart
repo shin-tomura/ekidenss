@@ -212,6 +212,9 @@ List<Kiji> nenkanHyoushouKiji(KijiKankyou k) {
     }
   }
   if (yakushinAge < 2) yakushin = null;
+  // どの大学にも昨年の正月駅伝の順位が残っていない年(ゲームを始めた年度)は、比べるものがないので出さない
+  // (全大学が昨年不出場の扱いになり、優勝校が「昨年は出場できなかったが」と書かれていたため。1.9.7)
+  if (!k.univ.any((u) => shutsujouJuni(juniRace(u, 2, 1)))) yakushin = null;
   // ベストパフォーマンス賞(今季の区間賞の中で、2位との差が距離あたりで一番大きかった走り)
   SenshuData? bestRun;
   int bestRace = -1;

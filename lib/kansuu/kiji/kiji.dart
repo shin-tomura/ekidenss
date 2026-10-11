@@ -89,6 +89,35 @@ List<Kiji> kijiJikkyouIchiran() {
   }
 }
 
+/// 学内メディアの区間ごとの速報(1.9.7。自分の大学の選手を追う。終わったばかりの区間が先頭。
+/// 結果画面(mode 700)では大会が終わっているので、昨年の記録の見方を結果の記事と同じにする)
+List<Kiji> kijiGakunaiSokuhouIchiran() {
+  try {
+    final Ghensuu? gh = Hive.box<Ghensuu>('ghensuuBox').getAt(0);
+    if (gh == null) return [];
+    final bool owatta = gh.mode == 700;
+    final KijiKankyou? k = KijiKankyou.yomu(kekka: owatta);
+    if (k == null || !k.ekiden) return [];
+    final List<Kiji> list = gakunaiSokuhouKiji(k, owatta: owatta);
+    _log(list);
+    return list;
+  } catch (e, st) {
+    debugPrint('[ニュース記事] 学内メディアの速報を作れませんでした: $e\n$st');
+    return [];
+  }
+}
+
+/// レース画面の「実況・速報」のカードで、見出しを予告する記事(1.9.7)
+/// 記事の画面で最初に開くサイトと同じ順(自分の大学が走っていれば学内メディアの速報、
+/// 正月駅伝で学連選抜がいれば学連選抜通信の速報、それ以外は箱庭スポーツ中継)
+List<Kiji> kijiJikkyouSokuhouIchiran() {
+  final List<Kiji> gakunai = kijiGakunaiSokuhouIchiran();
+  if (gakunai.isNotEmpty) return gakunai;
+  final List<Kiji> gakuren = kijiGakurenSokuhouIchiran();
+  if (gakuren.isNotEmpty) return gakuren;
+  return kijiJikkyouIchiran();
+}
+
 /// 表示中の大会のスタート直前号(当日変更のあと。駅伝だけ)
 List<Kiji> kijiChokuzenIchiran() {
   try {

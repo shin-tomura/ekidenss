@@ -73,10 +73,12 @@ class KijiBan {
 }
 
 /// 学内メディアの記事を、サイト1つ分にする(記事がなければ空。箱庭スポーツと並べるとき)
+/// [sokuhou] 区間ごとの速報のとき(切り替えのボタンを「○○スポーツ・速報」にして、結果号と分ける。1.9.7)
 List<KijiBan> _gakunaiBan(
   List<Kiji> list, {
   required String sub,
   required bool kekka,
+  bool sokuhou = false,
 }) {
   if (list.isEmpty) return [];
   return [
@@ -86,6 +88,7 @@ List<KijiBan> _gakunaiBan(
       list: list,
       kekka: kekka,
       gakunai: true,
+      kirikaeMei: sokuhou ? '${list.first.site}・速報' : null,
     ),
   ];
 }
@@ -135,6 +138,14 @@ void kijiKekkaHiraku(BuildContext context) {
     ),
     ..._gakurenBan(kijiGakurenKekkaIchiran(), sub: '学連選抜・結果号', kekka: true),
     if (jikkyou.isNotEmpty) _jikkyouBan(jikkyou),
+    // 区間ごとの速報(学内メディアと学連選抜通信。1.9.7)
+    if (jikkyou.isNotEmpty)
+      ..._gakunaiBan(
+        kijiGakunaiSokuhouIchiran(),
+        sub: '陸上競技部・区間ごとの速報',
+        kekka: true,
+        sokuhou: true,
+      ),
     if (jikkyou.isNotEmpty)
       ..._gakurenBan(
         kijiGakurenSokuhouIchiran(),
@@ -156,10 +167,18 @@ KijiBan _jikkyouBan(List<Kiji> list) {
   );
 }
 
-/// 駅伝の実況を開く(レース画面の、区間が終わったあとの指示の画面から。1.9.4)
-/// 正月駅伝なら、学連選抜通信の区間ごとの速報も切り替えて読める(最初に開く。1.9.7)
+/// 駅伝の実況を開く(レース画面の、区間が終わったあとの指示の画面の「実況・速報」から。1.9.4)
+/// 1.9.7から、学内メディアと学連選抜通信の区間ごとの速報も切り替えて読める。
+/// 自分に関係のある記事がすぐ読めるように、最初に開くのは、自分の大学が走っていれば学内メディアの速報、
+/// 正月駅伝で学連選抜がいれば学連選抜通信の速報、それ以外は箱庭スポーツ中継(記事のある最初のサイト)
 void kijiJikkyouHiraku(BuildContext context) {
   _hiraku(context, [
+    ..._gakunaiBan(
+      kijiGakunaiSokuhouIchiran(),
+      sub: '陸上競技部・区間ごとの速報',
+      kekka: true,
+      sokuhou: true,
+    ),
     ..._gakurenBan(
       kijiGakurenSokuhouIchiran(),
       sub: '学連選抜・区間ごとの速報',

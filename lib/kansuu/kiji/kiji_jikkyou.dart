@@ -8,6 +8,7 @@ import 'package:ekiden/kansuu/ikku_pace.dart';
 import 'package:ekiden/kansuu/kiji/kiji_kihon.dart';
 import 'package:ekiden/kansuu/kiji/kiji_comment.dart';
 import 'package:ekiden/kansuu/koukou.dart'; // 出身校(高校の同期対決。1.9.5)
+import 'package:ekiden/kansuu/kiji/kiji_gakunai.dart' show gakunaiSiteMei, gakunaiKishaMei; // 学内メディアの速報(1.9.7)
 
 // ------------------------------------------------------------
 // 駅伝の実況「箱庭スポーツ中継」(1.9.4。レース画面の「実況」のカードと、結果画面の記事の画面)
@@ -1857,4 +1858,307 @@ void _sanshouToInterview(
       ])}」',
     );
   }
+}
+
+// ------------------------------------------------------------
+// 学内メディアの区間ごとの速報(1.9.7)
+// ・自分の大学の学内メディア「○○スポーツ」が、自分の大学の選手を追う速報。区間が終わるたびに1本
+//   (レース画面の「実況・速報」のカードと、結果画面の記事の画面の切り替えで読める)
+// ・実況と同じ途中経過(_kukanKoma)と補正の説明の読み取り(_hashiriYomu)を使い、学生記者が書く常体の速報にする。
+//   見出し・区間の走り(指示の成否・1区の集団のペース・順位の上げ下げ・見えている能力)・差・因縁・
+//   中継所での一言・次の走者・ここまでの区間成績の表
+// ・目標順位は正月駅伝の6区のスタート前に決め直せるので、目標との比べは、読んだときの一番新しい区間の
+//   速報だけに書く(前の区間の速報を読み返したときに、そのときと違う目標で書かないように)
+// ・正月駅伝の往路を終えた直後(復路の当日変更の前)は、6区の選手の名前を出さない(実況と同じ)
+// ・レース中は大学の順位の記録がまだ昨年のままなので、因縁は実況と同じく owatta で読む。
+//   ただし、時制の変わる因縁(初めての駅伝・最後の大会)の文と、因縁の話し言葉は使わない
+// ------------------------------------------------------------
+
+/// 学内メディアの区間ごとの速報(終わったばかりの区間が先頭。自分の大学が出ていなければ空)
+List<Kiji> gakunaiSokuhouKiji(KijiKankyou k, {required bool owatta}) {
+  if (!k.ekiden) return [];
+  final UnivData? myU = k.jibunUniv;
+  if (myU == null || !k.shutsujou(myU)) return [];
+  final int ks = k.kukansuu;
+  final int done = k.gh.nowracecalckukan < ks ? k.gh.nowracecalckukan : ks;
+  if (done <= 0) return [];
+  final String site = gakunaiSiteMei(myU);
+  // 区間ごとの途中経過(表でも使うので、一度だけ作る)
+  final List<List<_Koma>> junList = [
+    for (int kk = 0; kk < done; kk++) _kukanKoma(k, kk),
+  ];
+  final List<Kiji> list = [];
+  for (int kk = done - 1; kk >= 0; kk--) {
+    final Kiji? kiji = _gakunaiSokuhou(
+      k,
+      kk,
+      junList,
+      site: site,
+      owatta: owatta,
+      saishin: kk == done - 1,
+    );
+    if (kiji != null) list.add(kiji);
+  }
+  return list;
+}
+
+/// 途中経過の中の自分の大学(なければnull)
+_Koma? _jibunKoma(KijiKankyou k, List<_Koma> jun) {
+  for (final _Koma x in jun) {
+    if (x.u.id == k.gh.MYunivid) return x;
+  }
+  return null;
+}
+
+/// 区間[kk]の学内メディアの速報([saishin] 読んだときの一番新しい区間か。目標との比べはそのときだけ書く)
+Kiji? _gakunaiSokuhou(
+  KijiKankyou k,
+  int kk,
+  List<List<_Koma>> junList, {
+  required String site,
+  required bool owatta,
+  required bool saishin,
+}) {
+  final List<_Koma> jun = junList[kk];
+  if (jun.isEmpty) return null;
+  final _Koma? my = _jibunKoma(k, jun);
+  if (my == null || my.s == null) return null;
+  final SenshuData s = my.s!;
+  final int race = k.race;
+  final int ks = k.kukansuu;
+  final int n = jun.length;
+  final bool saigo = kk == ks - 1;
+  final bool ouroOwari = race == 2 && ks >= 6 && kk == 4;
+  final KijiKakite w = KijiKakite(k, kijiTane(k.gh, race, 260 + kk));
+  final _Hashiri h = _hashiriYomu(s, kk);
+  final int kj = my.kukanJuni;
+  final int d = kk == 0 ? 0 : my.tuukaMae - my.tuuka;
+  final bool yoi = kj <= n ~/ 3;
+  final bool kurushii = n >= 6 && kj >= (n * 3) ~/ 4;
+  final String kukanMei = kukanYobikata(k.gh, race, kk, ks);
+  final String kyori = kmMoji(k.gh.kyori_taikai_kukangoto[race][kk]);
+  // シード権のライン(11月駅伝8校・正月駅伝10校。出場校がそれより少なければ争いなし)
+  final int seedSuu = race == 1 ? 8 : (race == 2 ? 10 : 0);
+  final bool seedAri = seedSuu > 0 && n > seedSuu;
+  final int mokuhyou = my.u.mokuhyojuni.length > race ? my.u.mokuhyojuni[race] : -1;
+  final bool mokuhyouAri = mokuhyou >= 0 && mokuhyou < n;
+  final _Koma shui = jun[0];
+
+  // 見出し
+  final String hyouka = kj == 0
+      ? '区間賞の快走'
+      : (d >= 3
+            ? '$d人抜きの力走'
+            : (yoi
+                  ? '区間${juniMoji(kj)}の好走'
+                  : (kurushii ? '区間${juniMoji(kj)}と苦しむ' : '区間${juniMoji(kj)}')));
+  String midashi =
+      '【${kk + 1}区】${myouji(s.name)}、$hyouka　'
+      '${saigo ? '${juniMoji(my.tuuka)}でゴール' : '${juniMoji(my.tuuka)}で${kk + 2}区へ'}';
+  if (saigo && seedAri) {
+    if (my.tuuka < seedSuu) {
+      midashi += '　シード権確保';
+    } else if (my.tuuka <= seedSuu + 2) {
+      midashi += '　シード権に届かず';
+    }
+  }
+
+  // リード
+  final String yobi = w.senshu(s);
+  final String lead = kk == 0
+      ? '$kukanMei($kyori)を任された$yobiは、区間${juniMoji(kj)}(${jikanMoji(my.kukanTime)})で走り、'
+            '${juniMoji(my.tuuka)}でたすきをつないだ。'
+      : '$kukanMei($kyori)。${juniMoji(my.tuukaMae)}でたすきを受けた$yobiは、'
+            '区間${juniMoji(kj)}(${jikanMoji(my.kukanTime)})で走り、'
+            '${juniMoji(my.tuuka)}で${saigo ? 'ゴールした' : 'たすきをつないだ'}。';
+
+  // 本文: 区間の走り
+  final String y = w.senshu(s); // 2回目からは名字
+  final StringBuffer sb = StringBuffer();
+  if (kk == 0) {
+    if (h.siji == 1 && h.seikou != null) {
+      // 指示での飛び出しか、指示なしで自ら飛び出したか
+      final String mae = s.sijiflag == 1 ? '指示どおりスタート直後に飛び出し' : 'スタート直後に自ら飛び出し';
+      sb.write(h.seikou! ? '$yは$mae、狙いどおりの展開に持ち込んだ。' : '$yは$maeたが、後半は苦しい走りになった。');
+    } else if (h.shuudan.isNotEmpty) {
+      if (h.shuudan.contains('速すぎた')) {
+        sb.write('$yは速い集団のペースについていき、後半に大きく失速した。');
+      } else if (h.shuudan.contains('遅かった')) {
+        sb.write('$yにとって集団のペースは遅く、持ち味を出し切れなかった。');
+      } else if (h.shuudan.contains('少しタイム得')) {
+        sb.write('$yは集団の流れにうまく乗った。');
+      } else if (h.shuudan.contains('免れた')) {
+        sb.write('$yは速い流れに最後まで食らいついた。');
+      } else if (h.shuudan.contains('自分で作った')) {
+        sb.write('$yが自ら集団を引っ張った。');
+      }
+    }
+  } else {
+    if (h.siji == 1 && h.seikou != null) {
+      sb.write(h.seikou! ? '前半から突っ込む指示に、$yはしっかり応えた。' : '前半から突っ込む指示だったが、$yは後半に苦しんだ。');
+    } else if (h.siji == 2 && h.seikou != null) {
+      sb.write(h.seikou! ? '前半を抑える指示どおり、$yは後半に伸びた。' : '前半を抑える指示だったが、$yは思うように上げられなかった。');
+    } else if (h.aseri) {
+      sb.write('目標順位を下回ってたすきを受けた$yは、前半から突っ込み、後半にその分が響いた。');
+    } else if (h.hitoiki) {
+      sb.write('目標順位を上回る位置でたすきを受けた$yは、少し気持ちが緩んだか。');
+    }
+    if (d >= 3) {
+      sb.write('$d人を抜く力走で、${juniMoji(my.tuukaMae)}から${juniMoji(my.tuuka)}に浮上した。');
+    } else if (d > 0) {
+      sb.write('${juniMoji(my.tuukaMae)}から${juniMoji(my.tuuka)}に順位を上げた。');
+    } else if (d == 0) {
+      sb.write('${juniMoji(my.tuuka)}を守った。');
+    } else {
+      sb.write('${juniMoji(my.tuukaMae)}から${juniMoji(my.tuuka)}に順位を落としたが、最後までたすきを運んだ。');
+    }
+  }
+  if (kj == 0) sb.write('見事な区間賞だった。');
+  // 見えている能力(補正の説明)と、分析で際立っていた能力(数字は書かない)
+  if (yoi && h.tsuyomi != null && h.tsuyomi!.juni <= 3) {
+    sb.write('${h.tsuyomi!.mei}はこの区間の選手の中で${h.tsuyomi!.juni}番目で、それが走りに表れた。');
+  } else if (yoi && h.kiwaYoi != null) {
+    sb.write('${h.kiwaYoi}が、この区間の選手の中で際立っていた。');
+  } else if (kurushii && h.yowami != null && h.yowami!.juni >= n - 2) {
+    sb.write('${h.yowami!.mei}で差をつけられ、この区間との相性に苦しんだ。');
+  } else if (kurushii && h.kiwaWarui != null) {
+    sb.write('${h.kiwaWarui}で差をつけられ、この区間との相性に苦しんだ。');
+  }
+  w.danraku(sb.toString());
+
+  // 本文: トップ・目標・シード権との差
+  final List<String> saList = [];
+  if (my.tuuka > 0) {
+    saList.add('トップの${shui.mei}とは${kinsaMoji(saByou(my.ruikei, shui.ruikei))}');
+  }
+  if (saishin && mokuhyouAri && my.tuuka != mokuhyou) {
+    final _Koma line = jun[mokuhyou];
+    saList.add(
+      my.tuuka < mokuhyou
+          ? '目標の${juniMoji(mokuhyou)}の${line.mei}に${saMoji(saByou(line.ruikei, my.ruikei))}先行'
+          : '目標の${juniMoji(mokuhyou)}の${line.mei}まで${kinsaMoji(saByou(my.ruikei, line.ruikei))}',
+    );
+  }
+  if (seedAri && my.tuuka >= seedSuu) {
+    saList.add('シード権の${juniMoji(seedSuu - 1)}まで${kinsaMoji(saByou(my.ruikei, jun[seedSuu - 1].ruikei))}');
+  } else if (seedAri && !saigo && my.tuuka < seedSuu && my.tuuka >= seedSuu - 2) {
+    saList.add('シード圏外の${juniMoji(seedSuu)}の${jun[seedSuu].mei}とは${kinsaMoji(saByou(jun[seedSuu].ruikei, my.ruikei))}');
+  }
+  if (saList.isNotEmpty) w.danraku('${saList.join('、')}。');
+
+  // 本文: 因縁(時制の変わる初めての駅伝・最後の大会は使わない)と4年生
+  final List<Innen> mi = [
+    for (final Innen i in senshuInnen(k, s, kk, kj: kj, kekka: owatta))
+      if (i.shurui != InnenShurui.debut && i.shurui != InnenShurui.saigo) i,
+  ];
+  final StringBuffer ib = StringBuffer();
+  if (mi.isNotEmpty && mi.first.ten >= 45) ib.write('$y。${mi.first.bun}');
+  if (s.gakunen == 4) {
+    ib.write(race == 2 ? '最後の正月駅伝を走り終えた。' : '4年生として最後の${k.raceMei}を走り終えた。');
+  }
+  w.danraku(ib.toString());
+
+  // 中継所での一言
+  final CommentBamen bamen = kj == 0
+      ? CommentBamen.kukanshou
+      : (d >= 3
+            ? CommentBamen.oinuki
+            : (kurushii
+                  ? CommentBamen.brake
+                  : (s.gakunen == 4 && saigo && race == 2
+                        ? CommentBamen.yonenSaigo
+                        : (s.gakunen == 1 && yoi && !k.ichinenDake
+                              ? CommentBamen.ichinenKousou
+                              : CommentBamen.gakunaiKekka))));
+  final String jijitsu = kurushii
+      ? '区間${juniMoji(kj)}。チームに申し訳ない'
+      : (yoi
+            ? '区間${juniMoji(kj)}。自分の役目は果たせたと思う'
+            : (saigo ? '区間${juniMoji(kj)}。最後まで出し切った' : '区間${juniMoji(kj)}。次の${kk + 2}区に、少しでもいい位置で渡したかった'));
+  w.comment(
+    senshuCommentJijitsu(
+      w,
+      bamen,
+      myouji(s.name),
+      jijitsu: [jijitsu],
+      kuyashii: kurushii,
+    ),
+  );
+
+  // 本文: 次の走者(最終区はゴール)
+  if (!saigo) {
+    // 正月駅伝の往路を終えた直後のレース画面は、まだ復路の当日変更の前
+    final bool fukuroMae = ouroOwari && !owatta && k.gh.nowracecalckukan == kk + 1;
+    w.koMidashi(ouroOwari ? '往路を終えて' : '次は${kk + 2}区');
+    final StringBuffer nb = StringBuffer();
+    if (ouroOwari) nb.write('${my.mei}は往路を${juniMoji(my.tuuka)}で終えた。');
+    SenshuData? t;
+    for (final SenshuData x in k.senshu) {
+      if (x.univid == my.u.id && k.entry(x) == kk + 1) {
+        t = x;
+        break;
+      }
+    }
+    if (fukuroMae) {
+      nb.write('復路は、当日変更のあとの6区から始まる。');
+    } else if (t != null) {
+      nb.write(
+        '${ouroOwari ? '復路の' : ''}${kukanYobikata(k.gh, race, kk + 1, ks)}'
+        '(${kmMoji(k.gh.kyori_taikai_kukangoto[race][kk + 1])})は${w.senshu(t)}。',
+      );
+      final int idx = kukanKihonShumoku(k.gh, race, kk + 1);
+      final double bt = k.jikoBest(t, idx);
+      if (bt < TEISUU.DEFAULTTIME) {
+        final int gj = idx < t.gakunaijuni_bestkiroku.length
+            ? t.gakunaijuni_bestkiroku[idx]
+            : TEISUU.DEFAULTJUNI;
+        nb.write(
+          '${kijiShumokuMei[idx]}の持ちタイムは${jikanMoji(bt)}'
+          '${(gj >= 0 && gj < TEISUU.DEFAULTJUNI) ? '(チーム内${gj + 1}位)' : ''}。',
+        );
+      }
+      if (t.gakunen == 4) {
+        nb.write(race == 2 ? '最後の正月駅伝に挑む4年生だ。' : '4年生にとっては、最後の${k.raceMei}になる。');
+      }
+    }
+    w.danraku(nb.toString());
+  } else {
+    w.koMidashi('ゴール');
+    final StringBuffer gb = StringBuffer();
+    gb.write('${my.mei}は総合${juniMoji(my.tuuka)}でゴールした。');
+    if (saishin && mokuhyouAri) {
+      gb.write(my.tuuka <= mokuhyou ? '目標の${juniMoji(mokuhyou)}以内を達成した。' : '目標の${juniMoji(mokuhyou)}には届かなかった。');
+    }
+    if (seedAri) gb.write(my.tuuka < seedSuu ? 'シード権を確保した。' : 'シード権には届かなかった。');
+    gb.write('詳しくは、結果号でお伝えする。');
+    w.danraku(gb.toString());
+  }
+
+  // 表: ここまでの区間成績
+  final List<List<String>> gyou = [];
+  for (int i = 0; i <= kk; i++) {
+    final _Koma? x = _jibunKoma(k, junList[i]);
+    if (x == null) continue;
+    gyou.add([
+      '${i + 1}区',
+      x.s == null ? '-' : '${fullMei(x.s!.name)}(${x.s!.gakunen})',
+      juniMoji(x.kukanJuni),
+      juniMoji(x.tuuka),
+    ]);
+  }
+  return Kiji(
+    category: '駅伝・速報',
+    midashi: midashi,
+    lead: lead,
+    honbun: w.honbun,
+    hyou: [
+      KijiHyou('${my.mei}の区間成績(${kk + 1}区まで)', ['区間', '選手', '区間順位', '通過順位'], gyou),
+    ],
+    haishin: '${k.gh.year}年${k.gh.month}月${k.gh.day}日 ${kk + 1}区終了時点',
+    kisha: gakunaiKishaMei(k, site, 260),
+    jibun: true,
+    kekka: true,
+    site: site,
+    gakunai: true,
+  );
 }

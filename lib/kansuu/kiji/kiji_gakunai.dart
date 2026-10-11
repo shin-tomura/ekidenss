@@ -4,6 +4,7 @@ import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/screens/Modal_courseshoukai.dart'; // 大会の名前(courseRaceTitle)
 import 'package:ekiden/kansuu/kiji/kiji_kihon.dart';
 import 'package:ekiden/kansuu/kiji/kiji_comment.dart';
+import 'package:ekiden/kansuu/kiji/kiji_tokuchou.dart'; // 選手の特徴の文(1.9.7)
 import 'package:ekiden/kansuu/kiji/kiji_kekka.dart' show EkidenKekka, EkidenUnivKekka;
 import 'package:ekiden/kansuu/kiji/kiji_yosen.dart'
     show YosenKekka, YosenUnivKekka, YosenSenshuKekka;
@@ -366,7 +367,8 @@ String _maeNoShussouBun(KijiKankyou k, SenshuData s, int kk, String yobi) {
 
 /// 選手[s]を区間[kk]の選手として紹介する段落(持ちタイム・出走歴・4年生・出身地と趣味)
 /// 戻り値は、紹介に添えた因縁(コメントの事実に使う。なければnull。1.9.4)
-Innen? _shoukai(KijiKakite w, SenshuData s, int kk) {
+/// [tk] 選手の特徴の文を作る道具(持ちタイムの順位から、区間に合うかを書く。1.9.7)
+Innen? _shoukai(KijiKakite w, SenshuData s, int kk, {TokuchouKaki? tk}) {
   final KijiKankyou k = w.k;
   final String yobi = myouji(s.name);
   final StringBuffer sb = StringBuffer();
@@ -382,6 +384,8 @@ Innen? _shoukai(KijiKakite w, SenshuData s, int kk) {
     );
   }
   w.danraku(sb.toString());
+  // 選手の特徴(持ちタイムの順位から見た、距離・区間の型・区間内順位・坂との合い。1.9.7)
+  if (tk != null) w.danraku(tk.bun(s, kk, hashiru: kukanHashiru(k, kk)));
   w.danraku(shusshinShumiBun(k, s, w.r, yobi));
   return innen;
 }
@@ -913,12 +917,15 @@ Kiji _meikan(
   ]);
   final String lead =
       '${k.taikaiMei}の区間エントリーが決まった。たすきをつなぐ$ks人'
-      '${hoketsu.isEmpty ? '' : 'と、補欠の${hoketsu.length}人'}を紹介する。';
+      '${hoketsu.isEmpty ? '' : 'と、補欠の${hoketsu.length}人'}を紹介する。'
+      '選手の特徴は、今季ベスト(ない種目は自己ベスト)の持ちタイムの順位から見た。';
+  // 選手の特徴の文(1.9.7。記者の型で、順位をそのまま出すか言葉にするかが変わる)
+  final TokuchouKaki tk = TokuchouKaki(k, w, MochiHyou(k), suuji: _gakunaiKata(k, site, no) == KishaKata.suuji);
   for (int kk = 0; kk < ks; kk++) {
     final SenshuData? s = hashiru[kk];
     if (s == null) continue;
     w.koMidashi('${kukanYobikata(k.gh, k.race, kk, ks)}　${w.senshu(s)}');
-    final Innen? innen = _shoukai(w, s, kk);
+    final Innen? innen = _shoukai(w, s, kk, tk: tk);
     w.comment(
       senshuCommentJijitsu(
         w,

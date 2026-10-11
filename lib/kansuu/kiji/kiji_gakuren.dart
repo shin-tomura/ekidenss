@@ -8,6 +8,7 @@ import 'package:ekiden/kansuu/gakuren_text.dart';
 import 'package:ekiden/kansuu/gakuren_kantoku.dart';
 import 'package:ekiden/kansuu/kiji/kiji_kihon.dart';
 import 'package:ekiden/kansuu/kiji/kiji_comment.dart';
+import 'package:ekiden/kansuu/kiji/kiji_tokuchou.dart'; // 選手の特徴の文(1.9.7)
 
 // ------------------------------------------------------------
 // 学連選抜を追う専門メディア「学連選抜通信」(1.9.7。正月駅伝だけ)
@@ -581,8 +582,14 @@ Kiji _tenbouMeikan(KijiKankyou k, List<_GSenshu> list) {
     '学連選抜$n人の選手名鑑　それぞれの大学の思いを胸に',
     '選手名鑑　学連選抜の$n人',
   ]);
+  // 区間内順位(区間を走る大学の選手と比べた「○番目相当」)は、区間エントリーが公開されたあとだけ書く
+  // (学連選抜編成の画面から読んだときは、ほかの大学の区間配置を伏せているので、学生全体の順位だけで書く。1.9.7)
+  final bool kukannai = kukannaiKoukai(k.gh);
   final String lead =
-      '${k.taikaiMei}を走る学連選抜の$n人を、区間の順に紹介する。持ちタイムは、区間の距離に合った種目の自己ベスト。';
+      '${k.taikaiMei}を走る学連選抜の$n人を、区間の順に紹介する。持ちタイムは、区間の距離に合った種目の自己ベスト。'
+      '選手の特徴は、今季ベスト(ない種目は自己ベスト)の持ちタイムの${kukannai ? '順位' : '学生全体の順位'}から見た。';
+  final KishaKata kata = kishaKataKara(_kishaMei(k, no));
+  final TokuchouKaki tk = TokuchouKaki(k, w, MochiHyou(k), suuji: kata != KishaKata.joukei);
   for (final _GSenshu x in list) {
     final int kk = x.kukan;
     w.koMidashi('${kk + 1}区　${_mei(w, x)}・${x.shozoku}');
@@ -612,6 +619,8 @@ Kiji _tenbouMeikan(KijiKankyou k, List<_GSenshu> list) {
       sb.write('1年生ながら、学連選抜の一員に選ばれた。');
     }
     w.danraku(sb.toString());
+    // 選手の特徴(持ちタイムの順位から見た、距離・区間の型・区間内順位相当・坂との合い。1.9.7)
+    w.danraku(tk.bunGakuren(x.g, kk, hashiru: kukannai ? kukanHashiru(k, kk) : null));
     final SenshuData? s = x.s;
     if (s != null) w.danraku(shusshinShumiBun(k, s, w.r, myouji(s.name)));
     // 意気込み(因縁があれば、その事実を入れる)
@@ -655,9 +664,10 @@ List<Kiji> gakurenSokuhouKiji(KijiKankyou k) {
   final int done = k.gh.nowracecalckukan < ks ? k.gh.nowracecalckukan : ks;
   if (done <= 0) return [];
   final UnivGakurenData? gu = _gakurenUniv();
+  final MochiHyou hyou = MochiHyou(k); // 次の走者の特徴の文に使う(1.9.7)
   final List<Kiji> out = [];
   for (int kk = done - 1; kk >= 0; kk--) {
-    final Kiji? kiji = _sokuhou(k, list, gu, kk, saishin: kk == done - 1);
+    final Kiji? kiji = _sokuhou(k, list, gu, kk, saishin: kk == done - 1, hyou: hyou);
     if (kiji != null) out.add(kiji);
   }
   return out;
@@ -670,6 +680,7 @@ Kiji? _sokuhou(
   UnivGakurenData? gu,
   int kk, {
   required bool saishin,
+  required MochiHyou hyou,
 }) {
   final GakurenKukanKekka? r = gakurenKukanKekka(k.gh, kk);
   final _GSenshu? x = _kukanNoSenshu(list, kk);
@@ -809,6 +820,9 @@ Kiji? _sokuhou(
       if (mochi != null) nb.write('持ちタイムは$mochi。');
       final ({int juni, double time})? ty = _yosenKekka(tsugi.g);
       if (ty != null) nb.write('予選会は全体${juniMoji(ty.juni)}だった。');
+      // 次の走者の特徴(1.9.7)
+      final TokuchouKaki tk = TokuchouKaki(k, w, hyou, suuji: kishaKataKara(_kishaMei(k, 320)) != KishaKata.joukei, hajime: kk);
+      nb.write(tk.bunGakuren(tsugi.g, kk + 1, hashiru: kukanHashiru(k, kk + 1)));
     }
     w.danraku(nb.toString());
   } else {

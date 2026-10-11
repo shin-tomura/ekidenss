@@ -9,6 +9,7 @@ import 'package:ekiden/kansuu/kiji/kiji_kihon.dart';
 import 'package:ekiden/kansuu/kiji/kiji_comment.dart';
 import 'package:ekiden/kansuu/koukou.dart'; // 出身校(高校の同期対決。1.9.5)
 import 'package:ekiden/kansuu/kiji/kiji_gakunai.dart' show gakunaiSiteMei, gakunaiKishaMei; // 学内メディアの速報(1.9.7)
+import 'package:ekiden/kansuu/kiji/kiji_tokuchou.dart'; // 次の走者の特徴の文(1.9.7)
 
 // ------------------------------------------------------------
 // 駅伝の実況「箱庭スポーツ中継」(1.9.4。レース画面の「実況」のカードと、結果画面の記事の画面)
@@ -116,9 +117,10 @@ List<Kiji> jikkyouKiji(KijiKankyou k, {required bool owatta}) {
   final String ana = _hitoMei(k, 201);
   final String kaisetsu = _hitoMei(k, 202);
   final KishaKata kata = kishaKataKara(kaisetsu);
+  final MochiHyou hyou = MochiHyou(k); // 次の区間の自分の大学の走者の特徴の文に使う(1.9.7)
   final List<Kiji> list = [];
   for (int kk = done - 1; kk >= 0; kk--) {
-    final Kiji? kiji = _kukanJikkyou(k, kk, ana: ana, kaisetsu: kaisetsu, kata: kata, owatta: owatta);
+    final Kiji? kiji = _kukanJikkyou(k, kk, ana: ana, kaisetsu: kaisetsu, kata: kata, owatta: owatta, hyou: hyou);
     if (kiji != null) list.add(kiji);
   }
   return list;
@@ -314,6 +316,7 @@ Kiji? _kukanJikkyou(
   required String kaisetsu,
   required KishaKata kata,
   required bool owatta,
+  required MochiHyou hyou,
 }) {
   final List<_Koma> jun = _kukanKoma(k, kk);
   if (jun.isEmpty) return null;
@@ -1308,6 +1311,12 @@ Kiji? _kukanJikkyou(
         );
         final List<Innen> ti = senshuInnen(k, myTsugi, tsugi, kekka: false);
         if (ti.isNotEmpty && ti.first.ten >= 45) mb.write(ti.first.bun);
+        // 次の走者の特徴(持ちタイムの順位から見た、距離・区間の型・区間内順位・坂との合い。1.9.7。
+        // 解説者の型で、順位をそのまま出すか言葉にするかが変わる。復路の当日変更の前は区間内順位を書かない)
+        mb.write(
+          TokuchouKaki(k, w, hyou, suuji: kata != KishaKata.joukei, teinei: true, hajime: kk)
+              .bun(myTsugi, tsugi, hashiru: fukuroMae ? null : tsugiHashiru),
+        );
         // 前を行く大学(2位なら、首位争いの段落で書いたので書かない)
         if (me.tuuka >= 2) {
           final _Koma mae = jun[me.tuuka - 1];
@@ -1950,6 +1959,7 @@ List<Kiji> gakunaiSokuhouKiji(KijiKankyou k, {required bool owatta}) {
   final List<List<_Koma>> junList = [
     for (int kk = 0; kk < done; kk++) _kukanKoma(k, kk),
   ];
+  final MochiHyou hyou = MochiHyou(k); // 次の走者の特徴の文に使う(1.9.7)
   final List<Kiji> list = [];
   for (int kk = done - 1; kk >= 0; kk--) {
     final Kiji? kiji = _gakunaiSokuhou(
@@ -1959,6 +1969,7 @@ List<Kiji> gakunaiSokuhouKiji(KijiKankyou k, {required bool owatta}) {
       site: site,
       owatta: owatta,
       saishin: kk == done - 1,
+      hyou: hyou,
     );
     if (kiji != null) list.add(kiji);
   }
@@ -1981,6 +1992,7 @@ Kiji? _gakunaiSokuhou(
   required String site,
   required bool owatta,
   required bool saishin,
+  required MochiHyou hyou,
 }) {
   final List<_Koma> jun = junList[kk];
   if (jun.isEmpty) return null;
@@ -2183,6 +2195,12 @@ Kiji? _gakunaiSokuhou(
       if (t.gakunen == 4) {
         nb.write(race == 2 ? '最後の正月駅伝に挑む4年生だ。' : '4年生にとっては、最後の${k.raceMei}になる。');
       }
+      // 次の走者の特徴(1.9.7。学生記者の型で、順位をそのまま出すか言葉にするかが変わる)
+      final KishaKata gKata = kishaKataKara(gakunaiKishaMei(k, site, 260));
+      nb.write(
+        TokuchouKaki(k, w, hyou, suuji: gKata == KishaKata.suuji, hajime: kk)
+            .bun(t, kk + 1, hashiru: kukanHashiru(k, kk + 1)),
+      );
     }
     w.danraku(nb.toString());
   } else {

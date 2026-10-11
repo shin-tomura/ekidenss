@@ -294,7 +294,7 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
   int? get _imaChiku {
     if (!_chikuMeguri || _ghensuu == null || _chikuJunban.isEmpty) return null;
     if (_ghensuu!.scoutChances <= 0) return null;
-    final int i = (_roundBangou() - 1).clamp(0, _chikuJunban.length - 1);
+    final int i = (_roundBangou() - 1).clamp(0, _chikuJunban.length - 1).toInt();
     return _chikuJunban[i];
   }
 
@@ -340,7 +340,7 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
                         '大学画面の「コンピュータスカウト」で、今までの「全国一斉」に戻せます。\n\n' : ''}'
               '新入生は出身校の地区ごとに分かれていて、地区ごとに1ラウンドずつ交渉します。'
               'どの大学も、今の地区の選手に1人まで交渉できます(見送ることもできます)。'
-              'ほかの地区の選手は、上の地区のボタンで見られます。\n\n'
+              'ほかの地区の選手は、上の地区の切り替え(左右の矢印か、地区の名前を押す)で見られます。\n\n'
               '今年の地区の順番\n${narabi.join('\n')}',
               style: const TextStyle(color: Colors.black),
             ),
@@ -464,80 +464,157 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
     );
   }
 
-  /// 地区の切り替え(上部。地区の順番に並べ、今の地区と表示している地区に色を付ける。1.9.6)
-  /// 文字を大きくしていても、入りきらなければ折り返す
+  /// 地区の状態の文(今の地区・終わった地区・これからの地区)
+  String _chikuJoutaiMoji(int chiku) {
+    final int i = _chikuJunban.indexOf(chiku);
+    final int? ima = _imaChiku;
+    if (ima == null) return '終了';
+    if (chiku == ima) return '今の地区';
+    final int imaIdx = _chikuJunban.indexOf(ima);
+    return i < imaIdx ? '終了' : '${i + 1}地区目';
+  }
+
+  /// 表示する地区を、地区の順番(先頭は全地区)で前後に動かす([idou] は -1 か 1)
+  void _hyoujiChikuIdou(int idou) {
+    final List<int> narabi = [-1, ..._chikuJunban]; // -1は全地区
+    final int ima = _hyoujiChiku ?? -1;
+    final int i = narabi.indexOf(ima);
+    final int saki = ((i < 0 ? 0 : i) + idou).clamp(0, narabi.length - 1).toInt();
+    _hyoujiChikuErabu(narabi[saki]);
+  }
+
+  /// 表示する地区を選ぶ(-1は全地区。今の地区なら、地区が進んだときに次の地区へ付いていく)
+  void _hyoujiChikuErabu(int chiku) {
+    setState(() {
+      _hyoujiSentaku = (chiku >= 0 && chiku == _imaChiku) ? -2 : chiku;
+    });
+  }
+
+  /// 地区の一覧(下から出す。押した地区を表示する)
+  Future<void> _showChikuIchiran() async {
+    final int? hyouji = _hyoujiChiku;
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.grey[900],
+      builder: (context) {
+        Widget gyou(String midashi, String sub, bool erabi, int chiku) {
+          return ListTile(
+            title: Text(
+              midashi,
+              style: TextStyle(
+                color: erabi ? Colors.lightBlueAccent : Colors.white,
+                fontSize: HENSUU.fontsize_honbun,
+                fontWeight: erabi ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+            subtitle: sub.isEmpty
+                ? null
+                : Text(
+                    sub,
+                    style: TextStyle(
+                      color: Colors.white60,
+                      fontSize: HENSUU.fontsize_honbun - 3,
+                    ),
+                  ),
+            onTap: () {
+              Navigator.of(context).pop();
+              _hyoujiChikuErabu(chiku);
+            },
+          );
+        }
+
+        return SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              gyou('全地区', '', hyouji == null, -1),
+              for (final int c in _chikuJunban)
+                gyou(
+                  '${_junbanMoji(c)}${comScoutChikuMei(c)}(${_chikuNinzuu(c)}人)',
+                  _chikuJoutaiMoji(c),
+                  hyouji == c,
+                  c,
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// 地区の切り替え(上部の1行。1.9.6)
+  /// 左右の矢印で地区の順番に1つずつ動かし、真ん中を押すと地区の一覧から選べる
+  /// (文字を大きくしていても、真ん中の文が折り返すだけで、はみ出さない)
   Widget _buildChikuPanel() {
     final int? ima = _imaChiku;
     final int? hyouji = _hyoujiChiku;
-    final int imaIdx = ima == null ? _chikuJunban.length : _chikuJunban.indexOf(ima);
-    Widget chip(String label, bool erabi, bool usui, VoidCallback onTap) {
-      return InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: erabi ? Colors.blueAccent : Colors.transparent,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: erabi ? Colors.blueAccent : Colors.white24,
-            ),
-          ),
-          child: Text(
-            label,
-            style: TextStyle(
-              color: erabi
-                  ? Colors.white
-                  : (usui ? Colors.white38 : Colors.white70),
-              fontSize: HENSUU.fontsize_honbun - 3,
-            ),
-          ),
-        ),
-      );
+    final List<int> narabi = [-1, ..._chikuJunban];
+    final int pos = narabi.indexOf(hyouji ?? -1);
+    final String midashi = hyouji == null
+        ? '全地区'
+        : '${_junbanMoji(hyouji)}${comScoutChikuMei(hyouji)}(${_chikuNinzuu(hyouji)}人)';
+    final String sub;
+    if (hyouji == null) {
+      sub = ima == null ? '全部の地区の交渉が終わりました' : '今の地区は${comScoutChikuMei(ima)}';
+    } else if (hyouji == ima) {
+      sub = '今の地区(${_chikuJunban.indexOf(ima!) + 1}/${_chikuJunban.length})・交渉は1人まで';
+    } else {
+      sub = ima == null
+          ? 'この地区は終わりました'
+          : '${_chikuJoutaiMoji(hyouji)}(今の地区は${comScoutChikuMei(ima)})';
     }
-
     return Container(
       width: double.infinity,
       color: Colors.grey[900],
-      padding: const EdgeInsets.fromLTRB(12, 4, 12, 6),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Row(
         children: [
-          Text(
-            ima == null
-                ? '地区めぐり: 全部の地区の交渉が終わりました'
-                : '地区めぐり ${imaIdx + 1}地区目/${_chikuJunban.length}　'
-                      '今の地区: ${comScoutChikuMei(ima)}(${_chikuNinzuu(ima)}人。交渉は1人まで)',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: HENSUU.fontsize_honbun - 2,
-              fontWeight: FontWeight.bold,
+          IconButton(
+            icon: const Icon(Icons.chevron_left),
+            color: Colors.white,
+            disabledColor: Colors.white24,
+            tooltip: '前の地区',
+            onPressed: pos > 0 ? () => _hyoujiChikuIdou(-1) : null,
+          ),
+          Expanded(
+            child: InkWell(
+              onTap: _showChikuIchiran,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Column(
+                  children: [
+                    Text(
+                      '$midashi ▼',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: hyouji != null && hyouji == ima
+                            ? Colors.lightBlueAccent
+                            : Colors.white,
+                        fontSize: HENSUU.fontsize_honbun - 1,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      sub,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white60,
+                        fontSize: HENSUU.fontsize_honbun - 3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
-          const SizedBox(height: 4),
-          Wrap(
-            spacing: 6,
-            runSpacing: 4,
-            children: [
-              chip(
-                '全地区',
-                hyouji == null,
-                false,
-                () => setState(() => _hyoujiSentaku = -1),
-              ),
-              for (int i = 0; i < _chikuJunban.length; i++)
-                chip(
-                  '${_junbanMoji(_chikuJunban[i])}${comScoutChikuMei(_chikuJunban[i])}'
-                  '${_chikuJunban[i] == ima ? '(今)' : ''}',
-                  hyouji == _chikuJunban[i],
-                  i < imaIdx, // 終わった地区は薄く
-                  () => setState(
-                    () => _hyoujiSentaku = _chikuJunban[i] == ima
-                        ? -2
-                        : _chikuJunban[i],
-                  ),
-                ),
-            ],
+          IconButton(
+            icon: const Icon(Icons.chevron_right),
+            color: Colors.white,
+            disabledColor: Colors.white24,
+            tooltip: '次の地区',
+            onPressed: pos < narabi.length - 1
+                ? () => _hyoujiChikuIdou(1)
+                : null,
           ),
         ],
       ),
@@ -1038,7 +1115,7 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
         '今年のスカウトは「地区めぐり」です。新入生は出身校の地区(北海道・東北など11地区)ごとに分かれていて、'
         '地区ごとに1ラウンドずつ交渉します。地区の順番は毎年変わります。'
         'どの大学も、今の地区の選手に1人まで交渉でき、見送ることもできます。'
-        'ほかの地区の選手は、上の地区のボタンで見られます(交渉できるのは、その地区の番のときだけです)。\n\n'
+        'ほかの地区の選手は、上の地区の切り替え(左右の矢印か、地区の名前を押す)で見られます。交渉できるのは、その地区の番のときだけです。\n\n'
         '同じ選手に複数の大学が成功した場合は争奪戦になり、選手が進学先を選びます(名声の高い大学ほど選ばれやすくなります)。'
         'まれに、大学の名声をあまり気にしない新入生もいます。'
         '確定した選手は、その年はもう交渉に応じません。'
@@ -1970,49 +2047,66 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
                   ),
                 ),
               ),
-            // 地区めぐりの見送り(1.9.6。交渉せずに、今の地区のラウンドを進める)
+            // 地区めぐりで地区が残っているときは、「見送る」と「スカウト終了」を横に並べる
+            // (1.9.6。上下に並べると選手の一覧が狭くなるため。文字が大きいときはボタンの中で折り返す)
+            // (高さはIntrinsicHeightで2つのボタンにそろえる。下の一覧の外なので、高さが決まっていないため)
             if (_chikuMeguri && _imaChiku != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: OutlinedButton(
-                  onPressed: _showMiokuriDialog,
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    side: const BorderSide(color: Colors.blueAccent),
-                    minimumSize: const Size(double.infinity, 44),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+              IntrinsicHeight(
+                child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _showMiokuriDialog,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        side: const BorderSide(color: Colors.blueAccent),
+                        minimumSize: const Size(0, 50),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Text(
+                        '${comScoutChikuMei(_imaChiku!)}は見送る',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ),
-                  child: Text(
-                    '${comScoutChikuMei(_imaChiku!)}は見送って次の地区へ',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: HENSUU.fontsize_honbun - 2,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  const SizedBox(width: 8),
+                  Expanded(child: _scoutShuuryouButton(const Size(0, 50))),
+                ],
                 ),
-              ),
-            ElevatedButton(
-              onPressed: _ghensuu!.scoutChances > 0
-                  ? () => _showExitConfirmationDialog()
-                  : () => _scoutShuuryou(),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
-                foregroundColor: Colors.black,
-                minimumSize: const Size(double.infinity, 50),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: const Text(
-                "スカウト終了",
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-            ),
+              )
+            else
+              _scoutShuuryouButton(const Size(double.infinity, 50)),
           ],
         ),
+      ),
+    );
+  }
+
+  /// 「スカウト終了」のボタン([saishou] はボタンの最小の大きさ。地区めぐりでは見送りと横に並べる。1.9.6)
+  Widget _scoutShuuryouButton(Size saishou) {
+    return ElevatedButton(
+      onPressed: _ghensuu!.scoutChances > 0
+          ? () => _showExitConfirmationDialog()
+          : () => _scoutShuuryou(),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.blue,
+        foregroundColor: Colors.black,
+        minimumSize: saishou,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+      child: const Text(
+        "スカウト終了",
+        textAlign: TextAlign.center,
+        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
       ),
     );
   }

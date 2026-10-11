@@ -816,6 +816,9 @@ Map<int, double> comScoutSeikouritsuIchiran({
 //     争奪戦は、最後の志望と同じ重み(入学時名声影響度設定の重み。shozokuChuusenOmomi)で決める
 //     (変わり者は等しい確率)。失敗がないので「保留」は起きない
 //   ・地区めぐり(交渉)(2): 地区の分け方と順番は声かけと同じで、1地区に1人まで成功率で交渉する
+//     (1.9.6の開発中に作って試したが、声かけを本命にして、設定では選べないようにした(comScoutKousyouEraberu)。
+//      コードは残してある。選べないときは、yobiint2[87]が2でも声かけとして扱う。スカウトの途中で
+//      その年の形の記録が交渉なら、その年は交渉のまま進む)
 //   ・全国一斉(1): 1.9.5までの形。何も変えていない
 // ・既存のセーブデータも0なので地区めぐり(声かけ)になる(一度はみんなに試してほしいという開発者の
 //   希望で、初期値にした。OFFの人はOFFのまま)。1.9.6の開発中は、0が地区めぐり(交渉)だった
@@ -862,6 +865,11 @@ const int comScoutKatachiKoekake = 0; // 地区めぐり(声かけ)
 const int comScoutKatachiZenkoku = 1; // 全国一斉
 const int comScoutKatachiKousyou = 2; // 地区めぐり(交渉)
 
+/// 地区めぐり(交渉)を設定で選べるか(1.9.6。開発中に作ったが、声かけを本命にして選べないようにした)
+/// trueにすると、コンピュータスカウトの画面と各種設定のQRコードで選べるようになる
+/// (説明書・コンピュータスカウトの説明・変更履歴の文は、選べない前提で書いているので、直すこと)
+const bool comScoutKousyouEraberu = false;
+
 /// スカウトの形の名前(yobiint2[87]の値の順)
 const List<String> comScoutKatachiMei = ['地区めぐり(声かけ)', '全国一斉', '地区めぐり(交渉)'];
 
@@ -874,6 +882,7 @@ const int comScoutNendoIndex = 88;
 const double _kagenJougen = 0.75;
 
 /// スカウトの形の設定(0=地区めぐり(声かけ)・1=全国一斉・2=地区めぐり(交渉)。ONかどうかは見ない)
+/// (地区めぐり(交渉)を選べないときは、2なら声かけを返す)
 int comScoutKatachiSettei(KantokuData kantoku) {
   if (kantoku.yobiint2.length <= comScoutKatachiIndex) {
     return comScoutKatachiKoekake;
@@ -889,8 +898,12 @@ void comScoutKatachiKaku(List<int> yobiint2, int katachi) {
   yobiint2[comScoutKatachiIndex] = katachi;
 }
 
-/// 各種設定のQRコードから読んだスカウトの形の値が、正しい形かどうか
-bool comScoutKatachiTadashii(int v) => v >= 0 && v <= 2;
+/// スカウトの形の値が、正しい形かどうか(各種設定のQRコードから読んだ値にも使う)
+/// (地区めぐり(交渉)を選べないときは、0と1だけ)
+bool comScoutKatachiTadashii(int v) =>
+    v == comScoutKatachiKoekake ||
+    v == comScoutKatachiZenkoku ||
+    (v == comScoutKatachiKousyou && comScoutKousyouEraberu);
 
 /// その年の形の記録のコード(1=交渉・2=全国一斉・3=声かけ)を、スカウトの形(yobiint2[87]の値)にする
 int _nendoCodeKatachi(int code) {

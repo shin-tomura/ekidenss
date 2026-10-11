@@ -678,7 +678,8 @@ class SettingsQrProcessor {
         genkaitoppaYuuguuIreru(kantoku, yobiint2_85);
       }
       // コンピュータスカウトONのときのスカウトの形(int) kantoku.yobiint2[87] (1.9.6)
-      //   0=地区めぐり(声かけ)(初期値)・1=全国一斉・2=地区めぐり(交渉)(古いQRコードには含まれていないので、そのときは今の設定のまま)
+      //   0=地区めぐり(声かけ)(初期値)・1=全国一斉(古いQRコードには含まれていないので、そのときは今の設定のまま)
+//   2=地区めぐり(交渉)は、選べないとき(comScoutKousyouEraberu がfalse)は正しくない値として読まない
       final dynamic yobiint2_87 = dataMap['k_yobiint2_87'];
       if (yobiint2_87 is int &&
           comScoutKatachiTadashii(yobiint2_87) &&

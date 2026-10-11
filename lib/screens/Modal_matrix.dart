@@ -400,7 +400,8 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
       for (final int c in _sentakuKouho)
         if (_mieru(c, _kakushi)) c,
     ];
-    // 学連選抜の表だけの列しか選んでいなかったときなど、選べる列が1つもなければ全部出す
+    // 何も選んでいないとき(「すべて外す」のあとや、学連選抜の表だけの列しか選んでいないときの
+    // 大学の表)は、選手名だけの表にせず、全部の列を出す
     if (mieru.isEmpty) mieru = _sentakuKouho;
     _retsu = [0, ...mieru];
     _migiSenRetsu = {
@@ -420,17 +421,23 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
     return _extraCols[code - _eventLabels.length].label;
   }
 
-  /// 表示する列を選ぶ画面(チップで選ぶ。最後の1列は外せない)
+  /// 表示する列を選ぶ画面(チップで選ぶ。アプリのほかの部分に合わせた暗い背景。1.9.7)
+  /// 「すべて外す」で全部外してから、比べたい列だけを選べる(何も選んでいないときは、表には全部の列を出す)
   Future<void> _retsuSentaku() async {
+    const Color haikei = Color.fromARGB(255, 30, 30, 30);
+    final ButtonStyle botan = TextButton.styleFrom(
+      foregroundColor: HENSUU.LinkColor,
+      disabledForegroundColor: Colors.white38,
+    );
     await showDialog<void>(
       context: context,
       builder: (BuildContext dialogContext) {
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setDialog) {
             final List<int> kouho = _sentakuKouho;
-            // 大学の表と共通の列(学連選抜の表だけの2列を除く)で、表示している数。
-            // 共通の列を最低1つ残すので、大学の表が選手名だけになることはない
-            final int mieruSuu = kouho.where((c) => c > 0 && _mieru(c, _kakushi)).length;
+            // この表で選べる列を全部隠す印(ほかの表だけの列の印はそのまま残す)
+            final int zenbu = kouho.fold<int>(0, (m, c) => m | (1 << _retsuBit(c)));
+            final bool zenbuHazushita = (_kakushi & zenbu) == zenbu;
             Future<void> kaeru(int atai) async {
               setState(() {
                 _kakushi = atai;
@@ -441,9 +448,10 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
             }
 
             return AlertDialog(
+              backgroundColor: haikei,
               title: const Text(
                 '表示する列を選ぶ',
-                style: TextStyle(color: Colors.black),
+                style: TextStyle(color: Colors.white),
               ),
               content: SingleChildScrollView(
                 child: Column(
@@ -451,9 +459,10 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      '選んだ列を、表の並び順で詰めて表示します。どの画面から開いても同じ選び方になります。'
+                      '選んだ列を、表の並び順で詰めて表示します。何も選んでいないときは、全部の列を表示します。'
+                      'どの画面から開いても同じ選び方になります。'
                       '画像・テキストのコピー・CSVは、いつも全部の列です。',
-                      style: TextStyle(color: Colors.black87, fontSize: 12),
+                      style: TextStyle(color: Colors.white70, fontSize: 12),
                     ),
                     const SizedBox(height: 8),
                     Wrap(
@@ -465,15 +474,14 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
                             label: Text(_retsuMei(c)),
                             selected: _mieru(c, _kakushi),
                             onSelected: (bool v) {
-                              // 共通の列の最後の1列は外せない(選手名だけの表になるため)
-                              if (!v && c > 0 && mieruSuu <= 1) return;
                               final int bit = 1 << _retsuBit(c);
                               kaeru(v ? (_kakushi & ~bit) : (_kakushi | bit));
                             },
-                            labelStyle: const TextStyle(color: Colors.black, fontSize: 12),
-                            selectedColor: Colors.lightBlue.shade100,
-                            backgroundColor: Colors.grey.shade200,
-                            checkmarkColor: Colors.black,
+                            labelStyle: const TextStyle(color: Colors.white, fontSize: 12),
+                            selectedColor: Colors.blue.shade700,
+                            backgroundColor: Colors.grey.shade800,
+                            checkmarkColor: Colors.white,
+                            side: const BorderSide(color: Colors.white24),
                           ),
                       ],
                     ),
@@ -482,10 +490,17 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
               ),
               actions: [
                 TextButton(
+                  style: botan,
+                  onPressed: zenbuHazushita ? null : () => kaeru(_kakushi | zenbu),
+                  child: const Text('すべて外す'),
+                ),
+                TextButton(
+                  style: botan,
                   onPressed: _kakushi == 0 ? null : () => kaeru(0),
                   child: const Text('すべて表示に戻す'),
                 ),
                 TextButton(
+                  style: botan,
                   onPressed: () => Navigator.of(dialogContext).pop(),
                   child: const Text('閉じる'),
                 ),

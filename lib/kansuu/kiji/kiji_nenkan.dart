@@ -129,13 +129,36 @@ int? _nyuugakuNobi(KijiKankyou k, SenshuData s) {
   return sa > 0 ? sa : null;
 }
 
+/// 今年度に自己ベストを更新した種目1つ分(伸び盛り賞。1.9.8)
+class _Koushin {
+  /// 種目(time_bestkirokuの番号。0: 5000m、1: 1万m、2: ハーフ)
+  final int idx;
+
+  /// 前の記録(前の学年までの記録。5000mは入学時の記録も入れる)
+  final double mae;
+
+  /// 今季の記録(今季ベスト)
+  final double konki;
+
+  /// 前の記録が入学時の記録か
+  final bool nyuugaku;
+
+  const _Koushin(this.idx, this.mae, this.konki, this.nyuugaku);
+
+  /// 前の記録からの短縮率(距離の違う種目を比べられるように、秒数ではなく率で見る)
+  double get ritsu => (mae - konki) / mae;
+}
+
+/// 短縮率の合計
+double _ritsuGoukei(List<_Koushin> l) => l.fold(0.0, (double a, _Koushin x) => a + x.ritsu);
+
 /// 今年度(今の学年)に自己ベストを更新した種目(5000m・1万m・ハーフ)
 /// 今季ベストと同じく、学年ごとのレースのタイムから出す。前の学年までの記録(5000mは入学時の記録も)より
-/// 速い今季の記録があれば数える。初めての記録は更新に数えない
+/// 速い今季の記録があれば数える。初めての記録は更新に数えない(1年生の1万m・ハーフなど)
 /// (1.9.8。今までは自己ベストを出した年月の欄で見ていたが、その欄は書き込まれていなかったので、
 /// 伸び盛り賞が一度も出ていなかった)
-List<int> _konkiBestKoushin(KijiKankyou k, SenshuData s) {
-  final List<int> list = [];
+List<_Koushin> _konkiBestKoushin(SenshuData s) {
+  final List<_Koushin> list = [];
   for (final int idx in const [0, 1, 2]) {
     final double konki = konkiBestRace(s.kukantime_race, s.gakunen, idx);
     if (konki >= TEISUU.DEFAULTTIME) continue;
@@ -144,11 +167,15 @@ List<int> _konkiBestKoushin(KijiKankyou k, SenshuData s) {
       final double t = konkiBestRace(s.kukantime_race, g, idx);
       if (t < mae) mae = t;
     }
+    bool nyuugaku = false;
     if (idx == 0) {
       final double ny = s.kiroku_nyuugakuji_5000;
-      if (ny > 0 && ny < mae) mae = ny;
+      if (ny > 0 && ny < mae) {
+        mae = ny;
+        nyuugaku = true;
+      }
     }
-    if (mae < TEISUU.DEFAULTTIME && konki < mae) list.add(idx);
+    if (mae < TEISUU.DEFAULTTIME && konki < mae) list.add(_Koushin(idx, mae, konki, nyuugaku));
   }
   return list;
 }
@@ -611,17 +638,23 @@ List<Kiji> gakunaiHyoushouKiji(KijiKankyou k) {
     kourouYosen = kourou != null;
   }
   if (kourou != null) tsukatta.add(kourou.id);
-  // 伸び盛り賞(今年度に自己ベストを更新した種目が一番多い。同じなら学年の低いほう、次に5000mの持ちタイム)
+  // 伸び盛り賞(今年度に自己ベストを更新した種目が一番多い。同じなら前の記録からの短縮率の合計が大きいほう
+  // (1.9.8。距離の長い種目が有利にならないように、秒数ではなく率で比べる)、次に学年の低いほう、
+  // 次に5000mの持ちタイム)
   SenshuData? nobi;
-  List<int> nobiShumoku = [];
+  List<_Koushin> nobiShumoku = [];
   for (final SenshuData s in buin) {
     if (tsukatta.contains(s.id)) continue;
-    final List<int> ks = _konkiBestKoushin(k, s);
+    final List<_Koushin> ks = _konkiBestKoushin(s);
     if (ks.isEmpty) continue;
+    final bool onaji = ks.length == nobiShumoku.length;
+    final double ritsu = _ritsuGoukei(ks);
+    final double imaRitsu = _ritsuGoukei(nobiShumoku);
     final bool kaeru = nobi == null ||
         ks.length > nobiShumoku.length ||
-        (ks.length == nobiShumoku.length && s.gakunen < nobi.gakunen) ||
-        (ks.length == nobiShumoku.length && s.gakunen == nobi.gakunen && k.jikoBest(s, 0) < k.jikoBest(nobi, 0));
+        (onaji && ritsu > imaRitsu) ||
+        (onaji && ritsu == imaRitsu && s.gakunen < nobi.gakunen) ||
+        (onaji && ritsu == imaRitsu && s.gakunen == nobi.gakunen && k.jikoBest(s, 0) < k.jikoBest(nobi, 0));
     if (kaeru) {
       nobi = s;
       nobiShumoku = ks;
@@ -715,9 +748,22 @@ List<Kiji> gakunaiHyoushouKiji(KijiKankyou k) {
     final SenshuData nb = nobi;
     w.koMidashi('伸び盛り賞　${w.senshu(nb)}');
     final List<String> shumoku = [
-      for (final int idx in nobiShumoku) '${kijiShumokuMei[idx]}${jikanMoji(k.jikoBest(nb, idx))}',
+      for (final _Koushin x in nobiShumoku) '${kijiShumokuMei[x.idx]}${jikanMoji(x.konki)}',
     ];
-    w.danraku('伸び盛り賞は${w.senshu(nb)}(${nb.gakunen}年)。今季は${shumoku.join('、')}と、${nobiShumoku.length}種目で自己ベストを更新した。');
+    final StringBuffer nbBun = StringBuffer();
+    nbBun.write('伸び盛り賞は${w.senshu(nb)}(${nb.gakunen}年)。今季は${shumoku.join('、')}と、${nobiShumoku.length}種目で自己ベストを更新した。');
+    // 一番縮めた種目(短縮率で選び、秒数で書く。1.9.8)
+    final _Koushin ichiban = nobiShumoku.reduce((a, b) => b.ritsu > a.ritsu ? b : a);
+    final int chijimi = saByou(ichiban.mae, ichiban.konki);
+    if (chijimi >= 1) {
+      final String maeMoji = ichiban.nyuugaku ? '入学時の記録' : '前の記録';
+      nbBun.write(
+        nobiShumoku.length >= 2
+            ? '中でも${kijiShumokuMei[ichiban.idx]}は、$maeMojiから${saMoji(chijimi)}縮めた。'
+            : '$maeMojiから${saMoji(chijimi)}縮めた。',
+      );
+    }
+    w.danraku(nbBun.toString());
     w.comment(senshuComment(w, CommentBamen.hyoushou, myouji(nb.name)));
   }
 

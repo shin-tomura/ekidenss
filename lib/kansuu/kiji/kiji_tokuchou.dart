@@ -13,7 +13,11 @@ import 'package:ekiden/kansuu/kiji/kiji_kimochi.dart'; // 駅伝男・平常心�
 //
 // 見る観点(説明書の仕様と同じ見方。能力値は見ない)
 //  A 距離適性: 5000m・1万m・ハーフの全体順位(学生全体)を比べ、一番良い種目から
-//    スピード型・長い距離向きなどと見て、区間の距離と合うかを書く
+//    スピード型・長い距離向きなどと見て、区間の距離と合うかを書く。
+//    区間の距離の区分(7.5km以下は5000m、15km以下は1万m、それより長いとハーフ)に加えて、
+//    その大会の区間の中で長めか短めかでも書き分ける(1.9.7。正月駅伝は全区間がハーフの区分なので、
+//    20.8kmの区間も23.1kmの区間も同じ言い方になっていた)。距離に強い型は長い区間ほど、
+//    スピード型は短い区間ほど持ち味が生き、1万mが一番の型で区間も1万mの区分なら書き分けない
 //  B 区間の型: 1万m(トラック)とロード1万の全体順位を比べる。トラックが良ければ1区向き
 //    (ペース変動対応力が効き、ロード適性は効かない)、同じくらいなら2・3区向き(両方が効く)、
 //    ロードが良ければ4区以降向き(ロード適性が効き、ペース変動対応力は効かない)
@@ -422,10 +426,60 @@ class TokuchouKaki {
         'ハーフの${_zentaiMei(z[2], 2)}が示すとおり、距離に強いタイプ',
       ]);
     }
-    // 区間の距離との合い
+    // 区間の距離との合い(大会の中で長めか短めかでも書き分ける。1.9.7)
+    final int nagasa = anteishita ? 0 : _taikaiNoNagasa(kk);
+    final String taikai = k.raceMei;
     final String ai;
     if (anteishita) {
       ai = w.erabu(['$kyoriMojiのこの区間でも、持ちタイムどおりの走りが見込める。', '$kyoriMojiという距離に、不安はない。']);
+    } else if (best == kihon && best == 2 && nagasa == 1) {
+      // 距離に強い型で、大会の中でも長い区間
+      ai = w.erabu([
+        '$kyoriMojiは$taikaiの中でも長い区間で、距離に強い持ち味が一番生きる。',
+        '$taikaiの中でも長い$kyoriMojiの区間は、距離に強い持ち味にうってつけだ。',
+      ]);
+    } else if (best == kihon && best == 2 && nagasa == -1) {
+      // 距離に強い型で、大会の中では短めの区間
+      ai = w.erabu([
+        '$kyoriMojiは持ち味の距離の範囲だが、$taikaiの中では短めの区間だ。',
+        '$kyoriMojiの区間は持ち味の距離に入るものの、$taikaiの中では短めだ。',
+      ]);
+    } else if (best == kihon && best == 0 && nagasa == -1) {
+      // スピード型で、大会の中でも短い区間
+      ai = w.erabu([
+        '$kyoriMojiは$taikaiの中でも短い区間で、スピードが一番生きる。',
+        '$taikaiの中でも短い$kyoriMojiの区間は、スピードで押す持ち味にうってつけだ。',
+      ]);
+    } else if (best == kihon && best == 0 && nagasa == 1) {
+      // スピード型で、大会の中では長めの区間
+      ai = w.erabu([
+        '$kyoriMojiは持ち味の距離の範囲だが、$taikaiの中では長めの区間だ。',
+        '$kyoriMojiの区間は持ち味の距離に入るものの、$taikaiの中では長めだ。',
+      ]);
+    } else if (best < kihon && nagasa == -1) {
+      // 区間のほうが長いが、大会の中では短めの区間
+      ai = w.erabu([
+        '$kyoriMojiは持ち味の距離より長いが、$taikaiの中では短めの区間なのは救いだ。',
+        '持ち味の距離より長い$kyoriMojiでも、$taikaiの中では短めの区間なのは助かる。',
+      ]);
+    } else if (best < kihon && nagasa == 1) {
+      // 区間のほうが長く、大会の中でも長い区間
+      ai = w.erabu([
+        '$kyoriMojiは$taikaiの中でも長い区間で、持ち味の距離からは遠い。',
+        '$taikaiの中でも長い$kyoriMojiの区間は、持ち味の距離からは離れている。',
+      ]);
+    } else if (best > kihon && nagasa == -1) {
+      // 区間のほうが短く、大会の中でも短い区間
+      ai = w.erabu([
+        '$kyoriMojiは$taikaiの中でも短い区間で、持ち味を出し切る前に終わるかもしれない。',
+        '$taikaiの中でも短い$kyoriMojiの区間では、持ち味の距離に届かない。',
+      ]);
+    } else if (best > kihon && nagasa == 1) {
+      // 区間のほうが短いが、大会の中では長めの区間
+      ai = w.erabu([
+        '$kyoriMojiは持ち味の距離より短いが、$taikaiの中では長めの区間で、持ち味を出す余地はある。',
+        '持ち味の距離より短い$kyoriMojiでも、$taikaiの中では長めの区間で、持ち味を出す余地はある。',
+      ]);
     } else if (best == kihon) {
       ai = w.erabu([
         '$kyoriMojiのこの区間は、まさに持ち味の距離だ。',
@@ -444,6 +498,26 @@ class TokuchouKaki {
       ]);
     }
     return _Kansatsu(0, '$kataだ。$ai');
+  }
+
+  /// 区間[kk]が、この大会の区間の中で長めか短めか(1: 長め、-1: 短め、0: どちらでもない・比べない。1.9.7)
+  /// 距離の順に3つに分けた上と下の区間で、真ん中の距離から2%以上離れているときだけ長め・短めにする。
+  /// 大会の最長と最短の差が8%未満なら比べない(ほぼ同じ距離の区間を無理に分けないため)
+  int _taikaiNoNagasa(int kk) {
+    final int ks = k.kukansuu;
+    final List<double> kyori = k.gh.kyori_taikai_kukangoto[k.race];
+    if (ks < 3 || kyori.length < ks || kk < 0 || kk >= ks) return 0;
+    final List<double> l = [for (int i = 0; i < ks; i++) kyori[i]]..sort();
+    if (l.first <= 0 || l.last < l.first * 1.08) return 0;
+    final double naka = ks.isOdd ? l[ks ~/ 2] : (l[ks ~/ 2 - 1] + l[ks ~/ 2]) / 2.0;
+    final double d = kyori[kk];
+    if ((d - naka).abs() < naka * 0.02) return 0;
+    final int sanbun = ks ~/ 3;
+    final int nagai = l.where((x) => x > d).length;
+    final int mijikai = l.where((x) => x < d).length;
+    if (nagai < sanbun) return 1;
+    if (mijikai < sanbun) return -1;
+    return 0;
   }
 
   /// B 区間の型(1万m(トラック)とロード1万の全体順位を比べる)

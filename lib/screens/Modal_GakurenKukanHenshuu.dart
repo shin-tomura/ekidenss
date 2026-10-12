@@ -177,7 +177,7 @@ class _ModalGakurenKukanHenshuuState extends State<ModalGakurenKukanHenshuu> {
             padding: const EdgeInsets.all(12),
             children: [
               Text(
-                '区間ごとに走る選手を選んでください。ほかの区間を走る予定の選手を選ぶと、2人の区間が入れ替わります。最初はコンピュータが決めた配置になっています。\n'
+                '区間ごとに走る選手を選んでください。ほかの区間を走る予定の選手(一覧で「今は○区」と出る選手)を選ぶと、2人の区間が入れ替わります。最初はコンピュータが決めた配置になっています。\n'
                 '試走は大学の選手と同じ計算です(走るたびに多少タイムが違います)。1区の集団のペースや、2区以降のモチベーション低下補正、経験補正、調子は入っていません。\n'
                 '選手の名前の後ろの調子は、学連選抜で走るときの調子です。「詳細」に出る調子は元の大学の選手のもので、違うことがあります。',
                 style: TextStyle(
@@ -218,13 +218,23 @@ class _ModalGakurenKukanHenshuuState extends State<ModalGakurenKukanHenshuu> {
     );
   }
 
-  /// 選手の一覧に出す文(例: 山田太郎(3) 調子85 〇〇大 予選12位)
+  /// 選手の一覧に出す文の1行目(例: 山田太郎(3) 調子85 (今は3区))
   /// 調子は学連選抜の選手の調子(元の大学の選手の「詳細」の調子とは別。1.9.9)。
-  /// 文字を大きくしていて後ろが切れても見えるように、大学名より前に置く
-  String _senshuBun(Senshu_Gakuren_Data s, Map<int, UnivData> univMap) {
+  /// [kukan]とは別の区間を走る予定の選手には、その区間を付ける(選ぶと2人の区間が入れ替わる)
+  String _senshuBun1(Senshu_Gakuren_Data s, int kukan) {
+    final int entry = _entry(s);
+    final String betsuKukan = entry >= 0 && entry != kukan
+        ? ' (今は${entry + 1}区)'
+        : '';
+    return '${s.name}(${s.gakunen}) 調子${s.chousi}$betsuKukan';
+  }
+
+  /// 選手の一覧に出す文の2行目(例: 〇〇大 予選12位)
+  /// 文字を大きくしていても予選の成績が切れないように、1行目と分けて、省略せずに折り返す(1.9.9)
+  String _senshuBun2(Senshu_Gakuren_Data s, Map<int, UnivData> univMap) {
     final String univ = univMap[s.univid]?.name ?? '---';
     final int yosenJuni = s.kukanjuni_race[_yosenIndex][s.gakunen - 1] + 1;
-    return '${s.name}(${s.gakunen}) 調子${s.chousi} $univ 予選$yosenJuni位';
+    return '$univ 予選$yosenJuni位';
   }
 
   /// 区間1つ分の行
@@ -264,22 +274,40 @@ class _ModalGakurenKukanHenshuuState extends State<ModalGakurenKukanHenshuu> {
               style: TextStyle(color: Colors.white54),
             ),
             isExpanded: true,
+            // 選手の文は2行(折り返せばそれ以上)なので、高さを決めずに中身に合わせる
+            // (決まった高さのままだと、文字を大きくしたときに2行目がはみ出すため。1.9.9)
+            itemHeight: null,
             dropdownColor: const Color.fromARGB(255, 30, 30, 30),
             items: [
               for (final s in senshu)
                 DropdownMenuItem<int>(
                   value: s.id,
-                  child: Text(
-                    '${_senshuBun(s, univMap)}'
-                    '${_entry(s) >= 0 && _entry(s) != kukan ? '(${_entry(s) + 1}区)' : ''}',
-                    style: TextStyle(
-                      color: s.univid == myUnivid
-                          ? Colors.amber
-                          : HENSUU.LinkColor,
-                      fontSize: HENSUU.fontsize_honbun - 2,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _senshuBun1(s, kukan),
+                          style: TextStyle(
+                            color: s.univid == myUnivid
+                                ? Colors.amber
+                                : HENSUU.LinkColor,
+                            fontSize: HENSUU.fontsize_honbun - 2,
+                          ),
+                        ),
+                        Text(
+                          _senshuBun2(s, univMap),
+                          style: TextStyle(
+                            color: s.univid == myUnivid
+                                ? Colors.amber
+                                : HENSUU.LinkColor,
+                            fontSize: HENSUU.fontsize_honbun - 2,
+                          ),
+                        ),
+                      ],
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
             ],

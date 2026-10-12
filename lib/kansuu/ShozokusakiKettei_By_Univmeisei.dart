@@ -105,8 +105,7 @@ List<int> shozokuChuusenOmomi({
 /// [gakunen]: 割り当てを行う学年。
 ///
 /// この関数は、渡されたリスト内のSenshuDataオブジェクトの
-/// プロパティ（主にunivid）を変更します。
-/// 変更を永続化するには、この関数を呼び出した後にHive Boxに保存し直す必要があります。
+/// プロパティ（主にunivid）を変更し、最後に[gakunen]の選手を保存します(1.9.8)。
 Future<void> ShozokusakiKettei_By_Univmeisei({
   required List<UnivData> sortedunivdata,
   required List<SenshuData> nyuugakuji5000_senshudata,
@@ -254,7 +253,14 @@ Future<void> ShozokusakiKettei_By_Univmeisei({
       }
     }
   }
+  // 所属先を決めた新入生(留学生にした選手も)を、ここで保存する(1.9.8)
+  // (1.9.7までは呼び出した側で保存することにしていたが、年度替わりでは保存しておらず、
+  //  コンピュータスカウトONの新入生スカウトの途中でアプリを終了すると、留学生にした選手が
+  //  保存してあった日本人の新入生に戻っていた。1.9.5からは出身校の処理が保存していた)
+  for (final SenshuData s in nyuugakuji5000_senshudata) {
+    if (s.gakunen == gakunen) {
+      await s.save();
+    }
+  }
   print('ShozokusakiKettei_By_Univmeisei: 大学所属先決定処理を完了しました。');
-  // この関数で変更された選手データ (nyuugakuji5000_senshudata) は、
-  // この関数を呼び出した側でHive Boxに保存し直す必要があります。
 }

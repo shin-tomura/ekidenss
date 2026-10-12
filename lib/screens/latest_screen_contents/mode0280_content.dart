@@ -426,9 +426,11 @@ class _Mode0280Content extends State<Mode0280Content> {
                 return ListView(
                   children: [
                     Text("目標達成時獲得金銀 $kakutokustr"),
-                    // 区間配置確認(1.9.9。よく使うので、目立つボタンにしてリンクの列の一番上に置いた。kukan_haiti_button.dart)
-                    if (widget.ghensuu.hyojiracebangou != 4)
-                      KukanHaitiKakuninButton(targetUnivid: widget.ghensuu.MYunivid),
+                    // 区間配置確認と今季タイム一覧表(1.9.9。よく使うので、目立つボタンにしてリンクの列の一番上に置いた。kukan_haiti_button.dart)
+                    KakuninButtons(
+                      targetUnivid: widget.ghensuu.MYunivid,
+                      kukanHaiti: widget.ghensuu.hyojiracebangou != 4,
+                    ),
                     // 生成AIに渡すテキストのまとめボタン(目標順位の相談用。1.8.3。
                     // 当日変更のあとの画面なので、全大学の区間配置が分かるものも出してよい)
                     const AiCopyMatomeButton(mokuhyouGamen: true),

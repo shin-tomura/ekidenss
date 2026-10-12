@@ -720,13 +720,13 @@ class Mode0330Content extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 const SizedBox(height: 20),
-                                // 区間配置確認(1.9.9。よく使うので、目立つボタンにしてリンクの列の一番上に置いた。kukan_haiti_button.dart。
+                                // 区間配置確認と今季タイム一覧表(1.9.9。よく使うので、目立つボタンにしてリンクの列の一番上に置いた。kukan_haiti_button.dart。
                                 // 他大学の区間エントリーは展望記事などで見えているので、直前順位予想でも見られるようにした。
                                 // 駅伝では補欠も見られ、当日変更を推理できる。ほかの画面と同じく、正月駅伝予選では出さない)
-                                if (currentGhensuu.hyojiracebangou != 4)
-                                  KukanHaitiKakuninButton(
-                                    targetUnivid: currentGhensuu.MYunivid,
-                                  ),
+                                KakuninButtons(
+                                  targetUnivid: currentGhensuu.MYunivid,
+                                  kukanHaiti: currentGhensuu.hyojiracebangou != 4,
+                                ),
                                 // 展望記事(箱庭スポーツ。予想陣の3人の予想も記事に使う。1.9.2)
                                 // 目立つように、優勝争いの記事の見出しを予告するカードにして、一番上に置いた
                                 KijiLinkCard(

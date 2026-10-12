@@ -18,7 +18,6 @@ import 'package:ekiden/screens/Modal_rankingall.dart';
 import 'package:ekiden/screens/Modal_daigakuKosei.dart'; // 大学の個性(大学ごとの設定をまとめた画面。1.9.1)
 import 'package:ekiden/screens/Modal_TrainingList.dart';
 import 'package:ekiden/screens/Modal_meiseiitiran.dart';
-import 'package:ekiden/screens/Modal_matrix.dart';
 import 'package:ekiden/screens/Modal_matrix2.dart';
 import 'package:ekiden/screens/Modal_matrix3.dart';
 import 'package:ekiden/screens/ModalAverageTop10TimeRankingView.dart';
@@ -29,6 +28,7 @@ import 'package:ekiden/kansuu/shiyou_text.dart'; // 留学生の入学の決ま�
 import 'package:ekiden/kansuu/kiji/kiji_kihon.dart'
     show KijiHyou, univSandaiHyou, konkiKaisaiZumi; // 三大駅伝の成績の表(1.9.8)
 import 'package:ekiden/screens/kiji_hyou_view.dart'; // 表の部品(1.9.8)
+import 'package:ekiden/screens/kukan_haiti_button.dart'; // 今季タイム一覧表を開くボタン(1.9.9)
 //import 'package:ekiden/kansuu/kojinBestKirokuJuniKettei.dart';
 // Modal views (placeholders for now, you'll need to create these files)
 //import 'package:ekiden/modals/modal_univ_name_henshuu_view.dart';
@@ -3860,6 +3860,8 @@ class _UnivScreenState extends State<UnivScreen> {
                             ),
                           ),
                         const SizedBox(height: 10),
+                        // 今季タイム一覧表(1.9.9。よく使うので、目立つボタンにしてリンクの列の一番上に置いた。kukan_haiti_button.dart)
+                        KakuninButtons(targetUnivid: ghensuu.hyojiunivnum, kukanHaiti: false),
                         TextButton(
                           onPressed: () {
                             showGeneralDialog(
@@ -4001,52 +4003,6 @@ class _UnivScreenState extends State<UnivScreen> {
                         ),
 
                         const SizedBox(height: 10),
-                        TextButton(
-                          onPressed: () {
-                            showGeneralDialog(
-                              context: context,
-                              barrierColor: Colors.black.withOpacity(
-                                0.8,
-                              ), // モーダルの背景色
-                              barrierDismissible: true, // 背景タップで閉じられるようにする
-                              barrierLabel: '今季タイム一覧表', // アクセシビリティ用ラベル
-                              transitionDuration: const Duration(
-                                milliseconds: 300,
-                              ), // アニメーション時間
-                              pageBuilder:
-                                  (context, animation, secondaryAnimation) {
-                                    // ここに表示したいモーダルのウィジェットを指定
-                                    return ModalUnivSenshuMatrixView(
-                                      targetUnivId: ghensuu.hyojiunivnum,
-                                    ); // const を追加
-                                  },
-                              transitionBuilder:
-                                  (
-                                    context,
-                                    animation,
-                                    secondaryAnimation,
-                                    child,
-                                  ) {
-                                    // モーダル表示時のアニメーション (例: フェードイン)
-                                    return FadeTransition(
-                                      opacity: CurvedAnimation(
-                                        parent: animation,
-                                        curve: Curves.easeOut,
-                                      ),
-                                      child: child,
-                                    );
-                                  },
-                            );
-                          },
-                          child: Text(
-                            "今季タイム一覧表",
-                            style: TextStyle(
-                              color: const Color.fromARGB(255, 0, 255, 0),
-                              decoration: TextDecoration.underline,
-                              decorationColor: HENSUU.textcolor,
-                            ),
-                          ),
-                        ),
                         const SizedBox(height: 10),
                         TextButton(
                           onPressed: () {

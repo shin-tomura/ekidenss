@@ -1639,9 +1639,11 @@ class _Mode0350ContentState extends State<Mode0350Content> {
     final KantokuData kantoku = kantokuBox.get('KantokuData')!;
     return Column(
       children: [
-        // 区間配置確認(1.9.9。よく使うので、目立つボタンにしてリンクの列の一番上に置いた。kukan_haiti_button.dart)
-        if (gh!.hyojiracebangou != 4)
-          KukanHaitiKakuninButton(targetUnivid: gh!.MYunivid),
+        // 区間配置確認と今季タイム一覧表(1.9.9。よく使うので、目立つボタンにしてリンクの列の一番上に置いた。kukan_haiti_button.dart)
+        KakuninButtons(
+          targetUnivid: gh!.MYunivid,
+          kukanHaiti: gh!.hyojiracebangou != 4,
+        ),
         if (!gakurenKantoku &&
             kantoku.yobiint2[17] == 1 &&
             (gh!.hyojiracebangou <= 2 || gh!.hyojiracebangou == 5))

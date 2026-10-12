@@ -22,7 +22,6 @@ import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/screens/Modal_senshu.dart';
 import 'package:ekiden/screens/Modal_courseshoukai.dart';
 import 'package:ekiden/screens/Modal_koteisaitekikai.dart';
-import 'package:ekiden/screens/Modal_matrix.dart';
 import 'package:ekiden/screens/ai_copy_matome.dart';
 import 'package:ekiden/screens/Modal_matrix2.dart';
 import 'package:ekiden/screens/Modal_matrix3.dart';
@@ -31,6 +30,7 @@ import 'package:ekiden/screens/custom_seigen_parts.dart';
 import 'package:ekiden/screens/All0300.dart';
 import 'package:ekiden/screens/Modal_Taichoufuryou.dart';
 import 'package:ekiden/kansuu/ShoriGuard.dart';
+import 'package:ekiden/screens/kukan_haiti_button.dart'; // 今季タイム一覧表を開くボタン(1.9.9)
 
 String _getCombinedDifficultyText(KantokuData kantoku, Ghensuu currentGhensuu) {
   // 難易度モードを取得 (0:通常, 1:極, 2:天)
@@ -2826,6 +2826,8 @@ class _Mode0300ContentState extends State<Mode0300Content> {
       children: [
         if (seigenOshirase.isNotEmpty)
           CustomSeigenOshiraseBox(bun: seigenOshirase),
+        // 今季タイム一覧表(1.9.9。よく使うので、目立つボタンにしてリンクの列の一番上に置いた。kukan_haiti_button.dart)
+        KakuninButtons(targetUnivid: currentGhensuu.MYunivid, kukanHaiti: false),
         // 生成AIに渡すテキストのまとめボタン(1.8.2)
         // 区間エントリーの画面では、ほかの大学の区間エントリーが分かってしまうものを出さない
         // (一次エントリーの画面と同じ一覧にする)
@@ -2963,44 +2965,6 @@ class _Mode0300ContentState extends State<Mode0300Content> {
           },
           child: Text(
             "区間コース確認",
-            style: TextStyle(
-              color: const Color.fromARGB(255, 0, 255, 0),
-              decoration: TextDecoration.underline,
-              decorationColor: HENSUU.textcolor,
-            ),
-          ),
-        ),
-        TextButton(
-          onPressed: () {
-            showGeneralDialog(
-              context: context,
-              barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
-              barrierDismissible: true, // 背景タップで閉じられるようにする
-              barrierLabel: '今季タイム一覧表', // アクセシビリティ用ラベル
-              transitionDuration: const Duration(
-                milliseconds: 300,
-              ), // アニメーション時間
-              pageBuilder: (context, animation, secondaryAnimation) {
-                // ここに表示したいモーダルのウィジェットを指定
-                return ModalUnivSenshuMatrixView(
-                  targetUnivId: currentGhensuu.MYunivid,
-                ); // const を追加
-              },
-              transitionBuilder:
-                  (context, animation, secondaryAnimation, child) {
-                    // モーダル表示時のアニメーション (例: フェードイン)
-                    return FadeTransition(
-                      opacity: CurvedAnimation(
-                        parent: animation,
-                        curve: Curves.easeOut,
-                      ),
-                      child: child,
-                    );
-                  },
-            );
-          },
-          child: Text(
-            "今季タイム一覧表",
             style: TextStyle(
               color: const Color.fromARGB(255, 0, 255, 0),
               decoration: TextDecoration.underline,

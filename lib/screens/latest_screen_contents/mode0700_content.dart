@@ -1374,12 +1374,11 @@ class _Mode0700ContentState extends State<Mode0700Content> {
                                                 ),
                                               ), // ★コンマを追加★
 
-                                            // 区間配置確認(1.9.9。よく使うので、目立つボタンにしてリンクの列の一番上に置いた。kukan_haiti_button.dart)
-                                            if (currentGhensuu.hyojiracebangou <= 2 ||
-                                                currentGhensuu.hyojiracebangou == 5)
-                                              KukanHaitiKakuninButton(
-                                                targetUnivid: currentGhensuu.MYunivid,
-                                              ),
+                                            // 区間配置確認と今季タイム一覧表(1.9.9。よく使うので、目立つボタンにしてリンクの列の一番上に置いた。kukan_haiti_button.dart)
+                                            KakuninButtons(
+                                              targetUnivid: currentGhensuu.MYunivid,
+                                              kukanHaiti: currentGhensuu.hyojiracebangou <= 2 || currentGhensuu.hyojiracebangou == 5,
+                                            ),
                                             // 生成AIに渡すテキストのまとめボタン(レース後の振り返り用。1.8.2)
                                             if (currentGhensuu
                                                     .hyojiracebangou <=

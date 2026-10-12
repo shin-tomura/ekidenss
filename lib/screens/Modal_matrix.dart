@@ -338,7 +338,8 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
   final ScreenshotController _screenshotController = ScreenshotController();
 
   // 表のデータ(選手の並び・順位・能力が見えるか・所属大学など)。中身は _KonkiSeisekiHyou を参照
-  late final _KonkiSeisekiHyou _hyou;
+  // (上のバーの大学名を押して大学を切り替えたときに作り直すので final にしない。1.9.9)
+  late _KonkiSeisekiHyou _hyou;
   List<SenshuData> get _sortedSenshu => _hyou.senshuList;
   String get _univName => _hyou.univName;
   Map<int, Map<int, int>> get _rankMap => _hyou.rankMap;
@@ -351,6 +352,53 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
 
   bool _isInitialized = false;
   bool _isExporting = false;
+
+  // 表示している大学(1.9.9。上のバーの大学名を押して切り替えられる。学連選抜の表では使わない)
+  int _univId = 0;
+
+  /// 表示する大学を選ぶ(1.9.9。自分の大学を先頭に、ほかは大学のidの順。全部の大学を出す)
+  Future<void> _univErabu() async {
+    if (widget.gakuren || _isExporting) return;
+    final Ghensuu? gh = Hive.box<Ghensuu>('ghensuuBox').getAt(0);
+    final int myUnivId = gh?.MYunivid ?? -1;
+    final List<UnivData> univs = Hive.box<UnivData>('univBox').values.toList()
+      ..sort((a, b) => a.id.compareTo(b.id));
+    final List<UnivData> narabi = [
+      ...univs.where((u) => u.id == myUnivId),
+      ...univs.where((u) => u.id != myUnivId),
+    ];
+    final int? erabi = await showDialog<int>(
+      context: context,
+      builder: (context) {
+        return SimpleDialog(
+          title: const Text(
+            '表示する大学',
+            style: TextStyle(color: Colors.black),
+          ),
+          children: [
+            for (final UnivData u in narabi)
+              SimpleDialogOption(
+                onPressed: () => Navigator.of(context).pop(u.id),
+                child: Text(
+                  '${u.name}大学${u.id == myUnivId ? '(自分の大学)' : ''}',
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontWeight: u.id == _univId
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+    if (erabi == null || erabi == _univId || !mounted) return;
+    setState(() {
+      _univId = erabi;
+      _hyou = _KonkiSeisekiHyou(univId: erabi);
+    });
+  }
 
   final double _rowHeight = 75.0;
 
@@ -902,8 +950,9 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
 
   void _prepareData() {
     // 表のデータは _KonkiSeisekiHyou で作る(テキストのコピーを画面の外からも作れるように。1.8.2)
+    _univId = widget.targetUnivId;
     _hyou = _KonkiSeisekiHyou(
-      univId: widget.targetUnivId,
+      univId: _univId,
       gakuren: widget.gakuren,
     );
     // 表示する列(1.9.7)
@@ -922,10 +971,24 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
         Scaffold(
           backgroundColor: HENSUU.backgroundcolor,
           appBar: AppBar(
-            title: Text(
-              '$_univName 今季成績',
-              style: const TextStyle(fontSize: 15),
-            ),
+            // 大学名を押すと、表示する大学を選べる(1.9.9。学連選抜の表は10人の決まったメンバーなので切り替えない)。
+            // 右のボタンの分だけ狭いので、2行までにして、入りきらなければ「…」で省く
+            title: widget.gakuren
+                ? Text(
+                    '$_univName 今季成績',
+                    style: const TextStyle(fontSize: 15),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  )
+                : InkWell(
+                    onTap: _univErabu,
+                    child: Text(
+                      '$_univName 今季成績 ▼',
+                      style: const TextStyle(fontSize: 15),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
             backgroundColor: HENSUU.backgroundcolor,
             foregroundColor: Colors.white,
             elevation: 0,
@@ -936,19 +999,45 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
                 tooltip: '列を選ぶ',
                 onPressed: _isExporting ? null : _retsuSentaku,
               ),
-              // テキストでコピー(CSV形式の文をクリップボードに入れる。1.8.2)
-              IconButton(
-                icon: const Icon(Icons.copy),
-                tooltip: 'テキストでコピー',
-                onPressed: _isExporting ? null : _copyAsText,
-              ),
-              IconButton(
-                icon: const Icon(Icons.image),
-                onPressed: _isExporting ? null : _shareFullTableImage,
-              ),
-              IconButton(
+              // 書き出し(テキストでコピー・画像・CSV)は、1つのボタンにまとめた(1.9.9。
+              // 上のバーの大学名の場所を広げるため。押すと3つから選ぶ)
+              PopupMenuButton<int>(
                 icon: const Icon(Icons.share),
-                onPressed: _isExporting ? null : _exportAndShareCsv,
+                tooltip: '書き出し',
+                enabled: !_isExporting,
+                onSelected: (int erabi) {
+                  if (erabi == 0) {
+                    // テキストでコピー(CSV形式の文をクリップボードに入れる。1.8.2)
+                    _copyAsText();
+                  } else if (erabi == 1) {
+                    _shareFullTableImage();
+                  } else {
+                    _exportAndShareCsv();
+                  }
+                },
+                itemBuilder: (context) => const [
+                  PopupMenuItem<int>(
+                    value: 0,
+                    child: ListTile(
+                      leading: Icon(Icons.copy),
+                      title: Text('テキストでコピー'),
+                    ),
+                  ),
+                  PopupMenuItem<int>(
+                    value: 1,
+                    child: ListTile(
+                      leading: Icon(Icons.image),
+                      title: Text('画像で共有'),
+                    ),
+                  ),
+                  PopupMenuItem<int>(
+                    value: 2,
+                    child: ListTile(
+                      leading: Icon(Icons.table_view),
+                      title: Text('CSVファイルで共有'),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

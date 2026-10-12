@@ -8,12 +8,12 @@ import 'package:ekiden/screens/Modal_senshu.dart';
 import 'package:ekiden/screens/Modal_courseshoukai.dart';
 import 'package:ekiden/screens/All0150.dart';
 import 'package:ekiden/kantoku_data.dart';
-import 'package:ekiden/screens/Modal_matrix.dart';
 import 'package:ekiden/screens/ai_copy_matome.dart';
 import 'package:ekiden/screens/Modal_matrix2.dart';
 import 'package:ekiden/screens/Modal_matrix3.dart';
 import 'package:ekiden/kansuu/custom_seigen.dart'; // カスタム駅伝の出場制限(1.9.1)
 import 'package:ekiden/screens/custom_seigen_parts.dart';
+import 'package:ekiden/screens/kukan_haiti_button.dart'; // 今季タイム一覧表を開くボタン(1.9.9)
 
 class Mode0150Content extends StatefulWidget {
   final Ghensuu ghensuu;
@@ -415,6 +415,11 @@ class _Mode0150ContentState extends State<Mode0150Content> {
                               // 出場制限で補った選手のお知らせ(1.9.1)
                               if (seigenOshirase.isNotEmpty)
                                 CustomSeigenOshiraseBox(bun: seigenOshirase),
+                              // 今季タイム一覧表(1.9.9。よく使うので、目立つボタンにしてリンクの列の一番上に置いた。kukan_haiti_button.dart)
+                              KakuninButtons(
+                                targetUnivid: currentGhensuu.MYunivid,
+                                kukanHaiti: false,
+                              ),
                               if (kantoku.yobiint2[17] == 1 &&
                                   (raceIndex <= 2 || raceIndex == 5))
                                 TextButton(
@@ -484,58 +489,6 @@ class _Mode0150ContentState extends State<Mode0150Content> {
                                   style: TextStyle(
                                     color: Color.fromARGB(255, 0, 255, 0),
                                     decoration: TextDecoration.underline,
-                                  ),
-                                ),
-                              ),
-                              TextButton(
-                                onPressed: () {
-                                  showGeneralDialog(
-                                    context: context,
-                                    barrierColor: Colors.black.withOpacity(
-                                      0.8,
-                                    ), // モーダルの背景色
-                                    barrierDismissible:
-                                        true, // 背景タップで閉じられるようにする
-                                    barrierLabel: '今季タイム一覧表', // アクセシビリティ用ラベル
-                                    transitionDuration: const Duration(
-                                      milliseconds: 300,
-                                    ), // アニメーション時間
-                                    pageBuilder:
-                                        (
-                                          context,
-                                          animation,
-                                          secondaryAnimation,
-                                        ) {
-                                          // ここに表示したいモーダルのウィジェットを指定
-                                          return ModalUnivSenshuMatrixView(
-                                            targetUnivId:
-                                                currentGhensuu.MYunivid,
-                                          ); // const を追加
-                                        },
-                                    transitionBuilder:
-                                        (
-                                          context,
-                                          animation,
-                                          secondaryAnimation,
-                                          child,
-                                        ) {
-                                          // モーダル表示時のアニメーション (例: フェードイン)
-                                          return FadeTransition(
-                                            opacity: CurvedAnimation(
-                                              parent: animation,
-                                              curve: Curves.easeOut,
-                                            ),
-                                            child: child,
-                                          );
-                                        },
-                                  );
-                                },
-                                child: Text(
-                                  "今季タイム一覧表",
-                                  style: TextStyle(
-                                    color: const Color.fromARGB(255, 0, 255, 0),
-                                    decoration: TextDecoration.underline,
-                                    decorationColor: HENSUU.textcolor,
                                   ),
                                 ),
                               ),

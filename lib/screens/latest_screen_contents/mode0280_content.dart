@@ -9,7 +9,7 @@ import 'package:ekiden/screens/ModalAverageTimeRankingView.dart';
 import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/screens/Modal_kukanentry.dart';
 //import 'package:ekiden/screens/Modal_senshu.dart';
-import 'package:ekiden/screens/Modal_kukanhaiti2.dart';
+import 'package:ekiden/screens/kukan_haiti_button.dart'; // 区間配置確認を開くボタン(1.9.9)
 import 'package:ekiden/screens/Modal_TodayChangeList.dart';
 import 'package:ekiden/screens/Modal_courseshoukai.dart';
 import 'package:ekiden/screens/Modal_kukanresult350.dart';
@@ -426,6 +426,9 @@ class _Mode0280Content extends State<Mode0280Content> {
                 return ListView(
                   children: [
                     Text("目標達成時獲得金銀 $kakutokustr"),
+                    // 区間配置確認(1.9.9。よく使うので、目立つボタンにしてリンクの列の一番上に置いた。kukan_haiti_button.dart)
+                    if (widget.ghensuu.hyojiracebangou != 4)
+                      KukanHaitiKakuninButton(targetUnivid: widget.ghensuu.MYunivid),
                     // 生成AIに渡すテキストのまとめボタン(目標順位の相談用。1.8.3。
                     // 当日変更のあとの画面なので、全大学の区間配置が分かるものも出してよい)
                     const AiCopyMatomeButton(mokuhyouGamen: true),
@@ -651,54 +654,6 @@ class _Mode0280Content extends State<Mode0280Content> {
                       ),
                     ),
 
-                    if (widget.ghensuu.hyojiracebangou != 4)
-                      TextButton(
-                        onPressed: () {
-                          // ★こちらも showGeneralDialog に変更★
-                          showGeneralDialog(
-                            context: context,
-                            barrierColor: Colors.black.withOpacity(
-                              0.8,
-                            ), // モーダルの背景色
-                            barrierDismissible: true, // 背景タップで閉じられるようにする
-                            barrierLabel: '区間配置確認', // アクセシビリティ用ラベル
-                            transitionDuration: const Duration(
-                              milliseconds: 300,
-                            ), // アニメーション時間
-                            pageBuilder:
-                                (context, animation, secondaryAnimation) {
-                                  // ここに表示したいモーダルのウィジェットを指定
-                                  return ModalKukanHaitiView(
-                                    targetUnivid: widget.ghensuu.MYunivid,
-                                  ); // const を追加
-                                },
-                            transitionBuilder:
-                                (
-                                  context,
-                                  animation,
-                                  secondaryAnimation,
-                                  child,
-                                ) {
-                                  // モーダル表示時のアニメーション (例: フェードイン)
-                                  return FadeTransition(
-                                    opacity: CurvedAnimation(
-                                      parent: animation,
-                                      curve: Curves.easeOut,
-                                    ),
-                                    child: child,
-                                  );
-                                },
-                          );
-                        },
-                        child: Text(
-                          "区間配置確認",
-                          style: TextStyle(
-                            color: const Color.fromARGB(255, 0, 255, 0),
-                            decoration: TextDecoration.underline,
-                            decorationColor: HENSUU.textcolor,
-                          ),
-                        ),
-                      ),
                     if (widget.ghensuu.hyojiracebangou <= 2 ||
                         widget.ghensuu.hyojiracebangou == 5 ||
                         widget.ghensuu.hyojiracebangou == 3)

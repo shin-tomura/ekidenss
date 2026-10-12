@@ -24,7 +24,7 @@ import 'package:ekiden/screens/gakuren_copy_button.dart';
 import 'package:ekiden/screens/ai_copy_matome.dart';
 import 'package:ekiden/screens/kiji_screen.dart'; // ニュース記事(1.9.2)
 import 'package:ekiden/kansuu/kiji/kiji.dart'; // ニュース記事のカードの見出しの予告(1.9.2)
-import 'package:ekiden/screens/Modal_kukanhaiti2.dart';
+import 'package:ekiden/screens/kukan_haiti_button.dart'; // 区間配置確認を開くボタン(1.9.9)
 import 'package:ekiden/screens/Modal_courseshoukai.dart';
 import 'package:ekiden/screens/Modal_tuukajunisuii.dart';
 import 'package:ekiden/screens/Modal_timesasuii.dart';
@@ -1374,6 +1374,12 @@ class _Mode0700ContentState extends State<Mode0700Content> {
                                                 ),
                                               ), // ★コンマを追加★
 
+                                            // 区間配置確認(1.9.9。よく使うので、目立つボタンにしてリンクの列の一番上に置いた。kukan_haiti_button.dart)
+                                            if (currentGhensuu.hyojiracebangou <= 2 ||
+                                                currentGhensuu.hyojiracebangou == 5)
+                                              KukanHaitiKakuninButton(
+                                                targetUnivid: currentGhensuu.MYunivid,
+                                              ),
                                             // 生成AIに渡すテキストのまとめボタン(レース後の振り返り用。1.8.2)
                                             if (currentGhensuu
                                                     .hyojiracebangou <=
@@ -1536,78 +1542,6 @@ class _Mode0700ContentState extends State<Mode0700Content> {
                                                 ),
                                               ),
 
-                                            if (currentGhensuu
-                                                        .hyojiracebangou <=
-                                                    2 ||
-                                                currentGhensuu
-                                                        .hyojiracebangou ==
-                                                    5)
-                                              TextButton(
-                                                onPressed: () {
-                                                  showGeneralDialog(
-                                                    context: context,
-                                                    barrierColor: Colors.black
-                                                        .withOpacity(
-                                                          0.8,
-                                                        ), // モーダルの背景色
-                                                    barrierDismissible:
-                                                        true, // 背景タップで閉じられるようにする
-                                                    barrierLabel:
-                                                        '区間配置確認', // アクセシビリティ用ラベル
-                                                    transitionDuration:
-                                                        const Duration(
-                                                          milliseconds: 300,
-                                                        ), // アニメーション時間
-                                                    pageBuilder:
-                                                        (
-                                                          context,
-                                                          animation,
-                                                          secondaryAnimation,
-                                                        ) {
-                                                          // ここに表示したいモーダルのウィジェットを指定
-                                                          return ModalKukanHaitiView(
-                                                            targetUnivid:
-                                                                currentGhensuu
-                                                                    .MYunivid,
-                                                          ); // const を追加
-                                                        },
-                                                    transitionBuilder:
-                                                        (
-                                                          context,
-                                                          animation,
-                                                          secondaryAnimation,
-                                                          child,
-                                                        ) {
-                                                          // モーダル表示時のアニメーション (例: フェードイン)
-                                                          return FadeTransition(
-                                                            opacity:
-                                                                CurvedAnimation(
-                                                                  parent:
-                                                                      animation,
-                                                                  curve: Curves
-                                                                      .easeOut,
-                                                                ),
-                                                            child: child,
-                                                          );
-                                                        },
-                                                  );
-                                                },
-                                                child: Text(
-                                                  "区間配置確認",
-                                                  style: TextStyle(
-                                                    color: const Color.fromARGB(
-                                                      255,
-                                                      0,
-                                                      255,
-                                                      0,
-                                                    ),
-                                                    decoration: TextDecoration
-                                                        .underline,
-                                                    decorationColor:
-                                                        HENSUU.textcolor,
-                                                  ),
-                                                ),
-                                              ),
 
                                             if (currentGhensuu
                                                         .hyojiracebangou <=

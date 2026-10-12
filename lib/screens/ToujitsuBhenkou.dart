@@ -10,7 +10,7 @@ import 'package:ekiden/screens/ModalAverageTimeRankingView.dart';
 import 'package:ekiden/screens/Modal_courseshoukai.dart';
 import 'package:ekiden/screens/Modal_kukanresult350.dart';
 import 'package:ekiden/screens/Modal_tuukajuni.dart';
-import 'package:ekiden/screens/Modal_kukanhaiti2.dart';
+import 'package:ekiden/screens/kukan_haiti_button.dart'; // 区間配置確認を開くボタン(1.9.9)
 import 'package:ekiden/screens/Modal_TodayChangeList.dart';
 import 'package:ekiden/screens/Modal_matrix.dart';
 import 'package:ekiden/screens/Modal_matrix2.dart';
@@ -653,6 +653,8 @@ class _ToujitsuBHenkouScreenState extends State<ToujitsuBHenkouScreen> {
 
                   const SizedBox(height: 20),
 
+                  // 区間配置確認(1.9.9。よく使うので、目立つボタンにしてリンクの列の一番上に置いた。kukan_haiti_button.dart)
+                  KukanHaitiKakuninButton(targetUnivid: currentGhensuu.MYunivid),
                   // 生成AIに渡すテキストのまとめボタン(当日変更の相談用。1.8.3。
                   // コンピュータの大学の当日変更はプレイヤーの確定のあとなので、全大学の区間配置を出してよい)
                   const AiCopyMatomeButton(toujitsuGamen: true),
@@ -1006,45 +1008,6 @@ class _ToujitsuBHenkouScreenState extends State<ToujitsuBHenkouScreen> {
                     ),
                   ),
                   const SizedBox(height: 20),
-                  TextButton(
-                    onPressed: () {
-                      // ★こちらも showGeneralDialog に変更★
-                      showGeneralDialog(
-                        context: context,
-                        barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
-                        barrierDismissible: true, // 背景タップで閉じられるようにする
-                        barrierLabel: '区間配置確認', // アクセシビリティ用ラベル
-                        transitionDuration: const Duration(
-                          milliseconds: 300,
-                        ), // アニメーション時間
-                        pageBuilder: (context, animation, secondaryAnimation) {
-                          // ここに表示したいモーダルのウィジェットを指定
-                          return ModalKukanHaitiView(
-                            targetUnivid: currentGhensuu.MYunivid,
-                          ); // const を追加
-                        },
-                        transitionBuilder:
-                            (context, animation, secondaryAnimation, child) {
-                              // モーダル表示時のアニメーション (例: フェードイン)
-                              return FadeTransition(
-                                opacity: CurvedAnimation(
-                                  parent: animation,
-                                  curve: Curves.easeOut,
-                                ),
-                                child: child,
-                              );
-                            },
-                      );
-                    },
-                    child: Text(
-                      "区間配置確認",
-                      style: TextStyle(
-                        color: const Color.fromARGB(255, 0, 255, 0),
-                        decoration: TextDecoration.underline,
-                        decorationColor: HENSUU.textcolor,
-                      ),
-                    ),
-                  ),
                   const SizedBox(height: 20),
                   TextButton(
                     onPressed: () {

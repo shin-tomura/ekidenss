@@ -15,7 +15,7 @@ import 'package:ekiden/screens/Modal_kukanentry.dart';
 import 'package:ekiden/screens/Modal_senshu.dart';
 import 'package:ekiden/screens/Modal_kukanresult350.dart';
 import 'package:ekiden/screens/Modal_tuukajuni.dart';
-import 'package:ekiden/screens/Modal_kukanhaiti2.dart';
+import 'package:ekiden/screens/kukan_haiti_button.dart'; // 区間配置確認を開くボタン(1.9.9)
 import 'package:ekiden/screens/Modal_TodayChangeList.dart';
 import 'package:ekiden/screens/Modal_courseshoukai.dart';
 import 'package:ekiden/screens/Modal_siji.dart';
@@ -1639,6 +1639,9 @@ class _Mode0350ContentState extends State<Mode0350Content> {
     final KantokuData kantoku = kantokuBox.get('KantokuData')!;
     return Column(
       children: [
+        // 区間配置確認(1.9.9。よく使うので、目立つボタンにしてリンクの列の一番上に置いた。kukan_haiti_button.dart)
+        if (gh!.hyojiracebangou != 4)
+          KukanHaitiKakuninButton(targetUnivid: gh!.MYunivid),
         if (!gakurenKantoku &&
             kantoku.yobiint2[17] == 1 &&
             (gh!.hyojiracebangou <= 2 || gh!.hyojiracebangou == 5))
@@ -1795,46 +1798,6 @@ class _Mode0350ContentState extends State<Mode0350Content> {
           ),
         ),
 
-        if (gh!.hyojiracebangou != 4)
-          TextButton(
-            onPressed: () {
-              // ★こちらも showGeneralDialog に変更★
-              showGeneralDialog(
-                context: context,
-                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
-                barrierDismissible: true, // 背景タップで閉じられるようにする
-                barrierLabel: '区間配置確認', // アクセシビリティ用ラベル
-                transitionDuration: const Duration(
-                  milliseconds: 300,
-                ), // アニメーション時間
-                pageBuilder: (context, animation, secondaryAnimation) {
-                  // ここに表示したいモーダルのウィジェットを指定
-                  return ModalKukanHaitiView(
-                    targetUnivid: gh!.MYunivid,
-                  ); // const を追加
-                },
-                transitionBuilder:
-                    (context, animation, secondaryAnimation, child) {
-                      // モーダル表示時のアニメーション (例: フェードイン)
-                      return FadeTransition(
-                        opacity: CurvedAnimation(
-                          parent: animation,
-                          curve: Curves.easeOut,
-                        ),
-                        child: child,
-                      );
-                    },
-              );
-            },
-            child: Text(
-              "区間配置確認",
-              style: TextStyle(
-                color: const Color.fromARGB(255, 0, 255, 0),
-                decoration: TextDecoration.underline,
-                decorationColor: HENSUU.textcolor,
-              ),
-            ),
-          ),
         if (gh!.hyojiracebangou <= 2 ||
             gh!.hyojiracebangou == 5 ||
             gh!.hyojiracebangou == 3)

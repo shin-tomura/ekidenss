@@ -30,6 +30,7 @@ import 'package:ekiden/screens/Modal_tuukajunisuii.dart';
 import 'package:ekiden/screens/Modal_timesasuii.dart';
 import 'package:ekiden/kansuu/gakuren_text.dart';
 import 'package:ekiden/kansuu/gakuren_kantoku.dart'; // 学連選抜の監督をした年か(1.8.3)
+import 'package:ekiden/kansuu/mokuhyou_hosei.dart'; // 補正の強さが0%なら「タイム悪化あり」を出さない(1.9.8)
 
 // モーダルビューのプレースホルダー
 // 実際にはこれらのファイルを別途作成する必要があります
@@ -3229,7 +3230,9 @@ class _Mode0700ContentState extends State<Mode0700Content> {
                   mokuhyoJuniFlagIndex &&
               idJunUnivData[senshu.univid]
                       .mokuhyojuniwositamawatteruflag[mokuhyoJuniFlagIndex] ==
-                  1)
+                  1 &&
+              // 悪化を0%にしているときは出さない(1.9.8)
+              shitamawariAkkaAri())
             // 根拠(襷を受けた時点の順位・目標順位・差)は、走った時点で記録した補正の説明に出る。
             // ここで今の目標順位から作ると、レース中に目標を変えたときに補正の説明と食い違うので出さない(1.8.3)
             Text(
@@ -3244,7 +3247,8 @@ class _Mode0700ContentState extends State<Mode0700Content> {
                   mokuhyoJuniFlagIndex &&
               idJunUnivData[senshu.univid]
                       .mokuhyojuniwositamawatteruflag[mokuhyoJuniFlagIndex] <
-                  0)
+                  0 &&
+              hitoikiAkkaAri())
             Text(
               "チーム目標順位を上回っていたことによるほっと一息でのタイム悪化あり",
               style: const TextStyle(color: HENSUU.textcolor),

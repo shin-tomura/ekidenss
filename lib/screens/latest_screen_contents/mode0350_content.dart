@@ -2539,12 +2539,17 @@ class _Mode0350ContentState extends State<Mode0350Content> {
                             1) {
                       // 根拠(襷を受けた時点の順位・目標順位・差)は、走った時点で記録した補正の説明に出る。
                       // ここで今の目標順位から作ると、レース中に目標を変えたときに補正の説明と食い違うので出さない(1.8.3)
-                      sijiResult = "チーム目標順位を下回っていたことによる前半突っ込みでのタイム悪化あり";
+                      // 悪化を0%にしているときは出さない(1.9.8)
+                      if (shitamawariAkkaAri()) {
+                        sijiResult = "チーム目標順位を下回っていたことによる前半突っ込みでのタイム悪化あり";
+                      }
                     } else if (i_kukan > 0 &&
                         idjununivdata[currentGhensuu.MYunivid]
                                 .mokuhyojuniwositamawatteruflag[i_kukan - 1] <
                             0) {
-                      sijiResult = "チーム目標順位を上回っていたことによるほっと一息でのタイム悪化あり";
+                      if (hitoikiAkkaAri()) {
+                        sijiResult = "チーム目標順位を上回っていたことによるほっと一息でのタイム悪化あり";
+                      }
                     }
                   }
 
@@ -2707,12 +2712,17 @@ class _Mode0350ContentState extends State<Mode0350Content> {
                             1) {
                       // 根拠(襷を受けた時点の順位・目標順位・差)は、走った時点で記録した補正の説明に出る。
                       // ここで今の目標順位から作ると、レース中に目標を変えたときに補正の説明と食い違うので出さない(1.8.3)
-                      sijiResult = "チーム目標順位を下回っていたことによる前半突っ込みでのタイム悪化あり";
+                      // 悪化を0%にしているときは出さない(1.9.8)
+                      if (shitamawariAkkaAri()) {
+                        sijiResult = "チーム目標順位を下回っていたことによる前半突っ込みでのタイム悪化あり";
+                      }
                     } else if (i_kukan > 0 &&
                         idjununivdata[currentGhensuu.MYunivid]
                                 .mokuhyojuniwositamawatteruflag[i_kukan - 1] <
                             0) {
-                      sijiResult = "チーム目標順位を上回っていたことによるほっと一息でのタイム悪化あり";
+                      if (hitoikiAkkaAri()) {
+                        sijiResult = "チーム目標順位を上回っていたことによるほっと一息でのタイム悪化あり";
+                      }
                     }
                   }
 

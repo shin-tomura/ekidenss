@@ -6,6 +6,7 @@ import 'package:ekiden/senshu_data.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/kansuu/time_date.dart';
 import 'package:ekiden/kansuu/setsumei_sontoku.dart'; // 補正の損得と指示の成否の書き足し(1.8.8)
+import 'package:ekiden/kansuu/mokuhyou_hosei.dart'; // 補正の強さが0%なら「タイム悪化あり」を書かない(1.9.8)
 
 // ------------------------------------------------------------
 // 自分の大学のレース経過のテキスト(1.8.2)
@@ -162,9 +163,14 @@ String jibunRaceKeikaText(Ghensuu currentGhensuu) {
           sijiResult = "結果:${kekka[x.sijiseikouflag.clamp(0, 1).toInt()]}";
         } else if (my.mokuhyojuniwositamawatteruflag[k - 1] == 1) {
           // 根拠(襷を受けた時点の順位・目標順位・差)は、走った時点で記録した補正の説明に出る(1.8.3)
-          sijiResult = "チーム目標順位を下回っていたことによる前半突っ込みでのタイム悪化あり";
+          // 悪化を0%にしているときは書かない(1.9.8)
+          if (shitamawariAkkaAri()) {
+            sijiResult = "チーム目標順位を下回っていたことによる前半突っ込みでのタイム悪化あり";
+          }
         } else if (my.mokuhyojuniwositamawatteruflag[k - 1] < 0) {
-          sijiResult = "チーム目標順位を上回っていたことによるほっと一息でのタイム悪化あり";
+          if (hitoikiAkkaAri()) {
+            sijiResult = "チーム目標順位を上回っていたことによるほっと一息でのタイム悪化あり";
+          }
         }
       }
       sb.writeln('  指示内容:${options[sijiflag]}');

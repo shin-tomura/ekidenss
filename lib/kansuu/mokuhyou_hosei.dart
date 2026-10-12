@@ -1,3 +1,4 @@
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/kantoku_data.dart';
 
@@ -146,6 +147,19 @@ class HoseiTsuyosa {
   bool get shokiti =>
       shitamawari == 1.0 && hitoiki == 1.0 && seikou == 1.0 && shippai == 1.0;
 }
+
+/// 今の設定の補正の強さ(画面やテキストで使う。監督のデータが読めなければ初期値の100%。1.9.8)
+HoseiTsuyosa hoseiTsuyosaIma() {
+  final KantokuData? kantoku = Hive.box<KantokuData>('kantokuBox').get('KantokuData');
+  return kantoku == null ? const HoseiTsuyosa() : HoseiTsuyosa.fromKantoku(kantoku);
+}
+
+/// 目標順位を下回ったときの悪化(前半突っ込み)を「タイム悪化あり」と出すか
+/// (「目標順位・指示の補正設定」で0%なら、補正の説明に+0.0秒の行が残っても出さない。1.9.8)
+bool shitamawariAkkaAri() => hoseiTsuyosaIma().shitamawari > 0;
+
+/// ほっと一息を「タイム悪化あり」と出すか(0%なら出さない。1.9.8)
+bool hitoikiAkkaAri() => hoseiTsuyosaIma().hitoiki > 0;
 
 /// 「前半突っ込み」の指示に成功したときのタイムの倍率(初期値0.99)
 double sijiTsukkomiSeikouBairitsu(HoseiTsuyosa tsuyosa) {

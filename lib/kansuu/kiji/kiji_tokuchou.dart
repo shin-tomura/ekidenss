@@ -946,6 +946,9 @@ class TokuchouKaki {
 
     // S3 なぜそうなったか(指示・焦り・集団のペース・際立った能力)
     final StringBuffer sb3 = StringBuffer();
+    // 目標を下回っての焦り・上回ってのほっと一息を理由として書くのは、期待以下か順位を落としたときだけ
+    // (1.9.8。期待以上や順位を上げたときに書くと、結果と食い違って読める)
+    final bool furuwazu = hantei == 3 || (d < 0 && hantei != 1);
     // 駅伝男・平常心の高い選手は、指示の成否を持ち味に結びつける(1.9.7)
     final String? kimochi = kimochiFurikaeri(
       w,
@@ -978,10 +981,9 @@ class TokuchouKaki {
       sb3.write(jijou.seikou! ? '前半から突っ込む指示に、しっかり応えた。' : '前半から突っ込む指示だったが、後半に失速した。');
     } else if (jijou.siji == 2 && jijou.seikou != null) {
       sb3.write(jijou.seikou! ? '前半を抑える指示どおり、後半に伸びた。' : '前半を抑える指示だったが、思うように上げられなかった。');
-    } else if (jijou.aseri && aseriWoKaku(k)) {
+    } else if (jijou.aseri && aseriWoKaku(k) && furuwazu) {
       sb3.write('目標順位を下回ってたすきを受け、前半から突っ込んだ分が後半に響いた。');
-    } else if (jijou.hitoiki && hitoikiWoKaku(k) && (hantei == 3 || (d < 0 && hantei != 1))) {
-      // ほっと一息の悪化は小さいので、理由として書くのは期待以下か順位を落としたときだけ(1.9.8)
+    } else if (jijou.hitoiki && hitoikiWoKaku(k) && furuwazu) {
       sb3.write('目標を上回る位置でたすきを受け、少し気持ちが緩んだか。');
     }
     if ((hantei == 1 || yoi) && jijou.kiwaYoi != null) {

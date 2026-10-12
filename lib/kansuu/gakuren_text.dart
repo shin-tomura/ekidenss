@@ -12,6 +12,7 @@ import 'package:ekiden/kansuu/kukannai_juni.dart'; // 持ちタイムの区間�
 import 'package:ekiden/kansuu/gakuren_kantoku.dart';
 import 'package:ekiden/kansuu/setsumei_sontoku.dart'; // 補正の損得と指示の成否の書き足し(1.8.8)
 import 'package:ekiden/kansuu/konki_best.dart'; // 今季ベスト(1.9.1)
+import 'package:ekiden/kansuu/mokuhyou_hosei.dart'; // 補正の強さが0%なら「タイム悪化あり」を書かない(1.9.8)
 
 // ------------------------------------------------------------
 // 学連選抜のテキスト(1.8.2)
@@ -459,11 +460,16 @@ List<String> gakurenSijiBun(
     bun.add('結果:${kekka[s.sijiseikouflag.clamp(0, 1).toInt()]}');
   } else if (u.mokuhyojuniwositamawatteruflag.length > kukan - 1 &&
       u.mokuhyojuniwositamawatteruflag[kukan - 1] == 1) {
-    bun.add('学連選抜の目標順位を下回っていたことによる前半突っ込みでのタイム悪化あり');
+    // 悪化を0%にしているときは書かない(1.9.8)
+    if (shitamawariAkkaAri()) {
+      bun.add('学連選抜の目標順位を下回っていたことによる前半突っ込みでのタイム悪化あり');
+    }
   } else if (u.mokuhyojuniwositamawatteruflag.length > kukan - 1 &&
       u.mokuhyojuniwositamawatteruflag[kukan - 1] < 0) {
-    // 目標を上回ったときのほっと一息(学連選抜の監督をしているときだけ)
-    bun.add('学連選抜の目標順位を上回っていたことによるほっと一息でのタイム悪化あり');
+    // 目標を上回ったときのほっと一息(学連選抜の監督をしているときだけ。0%なら書かない)
+    if (hitoikiAkkaAri()) {
+      bun.add('学連選抜の目標順位を上回っていたことによるほっと一息でのタイム悪化あり');
+    }
   }
   return bun;
 }

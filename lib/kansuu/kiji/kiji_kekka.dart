@@ -1737,7 +1737,7 @@ Kiji? _jibunKiji(EkidenKekka e) {
     final List<String> hoka = [];
     for (final int k2 in jijouJun.skip(1)) {
       final ToujituJijou j2 = jijou[k2]!;
-      hoka.add('${k2 + 1}区に${w.senshu(j2.hairi)}(区間${m.kukanJuni[k2] + 1}位)');
+      hoka.add('${k2 + 1}区に${w.senshuSoe(j2.hairi, '区間${m.kukanJuni[k2] + 1}位')}');
       kaita.add(k2);
     }
     if (hoka.isNotEmpty) {

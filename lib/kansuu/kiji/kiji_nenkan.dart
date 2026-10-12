@@ -130,9 +130,9 @@ List<int> _konkiBestKoushin(KijiKankyou k, SenshuData s) {
 }
 
 /// 選手の呼び方(大学名つき)
-String _daigakuTsuki(KijiKankyou k, KijiKakite w, SenshuData s) {
+String _daigakuTsuki(KijiKankyou k, KijiKakite w, SenshuData s, {String soe = ''}) {
   final String d = (s.univid >= 0 && s.univid < k.univ.length) ? '${daigakuMei(k.univ[s.univid])}・' : '';
-  return '$d${w.senshu(s)}';
+  return '$d${w.senshuSoe(s, soe)}';
 }
 
 /// 年度の文(「2026年度」。1〜3月なので、前の年の4月からの年度)
@@ -270,7 +270,8 @@ List<Kiji> nenkanHyoushouKiji(KijiKankyou k) {
   final StringBuffer lead = StringBuffer();
   lead.write('本紙は、$nendoの大学駅伝・陸上長距離の年間表彰を発表した。');
   lead.write('対象は三大駅伝(${_sandai.map(courseRaceTitle).join('・')})と対校戦の3種目で、区間順位と種目の順位を点にして選んだ。');
-  lead.write('年間最優秀選手には、${_naiyouMoji(mvp)}の$mvpMei(${mvp.s.gakunen}年)を選んだ。');
+  // 学年は名前を初めて出すときに付く(mvpMei に入っている)ので、ここでは足さない(1.9.8)
+  lead.write('年間最優秀選手には、${_naiyouMoji(mvp)}の$mvpMeiを選んだ。');
 
   // 年間最優秀選手
   w.koMidashi('年間最優秀選手　${w.senshu(mvp.s)}');
@@ -287,10 +288,11 @@ List<Kiji> nenkanHyoushouKiji(KijiKankyou k) {
   if (mvp.s.gakunen == 4) mb.write('4年生にとっては、最後の1年での受賞となった。');
   if (tenAri.length >= 2) {
     final _Seiseki ji = tenAri[1];
-    mb.write('次点は${_daigakuTsuki(k, w, ji.s)}(${ji.s.gakunen}年)${_naiyouMoji(ji).isNotEmpty ? '(${_naiyouMoji(ji)})' : ''}');
+    // 学年と成績は1つのかっこにまとめる(「山田太郎(3年・…)」。1.9.8)
+    mb.write('次点は${_daigakuTsuki(k, w, ji.s, soe: _naiyouMoji(ji))}');
     if (tenAri.length >= 3) {
       final _Seiseki san = tenAri[2];
-      mb.write('、3位は${_daigakuTsuki(k, w, san.s)}(${san.s.gakunen}年)');
+      mb.write('、3位は${_daigakuTsuki(k, w, san.s)}');
     }
     mb.write('だった。');
   }

@@ -1008,14 +1008,14 @@ Kiji _kukanTenbou(Tenbou t, List<KijiYosouJin> yosou) {
     if (ma.isEmpty) {
       sb.write('持ちタイムの比べにくい区間だ。');
     } else {
-      sb.write('${kijiShumokuMei[idx]}の持ちタイムで${w.senshu(a, daigaku: true)}($ma)がトップ。');
+      sb.write('${kijiShumokuMei[idx]}の持ちタイムで${w.senshuSoe(a, ma, daigaku: true)}がトップ。');
       // 持ちタイム1位の選手の因縁(点の高いものだけ。1.9.4)
       final List<Innen> ai = senshuInnen(k, a, kk, kekka: false);
       if (ai.isNotEmpty && ai.first.ten >= 55) sb.write(ai.first.bun);
       final List<String> tsuzuku = [
         for (final SenshuData s in j.skip(1).take(2))
           if (t.mochiMoji(s, idx).isNotEmpty)
-            '${w.senshu(s)}(${t.univMei(s.univid)})',
+            w.senshuSoe(s, t.univMei(s.univid)),
       ];
       if (tsuzuku.isNotEmpty) sb.write('${tsuzuku.join('、')}が続く。');
     }
@@ -1865,7 +1865,7 @@ Kiji? _toujitsuKekkaTenbou(Tenbou t) {
     } else {
       final List<String> narabi = [
         for (final _Henkou h in omo)
-          '${h.x.mei}の${w.senshu(h.haitta!)}(${jouiMoji(h.haitta!)}、${h.kk + 1}区)',
+          '${h.x.mei}の${w.senshuSoe(h.haitta!, '${jouiMoji(h.haitta!)}、${h.kk + 1}区')}',
       ];
       w.danraku(
         '当日変更で起用された主な選手は、${narabi.join('、')}。'
@@ -1901,7 +1901,7 @@ Kiji? _toujitsuKekkaTenbou(Tenbou t) {
     } else {
       final List<String> narabi = [
         for (final _Henkou h in hazushi.take(3))
-          '${h.x.mei}の${w.senshu(h.deta)}(${jouiMoji(h.deta)}、${h.kk + 1}区)',
+          '${h.x.mei}の${w.senshuSoe(h.deta, '${jouiMoji(h.deta)}、${h.kk + 1}区')}',
       ];
       sb.write(
         '${narabi.join('、')}${hazushi.length > 3 ? 'ら${hazushi.length}人' : ''}は、'
@@ -1928,7 +1928,7 @@ Kiji? _toujitsuKekkaTenbou(Tenbou t) {
   if (demasezu.isNotEmpty) {
     final List<String> narabi = [
       for (final d in demasezu.take(3))
-        '${d.x.mei}の${w.senshu(d.s)}(${jouiMoji(d.s)})',
+        '${d.x.mei}の${w.senshuSoe(d.s, '${jouiMoji(d.s)}')}',
     ];
     // 温存の印(コンピュータの大学の戦略的エントリー)や体調不良が分かれば、そのことを書く(1.9.4)
     final List<String> wake = [];
@@ -2167,7 +2167,7 @@ Kiji? _toujitsuTenbou(Tenbou t) {
   } else {
     final List<String> narabi = [
       for (final _HoketsuJitsuryokusha h in hoketsu)
-        '${h.x.mei}の${w.senshu(h.s)}(${juniMei(h)})',
+        '${h.x.mei}の${w.senshuSoe(h.s, juniMei(h))}',
     ];
     w.danraku(
       '補欠に入ったのは、${narabi.join('、')}。'
@@ -2832,7 +2832,7 @@ Kiji? _chuumokuTenbou(Tenbou t, List<KijiYosouJin> yosou) {
       );
       final List<String> tsuzuku = [
         for (final SenshuData s in j.skip(1).take(2))
-          if (t.mochiMoji(s, idx).isNotEmpty) '${w.senshu(s)}(${t.univMei(s.univid)})',
+          if (t.mochiMoji(s, idx).isNotEmpty) w.senshuSoe(s, t.univMei(s.univid)),
       ];
       if (tsuzuku.isNotEmpty) sb.write('${tsuzuku.join('、')}が続く。');
       final int? soroi = _soroiKukanshou(t, yosou, kk);
@@ -2919,7 +2919,7 @@ Kiji? _chuumokuTenbou(Tenbou t, List<KijiYosouJin> yosou) {
   );
   final List<String> tsuzuku = [
     for (final SenshuData s in j.skip(1).take(4))
-      if (t.mochiMoji(s, idx).isNotEmpty) '${w.senshu(s, daigaku: true)}(${t.mochiMoji(s, idx)})',
+      if (t.mochiMoji(s, idx).isNotEmpty) w.senshuSoe(s, t.mochiMoji(s, idx), daigaku: true),
   ];
   if (tsuzuku.isNotEmpty) {
     w.danraku('持ちタイムの上位には${tsuzuku.join('、')}が並ぶ。');

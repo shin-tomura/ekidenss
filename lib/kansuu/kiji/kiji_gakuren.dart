@@ -123,6 +123,19 @@ String _mei(KijiKakite w, _GSenshu x, {bool daigaku = false}) {
   );
 }
 
+/// 選手の呼び方に、かっこの補足[soe]を添える(初めてなら学年と1つのかっこにまとめる。1.9.8)
+String _meiSoe(KijiKakite w, _GSenshu x, String soe, {bool daigaku = false}) {
+  final SenshuData? s = x.s;
+  if (s != null) return w.senshuSoe(s, soe, daigaku: daigaku);
+  return w.hitoSoe(
+    'G${x.g.id}',
+    x.g.name,
+    '${x.g.gakunen}年',
+    daigaku ? '${x.shozoku}の' : '',
+    soe,
+  );
+}
+
 /// 正月駅伝予選の全体順位(0が1位)とタイム(走っていなければnull。タイムがなければ DEFAULTTIME)
 ({int juni, double time})? _yosenKekka(Senshu_Gakuren_Data g) {
   final int gi = g.gakunen - 1;
@@ -369,7 +382,7 @@ String _atoComment(KijiKakite w, String yobi, String shozoku, int j, int d, int 
 
 /// 人の名前を「、」でつなぐ(4人以上なら「○人」)
 String _narabe(KijiKakite w, List<_GSenshu> l) {
-  return [for (final _GSenshu x in l) '${_mei(w, x)}(${x.shozoku})'].join('、');
+  return [for (final _GSenshu x in l) _meiSoe(w, x, x.shozoku)].join('、');
 }
 
 // ------------------------------------------------------------

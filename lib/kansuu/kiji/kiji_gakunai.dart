@@ -1344,7 +1344,7 @@ Kiji? _fukuro(KijiKankyou k, String site, UnivData u) {
     for (int kk = 0; kk < 5; kk++) {
       final SenshuData? s = _kukanNoSenshu(k, kk);
       if (s == null) continue;
-      l.add('${kk + 1}区${w.senshu(s)}(区間${o.kukanJuni[kk] + 1}位)');
+      l.add('${kk + 1}区${w.senshuSoe(s, '区間${o.kukanJuni[kk] + 1}位')}');
     }
     if (l.isNotEmpty) w.danraku('往路は、${l.join('、')}がたすきをつないだ。');
   }

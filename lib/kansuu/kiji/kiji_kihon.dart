@@ -1935,6 +1935,28 @@ class KijiKakite {
     );
   }
 
+  /// 選手の呼び方に、かっこの補足[soe]を添える
+  /// (初めては「山田太郎(2年・区間5位)」、2回目からは「山田(区間5位)」。学年のかっこのすぐ後ろに
+  /// 別のかっこが続かないように1つにまとめる。[soe]が空なら senshu と同じ。1.9.8)
+  String senshuSoe(SenshuData s, String soe, {bool daigaku = false}) {
+    return hitoSoe(
+      'S${s.id}',
+      s.name,
+      '${s.gakunen}年',
+      daigaku && s.univid >= 0 && s.univid < k.univ.length
+          ? '${daigakuMei(k.univ[s.univid])}の'
+          : '',
+      soe,
+    );
+  }
+
+  /// 人の呼び方に、かっこの補足[soe]を添える(hito と同じ決まりで、初めてなら[kakko]と1つのかっこにまとめる。1.9.8)
+  String hitoSoe(String kagi, String name, String kakko, String atama, String soe) {
+    if (soe.isEmpty) return hito(kagi, name, kakko, atama);
+    if (_deta.contains(kagi)) return '${hito(kagi, name, kakko, atama)}($soe)';
+    return hito(kagi, name, kakko.isEmpty ? soe : '$kakko・$soe', atama);
+  }
+
   /// その人の名前をもう出したか
   bool deta(String kagi) => _deta.contains(kagi);
 

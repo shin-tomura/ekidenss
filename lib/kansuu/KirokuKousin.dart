@@ -1673,6 +1673,13 @@ Future<void> kirokuKousin({
               sortedsenshudata[i].time_taikai_total) {
             sortedsenshudata[i].time_bestkiroku[kirokubangou] =
                 sortedsenshudata[i].time_taikai_total;
+            // 自己ベストを出した年月(1.9.8。欄はあったが書き込んでいなかった。1.9.7までに出した
+            // 自己ベストは0(不明)のまま。古いデータで欄が短いときは書かない)
+            if (sortedsenshudata[i].year_bestkiroku.length > kirokubangou &&
+                sortedsenshudata[i].month_bestkiroku.length > kirokubangou) {
+              sortedsenshudata[i].year_bestkiroku[kirokubangou] = gh[0].year;
+              sortedsenshudata[i].month_bestkiroku[kirokubangou] = gh[0].month;
+            }
             sortedsenshudata[i].chokuzentaikai_pbflag = 1;
           }
           if (gh[0].time_zentaikojinkiroku[kirokubangou][0] >

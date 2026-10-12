@@ -3,6 +3,7 @@ import 'package:ekiden/senshu_data.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/screens/Modal_courseshoukai.dart'; // 大会の名前(courseRaceTitle)
 import 'package:ekiden/kansuu/meisei_rireki.dart';
+import 'package:ekiden/kansuu/konki_best.dart'; // 今季ベスト(伸び盛り賞の自己ベスト更新。1.9.8)
 import 'package:ekiden/kansuu/kiji/kiji_kihon.dart';
 import 'package:ekiden/kansuu/kiji/kiji_comment.dart';
 import 'package:ekiden/kansuu/kiji/kiji_gakunai.dart' show gakunaiSiteMeiJibun, gakunaiKishaMei;
@@ -70,6 +71,19 @@ int _taikousenTen(int j) => j == 0 ? 8 : (j == 1 ? 6 : (j == 2 ? 5 : (j <= 7 ? 3
   return (entry: entry, juni: juni);
 }
 
+/// 選手[s]の今の学年の正月駅伝予選の全体順位(0が1位)とタイム(走っていなければnull。
+/// タイムがなければ DEFAULTTIME。学内MVPの控えの決め方で使う。1.9.8)
+({int juni, double time})? _yosenKonki(SenshuData s) {
+  final ({int entry, int juni}) a = _konki(s, 4);
+  if (a.entry < 0 || !shutsujouJuni(a.juni)) return null;
+  final int g = s.gakunen - 1;
+  double t = TEISUU.DEFAULTTIME;
+  if (s.kukantime_race.length > 4 && g >= 0 && s.kukantime_race[4].length > g) {
+    t = s.kukantime_race[4][g];
+  }
+  return (juni: a.juni, time: t);
+}
+
 _Seiseki _seiseki(SenshuData s) {
   final _Seiseki x = _Seiseki(s);
   for (final int r in _sandai) {
@@ -115,16 +129,26 @@ int? _nyuugakuNobi(KijiKankyou k, SenshuData s) {
   return sa > 0 ? sa : null;
 }
 
-/// 今年度(4月〜3月)に自己ベストを更新した種目(5000m・1万m・ハーフ)
+/// 今年度(今の学年)に自己ベストを更新した種目(5000m・1万m・ハーフ)
+/// 今季ベストと同じく、学年ごとのレースのタイムから出す。前の学年までの記録(5000mは入学時の記録も)より
+/// 速い今季の記録があれば数える。初めての記録は更新に数えない
+/// (1.9.8。今までは自己ベストを出した年月の欄で見ていたが、その欄は書き込まれていなかったので、
+/// 伸び盛り賞が一度も出ていなかった)
 List<int> _konkiBestKoushin(KijiKankyou k, SenshuData s) {
   final List<int> list = [];
   for (final int idx in const [0, 1, 2]) {
-    if (s.year_bestkiroku.length <= idx || s.month_bestkiroku.length <= idx) continue;
-    if (k.jikoBest(s, idx) >= TEISUU.DEFAULTTIME) continue;
-    final int y = s.year_bestkiroku[idx];
-    final int m = s.month_bestkiroku[idx];
-    final bool konki = (y == k.gh.year && m <= 3) || (y == k.gh.year - 1 && m >= 4);
-    if (konki) list.add(idx);
+    final double konki = konkiBestRace(s.kukantime_race, s.gakunen, idx);
+    if (konki >= TEISUU.DEFAULTTIME) continue;
+    double mae = TEISUU.DEFAULTTIME;
+    for (int g = 1; g < s.gakunen; g++) {
+      final double t = konkiBestRace(s.kukantime_race, g, idx);
+      if (t < mae) mae = t;
+    }
+    if (idx == 0) {
+      final double ny = s.kiroku_nyuugakuji_5000;
+      if (ny > 0 && ny < mae) mae = ny;
+    }
+    if (mae < TEISUU.DEFAULTTIME && konki < mae) list.add(idx);
   }
   return list;
 }
@@ -498,7 +522,20 @@ List<Kiji> gakunaiHyoushouKiji(KijiKankyou k) {
   final Set<int> tsukatta = {};
 
   // 学内MVP
-  final _Seiseki? mvp = tenAri.isEmpty ? null : tenAri.first;
+  // (点のある選手がいなければ、正月駅伝予選でチーム内トップの選手にする。1.9.8。
+  //  三大駅伝に出られず、対校戦でも入賞のない大学では、学内MVPが出ていなかった)
+  _Seiseki? mvp = tenAri.isEmpty ? null : tenAri.first;
+  ({int juni, double time})? mvpYosen;
+  if (mvp == null) {
+    for (final _Seiseki x in zen) {
+      final ({int juni, double time})? y = _yosenKonki(x.s);
+      if (y == null) continue;
+      if (mvpYosen == null || y.juni < mvpYosen.juni) {
+        mvp = x;
+        mvpYosen = y;
+      }
+    }
+  }
   if (mvp != null) tsukatta.add(mvp.s.id);
   // 学内新人賞(1年生で点が最高。誰も点がなければ、入学時からの伸びが一番大きい1年生)
   _Seiseki? shinjin;
@@ -548,6 +585,31 @@ List<Kiji> gakunaiHyoushouKiji(KijiKankyou k) {
       kourouKukanshou = kukanshou;
     }
   }
+  // 4年生に本戦の出走がなければ、駅伝予選(11月駅伝予選・正月駅伝予選)の出走が一番多い4年生にする
+  // (同じなら1万mの持ちタイム。1.9.8。本戦に出られない大学では、功労賞が出ていなかった)
+  bool kourouYosen = false;
+  if (kourou == null) {
+    for (final SenshuData s in buin) {
+      if (s.gakunen != 4 || tsukatta.contains(s.id)) continue;
+      int shussou = 0;
+      for (final int r in const [3, 4]) {
+        if (s.entrykukan_race.length <= r) continue;
+        for (int g = 0; g < 4 && g < s.entrykukan_race[r].length; g++) {
+          if (s.entrykukan_race[r][g] < 0) continue;
+          final int j = (s.kukanjuni_race.length > r && s.kukanjuni_race[r].length > g) ? s.kukanjuni_race[r][g] : TEISUU.DEFAULTJUNI;
+          if (!shutsujouJuni(j)) continue;
+          shussou++;
+        }
+      }
+      if (shussou == 0) continue;
+      final SenshuData? ima = kourou;
+      if (ima == null || shussou > kourouShussou || (shussou == kourouShussou && k.jikoBest(s, 1) < k.jikoBest(ima, 1))) {
+        kourou = s;
+        kourouShussou = shussou;
+      }
+    }
+    kourouYosen = kourou != null;
+  }
   if (kourou != null) tsukatta.add(kourou.id);
   // 伸び盛り賞(今年度に自己ベストを更新した種目が一番多い。同じなら学年の低いほう、次に5000mの持ちタイム)
   SenshuData? nobi;
@@ -575,14 +637,29 @@ List<Kiji> gakunaiHyoushouKiji(KijiKankyou k) {
   final StringBuffer lead = StringBuffer();
   lead.write('陸上競技部の$nendoを締めくくる学内表彰を、編集部が選んだ。');
   lead.write('対象は三大駅伝と対校戦の3種目で、区間順位と種目の順位を点にした。');
-  if (mvp != null) lead.write('学内MVPは、${_naiyouMoji(mvp)}の${w.senshu(mvp.s)}。');
+  if (mvp != null) {
+    lead.write(
+      mvpYosen == null
+          ? '学内MVPは、${_naiyouMoji(mvp)}の${w.senshu(mvp.s)}。'
+          : '点に届いた部員はいなかったため、学内MVPは正月駅伝予選でチームトップだった${w.senshu(mvp.s)}を選んだ。',
+    );
+  }
 
   // 学内MVP
   if (mvp != null) {
     w.koMidashi('学内MVP　${w.senshu(mvp.s)}');
     final StringBuffer mb = StringBuffer();
-    mb.write('${w.senshu(mvp.s)}は今季、三大駅伝を${mvp.ekiden}度走り${mvp.kukanshou > 0 ? '、区間賞${mvp.kukanshou}度' : ''}。');
-    if (_naiyouMoji(mvp).isNotEmpty) mb.write('${_naiyouMoji(mvp)}と、チームの柱として走った。');
+    final ({int juni, double time})? my = mvpYosen;
+    if (my != null) {
+      // 正月駅伝予選のチーム内トップで選んだとき(1.9.8)
+      mb.write(
+        '${w.senshu(mvp.s)}は正月駅伝予選で全体${juniMoji(my.juni)}'
+        '${my.time < TEISUU.DEFAULTTIME ? '(${jikanMoji(my.time)})' : ''}と、チームの先頭で予選会を戦った。',
+      );
+    } else {
+      mb.write('${w.senshu(mvp.s)}は今季、三大駅伝を${mvp.ekiden}度走り${mvp.kukanshou > 0 ? '、区間賞${mvp.kukanshou}度' : ''}。');
+      if (_naiyouMoji(mvp).isNotEmpty) mb.write('${_naiyouMoji(mvp)}と、チームの柱として走った。');
+    }
     if (tenAri.length >= 2) mb.write('チーム内の2位は${w.senshu(tenAri[1].s)}${_naiyouMoji(tenAri[1]).isNotEmpty ? '(${_naiyouMoji(tenAri[1])})' : ''}だった。');
     final int? mvpNobi = _nyuugakuNobi(k, mvp.s);
     if (mvpNobi != null && mvp.s.gakunen >= 2) mb.write('入学時の5000mから${saMoji(mvpNobi)}縮めてきた。');
@@ -620,9 +697,12 @@ List<Kiji> gakunaiHyoushouKiji(KijiKankyou k) {
     final SenshuData kr = kourou;
     w.koMidashi('功労賞　${w.senshu(kr)}');
     // 前の学年の記録が欠けている選手(ゲームを始めた年の4年生など)は、回数が少なく出るので数を書かない(1.9.7)
-    final String kaisuuBun = kirokuKaketeiru(kr)
-        ? '駅伝でたすきをつなぎ${kourouKukanshou > 0 ? '、区間賞も取った' : '続けた'}'
-        : '4年間で駅伝を$kourouShussou度走り${kourouKukanshou > 0 ? '、区間賞を$kourouKukanshou度取った' : '、たすきをつなぎ続けた'}';
+    // 本戦の出走がなく、駅伝予選の出走で選んだときは予選のことを書く(1.9.8)
+    final String kaisuuBun = kourouYosen
+        ? (kirokuKaketeiru(kr) ? '駅伝予選の舞台でチームを支え続けた' : '4年間で駅伝予選を$kourouShussou度走り、チームを支え続けた')
+        : (kirokuKaketeiru(kr)
+              ? '駅伝でたすきをつなぎ${kourouKukanshou > 0 ? '、区間賞も取った' : '続けた'}'
+              : '4年間で駅伝を$kourouShussou度走り${kourouKukanshou > 0 ? '、区間賞を$kourouKukanshou度取った' : '、たすきをつなぎ続けた'}');
     w.danraku(
       '功労賞は、この春卒業する${w.senshu(kr)}。$kaisuuBun。'
       'レースの日も練習の日も、チームの中心にいた4年間だった。',

@@ -842,6 +842,18 @@ class _SaveLoadScreenState extends State<SaveLoadScreen> {
       //mainの中にもあるので、そちらも変更すること！
       await koukouJouhouFuyo();
 
+      {
+        // 選手と大学のチャートの点数を一度計算し直す(1.9.7。mainの中の同じ処理の説明を参照)
+        //mainの中にもあるので、そちらも変更すること！
+        final checkversionValue = int.tryParse(sortedUnivData[7].name_tanshuku);
+        if (checkversionValue == null ||
+            checkversionValue < 21970 ||
+            checkversionValue > 999999999) {
+          await updateAllSenshuChartdata_atusataisei();
+          await refreshAllUnivAnalysisData();
+        }
+      }
+
       //1.4.3からバージョン番号保存することにした(この処理は一連の処理の中で1番最後にすること)
       //mainの中にもあるので、そちらも変更すること！
       final versionValue = int.tryParse(sortedUnivData[7].name_tanshuku);

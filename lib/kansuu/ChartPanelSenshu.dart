@@ -207,7 +207,7 @@ Widget buildSenshuAnalysisPanel(
         // 今季ベストで分析しているときの注意書き(1.9.1)
         if (konkiBestHyoujiChuu())
           const Text(
-            "※今季ベスト(今年度のレースでの最高記録)で分析しています。今季の記録がない種目は最低の評価になります",
+            "※今季ベスト(今年度のレースでの最高記録)で分析しています。今季の記録がない種目は自己ベストで分析します",
             style: TextStyle(
               color: Colors.white70,
               fontSize: 9,
@@ -222,6 +222,8 @@ Widget buildSenshuAnalysisPanel(
 
 /// 今季ベストで出した選手[senshu]の解析スコア(保存せず、その場で計算する。1.9.1)
 /// 計算は updateAllSenshuChartdata_atusataisei と同じで、母集団は全選手の今季ベスト。
+/// 1.9.7から、今季の記録がない種目は自己ベストで補う(hikakuMochiTime。母集団も同じ)。
+/// それまでは最低の1.0にしていたので、年度の初め(5月の対校戦まで)は全員の全部の項目が1.0になっていた。
 /// 保存したものと同じ目盛りになるよう、いったん圧縮してから解凍して返す
 Map<String, dynamic> konkiBestSenshuScores(SenshuData senshu) {
   final List<SenshuData> allSenshu = Hive.box<SenshuData>(
@@ -238,12 +240,12 @@ Map<String, dynamic> konkiBestSenshuScores(SenshuData senshu) {
   };
   for (var s in allSenshu) {
     for (var idx in pools.keys) {
-      double t = konkiBest(s, idx);
+      double t = hikakuMochiTime(s, idx);
       if (t > 0 && t < TEISUU.DEFAULTTIME) pools[idx]!.add(t);
     }
   }
   double sc(int idx) {
-    double t = konkiBest(senshu, idx);
+    double t = hikakuMochiTime(senshu, idx);
     if (t <= 0 || t >= TEISUU.DEFAULTTIME || pools[idx]!.isEmpty) return 1.0;
     double mean = pools[idx]!.reduce((a, b) => a + b) / pools[idx]!.length;
     double variance =

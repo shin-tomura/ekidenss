@@ -1026,6 +1026,19 @@ Future<void> main() async {
     //save_load_screenの中の _importFromSlot の中にもあるので、そちらも変更すること！
     await koukouJouhouFuyo();
 
+    {
+      // 選手と大学のチャートの点数を一度計算し直す(1.9.7。1.9.6までは年度替わりで計算し直して
+      // いなかったので、新入生に卒業した選手の点数が残っているデータがあるため)
+      //save_load_screenの中の _importFromSlot の中にもあるので、そちらも変更すること！
+      final checkversionValue = int.tryParse(sortedUnivData[7].name_tanshuku);
+      if (checkversionValue == null ||
+          checkversionValue < 21970 ||
+          checkversionValue > 999999999) {
+        await updateAllSenshuChartdata_atusataisei();
+        await refreshAllUnivAnalysisData();
+      }
+    }
+
     //1.4.3からバージョン番号保存することにした(この処理は一連の処理の中で1番最後にすること)
     //save_load_screenの中の _importFromSlot の中にもあるので、そちらも変更すること！
     final versionValue = int.tryParse(sortedUnivData[7].name_tanshuku);
@@ -2957,6 +2970,11 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       //nyuugakuji5000_senshudata: nyuugakuji5000SenshuData,
       //senshuBox: _senshuBox, // RetireNew内で選手データの保存が必要な場合
     );
+
+    // 選手と大学のチャートの点数を計算し直す(1.9.7。新入生は卒業した選手のデータを使い回して
+    // 作るので、計算し直さないと、次の個人のレースまで卒業した選手の点数が出ていた)
+    await updateAllSenshuChartdata_atusataisei();
+    await refreshAllUnivAnalysisData();
 
     // 5. 念の為セーブ (RetireNew内でsaveChangesが呼び出される場合は不要な場合もありますが、
     // ここでは明示的に保存することを推奨)

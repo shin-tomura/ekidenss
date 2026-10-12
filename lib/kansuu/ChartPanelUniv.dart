@@ -358,6 +358,7 @@ Future<void> refreshAllUnivAnalysisData() async {
 /// 今季ベストで出した大学[univid]の解析スコア(保存せず、その場で計算する。1.9.1)
 /// 計算は refreshAllUnivAnalysisData と同じ(大学ごとの上位10名の平均を、全大学の平均と比べる)で、
 /// 持ちタイムだけ今季ベストにする。保存したものと同じ目盛りになるよう、いったん圧縮してから解凍して返す
+// 1.9.7から、今季の記録がない種目は自己ベストで補う(hikakuMochiTime。選手のチャートと同じ)
 Map<String, dynamic> konkiBestUnivScores(int univid) {
   final allSenshu = Hive.box<SenshuData>('senshuBox').values.toList();
   Map<int, List<double>> pools = {
@@ -372,7 +373,7 @@ Map<String, dynamic> konkiBestUnivScores(int univid) {
   Map<int, Map<int, List<double>>> rawData = {};
   for (var s in allSenshu) {
     for (var idx in pools.keys) {
-      double t = konkiBest(s, idx);
+      double t = hikakuMochiTime(s, idx);
       if (t > 0 && t < TEISUU.DEFAULTTIME) {
         rawData
             .putIfAbsent(s.univid, () => {})
@@ -628,7 +629,7 @@ Widget buildUnivAnalysisPanel(
         // 今季ベストで分析しているときの注意書き(1.9.1)
         if (konkiBestHyoujiChuu())
           const Text(
-            "※今季ベスト(今年度のレースでの最高記録)で分析しています",
+            "※今季ベスト(今年度のレースでの最高記録)で分析しています。今季の記録がない種目は自己ベストで分析します",
             style: TextStyle(
               color: Colors.white70,
               fontSize: 9,

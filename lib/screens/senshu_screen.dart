@@ -2115,82 +2115,107 @@ class _SenshuScreenState extends State<SenshuScreen> {
                         ),
                         const SizedBox(height: 8),
 
-                        // 各種ベスト記録
-                        _buildBestRecordRow(
-                          '5千best',
-                          currentSenshu.time_bestkiroku[0],
-                          currentSenshu.gakunaijuni_bestkiroku[0],
-                          currentSenshu.zentaijuni_bestkiroku[0],
-                        ),
-                        konkiBestGyou(currentSenshu, 0, konkiJuni),
-                        _buildBestRecordRow(
-                          '1万best',
-                          currentSenshu.time_bestkiroku[1],
-                          currentSenshu.gakunaijuni_bestkiroku[1],
-                          currentSenshu.zentaijuni_bestkiroku[1],
-                        ),
-                        konkiBestGyou(currentSenshu, 1, konkiJuni),
-                        _buildBestRecordRow(
-                          'ハーフbest',
-                          currentSenshu.time_bestkiroku[2],
-                          currentSenshu.gakunaijuni_bestkiroku[2],
-                          currentSenshu.zentaijuni_bestkiroku[2],
-                        ),
-                        konkiBestGyou(currentSenshu, 2, konkiJuni),
-                        _buildBestRecordRow_full(
-                          'フルbest',
-                          currentSenshu.time_bestkiroku[3],
-                          currentSenshu.gakunaijuni_bestkiroku[3],
-                          currentSenshu.zentaijuni_bestkiroku[3],
-                        ),
-                        konkiBestGyou(currentSenshu, 3, konkiJuni),
-                        _buildBestRecordRow(
-                          '登り1万best',
-                          currentSenshu.time_bestkiroku[4],
-                          currentSenshu.gakunaijuni_bestkiroku[4],
-                          null, // Swiftコードで全体順位が表示されていないためnull
-                        ),
-                        konkiBestGyou(
-                          currentSenshu,
-                          4,
-                          konkiJuni,
-                          zentaiAri: false,
-                        ),
-                        _buildBestRecordRow(
-                          '下り1万best',
-                          currentSenshu.time_bestkiroku[5],
-                          currentSenshu.gakunaijuni_bestkiroku[5],
-                          null,
-                        ),
-                        konkiBestGyou(
-                          currentSenshu,
-                          5,
-                          konkiJuni,
-                          zentaiAri: false,
-                        ),
-                        _buildBestRecordRow(
-                          'ロード1万best',
-                          currentSenshu.time_bestkiroku[6],
-                          currentSenshu.gakunaijuni_bestkiroku[6],
-                          null,
-                        ),
-                        konkiBestGyou(
-                          currentSenshu,
-                          6,
-                          konkiJuni,
-                          zentaiAri: false,
-                        ),
-                        _buildBestRecordRow(
-                          'クロカン1万best',
-                          currentSenshu.time_bestkiroku[7],
-                          currentSenshu.gakunaijuni_bestkiroku[7],
-                          null,
-                        ),
-                        konkiBestGyou(
-                          currentSenshu,
-                          7,
-                          konkiJuni,
-                          zentaiAri: false,
+                        // 各種ベスト記録(持ちタイムの「自己ベスト/今季ベスト」の切り替えで、選んだほうだけを出す。
+                        // チャートの中の切り替えで変えたときも描き直すように、監督データを見て作る。1.9.9)
+                        ValueListenableBuilder<Box<KantokuData>>(
+                          valueListenable: Hive.box<KantokuData>(
+                            'kantokuBox',
+                          ).listenable(keys: ['KantokuData']),
+                          builder: (context, box, child) {
+                            final bool konki = konkiBestHyoujiChuu();
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // 切り替え(チャートの中の切り替えと同じ設定。切り替えると監督データが変わり、
+                                // この ValueListenableBuilder で描き直す)
+                                KonkiBestKirikae(onChanged: () {}),
+                                if (!konki) ...[
+                                  _buildBestRecordRow(
+                                    '5千best',
+                                    currentSenshu.time_bestkiroku[0],
+                                    currentSenshu.gakunaijuni_bestkiroku[0],
+                                    currentSenshu.zentaijuni_bestkiroku[0],
+                                  ),
+                                  _buildBestRecordRow(
+                                    '1万best',
+                                    currentSenshu.time_bestkiroku[1],
+                                    currentSenshu.gakunaijuni_bestkiroku[1],
+                                    currentSenshu.zentaijuni_bestkiroku[1],
+                                  ),
+                                  _buildBestRecordRow(
+                                    'ハーフbest',
+                                    currentSenshu.time_bestkiroku[2],
+                                    currentSenshu.gakunaijuni_bestkiroku[2],
+                                    currentSenshu.zentaijuni_bestkiroku[2],
+                                  ),
+                                  _buildBestRecordRow_full(
+                                    'フルbest',
+                                    currentSenshu.time_bestkiroku[3],
+                                    currentSenshu.gakunaijuni_bestkiroku[3],
+                                    currentSenshu.zentaijuni_bestkiroku[3],
+                                  ),
+                                  _buildBestRecordRow(
+                                    '登り1万best',
+                                    currentSenshu.time_bestkiroku[4],
+                                    currentSenshu.gakunaijuni_bestkiroku[4],
+                                    null, // Swiftコードで全体順位が表示されていないためnull
+                                  ),
+                                  _buildBestRecordRow(
+                                    '下り1万best',
+                                    currentSenshu.time_bestkiroku[5],
+                                    currentSenshu.gakunaijuni_bestkiroku[5],
+                                    null,
+                                  ),
+                                  _buildBestRecordRow(
+                                    'ロード1万best',
+                                    currentSenshu.time_bestkiroku[6],
+                                    currentSenshu.gakunaijuni_bestkiroku[6],
+                                    null,
+                                  ),
+                                  _buildBestRecordRow(
+                                    'クロカン1万best',
+                                    currentSenshu.time_bestkiroku[7],
+                                    currentSenshu.gakunaijuni_bestkiroku[7],
+                                    null,
+                                  ),
+                                ],
+                                if (konki) ...[
+                                  konkiBestGyou(currentSenshu, 0, konkiJuni, '5千今季'),
+                                  konkiBestGyou(currentSenshu, 1, konkiJuni, '1万今季'),
+                                  konkiBestGyou(currentSenshu, 2, konkiJuni, 'ハーフ今季'),
+                                  konkiBestGyou(currentSenshu, 3, konkiJuni, 'フル今季'),
+                                  konkiBestGyou(
+                                    currentSenshu,
+                                    4,
+                                    konkiJuni,
+                                    '登り1万今季',
+                                    zentaiAri: false,
+                                  ),
+                                  konkiBestGyou(
+                                    currentSenshu,
+                                    5,
+                                    konkiJuni,
+                                    '下り1万今季',
+                                    zentaiAri: false,
+                                  ),
+                                  konkiBestGyou(
+                                    currentSenshu,
+                                    6,
+                                    konkiJuni,
+                                    'ロード1万今季',
+                                    zentaiAri: false,
+                                  ),
+                                  konkiBestGyou(
+                                    currentSenshu,
+                                    7,
+                                    konkiJuni,
+                                    'クロカン1万今季',
+                                    zentaiAri: false,
+                                  ),
+                                ],
+                              ],
+                            );
+                          },
                         ),
 
                         const SizedBox(height: 16),

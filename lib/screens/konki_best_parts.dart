@@ -6,7 +6,7 @@ import 'package:ekiden/kansuu/konki_best.dart';
 // ------------------------------------------------------------
 // 今季ベストの画面の部品(1.9.1。今季ベストの決め方は lib/kansuu/konki_best.dart)
 // ・持ちタイムの「自己ベスト/今季ベスト」の切り替え(ランキング・区間配置確認・説明画面の設定タブ)
-// ・選手画面の、自己ベストの行の下に出す今季ベストの行
+// ・選手画面の、今季ベストの行(今季ベストの表示のときに、自己ベストの行の代わりに出す。1.9.9)
 // ------------------------------------------------------------
 
 /// 持ちタイムの「自己ベスト/今季ベスト」の切り替え
@@ -51,25 +51,28 @@ class KonkiBestKirikae extends StatelessWidget {
   }
 }
 
-/// 選手画面の、自己ベストの行の下に出す今季ベストの行(切り替えに関係なく出す)
-/// [zentaiAri]がfalseなら全体順位を出さない(自己ベストの行と揃える)
+/// 選手画面の、今季ベストの行
+/// 持ちタイムを今季ベストで表示しているときに、自己ベストの行の代わりに出す
+/// (1.9.8までは切り替えに関係なく、自己ベストの行の下に出していた。1.9.9)
+/// [label]は行の名前(「5千今季」など)。[zentaiAri]がfalseなら全体順位を出さない(自己ベストの行と揃える)
 Widget konkiBestGyou(
   SenshuData s,
   int idx,
-  KonkiBestJuni juni, {
+  KonkiBestJuni juni,
+  String label, {
   bool zentaiAri = true,
 }) {
   const TextStyle style = TextStyle(
-    color: Colors.white70,
+    color: Colors.white,
     fontSize: HENSUU.fontsize_honbun,
   );
   final double time = juni.best(s, idx);
   if (time >= TEISUU.DEFAULTTIME) {
-    return const Text('　今季 記録無', style: style);
+    return Text('$label 記録無', style: style);
   }
   return Wrap(
     children: [
-      Text('　今季: ${konkiBestTimeBun(time, idx)}', style: style),
+      Text('$label: ${konkiBestTimeBun(time, idx)}', style: style),
       const SizedBox(width: 8),
       Text('学内${juni.gakunai(time, idx, s.univid)}位', style: style),
       if (zentaiAri) ...[
@@ -120,8 +123,8 @@ class _ModalKonkiBestSetteiState extends State<ModalKonkiBestSettei> {
                   '持ちタイムを自己ベストで出すか、今季ベストで出すかを選べます。\n\n'
                   '今季ベストは、今年度のレースでの最高記録です。'
                   '年間強化練習は年度ごとに変わるので、今の実力を比べるときに便利です。\n\n'
-                  '選手画面では、どちらを選んでも両方出します。'
-                  'それぞれの画面の上にある切り替えでも変えられます(どこで変えても同じ設定です)。',
+                  '選手画面の記録の欄も、選んだほうだけを出します。'
+                  'それぞれの画面にある切り替えでも変えられます(どこで変えても同じ設定です)。',
                   style: TextStyle(
                     color: HENSUU.textcolor,
                     fontSize: HENSUU.fontsize_honbun,

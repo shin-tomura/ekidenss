@@ -407,40 +407,120 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
     return bubun.join('・');
   }
 
+  /// 今年の周回数を、周回数のコード[code]に変える(1.9.9。地区の順番のダイアログから。
+  /// 1ラウンドも進める前だけ。設定タブの「コンピュータスカウト」の周回数も変わる。scout_com.dart)
+  Future<void> _shuukaiHenkou(int code) async {
+    final Ghensuu? gh = _ghensuu;
+    final KantokuData? kantoku = Hive.box<KantokuData>(
+      'kantokuBox',
+    ).get('KantokuData');
+    if (gh == null || kantoku == null || _chikuJunban.isEmpty) return;
+    if (gh.scoutChances < _roundSuu) return; // もう始めていたら変えない
+    await comScoutKotoshiShuukaiHenkou(
+      kantoku: kantoku,
+      nen: gh.year,
+      code: code,
+    );
+    final int shuukai = comScoutKotoshiShuukai(kantoku, gh.year);
+    // 残りのラウンドの数(地区の数×周回数)も直す(まだ1ラウンドも進めていないので、全部残っている)
+    gh.scoutChances = _chikuJunban.length * shuukai;
+    await gh.save();
+    if (!mounted) return;
+    setState(() {
+      _shuukai = shuukai;
+      _roundSuu = _chikuJunban.length * shuukai;
+    });
+  }
+
   /// 地区の順番のダイアログ(初めての地区めぐりなら、地区めぐりになったことのお知らせも出す)
+  /// 地区めぐり(声かけ)で、まだ1ラウンドも進めていなければ、今年の周回数も選べる(1.9.9)
   Future<void> _showChikuJunbanDialog({required bool hajimete}) async {
     final List<String> narabi = [
       for (final int c in _chikuJunban)
         '${_junbanMoji(c)}${comScoutChikuMei(c)}(${_chikuNinzuu(c)}人)',
     ];
+    // 周回数を選べるか(設定で変えられることを知らない人もいるので、ここでも選べるようにする。1.9.9)
+    final bool shuukaiEraberu =
+        _koekake && _ghensuu != null && _ghensuu!.scoutChances >= _roundSuu;
     await showDialog(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: Text(
-            _koekake ? '地区めぐり(声かけ)' : '地区めぐり(交渉)',
-            style: const TextStyle(color: Colors.black),
-          ),
-          content: SingleChildScrollView(
-            child: Text(
-              '${hajimete ? '今年から、コンピュータスカウトONの新入生スカウトが「地区めぐり」になりました。'
-                        '説明画面の設定タブの「コンピュータスカウト」で、今までの「全国一斉」に変えられます。\n\n' : ''}'
-              '${_koekake ? '新入生は出身校の地区ごとに分かれていて、地区ごとに1ラウンドずつ声をかけます。'
-                        'どの大学も、今の地区の選手に1人まで声をかけられます(見送ることもできます)。'
-                        'ほかに声をかけた大学がなければ確定し、重なれば争奪戦になります。' : '新入生は出身校の地区ごとに分かれていて、地区ごとに1ラウンドずつ交渉します。'
-                        'どの大学も、今の地区の選手に1人まで交渉できます(見送ることもできます)。'}'
-              'ほかの地区の選手は、上の地区の切り替え(左右の矢印か、地区の名前を押す)で見られます。\n\n'
-              '${_shuukai > 1 ? '今年は、この順番で最大$_shuukai周します(全員の進学先が決まれば、そこで終わります)。\n\n' : ''}'
-              '今年の地区の順番\n${narabi.join('\n')}',
-              style: const TextStyle(color: Colors.black),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('OK'),
-            ),
-          ],
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            final int imaCode = comScoutShuukaiSuu.indexOf(_shuukai);
+            return AlertDialog(
+              title: Text(
+                _koekake ? '地区めぐり(声かけ)' : '地区めぐり(交渉)',
+                style: const TextStyle(color: Colors.black),
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${hajimete ? '今年から、コンピュータスカウトONの新入生スカウトが「地区めぐり」になりました。'
+                                '説明画面の設定タブの「コンピュータスカウト」で、今までの「全国一斉」に変えられます。\n\n' : ''}'
+                      '${_koekake ? '新入生は出身校の地区ごとに分かれていて、地区ごとに1ラウンドずつ声をかけます。'
+                                'どの大学も、今の地区の選手に1人まで声をかけられます(見送ることもできます)。'
+                                'ほかに声をかけた大学がなければ確定し、重なれば争奪戦になります。' : '新入生は出身校の地区ごとに分かれていて、地区ごとに1ラウンドずつ交渉します。'
+                                'どの大学も、今の地区の選手に1人まで交渉できます(見送ることもできます)。'}'
+                      'ほかの地区の選手は、上の地区の切り替え(左右の矢印か、地区の名前を押す)で見られます。',
+                      style: const TextStyle(color: Colors.black),
+                    ),
+                    // 今年の周回数(1.9.9。選ぶと、設定タブの「コンピュータスカウト」の周回数も変わる)
+                    if (shuukaiEraberu) ...[
+                      const SizedBox(height: 12),
+                      const Text(
+                        '今年の周回数(この地区の順番で何周するか)',
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Wrap(
+                        spacing: 6,
+                        children: [
+                          for (int c = 0; c < comScoutShuukaiSuu.length; c++)
+                            ChoiceChip(
+                              label: Text('${comScoutShuukaiSuu[c]}周'),
+                              // ダイアログは白い背景なので、文字と色を決めておく
+                              labelStyle: const TextStyle(color: Colors.black),
+                              selectedColor: Colors.lightBlue.shade200,
+                              backgroundColor: Colors.grey.shade300,
+                              selected: c == imaCode,
+                              onSelected: (bool erabu) async {
+                                if (!erabu || c == imaCode) return;
+                                await _shuukaiHenkou(c);
+                                if (context.mounted) setDialogState(() {});
+                              },
+                            ),
+                        ],
+                      ),
+                      const Text(
+                        '周回するときは、全員の進学先が決まれば、そこで終わります。'
+                        'ここで選んだ周回数は、説明画面の設定タブの「コンピュータスカウト」の周回数にもなり、'
+                        '次の年からもこの周回数で始まります。',
+                        style: TextStyle(color: Colors.black54, fontSize: 12),
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                    Text(
+                      '${!shuukaiEraberu && _shuukai > 1 ? '今年は、この順番で最大$_shuukai周します(全員の進学先が決まれば、そこで終わります)。\n\n' : ''}'
+                      '今年の地区の順番\n${narabi.join('\n')}',
+                      style: const TextStyle(color: Colors.black),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('OK'),
+                ),
+              ],
+            );
+          },
         );
       },
     );

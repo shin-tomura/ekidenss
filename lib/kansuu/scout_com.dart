@@ -994,6 +994,25 @@ int comScoutKotoshiShuukai(KantokuData kantoku, int nen) {
       : 1;
 }
 
+/// 今年の地区めぐり(声かけ)の周回数を、周回数のコード[code]に変えて保存する(1.9.9)
+/// 新入生スカウトの画面の地区の順番のダイアログで、1ラウンドも進める前に選んだときに使う。
+/// その年の記録の周回数(yobiint2[88])と、設定の周回数(yobiint2[87]。コンピュータスカウトの画面と同じ値)の
+/// 両方を書き換える(設定で変えられることを知らない人も、ここで選べるように。次の年からもこの周回数になる)。
+/// 残りのラウンドの数(Ghensuu.scoutChances)は、呼び出し側で直す。今年が地区めぐり(声かけ)でなければ何もしない
+Future<void> comScoutKotoshiShuukaiHenkou({
+  required KantokuData kantoku,
+  required int nen,
+  required int code,
+}) async {
+  if (code < 0 || code >= comScoutShuukaiSuu.length) return;
+  if (kantoku.yobiint2.length <= comScoutNendoIndex) return;
+  if (comScoutKotoshiKatachi(kantoku, nen) != comScoutKatachiKoekake) return;
+  comScoutShuukaiCodeKaku(kantoku.yobiint2, code);
+  kantoku.yobiint2[comScoutNendoIndex] =
+      code * _nendoShuukaiKurai + _nendoKiroku(kantoku) % _nendoShuukaiKurai;
+  await kantoku.save();
+}
+
 /// 今年の新入生スカウトが地区めぐり(声かけか交渉)か
 bool comScoutKotoshiChikuMeguri(KantokuData kantoku, int nen) =>
     comScoutKotoshiKatachi(kantoku, nen) != comScoutKatachiZenkoku;

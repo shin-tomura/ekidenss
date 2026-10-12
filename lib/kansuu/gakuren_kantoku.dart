@@ -108,6 +108,43 @@ void gakurenTaichouFuryouNashi(
   if (s.chousi < 1) s.chousi = 1;
 }
 
+/// 大会当日の調子の持ち直しのくじを、学連選抜の選手にもかける(1.9.9)
+/// 1.9.8までは大学の選手だけにかけていたので、学連選抜の選手は区間エントリーのときの調子のまま走っていた。
+/// 大学の選手と同じ場面で呼ぶ(main.dartの、正月駅伝の1区のスタート前と6区のスタート前の調子設定。
+/// どちらも、プレイヤーの大学が正月駅伝に出る年で、スキップ中でないときだけ通る)。
+/// ・走る選手で調子が100でなければ、調子関連設定の「当日復活確率」(yobiint2[4])で100に戻す
+/// ・補欠がいないので、当日の突発的な体調不良のくじはかけない(gakurenTaichouFuryouNashiを参照)
+/// ・[fukuroMae]がtrueなら復路の前で、往路(1〜5区)を走り終えた選手は除く
+Future<void> gakurenToujituMochinaoshi({
+  required KantokuData kantoku,
+  required Random random,
+  required bool fukuroMae,
+}) async {
+  if (kantoku.yobiint2.length <= 4) return;
+  final Box<Senshu_Gakuren_Data> box = Hive.box<Senshu_Gakuren_Data>(
+    'gakurenSenshuBox',
+  );
+  final Map<dynamic, Senshu_Gakuren_Data> kakikae = {};
+  for (final dynamic key in box.keys) {
+    final Senshu_Gakuren_Data? s = box.get(key);
+    if (s == null) continue;
+    if (s.entrykukan_race.length <= 2 ||
+        s.gakunen < 1 ||
+        s.entrykukan_race[2].length < s.gakunen) {
+      continue;
+    }
+    final int entry = s.entrykukan_race[2][s.gakunen - 1];
+    if (entry < 0) continue; // 走らない選手
+    if (fukuroMae && entry <= 4) continue; // 往路を走り終えた選手
+    if (s.chousi >= 100) continue;
+    if (random.nextInt(100) < kantoku.yobiint2[4]) {
+      s.chousi = 100;
+      kakikae[key] = s;
+    }
+  }
+  if (kakikae.isNotEmpty) await box.putAll(kakikae);
+}
+
 /// 今年の正月駅伝で、プレイヤーが学連選抜の監督をするか
 /// (プレイヤーの大学が正月駅伝に出場できず、設定が「する」のとき)
 bool gakurenKantokuChuu(KantokuData kantoku, UnivData myUniv) {

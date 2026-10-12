@@ -596,7 +596,7 @@ class _ModalConditionSettingsState extends State<ModalConditionSettings> {
                     _buildSettingSlider(
                       title: '当日復活確率',
                       description:
-                          '体調不良やピーキングに失敗（調子100にならなかった）した選手が、大会当日に奇跡的に調子100に復活する確率です。',
+                          '体調不良やピーキングに失敗（調子100にならなかった）した選手が、大会当日に奇跡的に調子100に復活する確率です。正月駅伝では、学連選抜の選手にも大学の選手と同じ場面でかかります。',
                       currentValue: _revivalProb,
                       min: 0,
                       max: 99, // 99まで
@@ -614,7 +614,7 @@ class _ModalConditionSettingsState extends State<ModalConditionSettings> {
                     _buildSettingSlider(
                       title: '当日突発的体調不良確率',
                       description:
-                          '大会当日に急な体調不良を起こし、調子が落ちてしまう確率です（ピーキング成功者も対象）。体調不良の場合、調子は各選手の安定感とは関係なく、一律でのタイム悪化となります。なお、コンピュータのチームの選手には、「コンピュータチームの体調不良発生スイッチ」がONの場合にのみ体調不良が発生します。',
+                          '大会当日に急な体調不良を起こし、調子が落ちてしまう確率です（ピーキング成功者も対象）。体調不良の場合、調子は各選手の安定感とは関係なく、一律でのタイム悪化となります。なお、コンピュータのチームの選手には、「コンピュータチームの体調不良発生スイッチ」がONの場合にのみ体調不良が発生します。学連選抜の選手は補欠がいないため、体調不良にはなりません。',
                       currentValue: _suddenIllnessProb,
                       min: 0,
                       max: 20, // 20まで

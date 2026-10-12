@@ -1043,9 +1043,9 @@ Future<void> main() async {
     //save_load_screenの中の _importFromSlot の中にもあるので、そちらも変更すること！
     final versionValue = int.tryParse(sortedUnivData[7].name_tanshuku);
     if (versionValue == null ||
-        versionValue < 21980 ||
+        versionValue < 21990 ||
         versionValue > 999999999) {
-      sortedUnivData[7].name_tanshuku = "21980"; //バージョン番号
+      sortedUnivData[7].name_tanshuku = "21990"; //バージョン番号
       await sortedUnivData[7].save();
     }
 
@@ -2616,6 +2616,13 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                 await senshu.save();
               }
             }
+            // 学連選抜の復路の選手にも、当日の持ち直しのくじをかける
+            // (補欠がいないので、体調不良のくじはかけない。gakuren_kantoku.dart。1.9.9)
+            await gakurenToujituMochinaoshi(
+              kantoku: kantoku,
+              random: random,
+              fukuroMae: true,
+            );
 
             gh[0].mode = 345;
           } else {
@@ -4938,6 +4945,15 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                           senshu.chousi = 100;
                           await senshu.save();
                         }
+                      }
+                      // 正月駅伝では、学連選抜の選手にも当日の持ち直しのくじをかける
+                      // (補欠がいないので、体調不良のくじはかけない。gakuren_kantoku.dart。1.9.9)
+                      if (currentGhensuu.hyojiracebangou == 2) {
+                        await gakurenToujituMochinaoshi(
+                          kantoku: kantoku,
+                          random: random,
+                          fukuroMae: false,
+                        );
                       }
                       currentGhensuu.mode = 340; //当日変更画面へ
                     } else {

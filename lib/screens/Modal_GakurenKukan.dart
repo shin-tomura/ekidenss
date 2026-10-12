@@ -37,7 +37,7 @@ class ModalGakurenKukanView extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           const Text(
-            "正月駅伝予選において、本大会出場権を得られなかった各大学の中から1名ずつ選出されます。過去の正月駅伝出場回数が1回もしくは出場経験なしの選手の中で、予選会個人順位が一番良い選手が選ばれます。\n※本アプリでは、区間配置は選手の能力を基に自動編成されています。ただし、あなたの大学が正月駅伝に出場できない年は、学連選抜の監督として区間配置を決めることもできます(学連選抜編成の画面から)。",
+            "正月駅伝予選において、本大会出場権を得られなかった各大学の中から1名ずつ選出されます。過去の正月駅伝出場回数が1回もしくは出場経験なしの選手の中で、予選会個人順位が一番良い選手が選ばれます。\n※本アプリでは、区間配置は選手の能力を基に自動編成されています。ただし、あなたの大学が正月駅伝に出場できない年は、学連選抜の監督として区間配置を決めることもできます(学連選抜編成の画面から)。\n※一覧の調子は、学連選抜で走るときの調子です。「詳細」に出る調子は元の大学の選手のもので、違うことがあります。",
             style: TextStyle(
               color: HENSUU.textcolor,
               fontSize: 11,
@@ -295,6 +295,15 @@ class ModalGakurenKukanView extends StatelessWidget {
                                         fontSize: 11,
                                       ),
                                       overflow: TextOverflow.ellipsis,
+                                    ),
+                                    // 学連選抜の選手の調子(元の大学の選手の「詳細」の調子とは別。
+                                    // 体調不良を引き直したり、大会当日の持ち直しのくじを別に引いたりするため。1.9.9)
+                                    Text(
+                                      "調子 ${senshu.chousi}",
+                                      style: const TextStyle(
+                                        color: HENSUU.textcolor,
+                                        fontSize: 11,
+                                      ),
                                     ),
                                   ],
                                 ),

@@ -178,7 +178,8 @@ class _ModalGakurenKukanHenshuuState extends State<ModalGakurenKukanHenshuu> {
             children: [
               Text(
                 '区間ごとに走る選手を選んでください。ほかの区間を走る予定の選手を選ぶと、2人の区間が入れ替わります。最初はコンピュータが決めた配置になっています。\n'
-                '試走は大学の選手と同じ計算です(走るたびに多少タイムが違います)。1区の集団のペースや、2区以降のモチベーション低下補正、経験補正、調子は入っていません。',
+                '試走は大学の選手と同じ計算です(走るたびに多少タイムが違います)。1区の集団のペースや、2区以降のモチベーション低下補正、経験補正、調子は入っていません。\n'
+                '選手の名前の後ろの調子は、学連選抜で走るときの調子です。「詳細」に出る調子は元の大学の選手のもので、違うことがあります。',
                 style: TextStyle(
                   color: HENSUU.textcolor.withOpacity(0.85),
                   fontSize: HENSUU.fontsize_honbun - 2,
@@ -217,11 +218,13 @@ class _ModalGakurenKukanHenshuuState extends State<ModalGakurenKukanHenshuu> {
     );
   }
 
-  /// 選手の一覧に出す文(例: 山田太郎(3) 〇〇大 予選12位)
+  /// 選手の一覧に出す文(例: 山田太郎(3) 調子85 〇〇大 予選12位)
+  /// 調子は学連選抜の選手の調子(元の大学の選手の「詳細」の調子とは別。1.9.9)。
+  /// 文字を大きくしていて後ろが切れても見えるように、大学名より前に置く
   String _senshuBun(Senshu_Gakuren_Data s, Map<int, UnivData> univMap) {
     final String univ = univMap[s.univid]?.name ?? '---';
     final int yosenJuni = s.kukanjuni_race[_yosenIndex][s.gakunen - 1] + 1;
-    return '${s.name}(${s.gakunen}) $univ 予選$yosenJuni位';
+    return '${s.name}(${s.gakunen}) 調子${s.chousi} $univ 予選$yosenJuni位';
   }
 
   /// 区間1つ分の行

@@ -643,7 +643,12 @@ Kiji _tenbouMeikan(KijiKankyou k, List<_GSenshu> list) {
       w.danraku(kb.bun);
     }
     final SenshuData? s = x.s;
-    if (s != null) w.danraku(shusshinShumiBun(k, s, w.r, myouji(s.name)));
+    if (s != null) {
+      w.danraku(shusshinShumiBun(k, s, w.r, myouji(s.name)));
+      // 三大駅伝の成績の表(1.9.7。正月駅伝の欄は「今回」。何も載らない選手は省く)
+      final KijiHyou? rh = sandaiSeisekiHyou(s, imaRace: _race, shouryaku: true);
+      if (rh != null) w.hyou(rh);
+    }
     // 意気込み(因縁があれば、その事実を入れる)
     final String jijitsu = x.g.gakunen == 4
         ? '最後の正月駅伝。${x.shozoku}の仲間の分まで走りたい'

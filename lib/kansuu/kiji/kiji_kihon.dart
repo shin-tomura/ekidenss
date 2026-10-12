@@ -72,6 +72,9 @@ enum KijiBlockShurui {
 
   /// 小見出し
   koMidashi,
+
+  /// 表(本文の途中に置く表。選手の三大駅伝の成績など。1.9.7)
+  hyou,
 }
 
 /// 記事の本文の1かたまり
@@ -79,7 +82,10 @@ class KijiBlock {
   final KijiBlockShurui shurui;
   final String bun;
 
-  const KijiBlock(this.shurui, this.bun);
+  /// 表(種類が hyou のときだけ。1.9.7)
+  final KijiHyou? hyou;
+
+  const KijiBlock(this.shurui, this.bun, {this.hyou});
 }
 
 /// 記事に付ける表(成績欄)
@@ -92,7 +98,20 @@ class KijiHyou {
   /// 行(列の数は retsu と同じ)
   final List<List<String>> gyou;
 
-  const KijiHyou(this.title, this.retsu, this.gyou);
+  /// 生成AIに渡すテキストで、マスの中の改行の代わりに入れる文字(1.9.7)
+  final String masuTsunagi;
+
+  const KijiHyou(this.title, this.retsu, this.gyou, {this.masuTsunagi = '、'});
+}
+
+/// 表を、生成AIに渡すテキストに書く(マスの中の改行は masuTsunagi にして1行に並べる。1.9.7)
+void _hyouMoji(StringBuffer sb, KijiHyou h) {
+  sb.writeln();
+  sb.writeln('【${h.title}】');
+  sb.writeln(h.retsu.join(' / '));
+  for (final List<String> g in h.gyou) {
+    sb.writeln(g.map((x) => x.replaceAll('\n', h.masuTsunagi)).join(' / '));
+  }
 }
 
 /// ニュース記事1本
@@ -162,16 +181,13 @@ class Kiji {
         case KijiBlockShurui.danraku:
           sb.writeln(b.bun);
           break;
+        case KijiBlockShurui.hyou:
+          if (b.hyou != null) _hyouMoji(sb, b.hyou!);
+          break;
       }
     }
     for (final KijiHyou h in hyou) {
-      sb.writeln();
-      sb.writeln('【${h.title}】');
-      sb.writeln(h.retsu.join(' / '));
-      for (final List<String> g in h.gyou) {
-        // マスの中の改行(三大駅伝の表の3位までなど。1.9.7)は「、」にして1行に並べる
-        sb.writeln(g.map((x) => x.replaceAll('\n', '、')).join(' / '));
-      }
+      _hyouMoji(sb, h);
     }
     return sb.toString();
   }
@@ -1329,6 +1345,113 @@ class SandaiEkiden {
 }
 
 // ------------------------------------------------------------
+// 選手の三大駅伝の成績の表(1.9.7)
+// テレビの表のように、10月駅伝・11月駅伝・正月駅伝を横に並べ、学年を上から新しい順に並べる。
+// マスは2行(「3区」「区間2位」。区間賞は「区間賞」)。本戦を走っていない年は、予選を走っていれば
+// 予選の結果(11月駅伝の欄は11月駅伝予選の組と組の順位、正月駅伝の欄は正月駅伝予選の個人順位)、
+// 補欠(当日変更で外れた選手も)は「補欠」、学連選抜で走った正月駅伝は「学連 7区」「区間5位相当」。
+// その学年の記録が残っていない(ゲームを始めた年の2〜4年生など)ときは「記録なし」。
+// レース前の記事では、記事にしている大会を「今回」、今の学年でそれより後の大会を「これから」にする。
+// 卒業生特集・年間最優秀選手と、選手名鑑(学内メディアの三大駅伝の展望号・学連選抜通信・駅伝予選)で使う。
+// 選手名鑑では、走った・予選・学連選抜・補欠のどれも載らない選手は表を省く(shouryaku)
+// ------------------------------------------------------------
+
+/// 大会の、季の中での順(11月駅伝予選・10月駅伝・正月駅伝予選・11月駅伝・正月駅伝)
+const List<int> _kiNoJun = [3, 0, 4, 1, 2];
+
+/// 選手[s]の[g]年の、大会[race]の区間(記録がなければ-2)
+int _entryAt(SenshuData s, int race, int g) {
+  if (g < 1 || s.entrykukan_race.length <= race || s.entrykukan_race[race].length < g) return -2;
+  return s.entrykukan_race[race][g - 1];
+}
+
+/// 選手[s]の[g]年の、大会[race]の区間順位(記録がなければ TEISUU.DEFAULTJUNI)
+int _juniAt(SenshuData s, int race, int g) {
+  if (g < 1 || s.kukanjuni_race.length <= race || s.kukanjuni_race[race].length < g) {
+    return TEISUU.DEFAULTJUNI;
+  }
+  return s.kukanjuni_race[race][g - 1];
+}
+
+/// 選手[s]の[g]年の記録が残っていないか(対校戦の順位で見る。kirokuKaketeiru と同じ見方)
+bool _gakunenKirokuNashi(SenshuData s, int g) {
+  for (int race = 6; race <= 8; race++) {
+    if (shutsujouJuni(_juniAt(s, race, g))) return false;
+  }
+  return true;
+}
+
+/// 三大駅伝の成績の表の、大会[race]の[g]年のマス(載せることがなければnull)
+String? _sandaiSeisekiMasu(SenshuData s, int race, int g) {
+  final int e = _entryAt(s, race, g);
+  final int j = _juniAt(s, race, g);
+  if (e >= 0) {
+    if (gakurenShussouJuni(race, j)) return '学連 ${e + 1}区\n区間${j - 100 + 1}位相当';
+    if (shutsujouJuni(j)) return j == 0 ? '${e + 1}区\n区間賞' : '${e + 1}区\n区間${j + 1}位';
+    return '${e + 1}区';
+  }
+  // 本戦を走っていなければ、予選の結果(11月駅伝は11月駅伝予選、正月駅伝は正月駅伝予選)
+  final int yosen = race == 1 ? 3 : (race == 2 ? 4 : -1);
+  if (yosen >= 0) {
+    final int ye = _entryAt(s, yosen, g);
+    if (ye >= 0) {
+      final int yj = _juniAt(s, yosen, g);
+      final bool ari = shutsujouJuni(yj);
+      return yosen == 3
+          ? '予選 ${ye + 1}組${ari ? '\n組${yj + 1}位' : ''}'
+          : '予選会${ari ? '\n個人${yj + 1}位' : ''}';
+    }
+  }
+  // 補欠(-1)と、当日変更で外れた選手(-100以下)
+  if (e == -1 || e <= -100) return '補欠';
+  return null;
+}
+
+/// 選手[s]の三大駅伝の成績の表(学年は今の学年から1年まで、上から新しい順)
+/// [imaRace] レース前の記事なら、記事にしている大会(その大会は「今回」、今の学年でそれより後の
+/// 大会は「これから」。駅伝予選の記事なら、その予選の本戦の欄を「今回」にする)。
+/// 季が終わったあとの記事(卒業生特集・年間表彰)ならnull
+/// [shouryaku] 走った・予選・学連選抜・補欠のどれも載らないときにnullを返すか(選手名鑑)
+KijiHyou? sandaiSeisekiHyou(SenshuData s, {int? imaRace, bool shouryaku = false}) {
+  if (s.gakunen < 1 || s.gakunen > 4) return null;
+  final int imaJun = imaRace == null ? -1 : _kiNoJun.indexOf(imaRace);
+  final List<List<String>> gyou = [];
+  bool nanika = false;
+  for (int g = s.gakunen; g >= 1; g--) {
+    final bool nashi = g < s.gakunen && _gakunenKirokuNashi(s, g);
+    final bool ima = g == s.gakunen && imaJun >= 0;
+    final List<String> masu = [];
+    for (final int race in sandaiEkidenRace) {
+      String m;
+      if (nashi) {
+        m = '記録なし';
+      } else if (ima && race == imaRace) {
+        m = '今回';
+      } else if (ima && imaRace == 3 && race == 1) {
+        m = '予選\n今回';
+      } else if (ima && imaRace == 4 && race == 2) {
+        m = '予選会\n今回';
+      } else if (ima && _kiNoJun.indexOf(race) > imaJun) {
+        m = 'これから';
+      } else {
+        final String? d = _sandaiSeisekiMasu(s, race, g);
+        if (d != null) nanika = true;
+        m = d ?? '-';
+      }
+      masu.add(m);
+    }
+    gyou.add(['$g年', ...masu]);
+  }
+  if (shouryaku && !nanika) return null;
+  return KijiHyou(
+    '${fullMei(s.name)}の三大駅伝',
+    ['学年', for (final int race in sandaiEkidenRace) courseRaceTitle(race)],
+    gyou,
+    masuTsunagi: ' ',
+  );
+}
+
+// ------------------------------------------------------------
 // 区間の特徴(展望・結果の記事で、区間の呼び方と見る種目を決める)
 // ------------------------------------------------------------
 
@@ -1872,6 +1995,11 @@ class KijiKakite {
 
   void koMidashi(String bun) {
     honbun.add(KijiBlock(KijiBlockShurui.koMidashi, bun));
+  }
+
+  /// 本文の途中に表を置く(選手の三大駅伝の成績など。1.9.7)
+  void hyou(KijiHyou h) {
+    honbun.add(KijiBlock(KijiBlockShurui.hyou, '', hyou: h));
   }
 }
 

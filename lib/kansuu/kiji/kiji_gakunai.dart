@@ -996,6 +996,11 @@ Kiji _meikan(
       hani: 'チーム',
     );
     final Innen? innen = _shoukai(w, s, kk, tk: tk, kb: kb);
+    // 三大駅伝の成績の表(1.9.7。何も載らない選手は省く)
+    if (k.race >= 0 && k.race <= 2) {
+      final KijiHyou? rh = sandaiSeisekiHyou(s, imaRace: k.race, shouryaku: true);
+      if (rh != null) w.hyou(rh);
+    }
     w.comment(
       senshuCommentJijitsu(
         w,
@@ -1532,6 +1537,9 @@ List<Kiji> gakunaiSotsugyouKiji(KijiKankyou k) {
       if (yosen.isNotEmpty) sr.write('駅伝予選も${yosen.length}度走った。');
       w.danraku(sr.toString());
     }
+    // 三大駅伝の成績の表(1.9.7。4年分)
+    final KijiHyou? rh = sandaiSeisekiHyou(s);
+    if (rh != null) w.hyou(rh);
     w.danraku(shusshinShumiBun(k, s, w.r, yobi));
     w.comment(senshuComment(w, CommentBamen.sotsugyou, yobi));
     // 後輩のひと言(同じ区間を走った後輩、いなければ同じ出身地の後輩)
@@ -2071,6 +2079,9 @@ Kiji _yosenMeikan(
     w.danraku(sb.toString());
     if (!kb.tsuzukeru) w.danraku(kb.bun);
     w.danraku(shusshinShumiBun(k, s, w.r, yobi));
+    // 三大駅伝の成績の表(1.9.7。この予選の本戦の欄は「今回」。何も載らない選手は省く)
+    final KijiHyou? rh = sandaiSeisekiHyou(s, imaRace: k.race, shouryaku: true);
+    if (rh != null) w.hyou(rh);
     final List<Innen> yi = yosenInnen(k, s, kekka: false);
     w.comment(
       senshuCommentJijitsu(

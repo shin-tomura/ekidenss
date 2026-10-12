@@ -295,6 +295,9 @@ List<Kiji> nenkanHyoushouKiji(KijiKankyou k) {
     mb.write('だった。');
   }
   w.danraku(mb.toString());
+  // 年間最優秀選手の三大駅伝の成績の表(1.9.7)
+  final KijiHyou? mvpHyou = sandaiSeisekiHyou(mvp.s);
+  if (mvpHyou != null) w.hyou(mvpHyou);
   w.comment(
     senshuCommentJijitsu(
       w,

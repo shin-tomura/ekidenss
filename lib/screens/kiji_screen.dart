@@ -862,11 +862,14 @@ class KijiGamen extends StatelessWidget {
             style: const TextStyle(color: _honbunIro, fontSize: 15, height: 1.85),
           ),
         );
+      case KijiBlockShurui.hyou:
+        // 本文の途中の表(選手の三大駅伝の成績など。1.9.7)
+        return b.hyou == null ? const SizedBox.shrink() : _hyou(b.hyou!, ue: 10);
     }
   }
 
-  // 成績欄(横に長いときは横にスクロール)
-  Widget _hyou(KijiHyou h) {
+  // 成績欄(横に長いときは横にスクロール)。[ue] 上の余白(本文の途中に置く表は狭くする。1.9.7)
+  Widget _hyou(KijiHyou h, {double ue = 24}) {
     const TextStyle midashiStyle = TextStyle(
       color: Colors.white,
       fontSize: 13,
@@ -878,7 +881,7 @@ class KijiGamen extends StatelessWidget {
       child: Text(s, style: st, softWrap: false),
     );
     return Padding(
-      padding: const EdgeInsets.only(top: 24),
+      padding: EdgeInsets.only(top: ue),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

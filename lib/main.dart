@@ -3115,9 +3115,11 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       }
       //if (senshu.univid == ghensuu.MYunivid &&
       //  random.nextInt(100) < kantoku.yobiint2[6]) {
+      // 区間エントリー時体調不良は「区間エントリー時 体調不良確率」(yobiint2[6])で引く
+      // (1.9.8までは「当日突発的体調不良確率」(yobiint2[5])を使っていて、[6]の設定が効いていなかった。1.9.9)
       if ((senshu.univid == ghensuu.MYunivid ||
               (kantoku.yobiint2[10] == 0 && kantoku.yobiint2[21] == 1)) &&
-          random.nextInt(100) < kantoku.yobiint2[5]) {
+          random.nextInt(100) < kantoku.yobiint2[6]) {
         //区間エントリー時体調不良
         senshu.chousi = 0;
       }

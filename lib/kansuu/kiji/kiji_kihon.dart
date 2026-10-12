@@ -1561,6 +1561,77 @@ Set<int> konkiKaisaiZumi(Iterable<SenshuData> senshu) {
 }
 
 // ------------------------------------------------------------
+// 大学の三大駅伝の成績の表(1.9.8。大学画面で使う)
+// 年度を上から新しい順に(今季と過去5季)、10月駅伝・11月駅伝・正月駅伝を横に並べる。
+// マスは本戦の順位(「優勝」「3位」)。本戦に出ていない季は予選の順位(「予選12位」。11月駅伝の欄は
+// 11月駅伝予選、正月駅伝の欄は正月駅伝予選)。どちらもなければ「-」、今季まだなら「これから」。
+// 年度の欄の2行目に「今季」と「三冠」を書く(記事の三大駅伝の表と同じ)。
+// 大学の順位は大会ごとに「何回前か」で持っているので、今季の大会がもう開かれたか(konkiKaisaiZumi)で
+// 季にそろえる。ゲームを始める前の季(どの大学にも順位がない季)は出さない
+// ------------------------------------------------------------
+
+/// 大学の三大駅伝の表に出す季の数(今季を含む。今季と過去5季)
+const int univSandaiKisuu = 6;
+
+/// 大学[u]の三大駅伝の成績の表([univs] 全大学、[kaisai] 今季もう開かれた大会、[year]・[month] 今の年月)
+KijiHyou univSandaiHyou(
+  UnivData u,
+  List<UnivData> univs,
+  Set<int> kaisai,
+  int year,
+  int month, {
+  int kisuu = univSandaiKisuu,
+}) {
+  // [kiMae]季前(0が今季)の大会[race]の、順位の記録の番号(まだ開かれていない今季はマイナス)
+  int idx(int race, int kiMae) => kaisai.contains(race) ? kiMae : kiMae - 1;
+  // その季に大会[race]の順位を持つ大学があるか(ゲームを始める前の季は、どの大学にもない)
+  bool kiroku(int race, int kiMae) {
+    final int i = idx(race, kiMae);
+    if (i < 0) return false;
+    for (final UnivData x in univs) {
+      if (shutsujouJuni(juniRace(x, race, i))) return true;
+    }
+    return false;
+  }
+
+  final int nendo0 = month <= 3 ? year - 1 : year;
+  final List<List<String>> gyou = [];
+  for (int kiMae = 0; kiMae < kisuu; kiMae++) {
+    if (kiMae > 0 && !const [0, 1, 2, 3, 4].any((r) => kiroku(r, kiMae))) continue;
+    final List<String> masu = [];
+    int yuushou = 0;
+    for (final int race in sandaiEkidenRace) {
+      final int yosen = race == 1 ? 3 : (race == 2 ? 4 : -1);
+      final int i = idx(race, kiMae);
+      final int j = i < 0 ? TEISUU.DEFAULTJUNI : juniRace(u, race, i);
+      String m;
+      if (shutsujouJuni(j)) {
+        if (j == 0) yuushou++;
+        m = j == 0 ? '優勝' : '${j + 1}位';
+      } else {
+        final int yi = yosen < 0 ? -1 : idx(yosen, kiMae);
+        final int yj = yi < 0 ? TEISUU.DEFAULTJUNI : juniRace(u, yosen, yi);
+        if (shutsujouJuni(yj)) {
+          m = '予選${yj + 1}位';
+        } else {
+          m = i < 0 ? 'これから' : '-';
+        }
+      }
+      masu.add(m);
+    }
+    final String soe = [if (kiMae == 0) '今季', if (yuushou == sandaiEkidenRace.length) '三冠'].join('・');
+    final int nendo = nendo0 - kiMae;
+    gyou.add([soe.isEmpty ? '$nendo年度' : '$nendo年度\n$soe', ...masu]);
+  }
+  return KijiHyou(
+    '${daigakuMei(u)}の三大駅伝(今季と過去の季)',
+    ['年度', for (final int race in sandaiEkidenRace) courseRaceTitle(race)],
+    gyou,
+    masuTsunagi: ' ',
+  );
+}
+
+// ------------------------------------------------------------
 // 区間の特徴(展望・結果の記事で、区間の呼び方と見る種目を決める)
 // ------------------------------------------------------------
 

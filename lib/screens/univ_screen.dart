@@ -34,6 +34,9 @@ import 'package:ekiden/screens/Modal_kukanHaichiHoushin.dart'; // 区間配置�
 import 'package:ekiden/screens/Modal_shinnyuuseiShingakusaki.dart';
 import 'package:ekiden/kansuu/meisei_rireki.dart'; // 名声の履歴(1.8.8)
 import 'package:ekiden/kansuu/shiyou_text.dart'; // 留学生の入学の決まり(1.8.9)
+import 'package:ekiden/kansuu/kiji/kiji_kihon.dart'
+    show KijiHyou, univSandaiHyou, konkiKaisaiZumi; // 三大駅伝の成績の表(1.9.8)
+import 'package:ekiden/screens/kiji_hyou_view.dart'; // 表の部品(1.9.8)
 //import 'package:ekiden/kansuu/kojinBestKirokuJuniKettei.dart';
 // Modal views (placeholders for now, you'll need to create these files)
 //import 'package:ekiden/modals/modal_univ_name_henshuu_view.dart';
@@ -3573,6 +3576,15 @@ class _UnivScreenState extends State<UnivScreen> {
               sankankaisuu: 0,
             );
 
+        // 三大駅伝の成績の表(今季と過去5季。今季の大会がもう開かれたかは選手の記録で見る。1.9.8)
+        final KijiHyou univHyou = univSandaiHyou(
+          currentUnivData,
+          sortedUnivData,
+          konkiKaisaiZumi(Hive.box<SenshuData>('senshuBox').values),
+          ghensuu.year,
+          ghensuu.month,
+        );
+
         return Scaffold(
           appBar: AppBar(
             backgroundColor: Colors.grey[900], // AppBarの背景色
@@ -4318,6 +4330,9 @@ class _UnivScreenState extends State<UnivScreen> {
                             ),
                           ),
                         ),
+                        const SizedBox(height: 16),
+                        // 三大駅伝の成績の表(1.9.8)
+                        KijiHyouView(univHyou, ue: 0),
                         const SizedBox(height: 16),
                         _buildRaceHistory('10月駅伝', currentUnivData, 0, ghensuu),
                         _buildRaceHistory('11月駅伝', currentUnivData, 1, ghensuu),

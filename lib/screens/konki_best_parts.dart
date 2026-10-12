@@ -39,16 +39,10 @@ class KonkiBestKirikae extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      // 「持ちタイム」の文字は出さない(「自己ベスト」「今季ベスト」で分かるので。1.9.8)
       child: Wrap(
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
-          const Padding(
-            padding: EdgeInsets.only(right: 4),
-            child: Text(
-              '持ちタイム',
-              style: TextStyle(color: Colors.white70, fontSize: 12),
-            ),
-          ),
           chip('自己ベスト', false),
           chip('今季ベスト', true),
         ],

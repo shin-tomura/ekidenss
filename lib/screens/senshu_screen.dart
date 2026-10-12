@@ -24,6 +24,8 @@ import 'package:ekiden/kansuu/gin_tokkun_menu.dart'; // 夏合宿の銀特訓の
 import 'package:ekiden/kansuu/kiji/kiji_kihon.dart'
     show KijiHyou, SeisekiKiroku, sandaiSeisekiHyouKiroku, taikousenSeisekiHyou, konkiKaisaiZumi; // 成績の表(1.9.8)
 import 'package:ekiden/screens/kiji_hyou_view.dart'; // 表の部品(1.9.8)
+import 'package:ekiden/screens/Modal_nameedit.dart'
+    show ModalSenshuNameHenkou_modalsenshugamen; // 他大学の選手の名前の変更(箱庭モード。1.9.9)
 
 String _getCombinedDifficultyText(KantokuData kantoku, Ghensuu currentGhensuu) {
   // 難易度モードを取得 (0:通常, 1:極, 2:天)
@@ -1574,6 +1576,73 @@ class _SenshuScreenState extends State<SenshuScreen> {
   late Box<SenshuData> _senshuBox;
   late Box<UnivData> _univBox; // UnivData Boxの参照を追加
 
+  // 表示している他大学(1.9.9。nullなら自分の大学)。上の大学名の行を押して選ぶ。
+  // この画面の中だけで覚えるので、ほかの画面に移って戻ると自分の大学に戻る
+  int? _hokaUnivid;
+  // 他大学を表示しているときの選手の番号(自分の大学の分は、今までどおり ghensuu.hyojisenshunum に保存する)
+  int _hokaSenshuNum = 0;
+
+  /// 大学[univid]の選手を、学年の高い順(同じならidの順)に並べる
+  List<SenshuData> _senshuNarabi(Iterable<SenshuData> senshu, int univid) {
+    final List<SenshuData> list = senshu
+        .where((s) => s.univid == univid)
+        .toList();
+    list.sort((a, b) {
+      final int gakunenCompare = b.gakunen.compareTo(a.gakunen);
+      if (gakunenCompare != 0) return gakunenCompare;
+      return a.id.compareTo(b.id);
+    });
+    return list;
+  }
+
+  /// 表示する大学を選ぶ(1.9.9。自分の大学を先頭に、ほかは大学のidの順)
+  Future<void> _univErabu(
+    BuildContext context,
+    List<UnivData> sortedUnivData,
+    int myUnivId,
+  ) async {
+    final List<UnivData> narabi = [
+      ...sortedUnivData.where((u) => u.id == myUnivId),
+      ...sortedUnivData.where((u) => u.id != myUnivId),
+    ];
+    final int ima = _hokaUnivid ?? myUnivId;
+    final int? erabi = await showDialog<int>(
+      context: context,
+      builder: (context) {
+        return SimpleDialog(
+          title: const Text(
+            '表示する大学',
+            style: TextStyle(color: Colors.black),
+          ),
+          children: [
+            for (final UnivData u in narabi)
+              SimpleDialogOption(
+                onPressed: () => Navigator.of(context).pop(u.id),
+                child: Text(
+                  '${u.name}大学${u.id == myUnivId ? '(自分の大学)' : ''}',
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontWeight: u.id == ima
+                        ? FontWeight.bold
+                        : FontWeight.normal,
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+    if (erabi == null || !mounted) return;
+    setState(() {
+      if (erabi == myUnivId) {
+        _hokaUnivid = null;
+      } else if (erabi != _hokaUnivid) {
+        _hokaUnivid = erabi;
+        _hokaSenshuNum = 0;
+      }
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -1589,26 +1658,24 @@ class _SenshuScreenState extends State<SenshuScreen> {
       defaultValue: Ghensuu.initial(),
     )!;
     final int myUnivId = ghensuu.MYunivid;
+    // 他大学を表示しているときは、その大学の選手の中で送る(1.9.9)
+    final int? hokaUnivid = (_hokaUnivid != null && _hokaUnivid != myUnivId)
+        ? _hokaUnivid
+        : null;
 
-    final List<SenshuData> myUnivSenshuList = _senshuBox.values
-        .where((senshu) => senshu.univid == myUnivId)
-        .toList();
-
-    // 学年降順、ID昇順でソート
-    myUnivSenshuList.sort((a, b) {
-      int gakunenCompare = b.gakunen.compareTo(a.gakunen);
-      if (gakunenCompare != 0) {
-        return gakunenCompare;
-      }
-      return a.id.compareTo(b.id);
-    });
+    final List<SenshuData> myUnivSenshuList = _senshuNarabi(
+      _senshuBox.values,
+      hokaUnivid ?? myUnivId,
+    );
 
     if (myUnivSenshuList.isEmpty) {
       // 該当する選手がいない場合は何もしない
       return;
     }
 
-    int newSenshuNum = ghensuu.hyojisenshunum + delta;
+    int newSenshuNum =
+        (hokaUnivid != null ? _hokaSenshuNum : ghensuu.hyojisenshunum) +
+        delta;
 
     if (newSenshuNum < 0) {
       //newSenshuNum = myUnivSenshuList.length - 1;
@@ -1618,6 +1685,11 @@ class _SenshuScreenState extends State<SenshuScreen> {
       newSenshuNum = newSenshuNum - myUnivSenshuList.length;
     }
 
+    if (hokaUnivid != null) {
+      // 他大学の分は、この画面の中だけで覚える
+      if (mounted) setState(() => _hokaSenshuNum = newSenshuNum);
+      return;
+    }
     ghensuu.hyojisenshunum = newSenshuNum;
     await ghensuu.save(); // Hiveに保存
   }
@@ -1632,25 +1704,24 @@ class _SenshuScreenState extends State<SenshuScreen> {
           defaultValue: Ghensuu.initial(),
         )!;
         final int myUnivId = ghensuu.MYunivid;
-        final int currentSenshuNum = ghensuu.hyojisenshunum; // 現在表示する選手の番号
+        // 表示する大学(1.9.9。他大学を選んでいなければ自分の大学)
+        final int? hokaUnivid = (_hokaUnivid != null && _hokaUnivid != myUnivId)
+            ? _hokaUnivid
+            : null;
+        final int currentSenshuNum = hokaUnivid != null
+            ? _hokaSenshuNum
+            : ghensuu.hyojisenshunum; // 現在表示する選手の番号
         final univDataBox = Hive.box<UnivData>('univBox');
         List<UnivData> sortedUnivData = univDataBox.values.toList();
         sortedUnivData.sort((a, b) => a.id.compareTo(b.id));
         return ValueListenableBuilder<Box<SenshuData>>(
           valueListenable: _senshuBox.listenable(),
           builder: (context, senshuBox, _) {
-            final List<SenshuData> myUnivSenshuList = senshuBox.values
-                .where((senshu) => senshu.univid == myUnivId)
-                .toList();
-
-            // 学年降順、ID昇順でソート
-            myUnivSenshuList.sort((a, b) {
-              int gakunenCompare = b.gakunen.compareTo(a.gakunen);
-              if (gakunenCompare != 0) {
-                return gakunenCompare;
-              }
-              return a.id.compareTo(b.id);
-            });
+            // 表示する大学の選手(学年降順、ID昇順。他大学を表示しているときは、その大学の選手。1.9.9)
+            final List<SenshuData> myUnivSenshuList = _senshuNarabi(
+              senshuBox.values,
+              hokaUnivid ?? myUnivId,
+            );
 
             // 選手がいなければメッセージを表示
             if (myUnivSenshuList.isEmpty) {
@@ -1674,6 +1745,13 @@ class _SenshuScreenState extends State<SenshuScreen> {
               // 範囲外の場合は最初の選手を表示し、hyojisenshunumを0にリセット
               currentSenshu = myUnivSenshuList[0];
               WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (hokaUnivid != null) {
+                  // 他大学の分は、この画面の中の番号を戻す(1.9.9)
+                  if (mounted && _hokaSenshuNum != 0) {
+                    setState(() => _hokaSenshuNum = 0);
+                  }
+                  return;
+                }
                 if (ghensuu.hyojisenshunum != 0) {
                   ghensuu.hyojisenshunum = 0;
                   //ghensuu.save();ここには来ないはずなのでコメントアウトした
@@ -1856,12 +1934,29 @@ class _SenshuScreenState extends State<SenshuScreen> {
                 children: [
                   const SizedBox(height: 8), // スペースを確保
                   // 大学名と選手名
-                  Text(
-                    '$univName 大学選手データ',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: HENSUU.fontsize_honbun,
-                      //fontWeight: FontWeight.bold,
+                  // 大学名の行を押すと、表示する大学を選べる(1.9.9。他大学の選手も順に見られるように。
+                  // 表示の場所を増やさないように、今ある行を押せるようにした。他大学のときは色を変える)
+                  InkWell(
+                    onTap: () =>
+                        _univErabu(context, sortedUnivData, myUnivId),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      child: Text(
+                        hokaUnivid != null
+                            ? '$univName 大学選手データ(他大学) ▼'
+                            : '$univName 大学選手データ ▼',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: hokaUnivid != null
+                              ? Colors.orangeAccent
+                              : Colors.white,
+                          fontSize: HENSUU.fontsize_honbun,
+                          //fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ),
                   Row(
@@ -1961,8 +2056,10 @@ class _SenshuScreenState extends State<SenshuScreen> {
                                 defaultValue: Ghensuu.initial(),
                               )!;
                               final int myUnivId = ghensuu.MYunivid;
-                              final int currentSenshuNum =
-                                  ghensuu.hyojisenshunum; // 現在表示する選手の番号
+                              // 他大学を表示しているときは、この画面の中の番号(1.9.9)
+                              final int currentSenshuNum = hokaUnivid != null
+                                  ? _hokaSenshuNum
+                                  : ghensuu.hyojisenshunum; // 現在表示する選手の番号
                               final univDataBox = Hive.box<UnivData>('univBox');
                               List<UnivData> sortedUnivData = univDataBox.values
                                   .toList();
@@ -1992,6 +2089,7 @@ class _SenshuScreenState extends State<SenshuScreen> {
                                 WidgetsBinding.instance.addPostFrameCallback((
                                   _,
                                 ) async {
+                                  if (hokaUnivid != null) return; // 他大学のときは自分の大学の番号を変えない(1.9.9)
                                   if (ghensuu.hyojisenshunum != 0) {
                                     ghensuu.hyojisenshunum = 0;
                                     await ghensuu.save();
@@ -2059,6 +2157,13 @@ class _SenshuScreenState extends State<SenshuScreen> {
                                 pageBuilder:
                                     (context, animation, secondaryAnimation) {
                                       // ここに表示したいモーダルのウィジェットを指定
+                                      // 他大学を表示しているときは、表示している選手のidで開く(1.9.9。
+                                      // ModalSenshuNameHenkou は自分の大学の表示中の選手を変えるため)
+                                      if (hokaUnivid != null) {
+                                        return ModalSenshuNameHenkou_modalsenshugamen(
+                                          senshuId: currentSenshu.id,
+                                        );
+                                      }
                                       return const ModalSenshuNameHenkou(); // const を追加
                                     },
                                 transitionBuilder:
@@ -2465,8 +2570,8 @@ class _SenshuScreenState extends State<SenshuScreen> {
                         }),
 
                         const SizedBox(height: 16),
-                        // リンクボタン
-                        LinkButtons(context, ghensuu),
+                        // リンクボタン(金特訓・銀特訓・金銀交換・アルバムなど。自分の大学の選手だけ。1.9.9)
+                        if (hokaUnivid == null) LinkButtons(context, ghensuu),
 
                         const SizedBox(height: 20), // 下部ボタンとのマージン
                       ],

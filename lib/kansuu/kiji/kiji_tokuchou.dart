@@ -244,7 +244,9 @@ class HashiriJijou {
     tobidashi: g.startchokugotobidasiflag,
     tobidashiSeikou: g.startchokugotobidasiseikouflag,
     setsumei: g.string_racesetumei,
-    bunseki: g.racechuukakuseiflag,
+    // 学連選抜の選手は正月駅伝の分析を計算していない。racechuukakuseiflag は学連選抜に選ばれたときに
+    // 大学の選手のデータから写した値(正月駅伝予選などの分析)なので読まない(1.9.8)
+    bunseki: 0,
     kk: kk,
   );
 }
@@ -642,16 +644,70 @@ class TokuchouKaki {
     return _Kansatsu(2, '$junbun$handan');
   }
 
-  /// 坂の見立て(区間の起伏に合った種目の区間内の段。平坦な区間や記録がなければnull)
-  ({int dan, String michi})? _sakaDan(List<double> t, int kk, List<SenshuData>? hashiru) {
+  /// 坂の見立て(区間の起伏に合った種目の段。平坦な区間や記録がなければnull)
+  /// 展望号の名鑑(_saka)と同じく、区間内の順位が出せなければ学生全体の順位で見る
+  /// (1.9.8。夏の種目は区間の誰か1人でも記録がないと区間内の順位が出ないので、照合の文がほとんど出なかった)
+  /// [kukannai] 区間内の順位で見たか(falseなら学生全体)
+  ({int dan, String michi, bool kukannai})? _sakaDan(List<double> t, int kk, List<SenshuData>? hashiru) {
     final KukanTokuchou tok = kukanTokuchou(k.gh, k.race, kk);
-    if (tok == KukanTokuchou.heitan || hashiru == null) return null;
+    if (tok == KukanTokuchou.heitan) return null;
     final bool nobori = tok == KukanTokuchou.yamaNobori || tok == KukanTokuchou.nobori;
     final bool kudari = tok == KukanTokuchou.yamaKudari || tok == KukanTokuchou.kudari;
     final int ev = nobori ? 4 : (kudari ? 5 : 7);
-    final int r = hyou.kukannai(t[ev], ev, hashiru);
-    if (r <= 0) return null;
-    return (dan: _dan(r, hashiru.length), michi: nobori ? '登り' : (kudari ? '下り' : 'アップダウン'));
+    final String michi = nobori ? '登り' : (kudari ? '下り' : 'アップダウン');
+    if (hashiru != null) {
+      final int r = hyou.kukannai(t[ev], ev, hashiru);
+      if (r > 0) return (dan: _dan(r, hashiru.length), michi: michi, kukannai: true);
+    }
+    final int z = hyou.zentai(t[ev], ev);
+    if (z > 0) return (dan: _dan(z, hyou.zentaiSuu(ev)), michi: michi, kukannai: false);
+    return null;
+  }
+
+  /// 山の区間とアップダウンが50回以上の区間で、結果号の坂の照合のうち、見立てと結果がはっきり合う・外れる
+  /// 4通り(呼ぶ側で書く)以外の文(1.9.8。山の区間は坂の出来がそのまま区間順位に出るので、結果は区間順位の段で見る)
+  /// [kekka] 区間順位の段(0: 上位、1: 中ほど、2: 下位)、[mitate] 坂の種目の段(nullなら記録がない)、
+  /// [kukannai] 見立てを区間内の順位で見たか(falseなら学生全体)
+  String _sakaShouBun(
+    KukanTokuchou tok,
+    List<double> t, {
+    required int kekka,
+    required int? mitate,
+    required bool kukannai,
+    required String kukanJ,
+  }) {
+    final bool nobori = tok == KukanTokuchou.yamaNobori;
+    final bool kudari = tok == KukanTokuchou.yamaKudari;
+    final int ev = nobori ? 4 : (kudari ? 5 : 7);
+    final String sm = _shumoku[ev];
+    final String basho = nobori ? '山登り' : (kudari ? '山下り' : 'アップダウンの続くこの区間');
+    if (mitate == null) {
+      // 記録がない選手(展望号の名鑑では「適性は未知数」と書いた)
+      if (t[ev] < TEISUU.DEFAULTTIME) return '';
+      final String tekisei = nobori ? '山登りへの適性' : (kudari ? '山下りへの適性' : '起伏への適性');
+      if (kekka == 0) return '$smの記録がなく、$tekiseiは未知数だったが、$kukanJと十分に対応してみせた。';
+      if (kekka == 1) return '$smの記録がなく、$tekiseiは未知数だったが、$kukanJとまずまずの走りだった。';
+      final String kadai = nobori ? '登り' : (kudari ? '下り' : 'アップダウンへの対応');
+      return '$smの記録がなく、$tekiseiは未知数だったが、$kukanJ。$kadaiに課題を残した。';
+    }
+    final String ichi = kukannai ? '区間の' : '学生全体で';
+    if (mitate == 0 && kekka == 1) {
+      return '$smは$ichi上位だったが、$bashoの結果は$kukanJ。強みを結果に結びつけきれなかった。';
+    }
+    if (mitate == 1 && kekka == 0) {
+      final String tekisei = nobori ? '山登りへの適性' : (kudari ? '山下りへの適性' : 'アップダウンへの対応力');
+      return '$smは$ichi中ほどだったが、$bashoで$kukanJ。見立て以上の$tekiseiを示した。';
+    }
+    if (mitate == 1 && kekka == 1) {
+      return '$smは$ichi中ほどで、$bashoの結果も$kukanJ。その位置どおりの走りだった。';
+    }
+    if (mitate == 1 && kekka == 2) {
+      return '$smは$ichi中ほどだったが、$bashoでは$kukanJと苦しんだ。';
+    }
+    if (mitate == 2 && kekka == 1) {
+      return '$smは$ichi下位で不安もあったが、$bashoは$kukanJと踏みとどまった。';
+    }
+    return '';
   }
 
   /// D 坂とアップダウン(登り1万・下り1万・クロカン1万)
@@ -927,9 +983,14 @@ class TokuchouKaki {
     } else if (hantei == 2 && yowai.isNotEmpty) {
       s2 = '$yowaiの不安は残ったが、持ちタイムの位置は守った。';
     }
-    final ({int dan, String michi})? sk = _sakaDan(t, kk, hashiru);
+    // 山の区間とアップダウンが50回以上の区間は、展望号の名鑑と同じく坂の照合を必ず書く
+    // (1.9.8。今までは見立てと結果がはっきり合う・外れるときだけで、中ほどや記録がないときは何も書かなかった)
+    final KukanTokuchou tok = kukanTokuchou(k.gh, k.race, kk);
+    final bool sakaKanarazu =
+        tok == KukanTokuchou.yamaNobori || tok == KukanTokuchou.yamaKudari || tok == KukanTokuchou.updown;
+    final ({int dan, String michi, bool kukannai})? sk = _sakaDan(t, kk, hashiru);
+    String sakaBun = '';
     if (sk != null) {
-      final String sakaBun;
       if (sk.dan == 0 && yoi) {
         sakaBun = w.erabu(['${sk.michi}の強さも見立てどおりで、起伏を味方にした。', '展望号で頼りになると書いた${sk.michi}で、やはり差をつけた。']);
       } else if (sk.dan == 2 && kurushii) {
@@ -938,11 +999,14 @@ class TokuchouKaki {
         sakaBun = '${sk.michi}は強いはずだったが、この日は起伏で差を詰められなかった。';
       } else if (sk.dan == 2 && yoi) {
         sakaBun = '不安材料だった${sk.michi}を、持ち前の走りでしのいだ。';
-      } else {
-        sakaBun = '';
+      } else if (sakaKanarazu) {
+        sakaBun = _sakaShouBun(tok, t, kekka: yoi ? 0 : (kurushii ? 2 : 1), mitate: sk.dan, kukannai: sk.kukannai, kukanJ: kukanJ);
       }
-      if (sakaBun.isNotEmpty) s2 = s2 == null ? sakaBun : '$s2$sakaBun';
+    } else if (sakaKanarazu) {
+      // 記録がない(展望号では「適性は未知数」と書いた)
+      sakaBun = _sakaShouBun(tok, t, kekka: yoi ? 0 : (kurushii ? 2 : 1), mitate: null, kukannai: false, kukanJ: kukanJ);
     }
+    if (sakaBun.isNotEmpty) s2 = s2 == null ? sakaBun : '$s2$sakaBun';
 
     // S3 なぜそうなったか(指示・焦り・集団のペース・際立った能力)
     final StringBuffer sb3 = StringBuffer();

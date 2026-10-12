@@ -12,6 +12,9 @@ import 'package:ekiden/senshu_r_data.dart';
 import 'package:ekiden/album.dart';
 import 'package:ekiden/riji_data.dart';
 import 'package:ekiden/kansuu/joukai.dart';
+import 'package:ekiden/kansuu/kiji/kiji_kihon.dart'
+    show KijiHyou, SeisekiKiroku, sandaiSeisekiHyouKiroku, taikousenSeisekiHyou; // 成績の表(1.9.8)
+import 'package:ekiden/screens/kiji_hyou_view.dart'; // 表の部品(1.9.8)
 
 String _timeToMinuteSecondString(double time) {
   if (time == TEISUU.DEFAULTTIME) {
@@ -491,6 +494,16 @@ class _Senshu_R_ScreenState extends State<Senshu_R_Screen> {
                 }
               });
             }
+            // 三大駅伝と対校戦の成績の表(記事の表と同じ形。卒業生は4年分がそろっているので、4年として作る。1.9.8)
+            final SeisekiKiroku seiseki = SeisekiKiroku(
+              currentSenshu.name,
+              4,
+              currentSenshu.entrykukan_race,
+              currentSenshu.kukanjuni_race,
+              currentSenshu.kukantime_race,
+            );
+            final KijiHyou? sandaiHyou = sandaiSeisekiHyouKiroku(seiseki);
+            final KijiHyou? taikousenHyou = taikousenSeisekiHyou(seiseki);
             String yakushokustr = "";
             final rijiBox = Hive.box<RijiData>('rijiBox');
             final RijiData riji = rijiBox.get('RijiData')!;
@@ -912,6 +925,11 @@ class _Senshu_R_ScreenState extends State<Senshu_R_Screen> {
                         ),
 
                         const SizedBox(height: 16),
+                        // 三大駅伝と対校戦の成績の表(1.9.8)
+                        if (sandaiHyou != null) KijiHyouView(sandaiHyou, ue: 0),
+                        if (taikousenHyou != null) KijiHyouView(taikousenHyou, ue: 16),
+                        if (sandaiHyou != null || taikousenHyou != null)
+                          const SizedBox(height: 16),
                         const Text(
                           '駅伝・対校戦成績',
                           style: TextStyle(

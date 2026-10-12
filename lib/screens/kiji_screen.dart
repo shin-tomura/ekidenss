@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:ekiden/kansuu/kiji/kiji.dart';
 import 'package:ekiden/screens/ai_copy_matome.dart';
+import 'package:ekiden/screens/kiji_hyou_view.dart'; // 表の部品(1.9.8)
 
 // ------------------------------------------------------------
 // ニュース記事(箱庭スポーツ)の画面(1.9.2)
@@ -869,59 +870,8 @@ class KijiGamen extends StatelessWidget {
   }
 
   // 成績欄(横に長いときは横にスクロール)。[ue] 上の余白(本文の途中に置く表は狭くする。1.9.7)
-  Widget _hyou(KijiHyou h, {double ue = 24}) {
-    const TextStyle midashiStyle = TextStyle(
-      color: Colors.white,
-      fontSize: 13,
-      fontWeight: FontWeight.bold,
-    );
-    const TextStyle mojiStyle = TextStyle(color: _honbunIro, fontSize: 13);
-    Widget masu(String s, TextStyle st) => Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-      child: Text(s, style: st, softWrap: false),
-    );
-    return Padding(
-      padding: EdgeInsets.only(top: ue),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '【${h.title}】',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 6),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Table(
-              defaultColumnWidth: const IntrinsicColumnWidth(),
-              border: const TableBorder(
-                horizontalInside: BorderSide(color: _sen),
-                top: BorderSide(color: _sen),
-                bottom: BorderSide(color: _sen),
-              ),
-              children: [
-                TableRow(
-                  decoration: const BoxDecoration(color: _waku),
-                  children: [for (final String s in h.retsu) masu(s, midashiStyle)],
-                ),
-                for (final List<String> g in h.gyou)
-                  TableRow(
-                    children: [
-                      for (int i = 0; i < h.retsu.length; i++)
-                        masu(i < g.length ? g[i] : '', mojiStyle),
-                    ],
-                  ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  // 1.9.8から、選手画面の成績の表と同じ部品(kiji_hyou_view.dart)にした
+  Widget _hyou(KijiHyou h, {double ue = 24}) => KijiHyouView(h, ue: ue);
 
   // 生成AIに渡すテキストの枠
   Widget _aiWaku(BuildContext context, Kiji kiji) {

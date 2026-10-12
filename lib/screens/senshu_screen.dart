@@ -21,6 +21,9 @@ import 'package:ekiden/kansuu/joukai.dart';
 import 'package:ekiden/kansuu/konki_best.dart'; // 今季ベスト(1.9.1)
 import 'package:ekiden/screens/konki_best_parts.dart';
 import 'package:ekiden/kansuu/gin_tokkun_menu.dart'; // 夏合宿の銀特訓の練習メニュー(1.9.1)
+import 'package:ekiden/kansuu/kiji/kiji_kihon.dart'
+    show KijiHyou, SeisekiKiroku, sandaiSeisekiHyouKiroku, taikousenSeisekiHyou, konkiKaisaiZumi; // 成績の表(1.9.8)
+import 'package:ekiden/screens/kiji_hyou_view.dart'; // 表の部品(1.9.8)
 
 String _getCombinedDifficultyText(KantokuData kantoku, Ghensuu currentGhensuu) {
   // 難易度モードを取得 (0:通常, 1:極, 2:天)
@@ -1685,6 +1688,16 @@ class _SenshuScreenState extends State<SenshuScreen> {
             final String univName = currentUnivData?.name ?? '大学名不明';
             final kantokuBox = Hive.box<KantokuData>('kantokuBox');
             final KantokuData kantoku = kantokuBox.get('KantokuData')!;
+            // 三大駅伝と対校戦の成績の表(記事の表と同じ形。今の学年でまだ開かれていない大会は「これから」。1.9.8)
+            final Set<int> kaisai = konkiKaisaiZumi(senshuBox.values);
+            final KijiHyou? sandaiHyou = sandaiSeisekiHyouKiroku(
+              SeisekiKiroku.senshu(currentSenshu),
+              kaisai: kaisai,
+            );
+            final KijiHyou? taikousenHyou = taikousenSeisekiHyou(
+              SeisekiKiroku.senshu(currentSenshu),
+              kaisai: kaisai,
+            );
 
             // ⭐ アンパック（取り出し）
             final Map<String, int> extracted = PackedIndexHelper.unpackIndices(
@@ -2293,6 +2306,11 @@ class _SenshuScreenState extends State<SenshuScreen> {
                         ),
 
                         const SizedBox(height: 16),
+                        // 三大駅伝と対校戦の成績の表(1.9.8)
+                        if (sandaiHyou != null) KijiHyouView(sandaiHyou, ue: 0),
+                        if (taikousenHyou != null) KijiHyouView(taikousenHyou, ue: 16),
+                        if (sandaiHyou != null || taikousenHyou != null)
+                          const SizedBox(height: 16),
                         const Text(
                           '駅伝・対校戦成績',
                           style: TextStyle(

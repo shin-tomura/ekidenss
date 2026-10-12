@@ -2,6 +2,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:ekiden/senshu_data.dart';
+import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/constants.dart';
 import 'package:ekiden/screens/ModalAverageTop10TimeRankingView.dart';
 import 'package:ekiden/kansuu/konki_best.dart'; // 今季ベスト(1.9.1)
@@ -41,7 +42,23 @@ class ScoreCompressor {
 }
 
 /// 選手データを受け取り、解析パネル（レーダー＋数値）を返す共通関数
+/// 持ちタイムの「自己ベスト/今季ベスト」の切り替え(監督データに保存)が変わったら描き直す
+/// (1.9.7。ほかの画面で切り替えたときに、前の表示のまま残らないように)
 Widget buildSenshuAnalysisPanel(
+  SenshuData senshu, {
+  VoidCallback? onDetailTap,
+}) {
+  return ValueListenableBuilder<Box<KantokuData>>(
+    valueListenable: Hive.box<KantokuData>(
+      'kantokuBox',
+    ).listenable(keys: ['KantokuData']),
+    builder: (context, box, _) =>
+        _senshuAnalysisPanelNakami(senshu, onDetailTap: onDetailTap),
+  );
+}
+
+/// 選手の解析パネルの中身(buildSenshuAnalysisPanel から呼ぶ)
+Widget _senshuAnalysisPanelNakami(
   SenshuData senshu, {
   VoidCallback? onDetailTap,
 }) {

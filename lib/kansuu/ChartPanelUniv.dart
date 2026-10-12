@@ -424,7 +424,29 @@ Map<String, dynamic> konkiBestUnivScores(int univid) {
 /// 大学解析パネルを返す共通Widget
 /// 引数が targetUnivId のみの場合は保存データを表示、
 /// override... 引数がある場合はその値を優先表示する。
+/// 持ちタイムの「自己ベスト/今季ベスト」の切り替え(監督データに保存)が変わったら描き直す
+/// (1.9.7。大学画面の上で開いた画面で切り替えて閉じても、前の表示のまま残っていたため)
 Widget buildUnivAnalysisPanel(
+  int targetUnivId, {
+  Map<String, double>? overrideScores,
+  String? overrideType,
+  String? overrideAnalysis,
+}) {
+  return ValueListenableBuilder<Box<KantokuData>>(
+    valueListenable: Hive.box<KantokuData>(
+      'kantokuBox',
+    ).listenable(keys: ['KantokuData']),
+    builder: (context, box, _) => _univAnalysisPanelNakami(
+      targetUnivId,
+      overrideScores: overrideScores,
+      overrideType: overrideType,
+      overrideAnalysis: overrideAnalysis,
+    ),
+  );
+}
+
+/// 大学解析パネルの中身(buildUnivAnalysisPanel から呼ぶ)
+Widget _univAnalysisPanelNakami(
   int targetUnivId, {
   Map<String, double>? overrideScores,
   String? overrideType,

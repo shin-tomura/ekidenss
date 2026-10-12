@@ -82,14 +82,16 @@ class _SenshuRadarAnalysisViewState extends State<SenshuRadarAnalysisView> {
         : 50 + 10 * (val - mean) / stdDev;
   }
 
-  // [konki]がtrueなら今季ベストで分析する(今季ベストのない種目は最低の評価。1.9.1)
+  // [konki]がtrueなら今季ベストで分析する(1.9.1)
+  // 1.9.7から、今季の記録がない種目は自己ベストで補う(hikakuMochiTime。選手画面のチャートと同じ)。
+  // それまでは最低の評価にしていたので、年度の初め(5月の対校戦まで)は全員の全部の項目が1.0になっていた
   List<SenshuScoreData> _calculateSenshuScores(
     List<SenshuData> allSenshu,
     int targetUnivId,
     bool konki,
   ) {
     double kiroku(SenshuData s, int idx) =>
-        konki ? konkiBest(s, idx) : s.time_bestkiroku[idx];
+        konki ? hikakuMochiTime(s, idx) : s.time_bestkiroku[idx];
 
     Map<int, List<double>> pools = {
       0: [],
@@ -526,6 +528,17 @@ class _SenshuRadarAnalysisViewState extends State<SenshuRadarAnalysisView> {
               ),
               textAlign: TextAlign.center,
             ),
+            // 今季ベストで分析しているときの注意書き(1.9.7。選手画面のチャートと同じ)
+            if (konkiBestHyoujiChuu())
+              const Text(
+                "※今季ベスト(今年度のレースでの最高記録)で分析しています。今季の記録がない種目は自己ベストで分析します",
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 9,
+                  letterSpacing: -0.5,
+                ),
+                textAlign: TextAlign.center,
+              ),
           ],
         ),
       ),

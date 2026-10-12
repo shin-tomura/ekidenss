@@ -214,57 +214,84 @@ class _ModalAverageTop10TimeRankingViewState
     });
   }*/
 
-  // [konki]がtrueなら今季ベストで集計する(今季ベストのない選手はその種目の集計から除く。1.9.1)
+  // [konki]がtrueなら今季ベストで集計する(1.9.1)
+  // ・種目ごとのタイムの順位は今季ベストだけで集計する(今季ベストのない選手はその種目の集計から除く)
+  // ・AI分析の点数(総合評価とチャート)は、今季の記録がない種目を自己ベストで補う
+  //   (hikakuMochiTime。大学画面のチャートと同じ。1.9.7。それまでは補わなかったので、
+  //    年度の初め(5月の対校戦まで)は全部の大学の全部の項目が1.0になっていた)
   List<UnivAverageTime> _calculateRanking(
     List<SenshuData> allSenshuData,
     Map<int, UnivData> univMap,
     int raceIdx,
     bool konki,
   ) {
+    // 記録の取り方[kiroku]で、大学ごと・種目ごとの上位10名の平均タイムを[heikin]に、
+    // 偏差値を出すための全大学の平均の母集団を[pool]に入れる
+    void heikinShuukei(
+      double Function(SenshuData s, int idx) kiroku,
+      Map<int, Map<DisplayEvent, double>> heikin,
+      Map<DisplayEvent, List<double>> pool,
+    ) {
+      // 1. 各大学の種目別生データを収集
+      Map<int, Map<DisplayEvent, List<double>>> tempRaw = {};
+      for (var s in allSenshuData) {
+        if (!univMap.containsKey(s.univid)) continue;
+        tempRaw.putIfAbsent(s.univid, () => {});
+        for (var e in DisplayEvent.values) {
+          if (e == DisplayEvent.totalScore) continue;
+          double t = kiroku(s, _getTimeIndex(e));
+          if (t < TEISUU.DEFAULTTIME && t > 0) {
+            tempRaw[s.univid]!.putIfAbsent(e, () => []).add(t);
+          }
+        }
+      }
+
+      // 2. 上位10名の平均タイムを算出
+      tempRaw.forEach((uid, eventMap) {
+        heikin[uid] = {};
+        eventMap.forEach((event, times) {
+          times.sort();
+          int count = math.min(10, times.length);
+          if (count > 0) {
+            double avg =
+                times.sublist(0, count).reduce((a, b) => a + b) / count;
+            heikin[uid]![event] = avg;
+            pool[event]!.add(avg);
+          }
+        });
+      });
+    }
+
+    // 種目ごとのタイムの順位に使う平均
     final Map<int, Map<DisplayEvent, double>> univAverages = {};
     final Map<DisplayEvent, List<double>> allAvgsPool = {
       for (var e in DisplayEvent.values) e: [],
     };
+    heikinShuukei(
+      (s, idx) => konki ? konkiBest(s, idx) : s.time_bestkiroku[idx],
+      univAverages,
+      allAvgsPool,
+    );
 
-    // 1. 各大学の種目別生データを収集
-    Map<int, Map<DisplayEvent, List<double>>> tempRaw = {};
-    for (var s in allSenshuData) {
-      if (!univMap.containsKey(s.univid)) continue;
-      tempRaw.putIfAbsent(s.univid, () => {});
-      for (var e in DisplayEvent.values) {
-        if (e == DisplayEvent.totalScore) continue;
-        double t = konki
-            ? konkiBest(s, _getTimeIndex(e))
-            : s.time_bestkiroku[_getTimeIndex(e)];
-        if (t < TEISUU.DEFAULTTIME && t > 0) {
-          tempRaw[s.univid]!.putIfAbsent(e, () => []).add(t);
-        }
-      }
+    // AI分析の点数に使う平均(自己ベストのときは、タイムの順位と同じ)
+    Map<int, Map<DisplayEvent, double>> scoreAverages = univAverages;
+    Map<DisplayEvent, List<double>> scoreAvgsPool = allAvgsPool;
+    if (konki) {
+      scoreAverages = {};
+      scoreAvgsPool = {for (var e in DisplayEvent.values) e: []};
+      heikinShuukei(hikakuMochiTime, scoreAverages, scoreAvgsPool);
     }
-
-    // 2. 上位10名の平均タイムを算出
-    tempRaw.forEach((uid, eventMap) {
-      univAverages[uid] = {};
-      eventMap.forEach((event, times) {
-        times.sort();
-        int count = math.min(10, times.length);
-        if (count > 0) {
-          double avg = times.sublist(0, count).reduce((a, b) => a + b) / count;
-          univAverages[uid]![event] = avg;
-          allAvgsPool[event]!.add(avg);
-        }
-      });
-    });
 
     // 3. 偏差値ベースのスコア計算とリスト化
     List<UnivAverageTime> results = [];
     univAverages.forEach((uid, avgs) {
+      final Map<DisplayEvent, double> scoreAvgs = scoreAverages[uid] ?? {};
       double sc(DisplayEvent e) {
-        final val = avgs[e];
+        final val = scoreAvgs[e];
         if (val == null || val <= 0 || val >= TEISUU.DEFAULTTIME) {
           return 1.0;
         }
-        double tScore = _calcT(val, allAvgsPool[e] ?? []);
+        double tScore = _calcT(val, scoreAvgsPool[e] ?? []);
         return ((tScore - 30) / 4).clamp(1.0, 10.0);
       }
 

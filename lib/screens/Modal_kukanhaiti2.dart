@@ -659,14 +659,42 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
     );
   }
 
+  /// 選手の今の大会のエントリー(区間0〜・-1補欠・-2エントリー外・-(100+区間)当日変更で外れた)
+  int _entryOf(SenshuData s, int race) {
+    if (s.gakunen < 1 ||
+        s.entrykukan_race.length <= race ||
+        s.entrykukan_race[race].length < s.gakunen) {
+      return -2;
+    }
+    return s.entrykukan_race[race][s.gakunen - 1];
+  }
+
   Widget _buildMainList(Ghensuu gh, List<SenshuData> senshus) {
     final int raceIdx = gh.hyojiracebangou;
     final int kukanCount = gh.kukansuu_taikaigoto[raceIdx];
+    // 区間の選手の下に、補欠と、当日変更で外れた選手も出す(1.9.9。当日変更のある駅伝だけ。
+    // 誰が当日変更で入りそうかを、区間の選手の調子などと見比べて推理できるように)
+    final bool hoketsuAri = raceIdx <= 2 || raceIdx == 5;
+    final List<SenshuData> hoketsu = hoketsuAri
+        ? (senshus.where((s) => _entryOf(s, raceIdx) == -1).toList()..sort((a, b) {
+            final int g = b.gakunen.compareTo(a.gakunen);
+            return g != 0 ? g : a.id.compareTo(b.id);
+          }))
+        : <SenshuData>[];
+    final List<SenshuData> hazureta = hoketsuAri
+        ? (senshus.where((s) => _entryOf(s, raceIdx) <= -100).toList()..sort(
+            (a, b) => _entryOf(b, raceIdx).compareTo(_entryOf(a, raceIdx)),
+          ))
+        : <SenshuData>[];
+    final bool hoketsuDasu = hoketsu.isNotEmpty || hazureta.isNotEmpty;
 
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      itemCount: kukanCount,
+      itemCount: kukanCount + (hoketsuDasu ? 1 : 0),
       itemBuilder: (context, i_kukan) {
+        if (i_kukan >= kukanCount) {
+          return _buildHoketsuSection(gh, hoketsu, hazureta);
+        }
         final targetSenshus = senshus
             .where((s) => s.entrykukan_race[raceIdx][s.gakunen - 1] == i_kukan)
             .toList();
@@ -677,6 +705,56 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
               .toList(),
         );
       },
+    );
+  }
+
+  /// 補欠と、当日変更で外れた選手の欄(1.9.9。区間の選手と同じカードで、区間に関係するものは出さない)
+  Widget _buildHoketsuSection(
+    Ghensuu gh,
+    List<SenshuData> hoketsu,
+    List<SenshuData> hazureta,
+  ) {
+    final int raceIdx = gh.hyojiracebangou;
+    const TextStyle midashi = TextStyle(
+      color: Colors.white,
+      fontSize: 15,
+      fontWeight: FontWeight.bold,
+    );
+    const TextStyle setsumei = TextStyle(color: Colors.white70, fontSize: 12);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 8),
+        const Text('補欠', style: midashi),
+        Padding(
+          padding: const EdgeInsets.only(top: 2, bottom: 8),
+          child: Text(
+            '当日変更で区間に入ることがある選手です。'
+            // 直前順位予想の画面(mode 330)では、まだ大会当日の調子になっていない
+            '${gh.mode == 330 ? '調子は区間エントリーのときのもので、大会当日に持ち直したり体調を崩したりして変わることがあります。' : ''}',
+            style: setsumei,
+          ),
+        ),
+        if (hoketsu.isEmpty)
+          const Padding(
+            padding: EdgeInsets.only(bottom: 12),
+            child: Text('補欠の選手はいません。', style: setsumei),
+          ),
+        for (final SenshuData s in hoketsu)
+          _buildSenshuCard(gh, -1, s, hoketsuLabel: '補欠'),
+        if (hazureta.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          const Text('当日変更で外れた選手', style: midashi),
+          const SizedBox(height: 8),
+          for (final SenshuData s in hazureta)
+            _buildSenshuCard(
+              gh,
+              -1,
+              s,
+              hoketsuLabel: '${-_entryOf(s, raceIdx) - 100 + 1}区OUT',
+            ),
+        ],
+      ],
     );
   }
 
@@ -951,10 +1029,21 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
     );
   }
 
-  Widget _buildSenshuCard(Ghensuu gh, int kukanIdx, SenshuData s) {
+  /// 選手のカード
+  /// [hoketsuLabel]を渡すと、補欠・当日変更で外れた選手のカードにする(1.9.9。札にその文字を出し、
+  /// 区間の距離・区間内の順位・この区間の経験回数は出さない。[kukanIdx]は使わない)
+  Widget _buildSenshuCard(
+    Ghensuu gh,
+    int kukanIdx,
+    SenshuData s, {
+    String? hoketsuLabel,
+  }) {
+    final bool kukanAri = hoketsuLabel == null;
     String kukanLabel = "${kukanIdx + 1}区";
     if (gh.hyojiracebangou == 3) kukanLabel = "${kukanIdx + 1}組";
     if (gh.hyojiracebangou == 4) kukanLabel = "記録会";
+    if (hoketsuLabel != null) kukanLabel = hoketsuLabel;
+    final Color fudaIro = kukanAri ? Colors.cyanAccent : Colors.orangeAccent;
 
     return Card(
       color: Colors.white.withOpacity(0.09),
@@ -972,13 +1061,13 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
                   vertical: 4,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.cyanAccent.withOpacity(0.25),
+                  color: fudaIro.withOpacity(0.25),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
                   kukanLabel,
-                  style: const TextStyle(
-                    color: Colors.cyanAccent,
+                  style: TextStyle(
+                    color: fudaIro,
                     fontSize: 13,
                     fontWeight: FontWeight.bold,
                   ),
@@ -1013,7 +1102,9 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                "${_formatDoubleToFixed(gh.kyori_taikai_kukangoto[gh.hyojiracebangou][kukanIdx], 0)}m",
+                kukanAri
+                    ? "${_formatDoubleToFixed(gh.kyori_taikai_kukangoto[gh.hyojiracebangou][kukanIdx], 0)}m"
+                    : "",
                 style: const TextStyle(color: Colors.white70, fontSize: 13),
               ),
               Container(
@@ -1035,8 +1126,8 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
           childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
           children: [
             const Divider(color: Colors.white24),
-            _buildNouryokuSection(gh, s),
-            _buildRecordGrid(gh, s),
+            _buildNouryokuSection(gh, s, kukanAri: kukanAri),
+            _buildRecordGrid(gh, s, kukanAri: kukanAri),
           ],
         ),
       ),
@@ -1060,10 +1151,19 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
     );
   }
 
-  Widget _buildNouryokuSection(Ghensuu gh, SenshuData s) {
+  /// [kukanAri]がfalse(補欠など)なら、この区間の経験回数は出さない(1.9.9)
+  Widget _buildNouryokuSection(
+    Ghensuu gh,
+    SenshuData s, {
+    bool kukanAri = true,
+  }) {
     //過去に同じ区間を走ったことがあるかどうかの表示
     int keikenkaisuu = 0;
-    for (int i_gakunen = 0; i_gakunen < s.gakunen - 1; i_gakunen++) {
+    for (
+      int i_gakunen = 0;
+      kukanAri && i_gakunen < s.gakunen - 1;
+      i_gakunen++
+    ) {
       if (s.entrykukan_race[gh.hyojiracebangou][i_gakunen] ==
           s.entrykukan_race[gh.hyojiracebangou][s.gakunen - 1]) {
         keikenkaisuu++;
@@ -1118,7 +1218,8 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
     );
   }
 
-  Widget _buildRecordGrid(Ghensuu gh, SenshuData s) {
+  /// [kukanAri]がfalse(補欠など)なら、区間内の順位(「区」)は出さない(1.9.9)
+  Widget _buildRecordGrid(Ghensuu gh, SenshuData s, {bool kukanAri = true}) {
     List<Map<String, dynamic>> records = [
       if (gh.hyojiracebangou != 4)
         {'label': '5千best', 'idx': 0, 'showRank': true},
@@ -1135,7 +1236,14 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
     return Column(
       children: records
           .map(
-            (r) => _buildRecordRow(gh, s, r['label'], r['idx'], r['showRank']),
+            (r) => _buildRecordRow(
+              gh,
+              s,
+              r['label'],
+              r['idx'],
+              r['showRank'],
+              kukanAri: kukanAri,
+            ),
           )
           .toList(),
     );
@@ -1146,8 +1254,9 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
     SenshuData s,
     String label,
     int idx,
-    bool showRank,
-  ) {
+    bool showRank, {
+    bool kukanAri = true,
+  }) {
     final KonkiBestJuni? konki = _konkiJuni;
     if (konki != null) {
       return _buildKonkiRecordRow(gh, s, label, idx, showRank, konki);
@@ -1155,7 +1264,7 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
     final bool hasRecord = s.time_bestkiroku[idx] != TEISUU.DEFAULTTIME;
     // 夏の学内タイムトライアルの4種目は、その区間を走る選手全員に記録があるときだけ
     // 区間内順位も出す(0なら出さない。1.8.8)
-    final int ttKukanJuni = (hasRecord && !showRank)
+    final int ttKukanJuni = (hasRecord && !showRank && kukanAri)
         ? kukannaiJuni(s, idx, gh.hyojiracebangou)
         : 0;
     return Padding(
@@ -1201,7 +1310,7 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
                 runSpacing: 4,
                 children: [
                   if (showRank) ...[
-                    _rankTag("区", s.kukannaijuni[idx] + 1),
+                    if (kukanAri) _rankTag("区", s.kukannaijuni[idx] + 1),
                     _rankTag("学", s.gakunaijuni_bestkiroku[idx] + 1),
                     _rankTag("全", s.zentaijuni_bestkiroku[idx] + 1),
                   ] else ...[

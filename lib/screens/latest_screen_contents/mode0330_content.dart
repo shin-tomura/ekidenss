@@ -6,6 +6,7 @@ import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/senshu_data.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ekiden/screens/ModalAverageTimeRankingView.dart';
+import 'package:ekiden/screens/Modal_kukanhaiti2.dart'; // 区間配置確認(1.9.9。直前順位予想でも見られるように)
 import 'package:ekiden/kansuu/ikku_pace.dart'; // 1区の集団のペース(1.9.2)
 import 'package:ekiden/screens/ikku_pace_box.dart'; // 1区のペース予想の枠(1.9.2)
 import 'package:ekiden/kansuu/kiji/kiji.dart'; // 展望記事(1.9.2)
@@ -774,6 +775,62 @@ class Mode0330Content extends StatelessWidget {
                                   },
                                   child: Text(
                                     "区間エントリー選手持ちタイム大学ランキング",
+                                    style: TextStyle(
+                                      color: const Color.fromARGB(
+                                        255,
+                                        0,
+                                        255,
+                                        0,
+                                      ),
+                                      decoration: TextDecoration.underline,
+                                      decorationColor: HENSUU.textcolor,
+                                    ),
+                                  ),
+                                ),
+                                // 区間配置確認(1.9.9。他大学の区間エントリーは展望記事などで見えているので、
+                                // ここでも見られるようにした。駅伝では補欠も見られ、当日変更を推理できる)
+                                TextButton(
+                                  onPressed: () {
+                                    showGeneralDialog(
+                                      context: context,
+                                      barrierColor: Colors.black.withOpacity(
+                                        0.8,
+                                      ),
+                                      barrierDismissible: true,
+                                      barrierLabel: '区間配置確認',
+                                      transitionDuration: const Duration(
+                                        milliseconds: 300,
+                                      ),
+                                      pageBuilder:
+                                          (
+                                            context,
+                                            animation,
+                                            secondaryAnimation,
+                                          ) {
+                                            return ModalKukanHaitiView(
+                                              targetUnivid:
+                                                  currentGhensuu.MYunivid,
+                                            );
+                                          },
+                                      transitionBuilder:
+                                          (
+                                            context,
+                                            animation,
+                                            secondaryAnimation,
+                                            child,
+                                          ) {
+                                            return FadeTransition(
+                                              opacity: CurvedAnimation(
+                                                parent: animation,
+                                                curve: Curves.easeOut,
+                                              ),
+                                              child: child,
+                                            );
+                                          },
+                                    );
+                                  },
+                                  child: Text(
+                                    "区間配置確認",
                                     style: TextStyle(
                                       color: const Color.fromARGB(
                                         255,

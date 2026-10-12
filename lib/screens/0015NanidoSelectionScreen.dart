@@ -53,7 +53,7 @@ class NanidoSelectionScreen extends StatelessWidget {
                       child: Column(
                         children: <Widget>[
                           Text(
-                            "年度ごとの定期的な理事会からの支援や目標順位達成の際の獲得金銀量が変わってきます。\n後からでも、大学画面の下の方のリンクから変更できます。",
+                            "年度ごとの定期的な理事会からの支援や目標順位達成の際の獲得金銀量が変わってきます。\n後からでも、説明画面の設定タブの「難易度変更」から変更できます。",
                             style: TextStyle(color: HENSUU.textcolor),
                             textAlign: TextAlign.center, // テキストを中央寄せ
                           ),

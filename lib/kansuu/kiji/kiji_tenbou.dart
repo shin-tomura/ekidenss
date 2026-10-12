@@ -885,7 +885,7 @@ Kiji _yuushouTenbou(Tenbou t, List<KijiYosouJin> yosou) {
     lead: lead.toString(),
     hyou: [
       _maeHyoubanHyou(t, yosou, ekiden: true),
-      // 三大駅伝の優勝校(11月駅伝・正月駅伝。1.9.3。1.9.4から今季と過去の季の表)
+      // 三大駅伝の表(11月駅伝・正月駅伝。1.9.3。1.9.4から今季と過去の季の表、1.9.7から3位まで)
       if (sd != null && race >= 1) sd.konkiHyou(),
     ],
     jibun: hon.u.id == k.gh.MYunivid,

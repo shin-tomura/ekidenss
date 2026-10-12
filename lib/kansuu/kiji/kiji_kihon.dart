@@ -169,7 +169,8 @@ class Kiji {
       sb.writeln('【${h.title}】');
       sb.writeln(h.retsu.join(' / '));
       for (final List<String> g in h.gyou) {
-        sb.writeln(g.join(' / '));
+        // マスの中の改行(三大駅伝の表の3位までなど。1.9.7)は「、」にして1行に並べる
+        sb.writeln(g.map((x) => x.replaceAll('\n', '、')).join(' / '));
       }
     }
     return sb.toString();
@@ -1188,8 +1189,11 @@ bool hatsuKaisaiKekka(KijiKankyou k, int race) {
 /// 三大駅伝の大会の番号(10月駅伝・11月駅伝・正月駅伝)
 const List<int> sandaiEkidenRace = [0, 1, 2];
 
-/// 三大駅伝の優勝校の表(今季と過去の季)に出す季の数(今季を含む。1.9.4)
+/// 三大駅伝の表(今季と過去の季。1.9.7から3位まで)に出す季の数(今季を含む。1.9.4)
 const int sandaiKonkiKisuu = 5;
+
+/// 三大駅伝の表(今季と過去の季)に出す順位の数(1.9.7)
+const int sandaiKonkiJuniSuu = 3;
 
 /// 三大駅伝の優勝校を、季ごとに見る道具
 class SandaiEkiden {
@@ -1216,6 +1220,17 @@ class SandaiEkiden {
     if (idx < 0 || idx >= TEISUU.KIROKUHOZONNENSUU) return null;
     for (final UnivData u in k.univ) {
       if (juniRace(u, race, idx) == 0) return u;
+    }
+    return null;
+  }
+
+  /// [kiMae]季前(0が今の季)の大会[race]で、順位[juni](0が1位)だった大学
+  /// (まだ行われていない・記録がなければnull。1.9.7)
+  UnivData? juniNoUniv(int race, int kiMae, int juni) {
+    final int idx = owatta(race) ? kiMae : kiMae - 1;
+    if (idx < 0 || idx >= TEISUU.KIROKUHOZONNENSUU) return null;
+    for (final UnivData u in k.univ) {
+      if (juniRace(u, race, idx) == juni) return u;
     }
     return null;
   }
@@ -1249,10 +1264,12 @@ class SandaiEkiden {
   int nendo(int kiMae) =>
       (k.gh.month <= 3 ? k.gh.year - 1 : k.gh.year) - kiMae;
 
-  /// 三大駅伝の優勝校の表(今季と過去の季。1.9.4で、今季だけの表から過去の季も並べる表にした)
+  /// 三大駅伝の表(今季と過去の季。1.9.4で、今季だけの表から過去の季も並べる表にした)
+  /// 1.9.7から、テレビの表のように、各大会の欄に1位から3位までを縦に並べる(1つのマスに3行)
   /// ・1行目は今季。まだ行われていない大会は「これから」
   /// ・2行目から過去の季を、新しい順に[kisuu]季分(今季を含む)まで。記録のない季は出さない
-  /// ・三冠の季は、正月駅伝の欄に「(三冠)」を付ける(rekidaiHyou と同じ)
+  /// ・年度の欄の2行目に「今季」と「三冠」を書く(大会の欄に付けるより幅が狭く、スマホの縦画面に収まりやすい)
+  /// 優勝の記事・展望の記事・年間表彰で使う
   KijiHyou konkiHyou({int kisuu = sandaiKonkiKisuu}) {
     final List<List<String>> gyou = [];
     for (int i = 0; i < kisuu; i++) {
@@ -1262,19 +1279,27 @@ class SandaiEkiden {
       ];
       if (i > 0 && y.every((u) => u == null)) continue;
       final bool sk = y.every((u) => u != null && u.id == y[0]!.id);
+      final String soe = [if (i == 0) '今季', if (sk) '三冠'].join('・');
       gyou.add([
-        i == 0 ? '${nendo(i)}年度(今季)' : '${nendo(i)}年度',
-        for (int j = 0; j < y.length; j++)
-          (i == 0 && !owatta(sandaiEkidenRace[j]))
-              ? 'これから'
-              : (y[j] == null ? '-' : daigakuMei(y[j]!)) +
-                    (sk && j == y.length - 1 ? '(三冠)' : ''),
+        soe.isEmpty ? '${nendo(i)}年度' : '${nendo(i)}年度\n$soe',
+        for (final int race in sandaiEkidenRace)
+          (i == 0 && !owatta(race)) ? 'これから' : _sandaiJuniMasu(race, i),
       ]);
     }
-    return KijiHyou('三大駅伝の優勝校(今季と過去の季)', [
+    return KijiHyou('三大駅伝の上位3校(今季と過去の季)', [
       '年度',
       for (final int race in sandaiEkidenRace) courseRaceTitle(race),
     ], gyou);
+  }
+
+  /// 三大駅伝の表の、大会[race]の[kiMae]季前のマス(「1 東西大」から3位までを改行で並べる。記録がなければ「-」)
+  String _sandaiJuniMasu(int race, int kiMae) {
+    final List<String> l = [];
+    for (int j = 0; j < sandaiKonkiJuniSuu; j++) {
+      final UnivData? u = juniNoUniv(race, kiMae, j);
+      if (u != null) l.add('${j + 1} ${daigakuMei(u)}');
+    }
+    return l.isEmpty ? '-' : l.join('\n');
   }
 
   /// 三大駅伝の歴代優勝校の表(今の季の三大駅伝がすべて終わっていれば今の季から、[kisuu]季分。

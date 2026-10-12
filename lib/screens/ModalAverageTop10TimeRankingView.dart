@@ -634,11 +634,13 @@ $analysis
     );
 
     // 2. 共通Widgetに最新データを流し込んで表示
+    // 画面の上に持ちタイムの切り替えがあるので、パネルの中には出さない(1.9.8)
     return buildUnivAnalysisPanel(
       data.univid,
       overrideScores: data.courseScores,
       overrideType: currentType,
       overrideAnalysis: currentAnalysis,
+      kirikae: false,
     );
   }
 

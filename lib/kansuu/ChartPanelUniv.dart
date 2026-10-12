@@ -9,6 +9,7 @@ import 'package:ekiden/kantoku_data.dart';
 import 'dart:math' as math;
 import 'package:ekiden/screens/ModalAverageTop10TimeRankingView.dart';
 import 'package:ekiden/kansuu/konki_best.dart'; // 今季ベスト(1.9.1)
+import 'package:ekiden/screens/konki_best_parts.dart' show KonkiBestKirikae; // 持ちタイムの切り替え(1.9.8)
 
 class UnivAnalysisEngine {
   static const List<String> scoreKeys = ['スピード', 'スタミナ', '山適性', 'ロード', '起伏耐性'];
@@ -426,11 +427,13 @@ Map<String, dynamic> konkiBestUnivScores(int univid) {
 /// override... 引数がある場合はその値を優先表示する。
 /// 持ちタイムの「自己ベスト/今季ベスト」の切り替え(監督データに保存)が変わったら描き直す
 /// (1.9.7。大学画面の上で開いた画面で切り替えて閉じても、前の表示のまま残っていたため)
+/// [kirikae] パネルの中に持ちタイムの切り替えを出すか(画面の上にすでに切り替えがある画面ではfalse。1.9.8)
 Widget buildUnivAnalysisPanel(
   int targetUnivId, {
   Map<String, double>? overrideScores,
   String? overrideType,
   String? overrideAnalysis,
+  bool kirikae = true,
 }) {
   return ValueListenableBuilder<Box<KantokuData>>(
     valueListenable: Hive.box<KantokuData>(
@@ -441,6 +444,7 @@ Widget buildUnivAnalysisPanel(
       overrideScores: overrideScores,
       overrideType: overrideType,
       overrideAnalysis: overrideAnalysis,
+      kirikae: kirikae,
     ),
   );
 }
@@ -451,6 +455,7 @@ Widget _univAnalysisPanelNakami(
   Map<String, double>? overrideScores,
   String? overrideType,
   String? overrideAnalysis,
+  bool kirikae = true,
 }) {
   final univBox = Hive.box<UnivData>('univBox');
   final kantokuBox = Hive.box<KantokuData>('kantokuBox');
@@ -579,6 +584,13 @@ Widget _univAnalysisPanelNakami(
             ),
           ],
         ),
+        // 持ちタイムの「自己ベスト/今季ベスト」の切り替え(1.9.8。ほかの画面と共通の設定。
+        // 切り替えると監督データが変わり、このパネルは上の ValueListenableBuilder で描き直す)
+        if (kirikae)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: KonkiBestKirikae(onChanged: () {}),
+          ),
         const Divider(color: Colors.white38, height: 20),
         IntrinsicHeight(
           child: Row(

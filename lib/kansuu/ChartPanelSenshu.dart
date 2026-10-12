@@ -6,6 +6,7 @@ import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/constants.dart';
 import 'package:ekiden/screens/ModalAverageTop10TimeRankingView.dart';
 import 'package:ekiden/kansuu/konki_best.dart'; // 今季ベスト(1.9.1)
+import 'package:ekiden/screens/konki_best_parts.dart' show KonkiBestKirikae; // 持ちタイムの切り替え(1.9.8)
 
 class ScoreCompressor {
   static const List<String> keys = ['スピード', 'スタミナ', '山適性', 'ロード', '起伏耐性'];
@@ -44,16 +45,21 @@ class ScoreCompressor {
 /// 選手データを受け取り、解析パネル（レーダー＋数値）を返す共通関数
 /// 持ちタイムの「自己ベスト/今季ベスト」の切り替え(監督データに保存)が変わったら描き直す
 /// (1.9.7。ほかの画面で切り替えたときに、前の表示のまま残らないように)
+/// [kirikae] パネルの中に持ちタイムの切り替えを出すか(画面の上にすでに切り替えがある画面ではfalse。1.9.8)
 Widget buildSenshuAnalysisPanel(
   SenshuData senshu, {
   VoidCallback? onDetailTap,
+  bool kirikae = true,
 }) {
   return ValueListenableBuilder<Box<KantokuData>>(
     valueListenable: Hive.box<KantokuData>(
       'kantokuBox',
     ).listenable(keys: ['KantokuData']),
-    builder: (context, box, _) =>
-        _senshuAnalysisPanelNakami(senshu, onDetailTap: onDetailTap),
+    builder: (context, box, _) => _senshuAnalysisPanelNakami(
+      senshu,
+      onDetailTap: onDetailTap,
+      kirikae: kirikae,
+    ),
   );
 }
 
@@ -61,6 +67,7 @@ Widget buildSenshuAnalysisPanel(
 Widget _senshuAnalysisPanelNakami(
   SenshuData senshu, {
   VoidCallback? onDetailTap,
+  bool kirikae = true,
 }) {
   // 保存されている圧縮データ(toriaezu)を解凍
   // ※質問文のコードに合わせてsenshu.atusataisei（toriaezuの別名想定）を使用しています
@@ -116,6 +123,13 @@ Widget _senshuAnalysisPanelNakami(
               ),
           ],
         ),
+        // 持ちタイムの「自己ベスト/今季ベスト」の切り替え(1.9.8。ほかの画面と共通の設定。
+        // 切り替えると監督データが変わり、このパネルは上の ValueListenableBuilder で描き直す)
+        if (kirikae)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: KonkiBestKirikae(onChanged: () {}),
+          ),
         const Divider(color: Colors.white24, height: 20),
 
         // IntrinsicHeightを使用して、左右の高さの高い方に合わせる

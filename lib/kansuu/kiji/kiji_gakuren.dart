@@ -770,10 +770,16 @@ Kiji? _sokuhou(
     );
   } else {
     final int f = _mokuhyouFlag(gu, kk);
-    if (f == 1) {
+    if (f == 1 && aseriWoKaku(k)) {
       sb.write('目標の順位相当を下回ってたすきを受けた$yobiは、前半から突っ込み、後半にその分が響いた。');
-    } else if (f == -1) {
-      sb.write('目標を上回る位置でたすきを受けた$yobiは、少し気持ちが緩んだか。');
+    } else if (f == -1 && hitoikiWoKaku(k) && mae != null) {
+      // ほっと一息の悪化は小さいので、順位を落としたときだけ原因のように書き、
+      // 上げた・守ったときは逆接で順位の文につなぐ(1.9.8)
+      sb.write(
+        d < 0
+            ? '目標を上回る位置でたすきを受けた$yobiは、少し気持ちが緩んだか。'
+            : '目標を上回る位置でたすきを受け、気が緩んでもおかしくない場面だったが、$yobiは',
+      );
     }
   }
   if (mae != null) {
@@ -921,8 +927,7 @@ List<Kiji> gakurenKekkaKiji(KijiKankyou k) {
     for (int kk = 0; kk < ks; kk++) gakurenKukanKekka(k.gh, kk),
   ];
   if (kekka.isEmpty || kekka.last == null) return [];
-  final UnivGakurenData? gu = _gakurenUniv();
-  return [_kekkaTop(k, list, kekka), _kekkaZenin(k, list, kekka, gu)];
+  return [_kekkaTop(k, list, kekka), _kekkaZenin(k, list, kekka)];
 }
 
 /// 区間結果の表
@@ -1101,13 +1106,11 @@ Kiji _kekkaZenin(
   KijiKankyou k,
   List<_GSenshu> list,
   List<GakurenKukanKekka?> kekka,
-  UnivGakurenData? gu,
 ) {
   const int no = 312;
   final KijiKakite w = KijiKakite(k, kijiTane(k.gh, k.race, no));
   final int ks = k.kukansuu;
   final int n = _daigakuJun(k, ks - 1).length;
-  final bool kantoku = _kantokuChuu(k);
   final int sougou = kekka.last!.tuukaJuni;
   final String midashi = w.erabu([
     '学連選抜、${list.length}人の走りを振り返る',
@@ -1163,27 +1166,8 @@ Kiji _kekkaZenin(
     } else {
       sb.write('${juniMoji(mae)}相当から${juniMoji(r.tuukaJuni)}相当に下げたが、最後までたすきを運んだ。');
     }
-    // 指示と、目標を下回った・上回ったときの走り
-    if (kk == 0) {
-      if (g.startchokugotobidasiflag == 1) {
-        final bool seikou = g.startchokugotobidasiseikouflag == 1;
-        sb.write(
-          (kantoku && g.sijiflag == 1 ? '指示どおりスタート直後に飛び出し、' : 'スタート直後に自ら飛び出し、') +
-              (seikou ? '狙いどおりの展開に持ち込んだ。' : '後半は苦しんだ。'),
-        );
-      }
-    } else if (kantoku && (g.sijiflag == 1 || g.sijiflag == 2)) {
-      final bool seikou = g.sijiseikouflag == 1;
-      sb.write(
-        g.sijiflag == 1
-            ? (seikou ? '前半から突っ込む指示に応えた。' : '前半から突っ込む指示だったが、後半に苦しんだ。')
-            : (seikou ? '前半を抑える指示どおり、後半に伸びた。' : '前半を抑える指示だったが、思うように上げられなかった。'),
-      );
-    } else {
-      final int f = _mokuhyouFlag(gu, kk);
-      if (f == 1) sb.write('目標の順位相当を下回ってたすきを受け、前半から突っ込んだ。');
-      if (f == -1) sb.write('目標を上回る位置でたすきを受け、少し気持ちが緩んだか。');
-    }
+    // 指示・飛び出しの成否と、目標を下回った・上回ったときの走りは、見立ての照合の段落(なぜそうなったか)に
+    // 任せる(1.9.8。ここにも書いていたので、1人の中で同じことを2回書いていた。学内メディアの結果号と同じ形)
     final ({int juni, double time})? y = _yosenKekka(g);
     if (y != null) sb.write('予選会では全体${juniMoji(y.juni)}だった。');
     if (r.kukanJuni == 0) sb.write('区間1位相当で、${x.shozoku}に名声をもたらした。');

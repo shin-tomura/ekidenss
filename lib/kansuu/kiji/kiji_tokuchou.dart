@@ -978,9 +978,10 @@ class TokuchouKaki {
       sb3.write(jijou.seikou! ? '前半から突っ込む指示に、しっかり応えた。' : '前半から突っ込む指示だったが、後半に失速した。');
     } else if (jijou.siji == 2 && jijou.seikou != null) {
       sb3.write(jijou.seikou! ? '前半を抑える指示どおり、後半に伸びた。' : '前半を抑える指示だったが、思うように上げられなかった。');
-    } else if (jijou.aseri) {
+    } else if (jijou.aseri && aseriWoKaku(k)) {
       sb3.write('目標順位を下回ってたすきを受け、前半から突っ込んだ分が後半に響いた。');
-    } else if (jijou.hitoiki) {
+    } else if (jijou.hitoiki && hitoikiWoKaku(k) && (hantei == 3 || (d < 0 && hantei != 1))) {
+      // ほっと一息の悪化は小さいので、理由として書くのは期待以下か順位を落としたときだけ(1.9.8)
       sb3.write('目標を上回る位置でたすきを受け、少し気持ちが緩んだか。');
     }
     if ((hantei == 1 || yoi) && jijou.kiwaYoi != null) {

@@ -68,6 +68,13 @@ class KimochiBun {
 /// 目標順位の判定がない区間か(1区と、正月駅伝の6区)
 bool _hanteiNashi(int race, int kk) => kk <= 0 || (race == 2 && kk == 5);
 
+/// 速報・実況・結果号で、目標順位を下回って襷を受けたときの焦りを書くか
+/// (「目標順位・指示の補正設定」で悪化を0%にしているときは、補正の説明に+0.0秒の行が残っても書かない。1.9.8)
+bool aseriWoKaku(KijiKankyou k) => HoseiTsuyosa.fromKantoku(k.kantoku).shitamawari > 0;
+
+/// 速報・実況・結果号で、目標順位を上回って襷を受けたときのほっと一息を書くか(0%なら書かない。1.9.8)
+bool hitoikiWoKaku(KijiKankyou k) => HoseiTsuyosa.fromKantoku(k.kantoku).hitoiki > 0;
+
 /// 駅伝男・平常心の持ち味の文を作る道具(記事1本につき1つ。置き場所と入り方を選手ごとに回す)
 class KimochiKaki {
   final KijiKakite w;

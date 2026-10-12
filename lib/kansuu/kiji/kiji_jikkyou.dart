@@ -1026,6 +1026,8 @@ Kiji? _kukanJikkyou(
         if (my.tuukaMae < seedSuu) mb.write('${juniMoji(my.tuukaMae)}でたすきを受けていましたが、圏外に押し出されました。');
       }
     }
+    // 順位の上げ下げ(ほっと一息の書き方と、結果の文で使う)
+    final int d = kk == 0 ? 0 : my.tuukaMae - my.tuuka;
     // 指示
     if (kk == 0) {
       if (h.siji == 1 && h.seikou != null) {
@@ -1049,14 +1051,19 @@ Kiji? _kukanJikkyou(
         mb.write(h.seikou! ? '前半から突っ込む指示に、$yobiはしっかり応えました。' : '前半から突っ込む指示でしたが、$yobiは後半に苦しみました。');
       } else if (h.siji == 2 && h.seikou != null) {
         mb.write(h.seikou! ? '前半を抑える指示どおり、$yobiは後半に伸びました。' : '前半を抑える指示でしたが、$yobiは思うように上げられませんでした。');
-      } else if (h.aseri) {
+      } else if (h.aseri && aseriWoKaku(k)) {
         mb.write('目標順位を下回ってたすきを受けた$yobi、焦りからか前半から突っ込み、後半に代償を払いました。');
-      } else if (h.hitoiki) {
-        mb.write('目標順位を上回る位置でたすきを受けた$yobi、少し気持ちが緩んだでしょうか。');
+      } else if (h.hitoiki && hitoikiWoKaku(k)) {
+        // ほっと一息の悪化は小さいので、順位を落としたときだけ原因のように書き、
+        // 上げた・守ったときは逆接で結果の文につなぐ(1.9.8)
+        mb.write(
+          d < 0
+              ? '目標順位を上回る位置でたすきを受けた$yobi、少し気持ちが緩んだでしょうか。'
+              : '目標順位を上回る位置でたすきを受け、気が緩んでもおかしくない場面でしたが、',
+        );
       }
     }
     // 結果
-    final int d = kk == 0 ? 0 : my.tuukaMae - my.tuuka;
     if (seedKaita) {
       mb.write('アンカーの$yobiは区間${juniMoji(my.kukanJuni)}${d >= 3 ? '、$d人抜きの走り' : ''}でした。');
     } else if (kk == 0) {
@@ -2106,10 +2113,16 @@ Kiji? _gakunaiSokuhou(
       sb.write(h.seikou! ? '前半から突っ込む指示に、$yはしっかり応えた。' : '前半から突っ込む指示だったが、$yは後半に苦しんだ。');
     } else if (h.siji == 2 && h.seikou != null) {
       sb.write(h.seikou! ? '前半を抑える指示どおり、$yは後半に伸びた。' : '前半を抑える指示だったが、$yは思うように上げられなかった。');
-    } else if (h.aseri) {
+    } else if (h.aseri && aseriWoKaku(k)) {
       sb.write('目標順位を下回ってたすきを受けた$yは、前半から突っ込み、後半にその分が響いた。');
-    } else if (h.hitoiki) {
-      sb.write('目標順位を上回る位置でたすきを受けた$yは、少し気持ちが緩んだか。');
+    } else if (h.hitoiki && hitoikiWoKaku(k)) {
+      // ほっと一息の悪化は小さいので、順位を落としたときだけ原因のように書き、
+      // 上げた・守ったときは逆接で順位の文につなぐ(1.9.8)
+      sb.write(
+        d < 0
+            ? '目標順位を上回る位置でたすきを受けた$yは、少し気持ちが緩んだか。'
+            : '目標順位を上回る位置でたすきを受け、気が緩んでもおかしくない場面だったが、$yは',
+      );
     }
     if (d >= 3) {
       sb.write('$d人を抜く力走で、${juniMoji(my.tuukaMae)}から${juniMoji(my.tuuka)}に浮上した。');

@@ -10,6 +10,7 @@ import 'package:ekiden/kansuu/mokuhyou_hosei.dart';
 import 'package:ekiden/kansuu/custom_seigen.dart'; // カスタム駅伝の出場制限(1.9.1)
 import 'package:ekiden/kansuu/gin_tokkun_menu.dart'; // 銀特訓の形の切り替え(1.9.1)
 import 'package:ekiden/kansuu/ikku_pace.dart'; // 集団走設定(1.9.2)
+import 'package:ekiden/kansuu/yosen_com_siji.dart'; // 正月駅伝予選のコンピュータの大学の指示と集団走(1.9.9)
 import 'package:ekiden/kansuu/seichou_type.dart'; // 成長タイプ設定(1.9.3)
 import 'package:ekiden/kansuu/ToujituHenkou_com.dart'
     show senryakuEntryKakuritu; // 戦略的エントリー確率設定(1.9.4)
@@ -442,13 +443,19 @@ ShiyouSetsu shiyouSiji({bool setsumeisho = false}) {
     ]);
   }
   gyou.addAll([
-    ..._shougatsuYosenSijiGyou,
+    ..._shougatsuYosenSijiGyou(setsumeisho),
     // 「おまかせで組む」(説明書だけ。1.8.8。組み方は yosen_omakase.dart)
     if (setsumeisho) ...[
       '・正月駅伝予選のレース画面の「おまかせで組む」で、指示と設定タイムをまとめて入れられます(入れたあとに直してから確定できます)。',
       '　・試走タイムの近い選手どうしで集団を作り、駅伝男が90以上の選手は前半突っ込みにします。',
+      // コンピュータの大学も同じ組み方(1.9.9。yosen_com_siji.dart)
+      if (kantoku == null || yosenComSijiAri(kantoku))
+        '　・コンピュータの大学と、スキップ中の${_anata(setsumeisho)}の大学も、この組み方で組みます。',
     ],
     '・コンピュータの大学も、駅伝男や平常心の高い選手には指示を出すことがあります。',
+    // 正月駅伝予選のコンピュータの大学の指示と集団走の設定(説明書だけ。1.9.9)
+    if (setsumeisho)
+      '・正月駅伝予選でコンピュータの大学が指示と集団走を使うかは、設定タブの「正月駅伝予選の指示と集団走」で変えられます。',
   ]);
   return ShiyouSetsu('レース中の指示', gyou);
 }
@@ -744,7 +751,7 @@ String yosenKimariText(int race) {
   } else if (race == 4) {
     gyou = [
       ..._yosenShougatsuGyou,
-      ..._shougatsuYosenSijiGyou,
+      ..._shougatsuYosenSijiGyou(false),
       _keikenYosenGyou,
     ];
   } else {
@@ -772,7 +779,11 @@ const List<String> _yosenShougatsuGyou = [
 
 // 正月駅伝予選のフリー走と集団走(レース中の指示と、駅伝予選の決まりで使う。
 // 設定タイムの注意は、レース画面の説明と同じ内容)
-const List<String> _shougatsuYosenSijiGyou = [
+// コンピュータの大学の指示と集団走(1.9.9。yosen_com_siji.dart)は、設定が「使わない」のときは書き換える
+List<String> _shougatsuYosenSijiGyou(bool setsumeisho) {
+  final KantokuData? kantoku = _kantoku();
+  final bool comAri = kantoku == null || yosenComSijiAri(kantoku);
+  return [
   '・正月駅伝予選では、選手ごとにフリー走か集団走を選べます。',
   '・フリー走では、前半突っ込みか前半抑えも指示できます。',
   '・集団走では最大6つの集団を作れ、集団ごとに設定タイムを指示します。',
@@ -783,7 +794,14 @@ const List<String> _shougatsuYosenSijiGyou = [
   // 集団の落ち着き(1.9.7で書き足した。計算は RaceCalc.dart の正月駅伝予選)
   '・集団走では、集団で一番平常心が高い選手が集団を落ち着かせ、全員のタイムが少し良くなることがあります。',
   '　・その選手の平常心が高いほど、起こりやすくなります。',
-];
+  if (comAri) ...[
+    '・コンピュータの大学も、フリー走・集団走と指示を使います。',
+    '　・試走タイムの近い選手どうしで集団を作り、駅伝男の高い選手は前半突っ込みにします。',
+    '・スキップ中は、${_anata(setsumeisho)}の大学も同じ組み方で組みます。',
+  ] else
+    '・${_konoData(setsumeisho)}、コンピュータの大学の選手は、指示なしのフリー走で走ります。',
+  ];
+}
 
 // カリスマの近い選手・同じ選手がいるとき(集団走と、説明書の選手の能力のカリスマで使う。1.9.2で書き換えた)
 // ・その日の勢いがあるとき(集団走設定が「なし」以外): カリスマの近い選手が作ることがある

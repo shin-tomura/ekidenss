@@ -19,6 +19,7 @@ import 'package:ekiden/kansuu/mokuhyou_hosei.dart';
 import 'package:ekiden/kansuu/chousi_keiken_hosei.dart';
 import 'package:ekiden/kansuu/nouryoku_eikyodo.dart';
 import 'package:ekiden/kansuu/ikku_pace.dart'; // 1区の集団のペースの結果(1.9.2)
+import 'package:ekiden/kansuu/yosen_com_siji.dart'; // 正月駅伝予選のコンピュータの大学の指示と集団走(1.9.9)
 
 String _timeToMinuteSecondString(double time) {
   if (time == TEISUU.DEFAULTTIME) {
@@ -1154,10 +1155,37 @@ Future<void> RaceCalc({
     for (int ii = 0; ii < sortedsenshudata.length; ii++) {
       atai_hosei[ii][14] = 0.0;
     }
+    // Hive.box() を使って、既に開いているBoxを取得
+    final shuudansouBox = Hive.box<Shuudansou>('shuudansouBox');
+    // Boxからデータを読み込む
+    final Shuudansou? shuudansou = shuudansouBox.get('ShuudansouData');
+    // 指示と集団走の効果をかける大学と、大学ごとの集団A〜Fの設定タイム(1.9.9)
+    // ・プレイヤーの大学(スキップ中でなければ): レース画面で決めた指示と設定タイム(1.9.8までと同じ)
+    // ・コンピュータの大学と、スキップ中のプレイヤーの大学: 「おまかせで組む」と同じ組み方で、
+    //   ここで指示と設定タイムを決める(設定が「組まない」なら組まない。yosen_com_siji.dart)
+    final Map<int, List<double>> setteiTimeUniv = {};
+    final Set<int> omakaseUniv = shuudansou == null
+        ? <int>{}
+        : yosenOmakaseUniv(
+            kantoku: kantoku,
+            univs: sortedunivdata,
+            myUnivid: gh[0].MYunivid,
+          );
+    if (shuudansou != null && !omakaseUniv.contains(gh[0].MYunivid)) {
+      setteiTimeUniv[gh[0].MYunivid] = shuudansou.setteitime;
+    }
+    for (final int univid in omakaseUniv.toList()..sort()) {
+      setteiTimeUniv[univid] = yosenOmakaseKumu(
+        univid: univid,
+        senshu: sortedsenshudata,
+        shuudansou: shuudansou!,
+        random: random,
+      );
+    }
     List<SenshuData> entryFilteredsenshudata;
     //前半突っ込み
     entryFilteredsenshudata = sortedsenshudata
-        .where((s) => s.univid == gh[0].MYunivid && s.sijiflag == 1)
+        .where((s) => setteiTimeUniv.containsKey(s.univid) && s.sijiflag == 1)
         .toList();
     if (entryFilteredsenshudata.isNotEmpty) {
       // Find the pacemaker (highest charisma)
@@ -1181,7 +1209,7 @@ Future<void> RaceCalc({
     }
     //前半抑え
     entryFilteredsenshudata = sortedsenshudata
-        .where((s) => s.univid == gh[0].MYunivid && s.sijiflag == 2)
+        .where((s) => setteiTimeUniv.containsKey(s.univid) && s.sijiflag == 2)
         .toList();
     if (entryFilteredsenshudata.isNotEmpty) {
       // Find the pacemaker (highest charisma)
@@ -1211,11 +1239,10 @@ Future<void> RaceCalc({
     bool otitukaseseiouflag = false;
     String shuudanstr = "";
     //bool sijiflag2iruflag = false;
-    // Hive.box() を使って、既に開いているBoxを取得
-    final shuudansouBox = Hive.box<Shuudansou>('shuudansouBox');
-    // Boxからデータを読み込む
-    final Shuudansou? shuudansou = shuudansouBox.get('ShuudansouData');
 
+    // 集団走は、大学ごとに集団A〜Fを見る(1.9.9。1.9.8まではプレイヤーの大学だけ)
+    for (final int shuudanUnivid in setteiTimeUniv.keys.toList()..sort()) {
+    final List<double> setteitime = setteiTimeUniv[shuudanUnivid]!;
     for (int i_shuudan = 0; i_shuudan < 6; i_shuudan++) {
       if (i_shuudan == 0) {
         shuudanstr = "A";
@@ -1237,7 +1264,7 @@ Future<void> RaceCalc({
       }
       entryFilteredsenshudata = sortedsenshudata
           .where(
-            (s) => s.univid == gh[0].MYunivid && s.sijiflag == i_shuudan + 3,
+            (s) => s.univid == shuudanUnivid && s.sijiflag == i_shuudan + 3,
           )
           .toList();
       if (entryFilteredsenshudata.isNotEmpty) {
@@ -1253,10 +1280,10 @@ Future<void> RaceCalc({
         } else {
           otitukaseseiouflag = false;
         }
-        kijuntime = shuudansou!.setteitime[i_shuudan];
+        kijuntime = setteitime[i_shuudan];
         for (var senshu in entryFilteredsenshudata) {
           senshu.string_racesetumei +=
-              "集団${shuudanstr}設定タイム:${_timeToMinuteSecondString(shuudansou.setteitime[i_shuudan])}\n";
+              "集団${shuudanstr}設定タイム:${_timeToMinuteSecondString(setteitime[i_shuudan])}\n";
           if (otitukaseseiouflag == true) {
             final lasttime = senshu.time_taikai_total;
             senshu.time_taikai_total *= 0.998;
@@ -1312,6 +1339,7 @@ Future<void> RaceCalc({
         }
       }
     }
+    } // 大学ごとの集団走の終わり
   }
 
   //////////////////

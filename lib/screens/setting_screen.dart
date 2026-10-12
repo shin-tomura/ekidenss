@@ -23,6 +23,7 @@ import 'package:ekiden/screens/konki_best_parts.dart'; // 持ちタイムの表�
 import 'package:ekiden/screens/shuudan_settei.dart'; // 集団走設定(1.9.2)
 import 'package:ekiden/screens/seichou_type_settei.dart'; // 成長タイプ設定(1.9.3)
 import 'package:ekiden/screens/senryaku_entry_settei.dart'; // 戦略的エントリー確率設定(1.9.4)
+import 'package:ekiden/screens/yosen_com_siji_settei.dart'; // 正月駅伝予選の指示と集団走(1.9.9)
 import 'package:ekiden/screens/Modal_TrainingEffect.dart';
 import 'package:ekiden/screens/Modal_TimeChousei.dart';
 import 'package:ekiden/settings_qr_page.dart';
@@ -1348,6 +1349,41 @@ class _SettingScreenState extends State<SettingScreen>
             },
             child: Text(
               "区間配置の方針",
+              style: TextStyle(
+                color: const Color.fromARGB(255, 0, 255, 0),
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+              ),
+            ),
+          ),
+          // コンピュータの大学の正月駅伝予選の指示と集団走(1.9.9。yosen_com_siji.dart)
+          TextButton(
+            onPressed: () {
+              showGeneralDialog(
+                context: context,
+                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                barrierDismissible: true, // 背景タップで閉じられるようにする
+                barrierLabel: '正月駅伝予選の指示と集団走', // アクセシビリティ用ラベル
+                transitionDuration: const Duration(
+                  milliseconds: 300,
+                ), // アニメーション時間
+                pageBuilder: (context, animation, secondaryAnimation) {
+                  return const ModalYosenComSijiSettei();
+                },
+                transitionBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                      return FadeTransition(
+                        opacity: CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOut,
+                        ),
+                        child: child,
+                      );
+                    },
+              );
+            },
+            child: Text(
+              "正月駅伝予選の指示と集団走",
               style: TextStyle(
                 color: const Color.fromARGB(255, 0, 255, 0),
                 decoration: TextDecoration.underline,

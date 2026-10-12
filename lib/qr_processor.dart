@@ -20,6 +20,7 @@ import 'kansuu/ikku_pace.dart'; // 集団走設定の確認(1.9.2)
 import 'kansuu/custom_seigen.dart'; // カスタム駅伝の出場制限の確認(1.9.2)
 import 'kansuu/seichou_type.dart'; // 成長タイプ設定の確認(1.9.3)
 import 'kansuu/joukai.dart'; // 13分台の新入生の限界突破の優遇の確認(1.9.3)
+import 'kansuu/yosen_com_siji.dart'; // 正月駅伝予選のコンピュータの大学の指示と集団走の確認(1.9.9)
 
 // 読み込み時に複数枚のデータを一時的に保持する状態管理クラス
 class QrReceiveState {
@@ -197,6 +198,11 @@ class SettingsQrProcessor {
       // 形+10×周回数のコード。形は0=地区めぐり(声かけ)(初期値)・1=全国一斉・2=地区めぐり(交渉)。scout_com.dart)
       data['k_yobiint2_87'] = kantoku.yobiint2.length > comScoutKatachiIndex
           ? kantoku.yobiint2[comScoutKatachiIndex]
+          : 0;
+      // 正月駅伝予選のコンピュータの大学の指示と集団走(int) [89] (1.9.9で追加。0=使う(初期値)・1=使わない。
+      // yosen_com_siji.dart)
+      data['k_yobiint2_89'] = kantoku.yobiint2.length > yosenComSijiIndex
+          ? kantoku.yobiint2[yosenComSijiIndex]
           : 0;
     } else if (department == SettingsDepartment.octoberTime) {
       //区間ごとタイム調整(int)
@@ -687,6 +693,14 @@ class SettingsQrProcessor {
           comScoutKatachiTadashii(yobiint2_87) &&
           kantoku.yobiint2.length > comScoutKatachiIndex) {
         kantoku.yobiint2[comScoutKatachiIndex] = yobiint2_87;
+      }
+      // 正月駅伝予選のコンピュータの大学の指示と集団走(int) kantoku.yobiint2[89] (1.9.9)
+      //   0使う(初期値)・1使わない(古いQRコードには含まれていないので、そのときは今の設定のまま)
+      final dynamic yobiint2_89 = dataMap['k_yobiint2_89'];
+      if (yobiint2_89 is int &&
+          yosenComSijiAtaiTadashii(yobiint2_89) &&
+          kantoku.yobiint2.length > yosenComSijiIndex) {
+        kantoku.yobiint2[yosenComSijiIndex] = yobiint2_89;
       }
       // 金銀支給量設定の難易度ごとの割合(int) kantoku.yobiint3[70]〜[73] (1.9.1)
       //   鬼・難しい・普通・易しいの順。0なら100%(初期値)、1〜50なら値×10%

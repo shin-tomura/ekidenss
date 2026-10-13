@@ -10,6 +10,8 @@ import 'package:ekiden/kiroku.dart';
 import 'package:ekiden/constants.dart';
 import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/kansuu/rekidai_kiroku.dart'; // 歴代10位までの記録(1.8.8)
+import 'package:ekiden/kansuu/taikai_chouki.dart'
+    show ouroRace, fukuroRace, choukiOufukuKaishi; // 正月駅伝の往路記録・復路記録(2.0.0)
 
 String _getCombinedDifficultyText(KantokuData kantoku, Ghensuu currentGhensuu) {
   // 難易度モードを取得 (0:通常, 1:極, 2:天)
@@ -2020,6 +2022,62 @@ class _RecordScreenState extends State<RecordScreen>
     }
   }
 
+  // 正月駅伝の往路記録・復路記録の欄(全体と学内。歴代10位まで。2.0.0。kansuu/oufuku_kiroku.dart)
+  // ・[zentai] 全体の記録か(falseなら総監督をしている大学の学内記録。[kijunUniv]はその大学)
+  // ・往路・復路の記録は2.0.0から取り始めたので、それより前から遊んでいるデータは、記録を始めた年度を添える
+  //   (年度はどの大学も同じなので、全体の記録では[kijunUniv]にどの大学を渡してもよい)
+  List<Widget> _buildOufukuSections({
+    required bool zentai,
+    required Ghensuu ghensuu,
+    required UnivData kijunUniv,
+  }) {
+    const TextStyle chuu = TextStyle(
+      color: Colors.white,
+      fontSize: HENSUU.fontsize_honbun - 2,
+    );
+    Widget ran(int race, String title) {
+      return _buildRekidaiSection(
+        kagi: '${zentai ? 'zentai' : 'univ'}_taikai_$race',
+        title: title,
+        rekidai: zentai
+            ? rekidaiZentaiTaikai(ghensuu, race).yomu()
+            : rekidaiUnivTaikai(kijunUniv, race).yomu(),
+        isOverallTime: true,
+        senshu: false,
+        daigaku: zentai,
+        onReset: () => _showResetConfirmationDialog(
+          title,
+          () => zentai
+              ? _resetOverallRekidai(
+                  recordType: 1,
+                  shurui: 0,
+                  index1: race,
+                  index2: 0,
+                )
+              : _resetUnivRekidai(
+                  recordType: 1,
+                  shurui: 0,
+                  index1: race,
+                  index2: 0,
+                ),
+          hosoku: _resetHosoku(null),
+        ),
+      );
+    }
+
+    final int kaishi = choukiOufukuKaishi(kijunUniv);
+    return [
+      ran(ouroRace, '往路記録(1〜5区)'),
+      const SizedBox(height: 5),
+      ran(fukuroRace, '復路記録(6〜10区)'),
+      const SizedBox(height: 5),
+      if (kaishi > 1) ...[
+        Text('(往路記録・復路記録は$kaishi年度から記録しています)', style: chuu),
+        const SizedBox(height: 5),
+      ],
+    ];
+  }
+
   // 記録の行のヘルパーウィジェット(歴代10位まで。1.8.8で、学内・全体の個人記録・区間記録・総合記録の4つをまとめた)
   // ・ふだんは1位だけを出し、2位以下があるときは、記録の下の「2位以下を見る」「閉じる」で開いたり閉じたりする
   // ・[senshu] 選手名と学年を出すか(総合記録は出さない)
@@ -2432,6 +2490,13 @@ class _RecordScreenState extends State<RecordScreen>
             ),
           ),
           const SizedBox(height: 5),
+          // 正月駅伝の往路記録・復路記録(2.0.0。kansuu/oufuku_kiroku.dart)
+          if (race == 2)
+            ..._buildOufukuSections(
+              zentai: false,
+              ghensuu: ghensuu,
+              kijunUniv: myUnivData,
+            ),
           // 区間記録
           for (
             int index = 0;
@@ -2566,6 +2631,13 @@ class _RecordScreenState extends State<RecordScreen>
             ),
           ),
           const SizedBox(height: 5),
+          // 正月駅伝の往路記録・復路記録(2.0.0。kansuu/oufuku_kiroku.dart)
+          if (race == 2 && sortedUnivData.isNotEmpty)
+            ..._buildOufukuSections(
+              zentai: true,
+              ghensuu: ghensuu,
+              kijunUniv: sortedUnivData[0],
+            ),
           // 区間記録
           for (
             int index = 0;

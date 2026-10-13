@@ -1,7 +1,9 @@
 import 'package:ekiden/constants.dart';
 import 'package:ekiden/ghensuu.dart';
+import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/kansuu/taikai_chouki.dart';
+import 'package:ekiden/kansuu/rekidai_kiroku.dart'; // 歴代10位までの記録(往路記録・復路記録)
 
 // ------------------------------------------------------------
 // 正月駅伝の往路・復路の成績(2.0.0)
@@ -18,6 +20,12 @@ import 'package:ekiden/kansuu/taikai_chouki.dart';
 //   「○年ぶり」と連覇は、大会の長い記録(taikai_chouki.dart)で覚える
 // ・2.0.0より前から遊んでいるデータは、記録を始める前の分がないので、記録を始めた年度
 //   (choukiOufukuKaishi)を覚えておき、「初の往路優勝」「○度目」などと言い切らない
+// ・往路記録・復路記録(大会記録)も、ほかの大会と同じく全体と学内(総監督の大学)の歴代10位まで残す
+//   (Ghensuu・UnivData の大会記録の配列の18・19の行。rekidai_kiroku.dart)。記録画面の正月駅伝に出す。
+//   記録はこの版からなので、最初の正月駅伝が最初の記録になる(そのときは「新記録」と書かない)
+// ・従来の全体の往路記録・復路記録は、正月駅伝のスタートのときに KantokuData.yobiint4[22]・[23] に
+//   保存しておき(EntryCalc.dart・EntryCalc_2.dart)、記事の「往路新記録」とレース中の「往路記録比」に使う
+//   (大会のあとに記録を書き換えても、従来の記録と比べられるように。総合の大会記録の[20]と同じ考え方)
 // ------------------------------------------------------------
 
 /// 往路の区間数(往路は1〜5区)
@@ -216,4 +224,105 @@ String oufukuYuushouMoji(OufukuYuushou y) {
   }
   if (y.zenbu && y.renzoku != 0) return '${y.kaisuu}度目の';
   return '';
+}
+
+// ------------------------------------------------------------
+// 往路記録・復路記録(大会記録。2.0.0)
+// ------------------------------------------------------------
+
+/// 従来の全体の往路記録・復路記録を保存する KantokuData.yobiint4 の番号
+int oufukuJuraiBangou(int race) => race == ouroRace ? 22 : 23;
+
+/// 大会のスタートのときに、従来の全体の往路記録・復路記録を保存する(正月駅伝だけ。ほかの大会は0にする。
+/// EntryCalc.dart・EntryCalc_2.dart。保存は呼び出し側で行う)
+void oufukuJuraiHozon(KantokuData kantoku, Ghensuu gh, int racebangou) {
+  for (final int race in const [ouroRace, fukuroRace]) {
+    final int b = oufukuJuraiBangou(race);
+    if (kantoku.yobiint4.length <= b) continue;
+    int t = 0;
+    if (racebangou == 2 &&
+        gh.time_zentaitaikaikiroku.length > race &&
+        gh.time_zentaitaikaikiroku[race].isNotEmpty) {
+      t = gh.time_zentaitaikaikiroku[race][0].toInt();
+    }
+    kantoku.yobiint4[b] = t;
+  }
+}
+
+/// 従来の全体の往路記録・復路記録(秒。なければnull)
+int? oufukuJurai(KantokuData kantoku, int race) {
+  final int b = oufukuJuraiBangou(race);
+  if (kantoku.yobiint4.length <= b) return null;
+  final int t = kantoku.yobiint4[b];
+  if (t <= 0 || t >= TEISUU.DEFAULTTIME) return null;
+  return t;
+}
+
+/// 正月駅伝の結果を記録したあとに、往路記録・復路記録(全体と、総監督をしている大学の学内。
+/// 歴代10位まで)を更新する(KirokuKousin.dart。保存もする)
+Future<void> oufukuTaikaiKirokuKousin(Ghensuu gh, List<UnivData> univs) async {
+  if (gh.kukansuu_taikaigoto.length <= 2) return;
+  final int ks = gh.kukansuu_taikaigoto[2];
+  if (ks != shougatsuKukansuu) return;
+  UnivData? my;
+  for (final UnivData u in univs) {
+    if (u.id == gh.MYunivid) my = u;
+  }
+  bool ghKawatta = false;
+  bool myKawatta = false;
+  for (final int race in const [ouroRace, fukuroRace]) {
+    double? time(UnivData u) =>
+        race == ouroRace ? ouroTime(u) : fukuroTime(u, ks);
+    final List<UnivData> jun = [
+      for (final UnivData u in univs)
+        if (u.taikaientryflag.length > 2 &&
+            u.taikaientryflag[2] == 1 &&
+            time(u) != null)
+          u,
+    ]..sort((a, b) => time(a)!.compareTo(time(b)!));
+    // 全体
+    if (gh.time_zentaitaikaikiroku.length > race) {
+      final RekidaiOkiba okiba = rekidaiZentaiTaikai(gh, race);
+      final List<RekidaiKiroku> rekidai = okiba.yomu();
+      bool kawatta = false;
+      for (final UnivData u in jun) {
+        if (rekidaiIreru(
+          rekidai,
+          RekidaiKiroku(
+            time: time(u)!,
+            year: gh.year,
+            month: gh.month,
+            univname: u.name,
+          ),
+          TEISUU.SUU_REKIDAIKIROKUJUNISUU,
+        )) {
+          kawatta = true;
+        } else {
+          break; // タイム順なので、入らなかったら、これより後ろの大学も入らない
+        }
+      }
+      if (kawatta) {
+        okiba.kaku(rekidai);
+        ghKawatta = true;
+      }
+    }
+    // 学内(総監督をしている大学)
+    if (my != null && my.time_univtaikaikiroku.length > race) {
+      final double? t = time(my);
+      if (t != null && jun.contains(my)) {
+        final RekidaiOkiba okiba = rekidaiUnivTaikai(my, race);
+        final List<RekidaiKiroku> rekidai = okiba.yomu();
+        if (rekidaiIreru(
+          rekidai,
+          RekidaiKiroku(time: t, year: gh.year, month: gh.month),
+          TEISUU.SUU_REKIDAIKIROKUJUNISUU,
+        )) {
+          okiba.kaku(rekidai);
+          myKawatta = true;
+        }
+      }
+    }
+  }
+  if (ghKawatta) await gh.save();
+  if (myKawatta) await my!.save();
 }

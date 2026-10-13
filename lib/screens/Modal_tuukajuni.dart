@@ -12,6 +12,8 @@ import 'package:share_plus/share_plus.dart';
 import 'package:screenshot/screenshot.dart';
 //import 'dart:typed_data';
 import 'package:flutter/services.dart';
+import 'package:ekiden/kansuu/oufuku_kiroku.dart' show oufukuJurai; // 従来の往路記録(往路記録比。2.0.0)
+import 'package:ekiden/kansuu/taikai_chouki.dart' show ouroRace; // 往路の大会番号(2.0.0)
 
 class ModalKukanResultListViewPass extends StatefulWidget {
   const ModalKukanResultListViewPass({super.key});
@@ -336,6 +338,23 @@ class _ModalKukanResultListViewPassState
         diffWidgets.add(
           Text(
             '大会記録比: ${_formatTimeDifferenceForRecordDiff(diff)}',
+            style: TextStyle(
+              color: diff < 0 ? Colors.lightGreenAccent : Colors.redAccent,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        );
+      }
+    }
+    // 往路記録比(正月駅伝の5区を走り終えたトップの大学。従来の往路記録は、スタートのときに保存したもの。2.0.0)
+    if (isTopRunner && raceBangou == 2 && kukanBangou == 4 && lastKukanIndex == 9) {
+      final int? ouroRec = oufukuJurai(kantoku, ouroRace);
+      if (ouroRec != null) {
+        final double diff = totalTime - ouroRec.toDouble();
+        diffWidgets.add(
+          Text(
+            '往路記録比: ${_formatTimeDifferenceForRecordDiff(diff)}',
             style: TextStyle(
               color: diff < 0 ? Colors.lightGreenAccent : Colors.redAccent,
               fontSize: 12,
@@ -1054,6 +1073,20 @@ String tuukaJuniSokuhouHonbun({
               shareText +=
                   '   [大会記録比: ${_formatTimeDifferenceForRecordDiff(diff)}(大会記録ペースには${_formatTimeDifferenceForRecordDiff_copy(diff.abs())}及ばず)]\n';
             }
+          }
+        }
+      }
+      // 往路記録比(正月駅伝の5区を走り終えたトップの大学。2.0.0)
+      if (isTop && raceBangou == 2 && kukanBangou == 4 && lastKukanIndex == 9) {
+        final int? ouroRec = oufukuJurai(kantoku, ouroRace);
+        if (ouroRec != null) {
+          final double diff = tsuukaTimeTotal - ouroRec.toDouble();
+          if (diff < 0) {
+            shareText +=
+                '   [往路記録比: ${_formatTimeDifferenceForRecordDiff(diff)}(速報値では往路記録を${_formatTimeDifferenceForRecordDiff_copy(diff.abs())}更新)]\n';
+          } else {
+            shareText +=
+                '   [往路記録比: ${_formatTimeDifferenceForRecordDiff(diff)}(速報値では往路記録には${_formatTimeDifferenceForRecordDiff_copy(diff.abs())}及ばず)]\n';
           }
         }
       }

@@ -16,7 +16,19 @@ import 'package:ekiden/kansuu/taikai_chouki.dart' show ouroRace, choukiNendo;
 //   記録を始める前の分がないので「初」「○度目」と言い切らない)
 // ・本文は、往路のゴールの場面・5区の区間賞・上位の差・シード圏・自分の大学・復路への見通し。往路の成績の表を付ける
 // ・現実の新聞にならい、往路優勝は大きく、復路優勝は総合の記事の中で小さく扱う(復路優勝は kiji_kekka.dart)
+// ・往路新記録なら見出しに書く(従来の往路記録は、正月駅伝のスタートのときに保存したもの。oufukuShinkiroku)
 // ------------------------------------------------------------
+
+/// 往路記録・復路記録の新記録か([race] 18・19、[time] 今回のタイム)と、従来の記録を何秒更新したか(2.0.0)
+/// 従来の記録は、正月駅伝のスタートのときに保存したもの(oufuku_kiroku.dart の oufukuJurai)なので、
+/// 大会のあとに記録を書き換えたあとでも比べられる。
+/// 従来の記録がない(記録を始めた最初の正月駅伝など)ときは、新記録と書かない
+({bool shin, int koushin}) oufukuShinkiroku(KijiKankyou k, int race, double time) {
+  final int? jurai = oufukuJurai(k.kantoku, race);
+  if (jurai == null) return (shin: false, koushin: 0);
+  final int koushin = jurai - byou(time);
+  return (shin: koushin > 0, koushin: koushin);
+}
 
 /// 記事の番号(乱数の種と、記者・配信時刻を決める。結果の記事の1〜7と重ならないように)
 const int _no = 8;
@@ -114,6 +126,8 @@ Kiji _ouroKiji(KijiKankyou k, List<_OuroUniv> jun, {required bool kirokuZumi}) {
     nendo: choukiNendo(k.gh),
   );
   final String yMoji = oufukuYuushouMoji(y);
+  // 往路新記録か
+  final ({bool shin, int koushin}) shin = oufukuShinkiroku(k, ouroRace, win.time);
 
   // 見出し
   String midashi1;
@@ -129,7 +143,9 @@ Kiji _ouroKiji(KijiKankyou k, List<_OuroUniv> jun, {required bool kirokuZumi}) {
     midashi1 = w.erabu(['${win.mei}が往路優勝', '${win.mei}、往路を制す']);
   }
   String midashi2 = '';
-  if (gyakuten) {
+  if (shin.shin) {
+    midashi2 = '往路新記録';
+  } else if (gyakuten) {
     midashi2 = yama5 ? '山登りで逆転' : '5区で逆転';
   } else if (kinsa) {
     midashi2 = '${kinsaMoji(sa)}の激戦制す';
@@ -147,6 +163,9 @@ Kiji _ouroKiji(KijiKankyou k, List<_OuroUniv> jun, {required bool kirokuZumi}) {
     '${win.mei}が${jikanMoji(win.time)}で$yMoji往路優勝を果たした。',
   );
   if (y.renzokuFumei) lead.write('往路の連覇を、さらに伸ばした。');
+  if (shin.shin) {
+    lead.write('従来の往路記録を${saMoji(shin.koushin)}更新する往路新記録だった。');
+  }
   final SenshuData? s5 = _sousha(k, win.u, ou);
   if (gyakuten && s5 != null) {
     lead.write(

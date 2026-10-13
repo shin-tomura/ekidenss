@@ -836,10 +836,21 @@ Kiji _topKiji(EkidenKekka e) {
       if (x.ruikei[ou] < oW.ruikei[ou]) oW = x;
       if (fukuro(x) < fukuro(fW)) fW = x;
     }
+    // 往路新記録・復路新記録(従来の記録は、正月駅伝のスタートのときに保存したもの。2.0.0)
+    final bool ouroShin = oufukuShinkiroku(k, ouroRace, oW.ruikei[ou]).shin;
+    final bool fukuroShin = oufukuShinkiroku(k, fukuroRace, fukuro(fW)).shin;
     if (oW.u.id == win.u.id && fW.u.id == win.u.id) {
-      ika.write('${win.mei}は往路・復路ともに1位の完全優勝だった。');
+      final List<String> shinMei = [if (ouroShin) '往路', if (fukuroShin) '復路'];
+      ika.write(
+        shinMei.isEmpty
+            ? '${win.mei}は往路・復路ともに1位の完全優勝だった。'
+            : '${win.mei}は往路・復路ともに1位の完全優勝で、${shinMei.join('・')}は新記録だった。',
+      );
     } else {
-      ika.write('往路は${oW.mei}が制し、復路は${fW.mei}が最速だった。');
+      ika.write(
+        '往路は${oW.mei}が${ouroShin ? '往路新記録で' : ''}制し、'
+        '復路は${fW.mei}が${fukuroShin ? '復路新記録をマークした' : '最速だった'}。',
+      );
     }
   }
   // 前回王者
@@ -2727,8 +2738,13 @@ Kiji? _fukuroKiji(EkidenKekka e) {
   } else {
     lead.write('往路${juniMoji(sW.tuuka[ou])}の${sW.mei}が逆転し、総合優勝を果たした。');
   }
+  // 復路新記録(従来の記録は、正月駅伝のスタートのときに保存したもの。2.0.0)
+  final ({bool shin, int koushin}) fukuroShin = oufukuShinkiroku(k, fukuroRace, fukuro(fW));
   if (kanzen) {
     lead.write('${sW.mei}は復路のタイムも最も速く、往路・復路ともに1位の完全優勝だった。');
+    if (fukuroShin.shin) {
+      lead.write('復路のタイムは、従来の記録を${saMoji(fukuroShin.koushin)}更新する復路新記録だった。');
+    }
   }
 
   // 復路の山
@@ -2755,7 +2771,9 @@ Kiji? _fukuroKiji(EkidenKekka e) {
   // 復路優勝(小さく、1文だけ)
   if (!kanzen) {
     w.danraku(
-      '復路のタイムが最も速かったのは${fW.mei}で、${jikanMoji(fukuro(fW))}。2位とは${kinsaMoji(fukuroSa)}だった。',
+      '復路のタイムが最も速かったのは${fW.mei}で、${jikanMoji(fukuro(fW))}。'
+      '${fukuroShin.shin ? '従来の記録を${saMoji(fukuroShin.koushin)}更新する復路新記録で、' : ''}'
+      '2位とは${kinsaMoji(fukuroSa)}だった。',
     );
   }
 

@@ -9,6 +9,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ekiden/album.dart';
 import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/kansuu/TrialTime.dart';
+import 'package:ekiden/kansuu/oufuku_kiroku.dart' show oufukuJuraiHozon; // 従来の往路記録・復路記録(2.0.0)
 
 /// 駅伝のルール設定クラス
 class EkidenRuleConfig {
@@ -219,6 +220,8 @@ Future<List<int>> EntryCalc_2({
     kantoku.yobiint4[21] = sortedUnivData[gh[0].MYunivid]
         .time_univtaikaikiroku[racebangou][0]
         .toInt();
+    // 従来の全体の往路記録・復路記録(正月駅伝だけ。ほかの大会は0。2.0.0。oufuku_kiroku.dart)
+    oufukuJuraiHozon(kantoku, gh[0], racebangou);
   } else {
     for (int i = 0; i < 22; i++) kantoku.yobiint4[i] = 0;
     for (int i = 0; i < 10; i++) kantoku.yobiint3[i] = 0;

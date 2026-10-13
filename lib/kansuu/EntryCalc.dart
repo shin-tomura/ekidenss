@@ -19,6 +19,7 @@ import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/kansuu/gakuren_kantoku.dart';
 import 'package:ekiden/kansuu/konki_best.dart'; // 今季ベスト(1.9.1)
 import 'package:ekiden/kansuu/kukan_haichi.dart'; // 区間配置の見積もりと方針(1.9.1)
+import 'package:ekiden/kansuu/oufuku_kiroku.dart' show oufukuJuraiHozon; // 従来の往路記録・復路記録(2.0.0)
 
 List<int> kukanIDs = [];
 
@@ -97,6 +98,8 @@ Future<List<int>> EntryCalc({
     kantoku.yobiint4[21] = sortedUnivData[gh[0].MYunivid]
         .time_univtaikaikiroku[racebangou][0]
         .toInt();
+    // 従来の全体の往路記録・復路記録(正月駅伝だけ。ほかの大会は0。2.0.0。oufuku_kiroku.dart)
+    oufukuJuraiHozon(kantoku, gh[0], racebangou);
   } else {
     for (int i = 0; i < 22; i++) {
       kantoku.yobiint4[i] = 0;

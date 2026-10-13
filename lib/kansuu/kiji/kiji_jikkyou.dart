@@ -8,6 +8,7 @@ import 'package:ekiden/kansuu/ikku_pace.dart';
 import 'package:ekiden/kansuu/kiji/kiji_kihon.dart';
 import 'package:ekiden/kansuu/taikai_chouki.dart'; // 大会の長い記録の出来事(2.0.0)
 import 'package:ekiden/kansuu/oufuku_kiroku.dart'; // 往路優勝の回数・連覇(2.0.0)
+import 'package:ekiden/kansuu/kiji/kiji_ouro.dart' show oufukuShinkiroku; // 往路新記録(2.0.0)
 import 'package:ekiden/kansuu/kiji/kiji_comment.dart';
 import 'package:ekiden/kansuu/koukou.dart'; // 出身校(高校の同期対決。1.9.5)
 import 'package:ekiden/kansuu/kiji/kiji_gakunai.dart' show gakunaiSiteMei, gakunaiKishaMei; // 学内メディアの速報(1.9.7)
@@ -1183,6 +1184,11 @@ Kiji? _kukanJikkyou(
         ),
       );
       nb.write('往路はここまで。${shui.mei}が$ouroMoji往路優勝、2位の${ni.mei}とは${kinsaMoji(sa12)}です。復路のスタートは往路の差のままです。');
+      // 往路新記録(2.0.0。従来の往路記録は、正月駅伝のスタートのときに保存したもの)
+      final ({bool shin, int koushin}) ouroShin = oufukuShinkiroku(k, ouroRace, shui.ruikei);
+      if (ouroShin.shin) {
+        nb.write('${shui.mei}のタイムは、従来の記録を${saMoji(ouroShin.koushin)}更新する往路新記録です。');
+      }
       // シード圏の状況(1文だけ。走者の比べは、復路の当日変更の前なのでしない)
       if (nokori != null && morashi != null) {
         nb.write('シード権争いは、往路の時点で${juniMoji(seedSuu - 1)}が${nokori.mei}、${juniMoji(seedSuu)}の${morashi.mei}とは${kinsaMoji(saSeed)}です。');

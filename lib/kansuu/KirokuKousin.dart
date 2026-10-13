@@ -546,6 +546,11 @@ Future<void> kirokuKousin({
         await myUniv.save(); // UnivData の変更を保存
       }
     } // 学内大会記録終端
+
+    // 正月駅伝の往路記録・復路記録(全体と学内。歴代10位まで。大会番号18・19の行。2.0.0。oufuku_kiroku.dart)
+    if (racebangou == 2) {
+      await oufukuTaikaiKirokuKousin(gh[0], sortedunivdata);
+    }
   }
 
   // コンピュータ大学の目標順位達成時の金銀獲得(夏合宿まで保有する)

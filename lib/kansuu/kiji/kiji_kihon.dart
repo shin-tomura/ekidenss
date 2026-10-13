@@ -1408,17 +1408,34 @@ bool _gakunenKirokuNashi(SeisekiKiroku s, int g) {
   return true;
 }
 
+/// マスの最後に足す、走破タイムの行(1.9.9。[taimuAri]がfalseか、タイムがなければ空。
+/// 対校戦の表と同じく分と秒で書く(1時間を超えても「65分30秒」))
+String _taimuGyou(SeisekiKiroku s, int race, int g, bool taimuAri) {
+  if (!taimuAri) return '';
+  final double t = _timeAt(s, race, g);
+  return t < TEISUU.DEFAULTTIME ? '\n${TimeDate.timeToFunByouString(t)}' : '';
+}
+
 /// 三大駅伝の成績の表の、大会[race]の[g]年のマス(載せることがなければnull)
-String? _sandaiSeisekiMasu(SeisekiKiroku s, int race, int g) {
+/// [taimuAri]がtrueなら、区間順位の下に走破タイムも書く(1.9.9。選手画面・卒業生の画面)
+String? _sandaiSeisekiMasu(
+  SeisekiKiroku s,
+  int race,
+  int g, {
+  bool taimuAri = false,
+}) {
   final int e = _entryAt(s, race, g);
   final int j = _juniAt(s, race, g);
   if (e >= 0) {
-    if (gakurenShussouJuni(race, j)) return '学連 ${e + 1}区\n区間${j - 100 + 1}位相当';
-    if (shutsujouJuni(j)) return j == 0 ? '${e + 1}区\n区間賞' : '${e + 1}区\n区間${j + 1}位';
+    final String taimu = _taimuGyou(s, race, g, taimuAri);
+    if (gakurenShussouJuni(race, j)) return '学連 ${e + 1}区\n区間${j - 100 + 1}位相当$taimu';
+    if (shutsujouJuni(j)) {
+      return j == 0 ? '${e + 1}区\n区間賞$taimu' : '${e + 1}区\n区間${j + 1}位$taimu';
+    }
     return '${e + 1}区';
   }
   // 本戦を走っていなければ、予選の結果
-  final String? y = _yosenMasu(s, race, g);
+  final String? y = _yosenMasu(s, race, g, taimuAri: taimuAri);
   if (y != null) return y;
   // 当日変更で外れた選手(-(100+区間)。1.9.8から補欠と分け、どの区間から外れたかを書く。
   // 区間の補正の説明の「当日変更OUT」と同じ書き方にして、短く収める)
@@ -1430,16 +1447,18 @@ String? _sandaiSeisekiMasu(SeisekiKiroku s, int race, int g) {
 
 /// 三大駅伝の成績の表の、本戦の欄に出す予選の結果(11月駅伝は11月駅伝予選、正月駅伝は正月駅伝予選。
 /// 予選を走っていなければnull)
-String? _yosenMasu(SeisekiKiroku s, int race, int g) {
+/// [taimuAri]がtrueなら、順位の下に走破タイムも書く(1.9.9。11月駅伝予選は1万m、正月駅伝予選はハーフ)
+String? _yosenMasu(SeisekiKiroku s, int race, int g, {bool taimuAri = false}) {
   final int yosen = race == 1 ? 3 : (race == 2 ? 4 : -1);
   if (yosen < 0) return null;
   final int ye = _entryAt(s, yosen, g);
   if (ye < 0) return null;
   final int yj = _juniAt(s, yosen, g);
   final bool ari = shutsujouJuni(yj);
+  final String taimu = ari ? _taimuGyou(s, yosen, g, taimuAri) : '';
   return yosen == 3
-      ? '予選 ${ye + 1}組${ari ? '\n組${yj + 1}位' : ''}'
-      : '予選会${ari ? '\n個人${yj + 1}位' : ''}';
+      ? '予選 ${ye + 1}組${ari ? '\n組${yj + 1}位' : ''}$taimu'
+      : '予選会${ari ? '\n個人${yj + 1}位' : ''}$taimu';
 }
 
 /// 選手[s]の三大駅伝の成績の表(学年は今の学年から1年まで、上から新しい順)
@@ -1453,11 +1472,14 @@ KijiHyou? sandaiSeisekiHyou(SenshuData s, {int? imaRace, bool shouryaku = false}
 /// 三大駅伝の成績の表(sandaiSeisekiHyou の中身。卒業生の画面からも使えるように記録で受け取る。1.9.8)
 /// [kaisai] 季の途中で見る選手画面なら、今季もう開かれた大会(konkiKaisaiZumi)。今の学年でまだ開かれて
 /// いない大会は「これから」にする(予選だけ終わっていれば予選の結果)。記事ではnull
+/// [taimuAri] 区間順位(予選の順位)の下に走破タイムも書くか(1.9.9。選手画面・他大学の選手の詳細・
+/// 卒業生の画面はtrue。記事は、表が縦に長くなり生成AI向けのテキストも長くなるのでfalseのまま)
 KijiHyou? sandaiSeisekiHyouKiroku(
   SeisekiKiroku s, {
   int? imaRace,
   bool shouryaku = false,
   Set<int>? kaisai,
+  bool taimuAri = false,
 }) {
   if (s.gakunen < 1 || s.gakunen > 4) return null;
   final int imaJun = imaRace == null ? -1 : _kiNoJun.indexOf(imaRace);
@@ -1482,11 +1504,11 @@ KijiHyou? sandaiSeisekiHyouKiroku(
       } else if (kaisai != null && g == s.gakunen && !kaisai.contains(race)) {
         // 季の途中で、今の学年でまだ開かれていない大会(エントリーは選手を作ったときの補欠の値のままなので、
         // そのまま出すと「補欠」になる。1.9.8)
-        final String? y = _yosenMasu(s, race, g);
+        final String? y = _yosenMasu(s, race, g, taimuAri: taimuAri);
         if (y != null) nanika = true;
         m = y ?? 'これから';
       } else {
-        final String? d = _sandaiSeisekiMasu(s, race, g);
+        final String? d = _sandaiSeisekiMasu(s, race, g, taimuAri: taimuAri);
         if (d != null) nanika = true;
         m = d ?? '-';
       }

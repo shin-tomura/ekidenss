@@ -328,9 +328,11 @@ class _ModalSenshuDetailViewState extends State<ModalSenshuDetailView> {
             final KantokuData kantoku = kantokuBox.get('KantokuData')!;
             // 三大駅伝と対校戦の成績の表(記事の表と同じ形。今の学年でまだ開かれていない大会は「これから」。1.9.8)
             final Set<int> kaisai = konkiKaisaiZumi(senshuBox.values);
+            // 区間順位(予選の順位)の下に走破タイムも書く(1.9.9)
             final KijiHyou? sandaiHyou = sandaiSeisekiHyouKiroku(
               SeisekiKiroku.senshu(currentSenshu),
               kaisai: kaisai,
+              taimuAri: true,
             );
             final KijiHyou? taikousenHyou = taikousenSeisekiHyou(
               SeisekiKiroku.senshu(currentSenshu),

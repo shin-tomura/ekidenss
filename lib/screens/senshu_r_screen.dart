@@ -502,7 +502,8 @@ class _Senshu_R_ScreenState extends State<Senshu_R_Screen> {
               currentSenshu.kukanjuni_race,
               currentSenshu.kukantime_race,
             );
-            final KijiHyou? sandaiHyou = sandaiSeisekiHyouKiroku(seiseki);
+            // 区間順位(予選の順位)の下に走破タイムも書く(1.9.9)
+            final KijiHyou? sandaiHyou = sandaiSeisekiHyouKiroku(seiseki, taimuAri: true);
             final KijiHyou? taikousenHyou = taikousenSeisekiHyou(seiseki);
             String yakushokustr = "";
             final rijiBox = Hive.box<RijiData>('rijiBox');

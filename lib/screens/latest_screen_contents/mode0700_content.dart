@@ -31,6 +31,8 @@ import 'package:ekiden/screens/Modal_timesasuii.dart';
 import 'package:ekiden/kansuu/gakuren_text.dart';
 import 'package:ekiden/kansuu/gakuren_kantoku.dart'; // 学連選抜の監督をした年か(1.8.3)
 import 'package:ekiden/kansuu/mokuhyou_hosei.dart'; // 補正の強さが0%なら「タイム悪化あり」を出さない(1.9.8)
+import 'package:ekiden/screens/Modal_senshu_race_bunseki.dart'
+    show ModalSenshuAnalysisView; // 最終区の選手の結果分析(1.9.9)
 
 // モーダルビューのプレースホルダー
 // 実際にはこれらのファイルを別途作成する必要があります
@@ -1401,6 +1403,29 @@ class _Mode0700ContentState extends State<Mode0700Content> {
                                                 // 駅伝なら、学内メディアの結果号も記事の画面で切り替えて読める(1.9.3)
                                                 // 正月駅伝は学連選抜通信の結果号と速報も(1.9.7)
                                                 annai: kijiGakunaiAnnai(gakuren: true),
+                                              ),
+                                            // 最終区(11月駅伝予選は最終組)を走った自分の大学の選手の成績(1.9.9)
+                                            // 指示画面の「==直近区間==」と同じ形。一番下の「選手の成績」まで
+                                            // スクロールしなくても見られるように、ニュース記事のカードのすぐ下に置く
+                                            if ((currentGhensuu.hyojiracebangou <= 3 ||
+                                                    currentGhensuu.hyojiracebangou == 5) &&
+                                                idJunUnivData[currentGhensuu.MYunivid]
+                                                        .taikaientryflag[currentGhensuu
+                                                        .hyojiracebangou] ==
+                                                    1)
+                                              _buildSaishuuKukan(
+                                                currentGhensuu,
+                                                idJunUnivData,
+                                                gakunenJunUnivFilteredSenshuData,
+                                              ),
+                                            // 学連選抜の監督をした年の正月駅伝は、学連選抜の最終区の選手(1.9.9)
+                                            if (currentGhensuu.hyojiracebangou == 2 &&
+                                                idJunUnivData[currentGhensuu.MYunivid]
+                                                        .taikaientryflag[2] ==
+                                                    0)
+                                              _buildGakurenSaishuuKukan(
+                                                currentGhensuu,
+                                                idJunUnivData,
                                               ),
                                             if (currentGhensuu
                                                     .hyojiracebangou <=
@@ -2832,6 +2857,208 @@ class _Mode0700ContentState extends State<Mode0700Content> {
   }
 
   // 自分の大学の区間ごとの成績 (正月駅伝予選以外)
+  // MARK: - 最終区(最終組)の成績(1.9.9)
+  // 指示画面の「==直近区間==」(mode0350_content.dart の MyUnivRaceResults_lastkukan)と同じ形で、
+  // 最終区を走った自分の大学の選手の成績を、結果画面の上のほうに出す
+  // (一番下の「選手の成績」は最後までスクロールしないと見えず、結果分析のリンクもないので。
+  //  一番下の一覧はそのまま残す)
+  Widget _buildSaishuuKukan(
+    Ghensuu currentGhensuu,
+    List<UnivData> idJunUnivData,
+    List<SenshuData> gakunenJunUnivFilteredSenshuData,
+  ) {
+    final int race = currentGhensuu.hyojiracebangou;
+    final bool kumi = race == 3; // 11月駅伝予選は「組」
+    if (currentGhensuu.kukansuu_taikaigoto.length <= race ||
+        idJunUnivData.length <= currentGhensuu.MYunivid) {
+      return const SizedBox.shrink();
+    }
+    final UnivData my = idJunUnivData[currentGhensuu.MYunivid];
+    final int iKukan = currentGhensuu.kukansuu_taikaigoto[race] - 1;
+    if (iKukan < 0 ||
+        my.time_taikai_total.length <= iKukan ||
+        my.tuukajuni_taikai.length <= iKukan ||
+        my.kukanjuni_taikai.length <= iKukan) {
+      return const SizedBox.shrink();
+    }
+    final String totalTime = TimeDate.timeToJikanFunByouString(
+      my.time_taikai_total[iKukan],
+    );
+    final String kukanTime = TimeDate.timeToFunByouString(
+      iKukan > 0
+          ? my.time_taikai_total[iKukan] - my.time_taikai_total[iKukan - 1]
+          : my.time_taikai_total[iKukan],
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 8),
+        Text(
+          kumi ? "==最終組==" : "==最終区==",
+          style: const TextStyle(color: HENSUU.textcolor),
+        ),
+        Text(
+          "${iKukan + 1}${kumi ? "組目" : "区"}",
+          style: const TextStyle(color: HENSUU.textcolor),
+        ),
+        Text(
+          "通過順位:${my.tuukajuni_taikai[iKukan] + 1}位 $totalTime",
+          style: const TextStyle(color: HENSUU.textcolor),
+        ),
+        Text(
+          "${kumi ? "組内" : "区間"}順位:${my.kukanjuni_taikai[iKukan] + 1}位 $kukanTime",
+          style: const TextStyle(color: HENSUU.textcolor),
+        ),
+        const SizedBox(height: 10),
+        for (final SenshuData senshu in gakunenJunUnivFilteredSenshuData)
+          if (senshu.gakunen >= 1 &&
+              senshu.entrykukan_race.length > race &&
+              senshu.entrykukan_race[race].length >= senshu.gakunen &&
+              senshu.entrykukan_race[race][senshu.gakunen - 1] == iKukan)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextButton(
+                  onPressed: () {
+                    showGeneralDialog(
+                      context: context,
+                      barrierColor: Colors.black.withOpacity(0.8),
+                      barrierDismissible: true,
+                      barrierLabel: '結果分析',
+                      pageBuilder: (context, _, __) =>
+                          ModalSenshuAnalysisView(senshuId: senshu.id),
+                    );
+                  },
+                  child: const Text(
+                    "結果分析",
+                    style: TextStyle(
+                      color: Color.fromARGB(255, 0, 255, 0),
+                      decoration: TextDecoration.underline,
+                      decorationColor: HENSUU.textcolor,
+                    ),
+                  ),
+                ),
+                Text(
+                  "${senshu.name} ${senshu.gakunen}年",
+                  style: const TextStyle(color: HENSUU.textcolor),
+                ),
+                if (kumi)
+                  Text(
+                    "組内順位:${senshu.temp_juni + 1}位 ${TimeDate.timeToFunByouString(senshu.time_taikai_total)}",
+                    style: const TextStyle(color: HENSUU.textcolor),
+                  ),
+                // 指示内容と結果(一番下の「選手の成績」と同じ書き方)
+                _buildInstructionResultText(
+                  senshu,
+                  currentGhensuu,
+                  iKukan,
+                  idJunUnivData,
+                ),
+                if (senshu.string_racesetumei.isNotEmpty)
+                  Text(
+                    senshu.string_racesetumei,
+                    style: const TextStyle(color: HENSUU.textcolor),
+                  ),
+                const SizedBox(height: 10),
+              ],
+            ),
+      ],
+    );
+  }
+
+  // MARK: - 学連選抜の最終区の成績(学連選抜の監督をした年の正月駅伝。1.9.9)
+  // 指示画面の学連選抜の「==直近区間==」と同じ内容(指示の内容と結果、補正の説明)を、結果画面の上のほうに出す
+  // (一番下の「学連選抜参考記録」はそのまま残す)
+  Widget _buildGakurenSaishuuKukan(
+    Ghensuu currentGhensuu,
+    List<UnivData> idJunUnivData,
+  ) {
+    const int race = 2;
+    final List<UnivGakurenData> gakurenunivdata = Hive.box<UnivGakurenData>(
+      'gakurenUnivBox',
+    ).values.toList();
+    final List<Senshu_Gakuren_Data> gakurensenshudata =
+        Hive.box<Senshu_Gakuren_Data>('gakurenSenshuBox').values.toList();
+    final KantokuData? kantoku = Hive.box<KantokuData>(
+      'kantokuBox',
+    ).get('KantokuData');
+    if (kantoku == null ||
+        gakurenunivdata.isEmpty ||
+        gakurensenshudata.isEmpty ||
+        currentGhensuu.kukansuu_taikaigoto.length <= race ||
+        idJunUnivData.length <= currentGhensuu.MYunivid ||
+        !gakurenKantokuChuu(kantoku, idJunUnivData[currentGhensuu.MYunivid])) {
+      return const SizedBox.shrink();
+    }
+    final UnivGakurenData g = gakurenunivdata[0];
+    final int iKukan = currentGhensuu.kukansuu_taikaigoto[race] - 1;
+    if (iKukan < 0 ||
+        g.time_taikai_total.length <= iKukan ||
+        g.tuukajuni_taikai.length <= iKukan ||
+        g.kukanjuni_taikai.length <= iKukan) {
+      return const SizedBox.shrink();
+    }
+    final String totalTime = TimeDate.timeToJikanFunByouString(
+      g.time_taikai_total[iKukan],
+    );
+    final String kukanTime = TimeDate.timeToFunByouString(
+      iKukan > 0
+          ? g.time_taikai_total[iKukan] - g.time_taikai_total[iKukan - 1]
+          : g.time_taikai_total[iKukan],
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 8),
+        const Text(
+          "==学連選抜の最終区==",
+          style: TextStyle(color: HENSUU.textcolor),
+        ),
+        Text(
+          "${iKukan + 1}区",
+          style: const TextStyle(color: HENSUU.textcolor),
+        ),
+        Text(
+          "通過順位:${g.tuukajuni_taikai[iKukan] + 1}位相当 $totalTime",
+          style: const TextStyle(color: HENSUU.textcolor),
+        ),
+        Text(
+          "区間順位:${g.kukanjuni_taikai[iKukan] + 1}位相当 $kukanTime",
+          style: const TextStyle(color: HENSUU.textcolor),
+        ),
+        const SizedBox(height: 10),
+        for (final Senshu_Gakuren_Data senshu in gakurensenshudata)
+          if (senshu.gakunen >= 1 &&
+              senshu.entrykukan_race.length > race &&
+              senshu.entrykukan_race[race].length >= senshu.gakunen &&
+              senshu.entrykukan_race[race][senshu.gakunen - 1] == iKukan)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "${senshu.name} ${senshu.gakunen}年  ${senshu.univid >= 0 && senshu.univid < idJunUnivData.length ? idJunUnivData[senshu.univid].name : ''}",
+                  style: const TextStyle(color: HENSUU.textcolor),
+                ),
+                // 指示の内容と結果(一番下の「学連選抜参考記録」と同じ文。gakuren_text.dart)
+                for (final String bun in gakurenSijiBun(
+                  senshu,
+                  iKukan,
+                  g,
+                  midashi: '指示内容',
+                ))
+                  Text(bun, style: const TextStyle(color: HENSUU.textcolor)),
+                if (senshu.string_racesetumei.isNotEmpty)
+                  Text(
+                    senshu.string_racesetumei,
+                    style: const TextStyle(color: HENSUU.textcolor),
+                  ),
+                const SizedBox(height: 10),
+              ],
+            ),
+      ],
+    );
+  }
+
   Widget _buildMyUnivSectionResults(
     List<SenshuData> gakunenJunUnivFilteredSenshuData,
     Ghensuu currentGhensuu,

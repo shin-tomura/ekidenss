@@ -29,6 +29,8 @@ import 'package:ekiden/kansuu/kiji/kiji_kihon.dart'
     show KijiHyou, univSandaiHyou, konkiKaisaiZumi; // 三大駅伝の成績の表(1.9.8)
 import 'package:ekiden/screens/kiji_hyou_view.dart'; // 表の部品(1.9.8)
 import 'package:ekiden/screens/kukan_haiti_button.dart'; // 今季タイム一覧表を開くボタン(1.9.9)
+import 'package:ekiden/kansuu/kingin_kiroku.dart'
+    show kinginIchiranHyou, kinginIchiranChuu; // 金特訓・銀特訓の記録の一覧表(2.0.0)
 //import 'package:ekiden/kansuu/kojinBestKirokuJuniKettei.dart';
 // Modal views (placeholders for now, you'll need to create these files)
 //import 'package:ekiden/modals/modal_univ_name_henshuu_view.dart';
@@ -3257,7 +3259,7 @@ class UnivScreen extends StatefulWidget {
 class _UnivScreenState extends State<UnivScreen> {
   // Hive Boxの参照を保持
   late Box<Ghensuu> _ghensuuBox;
-  late Box<SenshuData> _senshuBox; // 表示には直接使用しませんが、完全性のために保持
+  late Box<SenshuData> _senshuBox; // 金特訓・銀特訓の記録の一覧表で使う(2.0.0)
   late Box<UnivData> _univBox;
   late Box<KantokuData> _kantokuBox;
   late Box<Senshu_R_Data> _rsenshuBox;
@@ -4312,6 +4314,8 @@ class _UnivScreenState extends State<UnivScreen> {
                         const SizedBox(height: 32),
                         // リンクボタン
                         LinkButtons(context, ghensuu),
+                        // 金特訓・銀特訓の記録の一覧表(邪魔にならないように一番下に置く。2.0.0)
+                        _buildKinginIchiran(ghensuu),
 
                         const SizedBox(height: 32), // スペースを確保
                       ],
@@ -4526,6 +4530,38 @@ class _UnivScreenState extends State<UnivScreen> {
           ),
         ),*/
       ],
+    );
+  }
+
+  // 金特訓・銀特訓の記録の一覧表(2.0.0。kingin_kiroku.dart)
+  // 夏合宿の日の結果画面と同じ表を、表示している大学の選手で出す(コンピュータの大学が使った金銀も記録している)。
+  // 記録のある選手がいなければ、1行だけ出す
+  Widget _buildKinginIchiran(Ghensuu ghensuu) {
+    const TextStyle chuuStyle = TextStyle(
+      color: HENSUU.textcolor,
+      fontSize: HENSUU.fontsize_honbun - 2,
+    );
+    final int univid = ghensuu.hyojiunivnum;
+    final KijiHyou? hyou = kinginIchiranHyou(
+      _senshuBox.values.where((s) => s.univid == univid),
+    );
+    return SizedBox(
+      width: double.infinity,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (hyou == null)
+            const Text('金特訓・銀特訓の記録はまだありません。', style: chuuStyle)
+          else ...[
+            KijiHyouView(hyou, ue: 0),
+            const SizedBox(height: 6),
+            Text(
+              kinginIchiranChuu(jibun: univid == ghensuu.MYunivid),
+              style: chuuStyle,
+            ),
+          ],
+        ],
+      ),
     );
   }
 

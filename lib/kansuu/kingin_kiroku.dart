@@ -7,7 +7,8 @@ import 'package:ekiden/kansuu/kiji/kiji_kihon.dart' show KijiHyou; // 選手画�
 // 夏合宿の金特訓・銀特訓で、誰のどの能力を何回(1回+10)上げたかを、選手ごとに学年ごとに記録する。
 // プレイヤーの大学(選手画面と夏合宿の画面の金特訓・銀特訓)も、コンピュータの大学(goldsilver_com.dart)も記録する。
 // 選手画面・他大学の選手の詳細・卒業生の画面に学年ごと能力ごとの表(kinginKirokuHyou)で出し、
-// 夏合宿の日の結果画面(mode0700_content.dart)に、自分の大学の選手の一覧表で出す。
+// 夏合宿の日の結果画面(mode0700_content.dart)に、自分の大学の選手の一覧表(kinginIchiranHyou)で出す。
+// 大学画面(univ_screen.dart)の一番下にも、表示している大学の選手の一覧表を常に出す(2.0.0)。
 // (夏合宿の画面 9100Gashuku.dart の「これまで」の行は、その画面が今は使われていないので表示されない)
 //
 // ・保存場所は SenshuData.name_tanshuku(選手の短縮名)。選手を作ったときの「短縮」のままで、
@@ -199,3 +200,62 @@ KijiHyou? kinginKirokuHyou(String text) {
     if (goukeiAri) '合計',
   ], gyou);
 }
+
+/// 1つの大学の選手の一覧表(夏合宿の日の結果画面と大学画面。2.0.0で結果画面の中から移した)
+/// [senshuList](1つの大学の選手)のうち、金特訓・銀特訓をしたことのある選手を、選手画面と同じ並び
+/// (学年の高い順、同じならidの順)で並べ、使った金・銀の量と、能力ごとの合計を出す
+/// (列は、誰かが上げたことのある能力だけ。学年ごとの内訳は kinginKirokuHyou の表に出る)。
+/// 記録のある選手がいなければnull
+KijiHyou? kinginIchiranHyou(Iterable<SenshuData> senshuList) {
+  final List<SenshuData> narabi = senshuList.toList()
+    ..sort((a, b) {
+      final int g = b.gakunen.compareTo(a.gakunen);
+      return g != 0 ? g : a.id.compareTo(b.id);
+    });
+  final List<SenshuData> kirokuAri = [];
+  final List<Map<int, int>> goukeiList = [];
+  final Set<int> agetaNouryoku = {};
+  for (final SenshuData s in narabi) {
+    final Map<int, int> goukei = kinginKirokuGoukei(s.name_tanshuku);
+    if (goukei.isEmpty) continue;
+    kirokuAri.add(s);
+    goukeiList.add(goukei);
+    agetaNouryoku.addAll(goukei.keys);
+  }
+  if (kirokuAri.isEmpty) return null;
+  final List<int> retsu = [
+    for (final int b in kinginNouryokuNarabi)
+      if (agetaNouryoku.contains(b)) b,
+  ];
+  final List<List<String>> gyou = [];
+  for (int i = 0; i < kirokuAri.length; i++) {
+    final SenshuData s = kirokuAri[i];
+    final Map<int, int> goukei = goukeiList[i];
+    int kin = 0;
+    int gin = 0;
+    goukei.forEach((b, k) {
+      if (kinginKinNouryoku(b)) {
+        kin += k;
+      } else {
+        gin += k;
+      }
+    });
+    gyou.add([
+      '${s.name}(${s.gakunen})',
+      kin > 0 ? '${kin * 10}' : '-',
+      gin > 0 ? '${gin * 10}' : '-',
+      for (final int b in retsu)
+        (goukei[b] ?? 0) > 0 ? '+${goukei[b]! * 10}' : '',
+    ]);
+  }
+  return KijiHyou('金特訓・銀特訓の記録', [
+    '選手',
+    '金',
+    '銀',
+    for (final int b in retsu) kinginNouryokuMei(b),
+  ], gyou);
+}
+
+/// 一覧表の下の注記([jibun]は自分の大学の表か。ほかの大学の選手の内訳は、選手の詳細で見る)
+String kinginIchiranChuu({required bool jibun}) =>
+    '能力ごとの合計です。学年ごとの内訳は、${jibun ? '選手画面' : '選手の詳細'}の「金銀で伸ばした能力」で見られます。';

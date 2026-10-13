@@ -2879,77 +2879,26 @@ class _Mode0700ContentState extends State<Mode0700Content> {
   }
 
   // MARK: - 金特訓・銀特訓の記録の一覧表(夏合宿の日の結果画面。1.9.9。kingin_kiroku.dart)
-  // 金特訓・銀特訓をしたことのある自分の大学の選手を、選手画面と同じ並び(学年の高い順、同じならidの順)で並べ、
-  // 使った金・銀の量と、能力ごとの合計を表にする(列は、誰かが上げたことのある能力だけ。
-  // 学年ごとの内訳は選手画面の「金銀で伸ばした能力」に出る)
+  // 金特訓・銀特訓をしたことのある自分の大学の選手の、使った金・銀の量と、能力ごとの合計の表
+  // (表の作り方は、大学画面でも使うので kingin_kiroku.dart の kinginIchiranHyou に移した。2.0.0)
   Widget _buildKinginIchiran(List<SenshuData> univFilteredSenshuData) {
     const TextStyle chuuStyle = TextStyle(
       color: HENSUU.textcolor,
       fontSize: HENSUU.fontsize_honbun - 2,
     );
-    final List<SenshuData> narabi = univFilteredSenshuData.toList()
-      ..sort((a, b) {
-        final int g = b.gakunen.compareTo(a.gakunen);
-        return g != 0 ? g : a.id.compareTo(b.id);
-      });
-    final List<SenshuData> senshuList = [];
-    final List<Map<int, int>> goukeiList = [];
-    final Set<int> agetaNouryoku = {};
-    for (final SenshuData s in narabi) {
-      final Map<int, int> goukei = kinginKirokuGoukei(s.name_tanshuku);
-      if (goukei.isEmpty) continue;
-      senshuList.add(s);
-      goukeiList.add(goukei);
-      agetaNouryoku.addAll(goukei.keys);
-    }
-    if (senshuList.isEmpty) {
+    final KijiHyou? hyou = kinginIchiranHyou(univFilteredSenshuData);
+    if (hyou == null) {
       return const Padding(
         padding: EdgeInsets.only(top: 16),
         child: Text('金特訓・銀特訓をすると、ここに一覧が出ます。', style: chuuStyle),
       );
     }
-    final List<int> retsu = [
-      for (final int b in kinginNouryokuNarabi)
-        if (agetaNouryoku.contains(b)) b,
-    ];
-    final List<List<String>> gyou = [];
-    for (int i = 0; i < senshuList.length; i++) {
-      final SenshuData s = senshuList[i];
-      final Map<int, int> goukei = goukeiList[i];
-      int kin = 0;
-      int gin = 0;
-      goukei.forEach((b, k) {
-        if (kinginKinNouryoku(b)) {
-          kin += k;
-        } else {
-          gin += k;
-        }
-      });
-      gyou.add([
-        '${s.name}(${s.gakunen})',
-        kin > 0 ? '${kin * 10}' : '-',
-        gin > 0 ? '${gin * 10}' : '-',
-        for (final int b in retsu)
-          (goukei[b] ?? 0) > 0 ? '+${goukei[b]! * 10}' : '',
-      ]);
-    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        KijiHyouView(
-          KijiHyou('金特訓・銀特訓の記録', [
-            '選手',
-            '金',
-            '銀',
-            for (final int b in retsu) kinginNouryokuMei(b),
-          ], gyou),
-          ue: 16,
-        ),
+        KijiHyouView(hyou, ue: 16),
         const SizedBox(height: 6),
-        const Text(
-          '能力ごとの合計です。学年ごとの内訳は、選手画面の「金銀で伸ばした能力」で見られます。',
-          style: chuuStyle,
-        ),
+        Text(kinginIchiranChuu(jibun: true), style: chuuStyle),
         const SizedBox(height: 8),
       ],
     );

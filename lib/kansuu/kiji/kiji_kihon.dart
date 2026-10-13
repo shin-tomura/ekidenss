@@ -1661,6 +1661,10 @@ Set<int> konkiKaisaiZumi(Iterable<SenshuData> senshu) {
 // 年度の欄の2行目に「今季」と「三冠」を書く(記事の三大駅伝の表と同じ)。
 // 大学の順位は大会ごとに「何回前か」で持っているので、今季の大会がもう開かれたか(konkiKaisaiZumi)で
 // 季にそろえる。ゲームを始める前の季(どの大学にも順位がない季)は出さない
+// 2.0.0から、一番右に正月駅伝の往路・復路の列も足した(大会番号18・19。oufuku_kiroku.dart)。
+// 往路・復路は正月駅伝と一緒に記録するので、季のそろえ方は正月駅伝と同じ。予選はないので、
+// 正月駅伝に出ていない季は「-」。2.0.0より前から遊んでいるデータで、記録を始める前の季は空欄にする
+// (「-」と見分けるため)。三冠は今までどおり三大駅伝の3つで見る
 // ------------------------------------------------------------
 
 /// 大学の三大駅伝の表に出す季の数(今季を含む。今季と過去5季)
@@ -1714,11 +1718,29 @@ KijiHyou univSandaiHyou(
     }
     final String soe = [if (kiMae == 0) '今季', if (yuushou == sandaiEkidenRace.length) '三冠'].join('・');
     final int nendo = nendo0 - kiMae;
+    // 正月駅伝の往路・復路(2.0.0)
+    final int oi = idx(2, kiMae);
+    final int kaishi = choukiOufukuKaishi(u);
+    for (final int race in const [ouroRace, fukuroRace]) {
+      if (oi < 0) {
+        masu.add('これから');
+      } else if (kaishi > 1 && nendo < kaishi) {
+        masu.add('');
+      } else {
+        final int j = juniRace(u, race, oi);
+        masu.add(shutsujouJuni(j) ? (j == 0 ? '優勝' : '${j + 1}位') : '-');
+      }
+    }
     gyou.add([soe.isEmpty ? '$nendo年度' : '$nendo年度\n$soe', ...masu]);
   }
   return KijiHyou(
     '${daigakuMei(u)}の三大駅伝(今季と過去の季)',
-    ['年度', for (final int race in sandaiEkidenRace) courseRaceTitle(race)],
+    [
+      '年度',
+      for (final int race in sandaiEkidenRace) courseRaceTitle(race),
+      '往路',
+      '復路',
+    ],
     gyou,
     masuTsunagi: ' ',
   );

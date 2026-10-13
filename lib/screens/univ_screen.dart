@@ -3345,6 +3345,8 @@ class _UnivScreenState extends State<UnivScreen> {
     //final int juniorRaceLength = univData.juni_race[raceIndex].length;
     final int juniorRaceLength = 5;
     final int displayCount = 5; // 直近5回を表示
+    // 正月駅伝の往路・復路の欄か(2.0.0)
+    final bool oufuku = raceIndex == ouroRace || raceIndex == fukuroRace;
 
     return Column(
       children: [
@@ -3356,8 +3358,7 @@ class _UnivScreenState extends State<UnivScreen> {
           ),
         ),
         // 往路・復路は2.0.0から記録している(それより前から遊んでいるデータは、記録を始めた年度を添える)
-        if ((raceIndex == ouroRace || raceIndex == fukuroRace) &&
-            choukiOufukuKaishi(univData) > 1)
+        if (oufuku && choukiOufukuKaishi(univData) > 1)
           Text(
             '(${choukiOufukuKaishi(univData)}年度から記録)',
             style: TextStyle(
@@ -3369,19 +3370,21 @@ class _UnivScreenState extends State<UnivScreen> {
         Wrap(
           //mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
-              '出場${univData.taikaibetushutujoukaisuu[raceIndex]}回',
-              style: TextStyle(color: HENSUU.textcolor),
-            ),
+            // 往路・復路の出場回数は正月駅伝と同じなので出さない(2.0.0)
+            if (!oufuku)
+              Text(
+                '出場${univData.taikaibetushutujoukaisuu[raceIndex]}回',
+                style: TextStyle(color: HENSUU.textcolor),
+              ),
             if (univData.taikaibetujunibetukaisuu[raceIndex][0] > 0)
               Text(
-                ' 優勝${univData.taikaibetujunibetukaisuu[raceIndex][0]}回',
+                '${oufuku ? '' : ' '}優勝${univData.taikaibetujunibetukaisuu[raceIndex][0]}回',
                 style: TextStyle(color: HENSUU.textcolor),
               )
             else if (univData.taikaibetusaikoujuni[raceIndex] !=
                 TEISUU.DEFAULTJUNI)
               Text(
-                ' 最高${univData.taikaibetusaikoujuni[raceIndex] + 1}位',
+                '${oufuku ? '' : ' '}最高${univData.taikaibetusaikoujuni[raceIndex] + 1}位',
                 style: TextStyle(color: HENSUU.textcolor),
               ),
           ],

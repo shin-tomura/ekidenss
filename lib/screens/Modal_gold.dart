@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ekiden/kansuu/kingin_kiroku.dart'; // 金銀の記録(1.9.9)
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ekiden/ghensuu.dart'; // Ghensuuクラスをインポート
 import 'package:ekiden/senshu_data.dart'; // SenshuDataクラスをインポート
@@ -160,6 +161,7 @@ class _ModalTokkunGoldState extends State<ModalTokkunGold> {
                                         setState(() {
                                           currentGhensuu.goldenballsuu -= 10;
                                           targetSenshu!.konjou += 10;
+                                          kinginKirokuTsuika(targetSenshu!, 0); // 金銀の記録(1.9.9)
                                         });
                                         await currentGhensuu.save(); // Hiveに保存
                                         await targetSenshu!.save(); // Hiveに保存
@@ -225,6 +227,7 @@ class _ModalTokkunGoldState extends State<ModalTokkunGold> {
                                         setState(() {
                                           currentGhensuu.goldenballsuu -= 10;
                                           targetSenshu!.heijousin += 10;
+                                          kinginKirokuTsuika(targetSenshu!, 1); // 金銀の記録(1.9.9)
                                         });
                                         await currentGhensuu.save(); // Hiveに保存
                                         await targetSenshu!.save(); // Hiveに保存
@@ -281,6 +284,7 @@ class _ModalTokkunGoldState extends State<ModalTokkunGold> {
                                         setState(() {
                                           currentGhensuu.goldenballsuu -= 10;
                                           targetSenshu!.anteikan += 10;
+                                          kinginKirokuTsuika(targetSenshu!, kinginAnteikan); // 金銀の記録(1.9.9)
                                         });
                                         await currentGhensuu.save(); // Hiveに保存
                                         await targetSenshu!.save(); // Hiveに保存

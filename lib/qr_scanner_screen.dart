@@ -1,5 +1,6 @@
 // lib/qr_scanner_screen.dart
 import 'dart:convert';
+import 'package:ekiden/kansuu/kingin_kiroku.dart'; // 金銀の記録(1.9.9)
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
@@ -100,6 +101,8 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
 
       if (confirmUpdate) {
         targetSenshu.name = newShareableData.name;
+        // 別の選手に置き換えるので、金銀の記録を消す(1.9.9。kingin_kiroku.dart)
+        targetSenshu.name_tanshuku = kinginKirokuNashi;
         targetSenshu.magicnumber = newShareableData.magicnumber;
         targetSenshu.a = newShareableData.a;
         targetSenshu.b = newShareableData.b;

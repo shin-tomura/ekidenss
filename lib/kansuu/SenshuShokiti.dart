@@ -7,6 +7,7 @@ import 'package:ekiden/kansuu/RironTime.dart';
 import 'package:ekiden/kansuu/RironTime_Nyuugakuji.dart';
 import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/kansuu/joukai.dart';
+import 'package:ekiden/kansuu/kingin_kiroku.dart'; // 金銀の記録(1.9.9)
 
 /// SenshuData Box 内の選手をループし、指定した学年の選手に特定の処理を適用する関数。
 ///
@@ -70,6 +71,8 @@ Future<void> SenshuShokitiSetteiByGakunen(
 
     // 学年で処理を分岐
     if (targetGakunen == 0 || senshu.gakunen == targetGakunen) {
+      // 卒業した選手の枠を新しい選手に作り直すので、金銀の記録を消す(1.9.9。kingin_kiroku.dart)
+      senshu.name_tanshuku = kinginKirokuNashi;
       int r_mae = 0;
       int r_ato = 0;
       // 在籍中の選手と名字・名前の両方が同じになったら選び直す(最大50回)

@@ -6,6 +6,7 @@ import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/senshu_data.dart';
 import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/kansuu/kingin_wariai.dart'; // 難易度ごとの金銀支給量の割合(1.9.1)
+import 'package:ekiden/kansuu/kingin_kiroku.dart'; // 金銀の記録(1.9.9)
 import 'package:hive_flutter/hive_flutter.dart';
 
 // ------------------------------------------------------------
@@ -939,7 +940,10 @@ int _junbanniKubaru(
   int renzokuShippai = 0;
   while (nokori > 0 && renzokuShippai < shuryoku.length) {
     final SenshuData s = shuryoku[idx];
+    // 金銀の記録(1.9.9)。どの能力が上がるかは tokkun の中で決まるので、前後の値で見分ける
+    final List<int> mae = kinginNouryokuAtai(s);
     if (tokkun(s)) {
+      kinginKirokuSabun(s, mae);
       nokori--;
       renzokuShippai = 0;
       henkouari.add(s);

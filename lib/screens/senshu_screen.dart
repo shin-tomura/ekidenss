@@ -21,6 +21,7 @@ import 'package:ekiden/kansuu/joukai.dart';
 import 'package:ekiden/kansuu/konki_best.dart'; // 今季ベスト(1.9.1)
 import 'package:ekiden/screens/konki_best_parts.dart';
 import 'package:ekiden/kansuu/gin_tokkun_menu.dart'; // 夏合宿の銀特訓の練習メニュー(1.9.1)
+import 'package:ekiden/kansuu/kingin_kiroku.dart'; // 金銀の記録(1.9.9)
 import 'package:ekiden/kansuu/kiji/kiji_kihon.dart'
     show KijiHyou, SeisekiKiroku, sandaiSeisekiHyouKiroku, taikousenSeisekiHyou, konkiKaisaiZumi; // 成績の表(1.9.8)
 import 'package:ekiden/screens/kiji_hyou_view.dart'; // 表の部品(1.9.8)
@@ -860,6 +861,7 @@ class _ModalTokkunGoldState extends State<ModalTokkunGold> {
                                         setState(() {
                                           currentGhensuu.goldenballsuu -= 10;
                                           targetSenshu!.anteikan += 10;
+                                          kinginKirokuTsuika(targetSenshu!, kinginAnteikan); // 金銀の記録(1.9.9)
                                         });
                                         await currentGhensuu.save(); // Hiveに保存
                                         await targetSenshu!.save(); // Hiveに保存
@@ -925,6 +927,7 @@ class _ModalTokkunGoldState extends State<ModalTokkunGold> {
                                         setState(() {
                                           currentGhensuu.goldenballsuu -= 10;
                                           targetSenshu!.konjou += 10;
+                                          kinginKirokuTsuika(targetSenshu!, 0); // 金銀の記録(1.9.9)
                                         });
                                         await currentGhensuu.save(); // Hiveに保存
                                         await targetSenshu!.save(); // Hiveに保存
@@ -990,6 +993,7 @@ class _ModalTokkunGoldState extends State<ModalTokkunGold> {
                                         setState(() {
                                           currentGhensuu.goldenballsuu -= 10;
                                           targetSenshu!.heijousin += 10;
+                                          kinginKirokuTsuika(targetSenshu!, 1); // 金銀の記録(1.9.9)
                                         });
                                         await currentGhensuu.save(); // Hiveに保存
                                         await targetSenshu!.save(); // Hiveに保存
@@ -1118,6 +1122,7 @@ class _ModalTokkunSilverState extends State<ModalTokkunSilver> {
     if (currentGhensuu.silverballsuu < 10) return;
     final int? bangou = ginTokkunSuru(senshu, menuBangou, currentGhensuu.year);
     if (bangou == null) return;
+    kinginKirokuTsuika(senshu, bangou); // 金銀の記録(1.9.9)
     final String mei = ginTokkunNouryokuMei(bangou);
     final int ato = ginTokkunNouryokuAtai(senshu, bangou);
     setState(() {
@@ -1216,6 +1221,7 @@ class _ModalTokkunSilverState extends State<ModalTokkunSilver> {
                     setState(() {
                       currentGhensuu.silverballsuu -= 10;
                       ginTokkunNouryokuAgeru(senshu, bangou);
+                      kinginKirokuTsuika(senshu, bangou); // 金銀の記録(1.9.9)
                     });
                     await currentGhensuu.save(); // Hiveに保存
                     await senshu.save(); // Hiveに保存
@@ -2436,6 +2442,15 @@ class _SenshuScreenState extends State<SenshuScreen> {
                               currentSenshu.tandokusou +
                               currentSenshu.paceagesagetaiouryoku,
                         ),
+                        // 金銀で伸ばした能力(夏合宿の金特訓・銀特訓。コンピュータの大学の分も。1.9.9。kingin_kiroku.dart)
+                        if (kinginKirokuBun(currentSenshu.name_tanshuku).isNotEmpty)
+                          Text(
+                            '金銀で伸ばした能力: ${kinginKirokuBun(currentSenshu.name_tanshuku)}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: HENSUU.fontsize_honbun,
+                            ),
+                          ),
 
                         const SizedBox(height: 16),
                         // 三大駅伝と対校戦の成績の表(1.9.8)

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ekiden/kansuu/kingin_kiroku.dart'; // 金銀の記録(1.9.9)
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ekiden/ghensuu.dart'; // Ghensuuクラスをインポート
 import 'package:ekiden/kantoku_data.dart'; //
@@ -924,6 +925,15 @@ class _Senshu_R_ScreenState extends State<Senshu_R_Screen> {
                               currentSenshu.tandokusou +
                               currentSenshu.paceagesagetaiouryoku,
                         ),
+                        // 在学中に金銀で伸ばした能力(卒業のときに写した記録。1.9.9。kingin_kiroku.dart)
+                        if (kinginKirokuBun(currentSenshu.name_tanshuku).isNotEmpty)
+                          Text(
+                            '金銀で伸ばした能力: ${kinginKirokuBun(currentSenshu.name_tanshuku)}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: HENSUU.fontsize_honbun,
+                            ),
+                          ),
 
                         const SizedBox(height: 16),
                         // 三大駅伝と対校戦の成績の表(1.9.8)

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ekiden/kansuu/kingin_kiroku.dart'; // 金銀の記録(1.9.9)
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ekiden/ghensuu.dart';
 import 'package:ekiden/senshu_data.dart';
@@ -372,6 +373,18 @@ class _GashukuScreenState extends State<GashukuScreen> {
                               ),
                             ],
                           ),
+                          // これまでに金銀で伸ばした能力(1.9.9。kingin_kiroku.dart)
+                          if (kinginKirokuBun(player.name_tanshuku).isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Text(
+                                'これまで: ${kinginKirokuBun(player.name_tanshuku)}',
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: HENSUU.fontsize_honbun - 2,
+                                ),
+                              ),
+                            ),
                           const SizedBox(height: 12),
                           // 各種ベスト記録
                           _buildBestRecordRow(

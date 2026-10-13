@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ekiden/kansuu/kingin_kiroku.dart'; // 金銀の記録(1.9.9)
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ekiden/ghensuu.dart'; // Ghensuuクラスをインポート
 import 'package:ekiden/senshu_data.dart'; // SenshuDataクラスをインポート
@@ -154,6 +155,7 @@ class _ModalTokkunSilverState extends State<ModalTokkunSilver> {
                                         setState(() {
                                           currentGhensuu.silverballsuu -= 10;
                                           targetSenshu!.choukyorinebari += 10;
+                                          kinginKirokuTsuika(targetSenshu!, 2); // 金銀の記録(1.9.9)
                                         });
                                         await currentGhensuu.save(); // Hiveに保存
                                         await targetSenshu!.save(); // Hiveに保存
@@ -212,6 +214,7 @@ class _ModalTokkunSilverState extends State<ModalTokkunSilver> {
                                         setState(() {
                                           currentGhensuu.silverballsuu -= 10;
                                           targetSenshu!.spurtryoku += 10;
+                                          kinginKirokuTsuika(targetSenshu!, 3); // 金銀の記録(1.9.9)
                                         });
                                         await currentGhensuu.save(); // Hiveに保存
                                         await targetSenshu!.save(); // Hiveに保存
@@ -270,6 +273,7 @@ class _ModalTokkunSilverState extends State<ModalTokkunSilver> {
                                         setState(() {
                                           currentGhensuu.silverballsuu -= 10;
                                           targetSenshu!.karisuma += 10;
+                                          kinginKirokuTsuika(targetSenshu!, 4); // 金銀の記録(1.9.9)
                                         });
                                         await currentGhensuu.save(); // Hiveに保存
                                         await targetSenshu!.save(); // Hiveに保存
@@ -329,6 +333,7 @@ class _ModalTokkunSilverState extends State<ModalTokkunSilver> {
                                         setState(() {
                                           currentGhensuu.silverballsuu -= 10;
                                           targetSenshu!.noboritekisei += 10;
+                                          kinginKirokuTsuika(targetSenshu!, 5); // 金銀の記録(1.9.9)
                                         });
                                         await currentGhensuu.save(); // Hiveに保存
                                         await targetSenshu!.save(); // Hiveに保存
@@ -387,6 +392,7 @@ class _ModalTokkunSilverState extends State<ModalTokkunSilver> {
                                         setState(() {
                                           currentGhensuu.silverballsuu -= 10;
                                           targetSenshu!.kudaritekisei += 10;
+                                          kinginKirokuTsuika(targetSenshu!, 6); // 金銀の記録(1.9.9)
                                         });
                                         await currentGhensuu.save(); // Hiveに保存
                                         await targetSenshu!.save(); // Hiveに保存
@@ -460,6 +466,7 @@ class _ModalTokkunSilverState extends State<ModalTokkunSilver> {
                                           targetSenshu!
                                                   .noborikudarikirikaenouryoku +=
                                               10;
+                                          kinginKirokuTsuika(targetSenshu!, 7); // 金銀の記録(1.9.9)
                                         });
                                         await currentGhensuu.save();
                                         await targetSenshu!.save();
@@ -520,6 +527,7 @@ class _ModalTokkunSilverState extends State<ModalTokkunSilver> {
                                         setState(() {
                                           currentGhensuu.silverballsuu -= 10;
                                           targetSenshu!.tandokusou += 10;
+                                          kinginKirokuTsuika(targetSenshu!, 8); // 金銀の記録(1.9.9)
                                         });
                                         await currentGhensuu.save(); // Hiveに保存
                                         await targetSenshu!.save(); // Hiveに保存
@@ -589,6 +597,7 @@ class _ModalTokkunSilverState extends State<ModalTokkunSilver> {
                                           currentGhensuu.silverballsuu -= 10;
                                           targetSenshu!.paceagesagetaiouryoku +=
                                               10;
+                                          kinginKirokuTsuika(targetSenshu!, 9); // 金銀の記録(1.9.9)
                                         });
                                         await currentGhensuu.save(); // Hiveに保存
                                         await targetSenshu!.save(); // Hiveに保存

@@ -15,7 +15,7 @@ class SenshuData extends HiveObject {
   @HiveField(3)
   String name;
   @HiveField(4)
-  String name_tanshuku;
+  String name_tanshuku; //1.9.9から、夏合宿の金銀の記録(誰のどの能力を何回上げたか)に使う(kingin_kiroku.dart)。それまでは「短縮」のままで使っていなかった
   @HiveField(5)
   double magicnumber;
   @HiveField(6)

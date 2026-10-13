@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ekiden/kansuu/kingin_kiroku.dart'; // 金銀の記録(1.9.9)
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ekiden/ghensuu.dart';
 import 'package:ekiden/constants.dart';
@@ -853,6 +854,15 @@ class _ModalSenshuDetailViewState extends State<ModalSenshuDetailView> {
                                 currentSenshu.tandokusou +
                                 currentSenshu.paceagesagetaiouryoku,
                           ),
+                          // 金銀で伸ばした能力(夏合宿の金特訓・銀特訓。コンピュータの大学の分も。1.9.9。kingin_kiroku.dart)
+                          if (kinginKirokuBun(currentSenshu.name_tanshuku).isNotEmpty)
+                            Text(
+                              '金銀で伸ばした能力: ${kinginKirokuBun(currentSenshu.name_tanshuku)}',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: HENSUU.fontsize_honbun,
+                              ),
+                            ),
 
                           const SizedBox(height: 16),
                           // 三大駅伝と対校戦の成績の表(1.9.8)

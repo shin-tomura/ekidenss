@@ -38,7 +38,10 @@ import 'package:ekiden/kansuu/taikai_chouki.dart'
         choukiTsuusan,
         choukiNendo,
         choukiRaceList,
-        choukiYuushou; // 大会の長い記録(最後の優勝。2.0.0)
+        choukiYuushou,
+        choukiOufukuKaishi,
+        ouroRace,
+        fukuroRace; // 大会の長い記録(最後の優勝)と、正月駅伝の往路・復路(2.0.0)
 //import 'package:ekiden/kansuu/kojinBestKirokuJuniKettei.dart';
 // Modal views (placeholders for now, you'll need to create these files)
 //import 'package:ekiden/modals/modal_univ_name_henshuu_view.dart';
@@ -3352,6 +3355,16 @@ class _UnivScreenState extends State<UnivScreen> {
             color: Colors.white,
           ),
         ),
+        // 往路・復路は2.0.0から記録している(それより前から遊んでいるデータは、記録を始めた年度を添える)
+        if ((raceIndex == ouroRace || raceIndex == fukuroRace) &&
+            choukiOufukuKaishi(univData) > 1)
+          Text(
+            '(${choukiOufukuKaishi(univData)}年度から記録)',
+            style: TextStyle(
+              color: HENSUU.textcolor,
+              fontSize: HENSUU.fontsize_honbun - 2,
+            ),
+          ),
 
         Wrap(
           //mainAxisAlignment: MainAxisAlignment.center,
@@ -4325,6 +4338,19 @@ class _UnivScreenState extends State<UnivScreen> {
                         _buildRaceHistory('10月駅伝', currentUnivData, 0, ghensuu),
                         _buildRaceHistory('11月駅伝', currentUnivData, 1, ghensuu),
                         _buildRaceHistory('正月駅伝', currentUnivData, 2, ghensuu),
+                        // 正月駅伝の往路(1〜5区)・復路(6〜10区)(2.0.0。kansuu/oufuku_kiroku.dart)
+                        _buildRaceHistory(
+                          '正月駅伝 往路',
+                          currentUnivData,
+                          ouroRace,
+                          ghensuu,
+                        ),
+                        _buildRaceHistory(
+                          '正月駅伝 復路',
+                          currentUnivData,
+                          fukuroRace,
+                          ghensuu,
+                        ),
                         _buildRaceHistory(
                           '11月駅伝予選',
                           currentUnivData,

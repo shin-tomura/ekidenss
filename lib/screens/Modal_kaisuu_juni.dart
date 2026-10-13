@@ -44,6 +44,9 @@ int _getMaxJuniCount(int racebangou) {
       return 30; // 1位から30位まで (配列インデックス0-29)
     case 9:
       return 30; // 1位から30位まで (配列インデックス0-29)
+    case 18:
+    case 19:
+      return 20; // 正月駅伝の往路・復路(2.0.0)。正月駅伝と同じく1位から20位まで
     default:
       return 10; // デフォルト (例として10位まで)
   }
@@ -107,6 +110,13 @@ class ModalUnivDetailView extends StatelessWidget {
     }
     if (racebangou == 9) {
       name_race = "対校戦";
+    }
+    // 正月駅伝の往路・復路(2.0.0。kansuu/oufuku_kiroku.dart)
+    if (racebangou == 18) {
+      name_race = "正月駅伝 往路";
+    }
+    if (racebangou == 19) {
+      name_race = "正月駅伝 復路";
     }
     final List<int> recentJunis = univData.juni_race[racebangou];
     final List<double> recentTimes = univData.time_race[racebangou];

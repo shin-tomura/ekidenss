@@ -449,6 +449,21 @@ class _Mode0280Content extends State<Mode0280Content> {
                         // 学内メディアの当日変更号も、記事の画面で切り替えて読める(1.9.3)
                         annai: kijiGakunaiAnnai(),
                       ),
+                    // 往路の結果(箱庭スポーツ。正月駅伝の6区のスタート前。往路優勝を大きく取り上げる。2.0.0。
+                    // kiji_ouro.dart)。学内メディアの復路スタート直前号も、記事の画面で切り替えて読める
+                    if (widget.ghensuu.hyojiracebangou == 2 &&
+                        widget.ghensuu.nowracecalckukan == 5 &&
+                        widget.ghensuu.kukansuu_taikaigoto[2] == 10)
+                      KijiLinkCard(
+                        key: ValueKey('kijiOuroF_${widget.ghensuu.year}'),
+                        namae: '往路の結果(箱庭スポーツ)',
+                        tsukuru: kijiOuroIchiran,
+                        hiraku: (context) =>
+                            kijiOuroHiraku(context, fukuroChokuzen: true),
+                        annai: kijiGakunaiShutsujou()
+                            ? '学内メディアの復路スタート直前号も、記事の画面の上で切り替えて読めます'
+                            : null,
+                      ),
                     // 復路スタート直前号(学内メディア「○○スポーツ」だけ。正月駅伝の6区のスタート前。
                     // 往路の振り返りと、復路を走る選手の紹介。1.9.3)
                     if (widget.ghensuu.hyojiracebangou == 2 &&

@@ -9,8 +9,9 @@ import 'package:ekiden/univ_data.dart';
 // 「105年ぶりの優勝」「12連覇」のように、それより前にさかのぼる記事が書けなかった。
 // そこで、出来事(優勝・本戦出場・シード権)ごとに、最後にあった年度・その前にあった年度・
 // 続いている回数だけを覚える(何年遊んでもデータは増えない)。
-// ・覚えるもの: 優勝は10月駅伝・11月駅伝・正月駅伝・カスタム駅伝・対校戦総合、
+// ・覚えるもの: 優勝は10月駅伝・11月駅伝・正月駅伝・カスタム駅伝・対校戦総合・正月駅伝の往路と復路、
 //   本戦出場は三大駅伝、シード権は11月駅伝(8位以内)と正月駅伝(10位以内)
+//   (往路・復路(大会番号18・19)の成績は、2.0.0から記録を始めた。oufuku_kiroku.dart)
 // ・年度は4月から翌年3月まで(正月駅伝とカスタム駅伝は、前の年の10月駅伝と同じ年度)。
 //   開かれない年のあるカスタム駅伝でも「○年ぶり」を年で数えられる。連続の回数は、開かれた回で数える
 // ・保存場所は UnivData.taikaibetujunibetukaisuu[17](大会番号17はフルマラソンで、大学の順位がない
@@ -18,7 +19,10 @@ import 'package:ekiden/univ_data.dart';
 //   型も項目も変えないので、今までのセーブデータもそのまま読める
 //   [0]〜[4] 優勝(大会0・1・2・5・9)、[5]〜[7] 本戦出場(大会0・1・2)、[8]・[9] シード権(大会1・2)
 //   [10]〜[14] 大会が最後に開かれた年度(大会0・1・2・5・9。順位の記録の[0]の大会の年度)
-//   [15]〜[28] 空き、[29] この大学で長い記録を使い始めた印(1)
+//   [15]・[16] 優勝(往路18・復路19)、[17]・[18] 最後に開かれた年度(往路18・復路19)
+//   [19] 往路・復路の成績を記録し始めた年度(0は未設定。1なら最初の正月駅伝から全部ある。
+//        2.0.0より前から遊んでいるデータは、2.0.0で最初に走る正月駅伝の年度)
+//   [20]〜[28] 空き、[29] この大学で長い記録を使い始めた印(1)
 // ・出来事の1つの番号に「最後の年度×10の10乗+その前の年度×10の5乗+連続の回数」を詰める(15桁まで)
 //   ・最後の年度が0: その出来事がない、または記録を始める前のことで年度が分からない
 //     (分からないときは、その前の年度の欄に「この年度以前」の年度を入れる)
@@ -41,13 +45,20 @@ const int choukiShutsujou = 1;
 /// 出来事: シード権
 const int choukiSeed = 2;
 
-/// 覚える大会(10月駅伝・11月駅伝・正月駅伝・カスタム駅伝・対校戦総合)
-const List<int> choukiRaceList = [0, 1, 2, 5, 9];
+/// 正月駅伝の往路・復路の大会番号(2.0.0。もともと往路・復路のために取ってあった番号。constants.dart)
+const int ouroRace = 18;
+const int fukuroRace = 19;
+
+/// 覚える大会(10月駅伝・11月駅伝・正月駅伝・カスタム駅伝・対校戦総合・往路・復路)
+const List<int> choukiRaceList = [0, 1, 2, 5, 9, ouroRace, fukuroRace];
 
 const List<int> _dekigotoList = [choukiYuushou, choukiShutsujou, choukiSeed];
 
 /// 使い始めた印の番号
 const int _shirushi = 29;
+
+/// 往路・復路の成績を記録し始めた年度の番号
+const int _oufukuKaishi = 19;
 
 /// 1つの値の桁(10の5乗)
 const int _keta = 100000;
@@ -56,7 +67,16 @@ const int _keta = 100000;
 int _bangou(int race, int dekigoto) {
   switch (dekigoto) {
     case choukiYuushou:
-      return choukiRaceList.indexOf(race);
+      const Map<int, int> yuushou = {
+        0: 0,
+        1: 1,
+        2: 2,
+        5: 3,
+        9: 4,
+        ouroRace: 15,
+        fukuroRace: 16,
+      };
+      return yuushou[race] ?? -1;
     case choukiShutsujou:
       return (race >= 0 && race <= 2) ? 5 + race : -1;
     case choukiSeed:
@@ -68,8 +88,16 @@ int _bangou(int race, int dekigoto) {
 
 /// 大会[race]が最後に開かれた年度の番号(覚えていなければ-1)
 int _kaisaiBangou(int race) {
-  final int i = choukiRaceList.indexOf(race);
-  return i < 0 ? -1 : 10 + i;
+  const Map<int, int> kaisai = {
+    0: 10,
+    1: 11,
+    2: 12,
+    5: 13,
+    9: 14,
+    ouroRace: 17,
+    fukuroRace: 18,
+  };
+  return kaisai[race] ?? -1;
 }
 
 /// シード権の数(11月駅伝は8校、正月駅伝は10校。main.dart の4月5日の出場権の決まりと同じ)
@@ -166,6 +194,35 @@ int choukiKaisaiNendo(UnivData u, int race) {
 /// 今の年度(4月から翌年3月まで)
 int choukiNendo(Ghensuu gh) => gh.month <= 3 ? gh.year - 1 : gh.year;
 
+/// 往路・復路の成績を記録し始めた年度(0は未設定。1以下なら最初の正月駅伝から全部ある。2.0.0)
+int choukiOufukuKaishi(UnivData u) {
+  final List<int>? g = _gyou(u);
+  if (g == null) return 0;
+  return g[_oufukuKaishi];
+}
+
+/// 往路・復路の成績を、最初の正月駅伝から全部記録しているか(2.0.0より前から遊んでいるデータは
+/// 記録を始める前の分がないので、「初の往路優勝」や「○度目」と言い切れない)
+bool choukiOufukuZenbu(UnivData u) => choukiOufukuKaishi(u) <= 1;
+
+/// 往路・復路の成績を記録し始めた年度が未設定なら、最初から全部記録しているとして1にする
+/// (新しく始めたゲームの最初の正月駅伝。oufuku_kiroku.dart。保存は呼び出し側で行う)
+void choukiOufukuKaishiSettei(UnivData u) {
+  final List<int>? g = _gyou(u);
+  if (g == null || g[_oufukuKaishi] != 0) return;
+  g[_oufukuKaishi] = 1;
+}
+
+/// 出来事[dekigoto]の連続の回数を「分からない」にする(記録を始める前から続いているかもしれないとき。
+/// 往路・復路を記録し始めた年度の正月駅伝で、出来事があった大学。保存は呼び出し側で行う)
+void choukiRenzokuFumei(UnivData u, int race, int dekigoto) {
+  final int b = _bangou(race, dekigoto);
+  final List<int>? g = _gyou(u);
+  if (b < 0 || g == null) return;
+  final ChoukiKiroku k = _yomuAtai(g[b]);
+  _kaku(g, b, k.saigo, k.mae, 0);
+}
+
 /// 大会[race]の結果を記録したあとに呼ぶ(KirokuKousin.dart。順位の記録をずらして[0]に今回の順位を
 /// 入れたあと。[1]が前回の順位)。[nendo] 今回の大会の年度。保存は呼び出し側で行う
 void choukiKousin(UnivData u, int race, int nendo) {
@@ -202,6 +259,8 @@ bool _konnendoOwatta(int race, Ghensuu gh) {
     1: [11, 5],
     2: [1, 5],
     5: [2, 25],
+    ouroRace: [1, 5],
+    fukuroRace: [1, 5],
   };
   final List<int>? hi = hiList[race];
   if (hi == null) return false;
@@ -247,9 +306,23 @@ Future<void> choukiIkou(List<UnivData> univs, Ghensuu gh) async {
               ? nendoIma - 1
               : (_konnendoOwatta(race, gh) ? nendoIma : nendoIma - 1));
   }
+  // 往路・復路の成績を記録し始める年度(正月駅伝がもう開かれていれば、次の正月駅伝から。
+  // まだ一度も開かれていなければ、最初から全部記録できるので1)
+  final int oufukuKaishi = kaisai[2]! > 0 ? kaisai[2]! + 1 : 1;
   for (final UnivData u in univs) {
     final List<int>? g = _gyou(u);
-    if (g == null || g[_shirushi] == 1) continue;
+    if (g == null) continue;
+    bool kawatta = false;
+    // 往路・復路の記録開始年度(2.0.0。印とは別に見るので、往路・復路より前の2.0.0testで
+    // 印を付けたデータにも入る)
+    if (g[_oufukuKaishi] == 0) {
+      g[_oufukuKaishi] = oufukuKaishi;
+      kawatta = true;
+    }
+    if (g[_shirushi] == 1) {
+      if (kawatta) await u.save();
+      continue;
+    }
     for (final int race in choukiRaceList) {
       final int k0 = kaisai[race]!;
       final int h = hajime[race]!;

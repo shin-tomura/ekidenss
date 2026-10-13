@@ -234,6 +234,27 @@ void kijiChokuzenHiraku(BuildContext context) {
   ]);
 }
 
+/// 正月駅伝の往路の記事を開く(2.0.0。5区が終わったあとのレース画面と、6区のスタート前の目標順位の確認の画面から)
+/// [fukuroChokuzen] 6区のスタート前(復路の当日変更のあと)なら、学内メディアの復路スタート直前号も切り替えて読める
+/// (5区が終わった直後のレース画面は、まだ復路の当日変更の前なので入れない)
+void kijiOuroHiraku(BuildContext context, {bool fukuroChokuzen = false}) {
+  _hiraku(context, [
+    KijiBan(
+      site: kijiSiteMei,
+      sub: '駅伝ニュース・往路',
+      list: kijiOuroIchiran(),
+      kekka: true,
+      nashiMoji: '往路の記事はまだありません',
+    ),
+    if (fukuroChokuzen)
+      ..._gakunaiBan(
+        kijiGakunaiChokuzenIchiran(),
+        sub: '陸上競技部・復路スタート直前号',
+        kekka: false,
+      ),
+  ]);
+}
+
 /// 学内メディアの復路スタート直前号を開く(正月駅伝の6区のスタート前の、目標順位の確認の画面から。1.9.3)
 void kijiGakunaiFukuroHiraku(BuildContext context) {
   final List<Kiji> list = kijiGakunaiChokuzenIchiran();

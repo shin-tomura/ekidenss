@@ -7,6 +7,7 @@ import 'package:ekiden/kansuu/gakuren_kantoku.dart';
 import 'package:ekiden/kansuu/ikku_pace.dart';
 import 'package:ekiden/kansuu/kiji/kiji_kihon.dart';
 import 'package:ekiden/kansuu/taikai_chouki.dart'; // 大会の長い記録の出来事(2.0.0)
+import 'package:ekiden/kansuu/oufuku_kiroku.dart'; // 往路優勝の回数・連覇(2.0.0)
 import 'package:ekiden/kansuu/kiji/kiji_comment.dart';
 import 'package:ekiden/kansuu/koukou.dart'; // 出身校(高校の同期対決。1.9.5)
 import 'package:ekiden/kansuu/kiji/kiji_gakunai.dart' show gakunaiSiteMei, gakunaiKishaMei; // 学内メディアの速報(1.9.7)
@@ -1172,7 +1173,16 @@ Kiji? _kukanJikkyou(
     w.koMidashi(ouroOwari ? '往路を終えて' : '次の${tsugi + 1}区へ');
     final StringBuffer nb = StringBuffer();
     if (ouroOwari) {
-      nb.write('往路はここまで。${shui.mei}が往路優勝、2位の${ni.mei}とは${kinsaMoji(sa12)}です。復路のスタートは往路の差のままです。');
+      // 往路優勝の回数・連覇・何年ぶり(2.0.0。oufuku_kiroku.dart。言い切れなければ書かない)
+      final String ouroMoji = oufukuYuushouMoji(
+        oufukuYuushou(
+          shui.u,
+          ouroRace,
+          kirokuZumi: owatta,
+          nendo: choukiNendo(k.gh),
+        ),
+      );
+      nb.write('往路はここまで。${shui.mei}が$ouroMoji往路優勝、2位の${ni.mei}とは${kinsaMoji(sa12)}です。復路のスタートは往路の差のままです。');
       // シード圏の状況(1文だけ。走者の比べは、復路の当日変更の前なのでしない)
       if (nokori != null && morashi != null) {
         nb.write('シード権争いは、往路の時点で${juniMoji(seedSuu - 1)}が${nokori.mei}、${juniMoji(seedSuu)}の${morashi.mei}とは${kinsaMoji(saSeed)}です。');

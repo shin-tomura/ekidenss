@@ -11,6 +11,7 @@ import 'package:ekiden/kansuu/kiji/kiji_gakunai.dart';
 import 'package:ekiden/kansuu/kiji/kiji_jikkyou.dart'; // 駅伝の実況「箱庭スポーツ中継」(1.9.4)
 import 'package:ekiden/kansuu/kiji/kiji_nenkan.dart'; // 年間表彰と学内表彰(3月25日。1.9.4)
 import 'package:ekiden/kansuu/kiji/kiji_gakuren.dart'; // 学連選抜通信(正月駅伝。1.9.7)
+import 'package:ekiden/kansuu/kiji/kiji_ouro.dart'; // 正月駅伝の往路の記事(2.0.0)
 import 'package:ekiden/kansuu/gakuren_text.dart' show gakurenKonnenAri;
 
 export 'package:ekiden/kansuu/kiji/kiji_kihon.dart'
@@ -117,6 +118,25 @@ String? kijiSokuhouAnnai() {
   ];
   if (mei.isEmpty) return null;
   return '${mei.join('と')}の区間ごとの速報も、記事の画面の上で切り替えて読めます';
+}
+
+/// 正月駅伝の往路の記事(2.0.0。5区が終わったあとのレース画面と、6区のスタート前の目標順位の確認の画面から。
+/// 結果画面の記事の一覧にも入る。kiji_ouro.dart)
+/// 結果画面(mode 700)では大会が終わっていて、今年の往路の成績も記録してある
+List<Kiji> kijiOuroIchiran() {
+  try {
+    final Ghensuu? gh = Hive.box<Ghensuu>('ghensuuBox').getAt(0);
+    if (gh == null) return [];
+    final bool owatta = gh.mode == 700;
+    final KijiKankyou? k = KijiKankyou.yomu(kekka: owatta);
+    if (k == null || k.race != 2) return [];
+    final List<Kiji> list = ouroKekkaKiji(k, kirokuZumi: owatta);
+    _log(list);
+    return list;
+  } catch (e, st) {
+    debugPrint('[ニュース記事] 往路の記事を作れませんでした: $e\n$st');
+    return [];
+  }
 }
 
 /// 表示中の大会のスタート直前号(当日変更のあと。駅伝だけ)

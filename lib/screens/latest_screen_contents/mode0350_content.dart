@@ -547,6 +547,16 @@ class _Mode0350ContentState extends State<Mode0350Content> {
                                   hiraku: kijiJikkyouHiraku,
                                   annai: kijiSokuhouAnnai(),
                                 ),
+                              // 正月駅伝の往路の記事(5区が終わったあと。往路優勝を大きく取り上げる。2.0.0。kiji_ouro.dart)
+                              if (_ouroOwari(currentGhensuu))
+                                KijiLinkCard(
+                                  key: ValueKey(
+                                    'kijiOuro_${currentGhensuu.year}',
+                                  ),
+                                  namae: '往路の結果(箱庭スポーツ)',
+                                  tsukuru: kijiOuroIchiran,
+                                  hiraku: (context) => kijiOuroHiraku(context),
+                                ),
                               // 生成AIに渡すテキストのまとめボタン(1.8.2)
                               const AiCopyMatomeButton(),
                               // リンクボタン
@@ -1344,6 +1354,14 @@ class _Mode0350ContentState extends State<Mode0350Content> {
                       hiraku: kijiJikkyouHiraku,
                       annai: kijiSokuhouAnnai(),
                     ),
+                  // 正月駅伝の往路の記事(5区が終わったあと。2.0.0。kiji_ouro.dart)
+                  if (_ouroOwari(currentGhensuu))
+                    KijiLinkCard(
+                      key: ValueKey('kijiOuroG_${currentGhensuu.year}'),
+                      namae: '往路の結果(箱庭スポーツ)',
+                      tsukuru: kijiOuroIchiran,
+                      hiraku: (context) => kijiOuroHiraku(context),
+                    ),
                   // 正月駅伝の6区のスタート前は、大学と同じく復路の目標順位を決め直せる
                   // (6区は判定せず、7区から効く。1.8.2)
                   if (kukan == 5 && shutsujouSuu > 0) ...[
@@ -1602,6 +1620,14 @@ class _Mode0350ContentState extends State<Mode0350Content> {
     final int race = currentGhensuu.hyojiracebangou;
     final bool ekiden = race == 0 || race == 1 || race == 2 || race == 5;
     return ekiden && currentGhensuu.nowracecalckukan > 0;
+  }
+
+  // 正月駅伝の5区が終わったところ(往路のゴール)か(往路の記事のカードを出す。2.0.0)
+  bool _ouroOwari(Ghensuu currentGhensuu) {
+    return currentGhensuu.hyojiracebangou == 2 &&
+        currentGhensuu.nowracecalckukan == 5 &&
+        currentGhensuu.kukansuu_taikaigoto.length > 2 &&
+        currentGhensuu.kukansuu_taikaigoto[2] == 10;
   }
 
   // 現在順位表示をWidgetに分離

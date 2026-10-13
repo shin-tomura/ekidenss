@@ -22,6 +22,7 @@ import 'package:ekiden/kansuu/meisei_rireki.dart'; // 名声の履歴(1.8.8)
 import 'package:ekiden/kansuu/rekidai_kiroku.dart'; // 歴代10位までの記録(1.8.8)
 import 'package:ekiden/kansuu/kingin_wariai.dart'; // 難易度ごとの金銀支給量の割合(1.9.1)
 import 'package:ekiden/kansuu/taikai_chouki.dart'; // 大会の長い記録(2.0.0)
+import 'package:ekiden/kansuu/oufuku_kiroku.dart'; // 正月駅伝の往路・復路の成績(2.0.0)
 
 String _timeToMinuteSecondString(double time) {
   if (time == TEISUU.DEFAULTTIME) {
@@ -129,6 +130,10 @@ Future<void> kirokuKousin({
       // 三大駅伝とカスタム駅伝だけ覚える(予選は覚えない)
       choukiKousin(timeJunUnivData[iJuni], racebangou, choukiNendo(gh[0]));
       await timeJunUnivData[iJuni].save(); // UnivData の変更を保存
+    }
+    // 正月駅伝の往路(1〜5区)・復路(6〜10区)の順位とタイム(大会番号18・19。2.0.0。oufuku_kiroku.dart)
+    if (racebangou == 2) {
+      await oufukuKirokuKousin(sortedunivdata, gh[0]);
     }
     // 現在時刻と前回の休憩時刻を比較
     {

@@ -6,6 +6,7 @@ import 'package:ekiden/kansuu/gakuren_kantoku.dart';
 import 'package:ekiden/kansuu/ikku_pace.dart';
 import 'package:ekiden/kansuu/kiji/kiji_kihon.dart';
 import 'package:ekiden/kansuu/taikai_chouki.dart'; // 大会の長い記録の出来事(2.0.0)
+import 'package:ekiden/kansuu/kiji/kiji_ouro.dart'; // 正月駅伝の往路の記事(2.0.0)
 import 'package:ekiden/kansuu/kiji/kiji_comment.dart';
 import 'package:ekiden/kansuu/kiji/kiji_kimochi.dart' show kimochiTokuhitsu; // 「駅伝男」たちの走り(1.9.7)
 
@@ -19,7 +20,8 @@ import 'package:ekiden/kansuu/kiji/kiji_kimochi.dart' show kimochiTokuhitsu; // 
 //     ブレーキ・当日変更・1年生・4年生など
 //  3. 区間賞・新記録の記事: 区間新・2位との差が一番大きい区間賞・連続区間賞・1年生や留学生
 //  4. シード権争いの記事(11月駅伝・正月駅伝)
-//  5. 往路・復路の記事(正月駅伝)
+//  5. 復路の記事(正月駅伝。2.0.0までは往路・復路の記事。往路優勝は往路の記事 kiji_ouro.dart で大きく、
+//     復路優勝はこの記事と優勝の記事の中で小さく扱う)
 //  6. 学連選抜の記事(正月駅伝で学連選抜が走ったとき)
 //  7. 三大駅伝の振り返り(正月駅伝のあと。今季の三大駅伝と、過去の季の優勝校・三冠。1.9.3。
 //     1.9.4から、表は記録が残っている季(今季を含めて10季)まで並べる)
@@ -219,8 +221,11 @@ List<Kiji> ekidenKekkaKiji(KijiKankyou k) {
   if (kukanshou != null) list.add(kukanshou);
   final Kiji? seed = _seedKiji(e);
   if (seed != null) list.add(seed);
-  final Kiji? ouro = _ouroFukuroKiji(e);
-  if (ouro != null) list.add(ouro);
+  // 正月駅伝の往路の記事(5区のあとに読める記事を、結果画面でも読み返せるように。2.0.0。kiji_ouro.dart)
+  list.addAll(ouroKekkaKiji(k, kirokuZumi: k.kekka));
+  // 復路の記事(2.0.0までは往路・復路の記事。復路優勝は本文で小さく扱う)
+  final Kiji? fukuro = _fukuroKiji(e);
+  if (fukuro != null) list.add(fukuro);
   if (gakuren != null && !list.contains(gakuren)) list.add(gakuren);
   final Kiji? sandai = _sandaiKiji(e);
   if (sandai != null) list.add(sandai);
@@ -819,6 +824,23 @@ Kiji _topKiji(EkidenKekka e) {
   if (e.n >= 3 && !sanKakizumi) {
     final EkidenUnivKekka san = e.jun[2];
     ika.write('3位には${san.mei}が入った。');
+  }
+  // 往路と復路(正月駅伝。2.0.0。往路優勝は往路の記事で大きく、復路優勝はここで小さく書く)
+  final int? ouroKs = e.ouroKukansuu;
+  if (ouroKs != null) {
+    final int ou = ouroKs - 1;
+    double fukuro(EkidenUnivKekka x) => x.time - x.ruikei[ou];
+    EkidenUnivKekka oW = e.jun[0];
+    EkidenUnivKekka fW = e.jun[0];
+    for (final EkidenUnivKekka x in e.jun) {
+      if (x.ruikei[ou] < oW.ruikei[ou]) oW = x;
+      if (fukuro(x) < fukuro(fW)) fW = x;
+    }
+    if (oW.u.id == win.u.id && fW.u.id == win.u.id) {
+      ika.write('${win.mei}は往路・復路ともに1位の完全優勝だった。');
+    } else {
+      ika.write('往路は${oW.mei}が制し、復路は${fW.mei}が最速だった。');
+    }
   }
   // 前回王者
   for (final EkidenUnivKekka x in e.jun) {
@@ -2641,10 +2663,14 @@ Kiji? _seedKiji(EkidenKekka e) {
 }
 
 // ------------------------------------------------------------
-// 5. 往路・復路の記事(正月駅伝)
+// 5. 復路の記事(正月駅伝。2.0.0)
+// 2.0.0までは「往路・復路の記事」で、見出しは「往路は○○、復路は○○がV」だった。
+// 往路優勝は、5区のあとの往路の記事(kiji_ouro.dart)で大きく取り上げるようにしたので、
+// 現実の新聞にならい、この記事は復路の戦い(山下り・巻き返し・総合優勝校の逃げ切りか逆転)を見出しにし、
+// 復路優勝(復路のタイムが一番速い大学)は本文の最後に1文だけ書く
 // ------------------------------------------------------------
 
-Kiji? _ouroFukuroKiji(EkidenKekka e) {
+Kiji? _fukuroKiji(EkidenKekka e) {
   final int? ouroKs = e.ouroKukansuu;
   if (ouroKs == null) return null;
   final KijiKankyou k = e.k;
@@ -2652,87 +2678,106 @@ Kiji? _ouroFukuroKiji(EkidenKekka e) {
   final KijiKakite w = KijiKakite(k, kijiTane(k.gh, k.race, no));
   final int ks = e.ks;
   final int ou = ouroKs - 1; // 往路の最後の区間
-  final List<EkidenUnivKekka> ouroJun = List<EkidenUnivKekka>.of(e.jun)
-    ..sort((a, b) => a.ruikei[ou].compareTo(b.ruikei[ou]));
   double fukuro(EkidenUnivKekka x) => x.time - x.ruikei[ou];
   final List<EkidenUnivKekka> fukuroJun = List<EkidenUnivKekka>.of(e.jun)
     ..sort((a, b) => fukuro(a).compareTo(fukuro(b)));
-  final EkidenUnivKekka oW = ouroJun[0];
   final EkidenUnivKekka fW = fukuroJun[0];
   final EkidenUnivKekka sW = e.jun[0];
-  final bool kanzen = oW.u.id == sW.u.id && fW.u.id == sW.u.id;
-  final int ouroSa = saByou(ouroJun[1].ruikei[ou], oW.ruikei[ou]);
+  final bool nigekiri = sW.tuuka[ou] == 0;
+  final bool kanzen = nigekiri && fW.u.id == sW.u.id && e.shui(ou).u.id == sW.u.id;
   final int fukuroSa = saByou(fukuro(fukuroJun[1]), fukuro(fW));
+  // 復路で一番大きく順位を上げた大学(4つ以上)
+  EkidenUnivKekka? makikaeshi;
+  for (final EkidenUnivKekka x in e.jun) {
+    final int agari = x.tuuka[ou] - x.juni;
+    if (agari < 4) continue;
+    if (makikaeshi == null || agari > makikaeshi.tuuka[ou] - makikaeshi.juni) {
+      makikaeshi = x;
+    }
+  }
+  // 復路の山(山下り・山登り)の区間賞
+  int yamaKukan = -1;
+  for (int kk = ouroKs; kk < ks; kk++) {
+    final KukanTokuchou t = kukanTokuchou(k.gh, k.race, kk);
+    if (t == KukanTokuchou.yamaNobori || t == KukanTokuchou.yamaKudari) {
+      yamaKukan = kk;
+      break;
+    }
+  }
 
+  // 見出し(復路優勝は見出しにしない)
   String midashi;
-  if (kanzen) {
-    midashi = w.erabu([
-      '${sW.mei}、往路・復路とも制す完全優勝',
-      '${sW.mei}が往復完全V',
-    ]);
+  if (makikaeshi != null) {
+    midashi =
+        '${makikaeshi.mei}、復路で${juniMoji(makikaeshi.tuuka[ou])}から${juniMoji(makikaeshi.juni)}に浮上';
+  } else if (yamaKukan >= 0 && e.kukanJun[yamaKukan][0].senshu[yamaKukan] != null) {
+    final EkidenUnivKekka t = e.kukanJun[yamaKukan][0];
+    midashi =
+        '${e.kukanMei(yamaKukan)}は${t.mei}・${myouji(t.senshu[yamaKukan]!.name)}が区間賞';
+  } else if (nigekiri) {
+    midashi = w.erabu(['${sW.mei}、復路も首位を守り切る', '${sW.mei}、復路を逃げ切る']);
   } else {
-    midashi = '往路は${oW.mei}、復路は${fW.mei}がV';
+    midashi = '${sW.mei}、往路${juniMoji(sW.tuuka[ou])}から復路で逆転';
   }
 
   final StringBuffer lead = StringBuffer();
-  lead.write(
-    '${k.taikaiMei}の往路(1〜$ouroKs区)は${oW.mei}が${jikanMoji(oW.ruikei[ou])}で制し、'
-    '${ouroSa <= 0 ? '2位とは1秒に満たない差だった' : '2位に${saMoji(ouroSa)}差をつけた'}。',
-  );
-  lead.write(
-    '復路(${ouroKs + 1}〜$ks区)は${fW.mei}が${jikanMoji(fukuro(fW))}で最速だった。',
-  );
+  lead.write('${k.taikaiMei}の復路(${ouroKs + 1}〜$ks区)は、');
+  if (nigekiri) {
+    lead.write('往路を制した${sW.mei}が首位を守り、そのまま総合優勝を果たした。');
+  } else {
+    lead.write('往路${juniMoji(sW.tuuka[ou])}の${sW.mei}が逆転し、総合優勝を果たした。');
+  }
   if (kanzen) {
-    lead.write('${sW.mei}は往路・復路ともに1位の完全優勝となった。');
-  } else if (oW.u.id != sW.u.id) {
-    lead.write('往路を制した${oW.mei}は、総合では${juniMoji(oW.juni)}だった。');
+    lead.write('${sW.mei}は復路のタイムも最も速く、往路・復路ともに1位の完全優勝だった。');
   }
 
-  // 往路の山・復路の山
-  for (int kk = 0; kk < ks; kk++) {
+  // 復路の山
+  if (yamaKukan >= 0) {
+    final int kk = yamaKukan;
     final KukanTokuchou t = kukanTokuchou(k.gh, k.race, kk);
-    if (t != KukanTokuchou.yamaNobori && t != KukanTokuchou.yamaKudari) continue;
     final EkidenUnivKekka x = e.kukanJun[kk][0];
     final SenshuData? s = x.senshu[kk];
-    if (s == null) continue;
-    w.danraku(
-      '${e.kukanMei(kk)}は${w.senshu(s, daigaku: true)}が${jikanMoji(x.kukanTime[kk])}で区間賞。'
-      '${t == KukanTokuchou.yamaNobori ? '険しい上り坂で' : '急な下り坂で'}'
-      '${e.kukanshouSa(kk) <= 0 ? '、2位との1秒に満たない差の競り合いを制した。' : '${saMoji(e.kukanshouSa(kk))}の差をつけた。'}',
-    );
+    if (s != null) {
+      w.danraku(
+        '${e.kukanMei(kk)}は${w.senshu(s, daigaku: true)}が${jikanMoji(x.kukanTime[kk])}で区間賞。'
+        '${t == KukanTokuchou.yamaNobori ? '険しい上り坂で' : '急な下り坂で'}'
+        '${e.kukanshouSa(kk) <= 0 ? '、2位との1秒に満たない差の競り合いを制した。' : '${saMoji(e.kukanshouSa(kk))}の差をつけた。'}',
+      );
+    }
   }
   // 復路の巻き返し
-  final List<EkidenUnivKekka> makikaeshi = [
-    for (final EkidenUnivKekka x in e.jun)
-      if (x.tuuka[ou] - x.juni >= 4) x,
-  ];
-  if (makikaeshi.isNotEmpty) {
-    final EkidenUnivKekka x = makikaeshi.first;
+  if (makikaeshi != null) {
+    final EkidenUnivKekka x = makikaeshi;
     w.danraku(
       '復路で大きく順位を上げたのは${x.mei}。往路${juniMoji(x.tuuka[ou])}から総合${juniMoji(x.juni)}まで巻き返した。',
     );
   }
-  w.danraku('復路の2位とは${kinsaMoji(fukuroSa)}だった。');
-
-  final List<List<String>> gyou = [];
-  for (int i = 0; i < e.n; i++) {
-    gyou.add([
-      juniMoji(i),
-      ouroJun[i].mei,
-      jikanMoji(ouroJun[i].ruikei[ou]),
-      fukuroJun[i].mei,
-      jikanMoji(fukuro(fukuroJun[i])),
-    ]);
+  // 復路優勝(小さく、1文だけ)
+  if (!kanzen) {
+    w.danraku(
+      '復路のタイムが最も速かったのは${fW.mei}で、${jikanMoji(fukuro(fW))}。2位とは${kinsaMoji(fukuroSa)}だった。',
+    );
   }
+
+  final List<List<String>> gyou = [
+    for (int i = 0; i < fukuroJun.length; i++)
+      [
+        juniMoji(i),
+        fukuroJun[i].mei,
+        jikanMoji(fukuro(fukuroJun[i])),
+        juniMoji(fukuroJun[i].tuuka[ou]),
+        juniMoji(fukuroJun[i].juni),
+      ],
+  ];
   return _kansei(
     k,
     no,
     w,
-    category: '駅伝・往路復路',
+    category: '駅伝・復路',
     midashi: midashi,
     lead: lead.toString(),
     hyou: [
-      KijiHyou('往路・復路の成績', ['順位', '往路', 'タイム', '復路', 'タイム'], gyou),
+      KijiHyou('復路の成績', ['順位', '大学', '復路タイム', '往路', '総合'], gyou),
     ],
   );
 }

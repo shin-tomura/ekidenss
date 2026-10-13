@@ -87,6 +87,8 @@ class UnivData extends HiveObject {
   @HiveField(28)
   List<List<int>> taikaibetujunibetukaisuu;
   // [大会(レース)種類番号][保存順位数、0→1位、29→30位]
+  // [17](フルマラソン。大学の順位がない)は、大会の長い記録(優勝・本戦出場・シード権の最後の年度と
+  // 連続の回数)の置き場所にした(2.0.0。kansuu/taikai_chouki.dart)
 
   @HiveField(29)
   List<List<double>> time_univkojinkiroku;

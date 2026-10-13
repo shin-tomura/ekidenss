@@ -2,6 +2,7 @@ import 'package:ekiden/constants.dart';
 import 'package:ekiden/senshu_data.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/kansuu/kiji/kiji_kihon.dart';
+import 'package:ekiden/kansuu/taikai_chouki.dart'; // 大会の長い記録の出来事(2.0.0)
 import 'package:ekiden/kansuu/kiji/kiji_comment.dart';
 
 // ------------------------------------------------------------
@@ -238,22 +239,24 @@ String _honsenKaisuuMoji(YosenKekka e, UnivData u) {
   if (e.honsenMikaisai) return '';
   final int kaisuu = shutsujouKaisuu(u, e.honsen) + 1;
   if (kaisuu <= 1) return '初の';
-  // 連続出場の数を言い切れないとき(残っている記録が全部出場で、それより前にも出場がある)は、
+  // 連続出場と前回の出場は、大会の長い記録で数える(2.0.0。直近10回より前もさかのぼれる)。
+  // 連続出場の数を言い切れないとき(記録を始める前から出場が続いている)は、
   // 連続の数を出さず、全期間の回数だけにする
-  final ({int kaisuu, bool kakutei}) rz = renzokuKakutei(
+  final ({int kaisuu, bool kakutei}) rz = renzokuChouki(
     u,
     e.honsen,
     0,
-    shutsujouJuni,
+    choukiShutsujou,
     shutsujouKaisuu(u, e.honsen),
   );
   if (!rz.kakutei) return '$kaisuu度目の';
   final int renzoku = rz.kaisuu + 1;
-  final int? mae = saigoNoKai(u, e.honsen, 0, shutsujouJuni);
+  final ({int? nen, bool hisabisa}) mae = saigoNoNen(u, e.honsen, 0, choukiShutsujou);
   return renzokuMoji(
     renzoku: renzoku,
-    buri: mae == null ? null : mae + 1,
+    buri: mae.nen == null ? null : mae.nen! + 1,
     kaisuu: kaisuu,
+    hisabisa: mae.hisabisa,
   );
 }
 
@@ -340,16 +343,16 @@ Kiji _yosenTopKiji(YosenKekka e) {
     for (final YosenUnivKekka x in e.jun)
       if (!e.tsuuka(x) && shutsujouJuni(juniRace(x.u, e.honsen, 0))) x,
   ];
-  int renzokuHonsen(YosenUnivKekka x) =>
-      renzokuKaisuu(x.u, e.honsen, 0, shutsujouJuni);
-  // 連続出場の数を言い切れるか(言い切れないときは数を出さない)
-  bool renzokuHonsenKakutei(YosenUnivKekka x) => renzokuKakutei(
+  // 連続出場の数と、その数を言い切れるか(大会の長い記録で数える。2.0.0。言い切れないときは数を出さない)
+  ({int kaisuu, bool kakutei}) renzokuHonsenK(YosenUnivKekka x) => renzokuChouki(
     x.u,
     e.honsen,
     0,
-    shutsujouJuni,
+    choukiShutsujou,
     shutsujouKaisuu(x.u, e.honsen),
-  ).kakutei;
+  );
+  int renzokuHonsen(YosenUnivKekka x) => renzokuHonsenK(x).kaisuu;
+  bool renzokuHonsenKakutei(YosenUnivKekka x) => renzokuHonsenK(x).kakutei;
   togireta.sort((a, b) => renzokuHonsen(b).compareTo(renzokuHonsen(a)));
   final YosenUnivKekka? togire = togireta.isEmpty ? null : togireta.first;
   final bool topRenzoku = juniRace(top.u, race, 1) == 0;
@@ -1066,11 +1069,11 @@ Kiji? _yosenJitenKiji(YosenKekka e) {
   // 本文: 逃したもの
   final StringBuffer nogashi = StringBuffer();
   if (shutsujouJuni(maeHonsen)) {
-    final ({int kaisuu, bool kakutei}) rz = renzokuKakutei(
+    final ({int kaisuu, bool kakutei}) rz = renzokuChouki(
       morashi.u,
       e.honsen,
       0,
-      shutsujouJuni,
+      choukiShutsujou,
       shutsujouKaisuu(morashi.u, e.honsen),
     );
     nogashi.write(

@@ -5,6 +5,7 @@ import 'package:ekiden/kansuu/gakuren_text.dart';
 import 'package:ekiden/kansuu/gakuren_kantoku.dart';
 import 'package:ekiden/kansuu/ikku_pace.dart';
 import 'package:ekiden/kansuu/kiji/kiji_kihon.dart';
+import 'package:ekiden/kansuu/taikai_chouki.dart'; // 大会の長い記録の出来事(2.0.0)
 import 'package:ekiden/kansuu/kiji/kiji_comment.dart';
 import 'package:ekiden/kansuu/kiji/kiji_kimochi.dart' show kimochiTokuhitsu; // 「駅伝男」たちの走り(1.9.7)
 
@@ -312,18 +313,22 @@ Kiji _topKiji(EkidenKekka e) {
 
   // 事実を集める
   final int kaisuu = juniKaisuu(win.u, race, 0);
-  final ({int kaisuu, bool kakutei}) rz = renzokuKakutei(
+  // 連覇の数と前回の優勝は、大会の長い記録で数える(2.0.0。直近10回より前もさかのぼれる)
+  final ({int kaisuu, bool kakutei}) rz = renzokuChouki(
     win.u,
     race,
     0,
-    (j) => j == 0,
+    choukiYuushou,
     kaisuu,
   );
   final int renzoku = rz.kaisuu;
-  // 連覇の数を言い切れないとき(残っている記録が全部優勝で、それより前にも優勝がある)は数を出さない
+  // 連覇の数を言い切れないとき(記録を始める前から優勝が続いている)は数を出さない
   final bool renzokuFumei = !rz.kakutei;
-  final int? maeYuushou = saigoNoKai(win.u, race, 1, (j) => j == 0);
+  final ({int? nen, bool hisabisa}) maeY = saigoNoNen(win.u, race, 1, choukiYuushou);
+  final int? maeYuushou = maeY.nen;
   final bool hatsu = kaisuu <= 1;
+  // 前回の優勝の年が分からない(今までのセーブデータで、直近10回より前に優勝していた)ときは「久々」と書く
+  final bool hisabisa = !hatsu && maeYuushou == null && maeY.hisabisa;
   // 今回が初めての開催(ゲームを始めた年など)なら、全校が初出場なので「初代王者」として書く
   final bool hatsuKaisai = hatsuKaisaiKekka(k, race);
   final String yuushouGo = race == 2 ? '総合優勝' : '優勝';
@@ -333,7 +338,7 @@ Kiji _topKiji(EkidenKekka e) {
       ? '$kaisuu度目の$yuushouGo'
       : (hatsu
             ? (race == 2 ? '初の総合優勝' : '初優勝')
-            : '${renzokuMoji(renzoku: renzoku, buri: maeYuushou, kaisuu: kaisuu)}$yuushouGo');
+            : '${renzokuMoji(renzoku: renzoku, buri: maeYuushou, kaisuu: kaisuu, hisabisa: hisabisa)}$yuushouGo');
   final int juraiTaikai = k.kantoku.yobiint4.length > 20
       ? k.kantoku.yobiint4[20]
       : 0;
@@ -422,6 +427,11 @@ Kiji _topKiji(EkidenKekka e) {
     midashi1 = w.erabu([
       '${win.mei}、$maeYuushou年ぶり$kaisuu度目V',
       '${win.mei}が$maeYuushou年ぶりの頂点',
+    ]);
+  } else if (hisabisa) {
+    midashi1 = w.erabu([
+      '${win.mei}、久々の$kaisuu度目V',
+      '${win.mei}が久々の頂点',
     ]);
   } else {
     midashi1 = w.erabu(['${win.mei}が$kaisuu度目のV', '${win.mei}、$kaisuu度目の優勝']);
@@ -815,11 +825,11 @@ Kiji _topKiji(EkidenKekka e) {
     if (x.juni == 0) continue;
     if (juniRace(x.u, race, 1) == 0) {
       // 今回は優勝していないので、全期間の優勝回数は前回までの分
-      final ({int kaisuu, bool kakutei}) mr = renzokuKakutei(
+      final ({int kaisuu, bool kakutei}) mr = renzokuChouki(
         x.u,
         race,
         1,
-        (j) => j == 0,
+        choukiYuushou,
         juniKaisuu(x.u, race, 0),
       );
       final int maeRenzoku = mr.kaisuu;
@@ -1359,10 +1369,13 @@ Kiji? _jibunKiji(EkidenKekka e) {
   String seedBun = '';
   if (seed != null) {
     if (seedNow && !seedMae) {
-      // 何年ぶりのシード権か(直近の記録で言い切れるときだけ)
-      final int? buri = saigoNoKai(m.u, race, 1, (j) => shutsujouJuni(j) && j < seed);
+      // 何年ぶりのシード権か(大会の長い記録で数える。2.0.0。年が分からないときは「久々」)
+      final ({int? nen, bool hisabisa}) sb = saigoNoNen(m.u, race, 1, choukiSeed);
+      final int? buri = sb.nen;
       seedBun = (buri != null && buri >= 2)
           ? '$buri年ぶりに上位$seed校のシード権を手にし、来季は予選会を免れる。'
+          : (buri == null && sb.hisabisa)
+          ? '久々に上位$seed校のシード権を手にし、来季は予選会を免れる。'
           : '上位$seed校に与えられるシード権を獲得し、来季は予選会を免れる。';
     } else if (seedNow && seedMae) {
       seedBun = 'シード権も守った。';
@@ -2366,21 +2379,21 @@ Kiji? _seedKiji(EkidenKekka e) {
     if (maeSeed && !imaSeed) ushinatta.add(x);
     if (!maeSeed && imaSeed) kakutoku.add(x);
   }
-  // 前回までの連続シード(今回の前まで)と、今回を含めた連続シード
-  // 数を言い切れないとき(残っている記録が全部シードで、それより前にもシードがある)は数を出さない
+  // 前回までの連続シード(今回の前まで)と、今回を含めた連続シード(大会の長い記録で数える。2.0.0)
+  // 数を言い切れないとき(記録を始める前からシードが続いている)は数を出さない
   // (前回までの連続シードは、今回シード権を逃した大学に使うので、全期間のシードの回数は前回までの分)
-  ({int kaisuu, bool kakutei}) maeRenzokuK(EkidenUnivKekka x) => renzokuKakutei(
+  ({int kaisuu, bool kakutei}) maeRenzokuK(EkidenUnivKekka x) => renzokuChouki(
     x.u,
     race,
     1,
-    (j) => j < seed,
+    choukiSeed,
     seedKaisuu(x.u, race, seed),
   );
-  ({int kaisuu, bool kakutei}) imaRenzokuK(EkidenUnivKekka x) => renzokuKakutei(
+  ({int kaisuu, bool kakutei}) imaRenzokuK(EkidenUnivKekka x) => renzokuChouki(
     x.u,
     race,
     0,
-    (j) => j < seed,
+    choukiSeed,
     seedKaisuu(x.u, race, seed),
   );
   int maeRenzoku(EkidenUnivKekka x) => maeRenzokuK(x).kaisuu;

@@ -4,6 +4,7 @@ import 'package:ekiden/senshu_data.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/kansuu/ikku_pace.dart';
 import 'package:ekiden/kansuu/kiji/kiji_kihon.dart';
+import 'package:ekiden/kansuu/taikai_chouki.dart'; // 大会の長い記録の出来事(2.0.0)
 import 'package:ekiden/kansuu/kiji/kiji_comment.dart';
 import 'package:ekiden/kansuu/kiji/kiji_kimochi.dart' show kimochiTokuhitsu; // 駅伝男の特集(1.9.7)
 
@@ -604,15 +605,15 @@ Kiji _yuushouTenbou(Tenbou t, List<KijiYosouJin> yosou) {
   for (final TenbouUniv x in t.jun) {
     if (juniRace(x.u, race, 0) == 0) ouja = x;
   }
-  // 前回までの連覇(大会の前なので、全期間の優勝回数は前回までの分)。
-  // 数を言い切れないとき(残っている記録が全部優勝で、それより前にも優勝がある)は数を出さない
+  // 前回までの連覇(大会の前なので、全期間の優勝回数は前回までの分。大会の長い記録で数える。2.0.0)。
+  // 数を言い切れないとき(記録を始める前から優勝が続いている)は数を出さない
   final ({int kaisuu, bool kakutei})? oujaRz = ouja == null
       ? null
-      : renzokuKakutei(
+      : renzokuChouki(
           ouja.u,
           race,
           0,
-          (j) => j == 0,
+          choukiYuushou,
           juniKaisuu(ouja.u, race, 0),
         );
   final int oujaRenzoku = oujaRz?.kaisuu ?? 0;
@@ -654,12 +655,18 @@ Kiji _yuushouTenbou(Tenbou t, List<KijiYosouJin> yosou) {
     for (final TenbouUniv x in t.jun)
       if (!hatsuKaisai && shutsujouKaisuu(x.u, race) == 0) x,
   ];
+  // 何年ぶりかは大会の長い記録で数える(2.0.0。年が分からないときは「久々」)
   final List<String> hisashiburi = [];
   for (final TenbouUniv x in t.jun) {
     if (shutsujouKaisuu(x.u, race) == 0) continue;
     if (shutsujouJuni(juniRace(x.u, race, 0))) continue;
-    final int? i = saigoNoKai(x.u, race, 1, shutsujouJuni);
-    if (i != null && i >= 2) hisashiburi.add('${x.mei}(${i + 1}年ぶり)');
+    final ({int? nen, bool hisabisa}) sb = saigoNoNen(x.u, race, 1, choukiShutsujou);
+    final int? i = sb.nen;
+    if (i != null && i >= 2) {
+      hisashiburi.add('${x.mei}(${i + 1}年ぶり)');
+    } else if (i == null && sb.hisabisa) {
+      hisashiburi.add('${x.mei}(久々)');
+    }
   }
 
   // 見出し
@@ -1337,17 +1344,17 @@ Kiji? _seedTenbou(Tenbou t, List<KijiYosouJin> yosou) {
     for (final TenbouUniv x in t.jun)
       if (x.juni >= seed - 3 && x.juni <= seed + 2) x,
   ];
-  // 前回までの連続シード(今回の前まで)
-  int renzokuSeed(TenbouUniv x) =>
-      renzokuKaisuu(x.u, race, 0, (j) => j < seed);
-  // 連続シードの数を言い切れるか(言い切れないときは数を出さない。全期間のシードの回数は前回までの分)
-  bool renzokuSeedKakutei(TenbouUniv x) => renzokuKakutei(
+  // 前回までの連続シード(今回の前まで)と、その数を言い切れるか(大会の長い記録で数える。2.0.0。
+  // 言い切れないときは数を出さない。全期間のシードの回数は前回までの分)
+  ({int kaisuu, bool kakutei}) renzokuSeedK(TenbouUniv x) => renzokuChouki(
     x.u,
     race,
     0,
-    (j) => j < seed,
+    choukiSeed,
     seedKaisuu(x.u, race, seed),
-  ).kakutei;
+  );
+  int renzokuSeed(TenbouUniv x) => renzokuSeedK(x).kaisuu;
+  bool renzokuSeedKakutei(TenbouUniv x) => renzokuSeedK(x).kakutei;
   // 前回シード権を取っていて、前評判でシード権の外にいる大学(連続シードの長い順)
   final List<TenbouUniv> kiken = [
     for (final TenbouUniv x in t.jun)

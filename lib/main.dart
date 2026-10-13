@@ -67,6 +67,7 @@ import 'package:ekiden/kansuu/ChartPanelSenshu.dart';
 import 'package:ekiden/kansuu/ChartPanelUniv.dart';
 import 'package:ekiden/kansuu/seichou_type.dart'; // 新入生の成長タイプの割合の移行処理(1.9.3)
 import 'package:ekiden/kansuu/koukou.dart'; // 出身校と高校時代の実績(1.9.5)
+import 'package:ekiden/kansuu/taikai_chouki.dart'; // 大会の長い記録の移行処理(2.0.0)
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 // ★ここに buildAppTheme() 関数を記述する★
@@ -1036,6 +1037,17 @@ Future<void> main() async {
           checkversionValue > 999999999) {
         await updateAllSenshuChartdata_atusataisei();
         await refreshAllUnivAnalysisData();
+      }
+    }
+
+    // 大会の長い記録(優勝・本戦出場・シード権の最後の年度と連続の回数。2.0.0。taikai_chouki.dart)を、
+    // 今までのセーブデータに、直近10回の順位の記録から分かる分だけ入れる。
+    // 版の番号では判定しない(2.0.0testで開いたデータにも入るように)。使い始めた印のある大学は何もしない
+    //save_load_screenの中の _importFromSlot の中にもあるので、そちらも変更すること！
+    {
+      final Ghensuu? gh = ghensuuBox.getAt(0);
+      if (gh != null) {
+        await choukiIkou(sortedUnivData, gh);
       }
     }
 

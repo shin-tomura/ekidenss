@@ -16,6 +16,7 @@ class TEISUU {
   //レース番号は、0→10月駅伝、1→11月駅伝、2→正月駅伝、3→11月駅伝予選、4→正月駅伝予選
   //5→マイ駅伝、6→インカレ5000、7→インカレ10000、8→インカレハーフ、9→インカレ総合
   //10→5000記録会、11→10000記録会、12→市民ハーフ、13→登り1万、14→下り1万、15→ロード1万、16→クロカン1万、17→フルマラソン、18→往路、19→復路
+  //(17のフルマラソンは大学の順位がないので、UnivData.taikaibetujunibetukaisuu[17]を大会の長い記録の置き場所にした。2.0.0。kansuu/taikai_chouki.dart)
   static const int SUU_MAXKYORI = 50; //km単位
   static const double MAGICNUMBER = 98470.0;
   //static const int KAKURITU13PUNDAINYUUGAKU = 7;

@@ -9,6 +9,7 @@ import 'package:ekiden/kansuu/time_date.dart';
 import 'package:ekiden/screens/Modal_courseshoukai.dart'; // 大会の名前(courseRaceTitle)
 import 'package:ekiden/kansuu/custom_seigen.dart'; // カスタム駅伝の出場制限(1年生だけか)
 import 'package:ekiden/kansuu/koukou.dart'; // 出身校と高校時代の実績(1.9.5)
+import 'package:ekiden/kansuu/taikai_chouki.dart'; // 大会の長い記録(2.0.0)
 
 // ------------------------------------------------------------
 // ニュース記事(箱庭スポーツ)の共通の部品(1.9.2)
@@ -1071,14 +1072,17 @@ String kmMoji(double meter) => '${(meter / 1000.0).toStringAsFixed(1)}km';
 
 /// 「2年連続5度目の」「3年ぶり4度目の」などの言い方(初めてのときは空。呼ぶ側で「初」を書く)
 /// [renzoku] 今回を含めた連続の年数、[buri] 前回から何年ぶりか(分からなければnull)、[kaisuu] 今回を含めた回数
+/// [hisabisa] 前回の年が分からないが、記録より前にあった(今までのセーブデータ。2.0.0。「久々となる5度目の」)
 String renzokuMoji({
   required int renzoku,
   required int? buri,
   required int kaisuu,
+  bool hisabisa = false,
 }) {
   if (kaisuu <= 1) return '';
   if (renzoku >= 2) return '$renzoku年連続$kaisuu度目の';
   if (buri != null && buri >= 2) return '$buri年ぶり$kaisuu度目の';
+  if (buri == null && hisabisa) return '久々となる$kaisuu度目の';
   return '$kaisuu度目の';
 }
 
@@ -1164,6 +1168,71 @@ int? saigoNoKai(
 
 /// 出場していた順位か
 bool shutsujouJuni(int juni) => juni >= 0 && juni < TEISUU.DEFAULTJUNI;
+
+// ------------------------------------------------------------
+// 大会の長い記録(2.0.0。taikai_chouki.dart)
+// 順位の記録は直近 TEISUU.KIROKUHOZONNENSUU 回分しか残らないので、「○年ぶり」と連続の回数は、
+// 出来事(優勝 choukiYuushou・本戦出場 choukiShutsujou・シード権 choukiSeed)ごとに覚えている
+// 最後の年度と連続の回数で数える。覚えていない大会や、記録と合わないときは、今までどおり直近の記録で数える
+// ------------------------------------------------------------
+
+/// [hajime]回前(0か1)より前で、最後に出来事[dekigoto]があったのは何年前か(saigoNoKai の代わり)
+/// 順位の記録の[0]の大会の年度からの差で数える(毎年開かれる大会では saigoNoKai と同じ数になる。
+/// 開かれない年のあるカスタム駅伝でも年で数える)。なければ nen は null。
+/// 記録を始める前(今までのセーブデータで直近の記録より前)にあって年が分からないときは、hisabisa を true にする
+({int? nen, bool hisabisa}) saigoNoNen(
+  UnivData u,
+  int race,
+  int hajime,
+  int dekigoto,
+) {
+  bool jouken(int j) => choukiAtta(race, dekigoto, j);
+  final int? kai = saigoNoKai(u, race, hajime, jouken);
+  final ChoukiKiroku? c = choukiYomu(u, race, dekigoto);
+  final int g = choukiKaisaiNendo(u, race);
+  if (c == null || g <= 0 || hajime < 0 || hajime > 1) {
+    return (nen: kai, hisabisa: false);
+  }
+  // 今回([0])にあったか。あったなら、覚えている最後の年度は[0]の年度のはず(合わなければ直近の記録で数える)
+  final bool ima = jouken(juniRace(u, race, 0));
+  if (ima && c.saigo != g) return (nen: kai, hisabisa: false);
+  final int nendo = (hajime == 1 && ima) ? c.mae : c.saigo;
+  if (nendo > 0 && nendo <= g) return (nen: g - nendo, hisabisa: false);
+  if (kai != null) return (nen: kai, hisabisa: false);
+  // 全期間の回数から、[hajime]回前より前にもあったか(年は分からない)
+  final int maeNoKaisuu =
+      choukiTsuusan(u, race, dekigoto) - ((hajime == 1 && ima) ? 1 : 0);
+  return (nen: null, hisabisa: maeNoKaisuu > 0);
+}
+
+/// [hajime]回前(0か1)から続けて出来事[dekigoto]があった回数と、その数を言い切れるか
+/// (renzokuKakutei の代わり。直近の記録で言い切れないときは、覚えている連続の回数で数える)
+/// [tsuusan] 全期間で出来事があった回数([hajime]回前までの分。renzokuKakutei と同じ)
+({int kaisuu, bool kakutei}) renzokuChouki(
+  UnivData u,
+  int race,
+  int hajime,
+  int dekigoto,
+  int tsuusan,
+) {
+  bool jouken(int j) => choukiAtta(race, dekigoto, j);
+  final ({int kaisuu, bool kakutei}) r = renzokuKakutei(
+    u,
+    race,
+    hajime,
+    jouken,
+    tsuusan,
+  );
+  if (r.kakutei || hajime < 0 || hajime > 1) return r;
+  final ChoukiKiroku? c = choukiYomu(u, race, dekigoto);
+  if (c == null || c.renzoku <= 0) return r;
+  // 今回([0])にあったなら、覚えている連続の回数は[0]の大会で終わる分(合わなければ直近の記録の数のまま)
+  final bool ima = jouken(juniRace(u, race, 0));
+  if (ima && c.saigo != choukiKaisaiNendo(u, race)) return r;
+  final int n = (hajime == 1 && ima) ? c.renzoku - 1 : c.renzoku;
+  if (n < r.kaisuu) return r;
+  return (kaisuu: n, kakutei: true);
+}
 
 /// 選手の区間順位[juni]が、正月駅伝を学連選抜(オープン参加)で走ったときのものか(1.9.5)
 /// 学連選抜で走った区間・区間順位・タイムは、正月駅伝のあとで元の選手のデータに書き戻され、

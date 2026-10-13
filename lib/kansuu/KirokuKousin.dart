@@ -21,6 +21,7 @@ import 'package:ekiden/kansuu/gakuren_text.dart'; // 学連選抜の結果(順�
 import 'package:ekiden/kansuu/meisei_rireki.dart'; // 名声の履歴(1.8.8)
 import 'package:ekiden/kansuu/rekidai_kiroku.dart'; // 歴代10位までの記録(1.8.8)
 import 'package:ekiden/kansuu/kingin_wariai.dart'; // 難易度ごとの金銀支給量の割合(1.9.1)
+import 'package:ekiden/kansuu/taikai_chouki.dart'; // 大会の長い記録(2.0.0)
 
 String _timeToMinuteSecondString(double time) {
   if (time == TEISUU.DEFAULTTIME) {
@@ -124,6 +125,9 @@ Future<void> kirokuKousin({
         timeJunUnivData[iJuni].juni_race[racebangou][0] = TEISUU.DEFAULTJUNI;
         timeJunUnivData[iJuni].time_race[racebangou][0] = TEISUU.DEFAULTTIME;
       }
+      // 大会の長い記録(優勝・本戦出場・シード権の最後の年度と連続の回数。2.0.0。taikai_chouki.dart)
+      // 三大駅伝とカスタム駅伝だけ覚える(予選は覚えない)
+      choukiKousin(timeJunUnivData[iJuni], racebangou, choukiNendo(gh[0]));
       await timeJunUnivData[iJuni].save(); // UnivData の変更を保存
     }
     // 現在時刻と前回の休憩時刻を比較
@@ -2054,6 +2058,8 @@ Future<void> kirokuKousin({
               inkarepointTotalJunUnivData[i].taikaibetusaikoujuni[9] =
                   inkarepointTotalJunUnivData[i].juni_race[9][0];
             }
+            // 大会の長い記録(総合優勝の最後の年度と連覇の数。総合が決まるハーフのあとだけ。2.0.0。taikai_chouki.dart)
+            choukiKousin(inkarepointTotalJunUnivData[i], 9, choukiNendo(gh[0]));
             await inkarepointTotalJunUnivData[i].save(); // Hiveに保存
           }
         }

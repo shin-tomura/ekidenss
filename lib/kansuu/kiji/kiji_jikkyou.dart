@@ -6,6 +6,7 @@ import 'package:ekiden/kansuu/gakuren_text.dart';
 import 'package:ekiden/kansuu/gakuren_kantoku.dart';
 import 'package:ekiden/kansuu/ikku_pace.dart';
 import 'package:ekiden/kansuu/kiji/kiji_kihon.dart';
+import 'package:ekiden/kansuu/taikai_chouki.dart'; // 大会の長い記録の出来事(2.0.0)
 import 'package:ekiden/kansuu/kiji/kiji_comment.dart';
 import 'package:ekiden/kansuu/koukou.dart'; // 出身校(高校の同期対決。1.9.5)
 import 'package:ekiden/kansuu/kiji/kiji_gakunai.dart' show gakunaiSiteMei, gakunaiKishaMei; // 学内メディアの速報(1.9.7)
@@ -732,7 +733,8 @@ Kiji? _kukanJikkyou(
       int togireNen = 0;
       bool togireKakutei = true;
       for (final _Koma x in ushinatta) {
-        final ({int kaisuu, bool kakutei}) r = renzokuKakutei(x.u, race, maeIdx, (j) => j < seedSuu, seedKaisuu(x.u, race, seedSuu));
+        // 連続シードは大会の長い記録で数える(2.0.0)
+        final ({int kaisuu, bool kakutei}) r = renzokuChouki(x.u, race, maeIdx, choukiSeed, seedKaisuu(x.u, race, seedSuu));
         if (r.kaisuu > togireNen) {
           togireNen = r.kaisuu;
           togireKakutei = r.kakutei;

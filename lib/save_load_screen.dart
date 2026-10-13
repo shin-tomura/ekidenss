@@ -25,6 +25,7 @@ import 'package:ekiden/kansuu/scout_com.dart';
 import 'package:ekiden/kansuu/gakuren_kantoku.dart'; // 学連選抜の監督の移行処理(1.8.2)
 import 'package:ekiden/kansuu/seichou_type.dart'; // 新入生の成長タイプの割合の移行処理(1.9.3)
 import 'package:ekiden/kansuu/koukou.dart'; // 出身校と高校時代の実績(1.9.5)
+import 'package:ekiden/kansuu/taikai_chouki.dart'; // 大会の長い記録の移行処理(2.0.0)
 //import 'dart:io';
 //import 'package:path_provider/path_provider.dart';
 
@@ -851,6 +852,15 @@ class _SaveLoadScreenState extends State<SaveLoadScreen> {
             checkversionValue > 999999999) {
           await updateAllSenshuChartdata_atusataisei();
           await refreshAllUnivAnalysisData();
+        }
+      }
+
+      // 大会の長い記録(2.0.0。mainの中の同じ処理の説明を参照)
+      //mainの中にもあるので、そちらも変更すること！
+      {
+        final Ghensuu? gh = Hive.box<Ghensuu>('ghensuuBox').getAt(0);
+        if (gh != null) {
+          await choukiIkou(sortedUnivData, gh);
         }
       }
 

@@ -31,6 +31,14 @@ import 'package:ekiden/screens/kiji_hyou_view.dart'; // 表の部品(1.9.8)
 import 'package:ekiden/screens/kukan_haiti_button.dart'; // 今季タイム一覧表を開くボタン(1.9.9)
 import 'package:ekiden/kansuu/kingin_kiroku.dart'
     show kinginIchiranHyou, kinginIchiranChuu; // 金特訓・銀特訓の記録の一覧表(2.0.0)
+import 'package:ekiden/kansuu/taikai_chouki.dart'
+    show
+        ChoukiKiroku,
+        choukiYomu,
+        choukiTsuusan,
+        choukiNendo,
+        choukiRaceList,
+        choukiYuushou; // 大会の長い記録(最後の優勝。2.0.0)
 //import 'package:ekiden/kansuu/kojinBestKirokuJuniKettei.dart';
 // Modal views (placeholders for now, you'll need to create these files)
 //import 'package:ekiden/modals/modal_univ_name_henshuu_view.dart';
@@ -3381,6 +3389,8 @@ class _UnivScreenState extends State<UnivScreen> {
                 Text('無 ', style: TextStyle(color: HENSUU.textcolor)),
           ],
         ),
+        // 最後の優勝(直近5回の欄に優勝がないときだけ。2.0.0)
+        _buildSaigoNoYuushou(univData, raceIndex, ghensuu),
         TextButton(
           onPressed: () {
             // Navigator.push を使用して Senshu_R_Screen へ遷移
@@ -3409,6 +3419,34 @@ class _UnivScreenState extends State<UnivScreen> {
         const SizedBox(height: 16), // 各レースの間にスペース
       ],
     );
+  }
+
+  // 最後の優勝の行(2.0.0。大会の長い記録 taikai_chouki.dart)
+  // 優勝を覚えている大会(三大駅伝・カスタム駅伝・対校戦)で、一度でも優勝していて、
+  // 直近5回の欄に優勝がないときだけ「最後の優勝 3年度(102年前)」と出す。
+  // 今までのセーブデータで、直近10回より前に優勝していて年度が分からないときは「○年度以前」と出す
+  Widget _buildSaigoNoYuushou(UnivData univData, int raceIndex, Ghensuu ghensuu) {
+    if (!choukiRaceList.contains(raceIndex) ||
+        univData.juni_race.length <= raceIndex ||
+        choukiTsuusan(univData, raceIndex, choukiYuushou) <= 0) {
+      return const SizedBox.shrink();
+    }
+    final List<int> juni = univData.juni_race[raceIndex];
+    for (int i = 0; i < 5 && i < juni.length; i++) {
+      if (juni[i] == 0) return const SizedBox.shrink();
+    }
+    final ChoukiKiroku? c = choukiYomu(univData, raceIndex, choukiYuushou);
+    if (c == null) return const SizedBox.shrink();
+    final int ima = choukiNendo(ghensuu);
+    final String text;
+    if (c.saigo > 0) {
+      text = '最後の優勝 ${c.saigo}年度(${ima - c.saigo}年前)';
+    } else if (c.mae > 0) {
+      text = '最後の優勝 ${c.mae}年度以前(${ima - c.mae}年以上前)';
+    } else {
+      return const SizedBox.shrink();
+    }
+    return Text(text, style: const TextStyle(color: HENSUU.textcolor));
   }
 
   @override

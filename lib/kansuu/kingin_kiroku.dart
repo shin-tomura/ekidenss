@@ -31,7 +31,11 @@ const String _midashi = '#金銀';
 const int kinginAnteikan = 10;
 
 /// 表示する能力の並び(金の駅伝男・平常心・安定感、銀の長距離粘り〜ペース変動対応力)
-const List<int> _narabi = [0, 1, kinginAnteikan, 2, 3, 4, 5, 6, 7, 8, 9];
+const List<int> kinginNouryokuNarabi = [0, 1, kinginAnteikan, 2, 3, 4, 5, 6, 7, 8, 9];
+
+/// 金特訓で上げる能力か(駅伝男・平常心・安定感。ほかは銀特訓)
+bool kinginKinNouryoku(int bangou) =>
+    bangou == 0 || bangou == 1 || bangou == kinginAnteikan;
 
 /// 能力の名前(番号は上の決まり)
 String kinginNouryokuMei(int bangou) {
@@ -100,6 +104,17 @@ Map<int, Map<int, int>> kinginKirokuYomu(String text) {
   return kiroku;
 }
 
+/// [text](選手の短縮名)の記録を学年を合わせて、能力ごとの回数にする(記録がなければ空)
+Map<int, int> kinginKirokuGoukei(String text) {
+  final Map<int, int> goukei = {};
+  for (final Map<int, int> m in kinginKirokuYomu(text).values) {
+    m.forEach((b, k) {
+      if (k > 0) goukei[b] = (goukei[b] ?? 0) + k;
+    });
+  }
+  return goukei;
+}
+
 /// 記録を短縮名の文字にする
 String _kaku(Map<int, Map<int, int>> kiroku) {
   final List<int> gakunenNarabi = kiroku.keys.toList()..sort();
@@ -146,7 +161,7 @@ String kinginKirokuBun(String text) {
   for (final int g in gakunenNarabi) {
     final Map<int, int> m = kiroku[g]!;
     final List<String> kou = [
-      for (final int b in _narabi)
+      for (final int b in kinginNouryokuNarabi)
         if ((m[b] ?? 0) > 0) '${kinginNouryokuMei(b)}+${m[b]! * 10}',
     ];
     if (kou.isNotEmpty) gyou.add('$g年 ${kou.join('、')}');

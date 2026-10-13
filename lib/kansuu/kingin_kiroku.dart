@@ -1,11 +1,14 @@
 import 'package:ekiden/senshu_data.dart';
+import 'package:ekiden/kansuu/kiji/kiji_kihon.dart' show KijiHyou; // 選手画面などの表
 
 // ------------------------------------------------------------
 // 金銀の記録(1.9.9)
 //
 // 夏合宿の金特訓・銀特訓で、誰のどの能力を何回(1回+10)上げたかを、選手ごとに学年ごとに記録する。
 // プレイヤーの大学(選手画面と夏合宿の画面の金特訓・銀特訓)も、コンピュータの大学(goldsilver_com.dart)も記録する。
-// 選手画面・他大学の選手の詳細・卒業生の画面・夏合宿の画面に出す。
+// 選手画面・他大学の選手の詳細・卒業生の画面に学年ごと能力ごとの表(kinginKirokuHyou)で出し、
+// 夏合宿の日の結果画面(mode0700_content.dart)に、自分の大学の選手の一覧表で出す。
+// (夏合宿の画面 9100Gashuku.dart の「これまで」の行は、その画面が今は使われていないので表示されない)
 //
 // ・保存場所は SenshuData.name_tanshuku(選手の短縮名)。選手を作ったときの「短縮」のままで、
 //   画面にも計算にも使っていなかったことを確かめた(大学の短縮名 UnivData.name_tanshuku とは別)。
@@ -167,4 +170,32 @@ String kinginKirokuBun(String text) {
     if (kou.isNotEmpty) gyou.add('$g年 ${kou.join('、')}');
   }
   return gyou.join(' / ');
+}
+
+/// 選手画面・他大学の選手の詳細・卒業生の画面の表(行は上げた能力、列は記録のある学年と合計。
+/// 合計の列は学年が2つ以上のときだけ。記録がなければnull)
+KijiHyou? kinginKirokuHyou(String text) {
+  final Map<int, Map<int, int>> kiroku = kinginKirokuYomu(text);
+  final List<int> gakunenNarabi = kiroku.keys
+      .where((g) => kiroku[g]!.values.any((k) => k > 0))
+      .toList()
+    ..sort();
+  if (gakunenNarabi.isEmpty) return null;
+  final Map<int, int> goukei = kinginKirokuGoukei(text);
+  final bool goukeiAri = gakunenNarabi.length >= 2;
+  final List<List<String>> gyou = [
+    for (final int b in kinginNouryokuNarabi)
+      if ((goukei[b] ?? 0) > 0)
+        [
+          kinginNouryokuMei(b),
+          for (final int g in gakunenNarabi)
+            (kiroku[g]![b] ?? 0) > 0 ? '+${kiroku[g]![b]! * 10}' : '',
+          if (goukeiAri) '+${goukei[b]! * 10}',
+        ],
+  ];
+  return KijiHyou('金銀で伸ばした能力', [
+    '能力',
+    for (final int g in gakunenNarabi) '$g年',
+    if (goukeiAri) '合計',
+  ], gyou);
 }

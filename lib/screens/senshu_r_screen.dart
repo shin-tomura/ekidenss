@@ -503,6 +503,8 @@ class _Senshu_R_ScreenState extends State<Senshu_R_Screen> {
               currentSenshu.kukanjuni_race,
               currentSenshu.kukantime_race,
             );
+            // 金銀で伸ばした能力の表(1.9.9。卒業のときに写した記録。なければnull)
+            final KijiHyou? kinginHyou = kinginKirokuHyou(currentSenshu.name_tanshuku);
             // 区間順位(予選の順位)の下に走破タイムも書く(1.9.9)
             final KijiHyou? sandaiHyou = sandaiSeisekiHyouKiroku(seiseki, taimuAri: true);
             final KijiHyou? taikousenHyou = taikousenSeisekiHyou(seiseki);
@@ -925,15 +927,8 @@ class _Senshu_R_ScreenState extends State<Senshu_R_Screen> {
                               currentSenshu.tandokusou +
                               currentSenshu.paceagesagetaiouryoku,
                         ),
-                        // 在学中に金銀で伸ばした能力(卒業のときに写した記録。1.9.9。kingin_kiroku.dart)
-                        if (kinginKirokuBun(currentSenshu.name_tanshuku).isNotEmpty)
-                          Text(
-                            '金銀で伸ばした能力: ${kinginKirokuBun(currentSenshu.name_tanshuku)}',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: HENSUU.fontsize_honbun,
-                            ),
-                          ),
+                        // 在学中に金銀で伸ばした能力の表(卒業のときに写した記録。1.9.9。kingin_kiroku.dart)
+                        if (kinginHyou != null) KijiHyouView(kinginHyou, ue: 16),
 
                         const SizedBox(height: 16),
                         // 三大駅伝と対校戦の成績の表(1.9.8)

@@ -189,6 +189,113 @@ String _daigakuTsuki(KijiKankyou k, KijiKakite w, SenshuData s, {String soe = ''
 /// 年度の文(「2026年度」。1〜3月なので、前の年の4月からの年度)
 String _nendoMoji(KijiKankyou k) => '${k.gh.month <= 3 ? k.gh.year - 1 : k.gh.year}年度';
 
+/// 名声の履歴の、大会ごとのまとめ(年間最優秀チームの「名声を大きく押し上げたのは」に使う。1.9.9)
+class _MeiseiTaikai {
+  /// 大会の名前(「正月駅伝」「対校戦」)
+  final String mei;
+
+  /// 記録した順(同じ量なら、先に記録した大会を先にする)
+  final int jun;
+
+  /// この大会で得た名声の合計
+  int ryou = 0;
+
+  /// 総合順位(1が1位。なければ0)
+  int sougou = 0;
+
+  /// 区間賞の数
+  int kukanshou = 0;
+
+  /// 学連選抜の監督として総合1位相当に導いたか
+  bool gakurenKantoku = false;
+
+  /// 学連選抜で区間1位相当だった選手の数
+  int gakurenKukan = 0;
+
+  /// 対校戦の種目で優勝した数
+  int shumokuYuushou = 0;
+
+  /// 対校戦の種目で8位以内に入った人数(優勝も含む)
+  int shumokuNyuushou = 0;
+
+  _MeiseiTaikai(this.mei, this.jun);
+
+  /// 「正月駅伝(総合1位、3区間で区間賞)」の形
+  String get moji {
+    final List<String> l = [
+      if (sougou > 0) '総合$sougou位',
+      if (kukanshou == 1) '区間賞',
+      if (kukanshou >= 2) '$kukanshou区間で区間賞',
+      if (gakurenKantoku) '学連選抜の監督として総合1位相当',
+      if (gakurenKukan == 1) '学連選抜で区間1位相当',
+      if (gakurenKukan >= 2) '学連選抜で$gakurenKukan人が区間1位相当',
+      if (shumokuYuushou > 0) '$shumokuYuushou種目で優勝',
+      if (shumokuYuushou == 0 && shumokuNyuushou > 0) '入賞$shumokuNyuushou人',
+    ];
+    return l.isEmpty ? mei : '$mei(${l.join('、')})';
+  }
+}
+
+/// 大学[univid]の今年度の名声の履歴を大会ごとに合計して、多かった大会から[kazu]つまでの文(1.9.9)
+/// これまでは履歴の1行ずつで比べていたので、区間賞が1区間ずつ別の行になったり、
+/// 目標順位によって総合順位の名声が区間賞より少なくなったりして、大きかった大会が挙がらないことがあった。
+/// 大会は履歴の各行の先頭の大会名で分ける(学連選抜の分は正月駅伝に含める。量が0の行と、読めない行は除く)
+List<String> _meiseiOokiiTaikai(int univid, {int kazu = 2}) {
+  final Map<String, _MeiseiTaikai> map = {};
+  _MeiseiTaikai taikai(String mei) =>
+      map.putIfAbsent(mei, () => _MeiseiTaikai(mei, map.length));
+  final RegExp gakurenKukanRe = RegExp(r'^(.+) 学連選抜 \d+区 区間1位相当');
+  final RegExp sougouRe = RegExp(r'^(.+) 総合(\d+)位');
+  final RegExp kukanshouRe = RegExp(r'^(.+) \d+区 区間賞');
+  final RegExp taikouKojinRe = RegExp(r'^対校戦 \S+ (\d+)位');
+  for (final MeiseiRirekiGyou g in meiseiRirekiYomu(0, univid)) {
+    if (g.ryou <= 0) continue;
+    final String n = g.naiyou;
+    final _MeiseiTaikai t;
+    if (n.startsWith('学連選抜 ')) {
+      // 学連選抜の監督として総合1位相当(正月駅伝に含める)
+      t = taikai(meiseiRirekiEkidenMei(2));
+      t.gakurenKantoku = true;
+    } else if (n.startsWith('対校戦 ')) {
+      t = taikai('対校戦');
+      final RegExpMatch? s = sougouRe.firstMatch(n);
+      final RegExpMatch? kj = taikouKojinRe.firstMatch(n);
+      if (s != null && s.group(1) == '対校戦') {
+        t.sougou = int.tryParse(s.group(2)!) ?? 0;
+      } else if (kj != null) {
+        t.shumokuNyuushou++;
+        if (kj.group(1) == '1') t.shumokuYuushou++;
+      }
+    } else {
+      final RegExpMatch? gk = gakurenKukanRe.firstMatch(n);
+      final RegExpMatch? s = sougouRe.firstMatch(n);
+      final RegExpMatch? ks = kukanshouRe.firstMatch(n);
+      if (gk != null) {
+        t = taikai(gk.group(1)!);
+        t.gakurenKukan++;
+      } else if (s != null) {
+        t = taikai(s.group(1)!);
+        t.sougou = int.tryParse(s.group(2)!) ?? 0;
+      } else if (ks != null) {
+        t = taikai(ks.group(1)!);
+        t.kukanshou++;
+      } else {
+        continue;
+      }
+    }
+    t.ryou += g.ryou;
+  }
+  final List<_MeiseiTaikai> narabi = map.values.toList()
+    ..sort((a, b) {
+      final int c = b.ryou.compareTo(a.ryou);
+      return c != 0 ? c : a.jun.compareTo(b.jun);
+    });
+  return [
+    for (final _MeiseiTaikai t in narabi.take(kazu))
+      if (t.ryou > 0) t.moji,
+  ];
+}
+
 // ------------------------------------------------------------
 // 箱庭スポーツの年間表彰
 // ------------------------------------------------------------
@@ -403,12 +510,8 @@ List<Kiji> nenkanHyoushouKiji(KijiKankyou k) {
     if (juni.isNotEmpty) tb.write('今季は${juni.join('、')}。');
     final SandaiEkiden? sandaiBt = SandaiEkiden.tsukuru(k, kekka: true);
     if (sandaiBt != null && sandaiBt.sankan(bt, 0)) tb.write('三大駅伝をすべて制する三冠の季だった。');
-    // 名声の履歴から、大きかった出来事を2つまで
-    final List<MeiseiRirekiGyou> rireki = meiseiRirekiYomu(0, bt.id)..sort((a, b) => b.ryou.compareTo(a.ryou));
-    final List<String> dekigoto = [
-      for (final MeiseiRirekiGyou g in rireki.take(2))
-        if (g.ryou > 0) g.naiyou,
-    ];
+    // 名声の履歴を大会ごとに合計して、大きかった大会を2つまで(1.9.9)
+    final List<String> dekigoto = _meiseiOokiiTaikai(bt.id);
     if (dekigoto.isNotEmpty) tb.write('名声を大きく押し上げたのは、${dekigoto.join('と')}だった。');
     w.danraku(tb.toString());
     if (jibun != null && bt.id == jibun.id) {

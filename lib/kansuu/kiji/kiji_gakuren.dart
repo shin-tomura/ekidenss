@@ -350,18 +350,30 @@ int _dan(int j, int n) {
   return j <= n ~/ 3 ? 0 : 1;
 }
 
-/// 区間を走ったあとの気持ちの言葉の場面([d] 抜いた大学の数。区間1位相当・下位・人抜き・上位・中位の順に見る)
-CommentBamen _atoBamen(int j, int d, int n) {
+/// 区間を走ったあとの気持ちの言葉の場面([d] 抜いた大学の数。区間1位相当・下位・人抜き・4年生・上位・中位の順に見る)
+/// 4年生は、大学の記事と同じく「4年生の最後」の言葉にする(最後の正月駅伝なので、「来年は戻ってきたい」と
+/// 言わないように。1.9.9)
+CommentBamen _atoBamen(int j, int d, int n, {int gakunen = 0}) {
   final int dan = _dan(j, n);
   if (j == 0) return CommentBamen.kukanshou;
   if (dan == 2) return CommentBamen.brake;
   if (d >= 3) return CommentBamen.oinuki;
+  if (gakunen == 4) return CommentBamen.yonenSaigo;
   return dan == 0 ? CommentBamen.gakurenKekka : CommentBamen.gakurenFutsuu;
 }
 
 /// 区間を走ったあとの一言(速報の中継所での一言と、結果号のコメント。1.9.7)
 /// 区間順位相当の段で、事実の話し言葉も変える(中位で「いい報告ができる」と言わないように)
-String _atoComment(KijiKakite w, String yobi, String shozoku, int j, int d, int n) {
+/// [gakunen] 走った選手の学年(4年生は最後の正月駅伝なので、言葉を変える。1.9.9)
+String _atoComment(
+  KijiKakite w,
+  String yobi,
+  String shozoku,
+  int j,
+  int d,
+  int n, {
+  int gakunen = 0,
+}) {
   final int dan = _dan(j, n);
   final String jijitsu = dan == 2
       ? '区間${juniMoji(j)}相当。$shozokuのみんなに申し訳ない'
@@ -369,14 +381,17 @@ String _atoComment(KijiKakite w, String yobi, String shozoku, int j, int d, int 
             ? '区間${juniMoji(j)}相当。$shozokuのみんなに、いい報告ができる'
             : w.erabu([
                 '区間${juniMoji(j)}相当。もっと前で勝負したかった',
-                '区間${juniMoji(j)}相当。この経験を$shozokuに持ち帰りたい',
+                gakunen == 4
+                    ? '区間${juniMoji(j)}相当。この経験を$shozokuの後輩に伝えたい'
+                    : '区間${juniMoji(j)}相当。この経験を$shozokuに持ち帰りたい',
               ]));
   return senshuCommentJijitsu(
     w,
-    _atoBamen(j, d, n),
+    _atoBamen(j, d, n, gakunen: gakunen),
     yobi,
     jijitsu: [jijitsu],
     kuyashii: dan == 2,
+    yonensei: gakunen == 4,
   );
 }
 
@@ -852,7 +867,7 @@ Kiji? _sokuhou(
   w.danraku(ab.toString());
 
   // 中継所での一言(区間順位相当の上位・中位・下位で変える。1.9.7)
-  w.comment(_atoComment(w, myouji(g.name), x.shozoku, j, d, n));
+  w.comment(_atoComment(w, myouji(g.name), x.shozoku, j, d, n, gakunen: g.gakunen));
 
   // 本文: 次の走者(最終区はゴール)
   if (!saigo) {
@@ -1082,13 +1097,20 @@ Kiji _kekkaTop(KijiKankyou k, List<_GSenshu> list, List<GakurenKukanKekka?> kekk
       '${daigakuMei(my)}から選ばれた${_mei(w, jibun)}は、${jibun.kukan + 1}区で区間${juniMoji(r.kukanJuni)}相当だった。',
     );
     final int? jm = r.maeTuukaJuni;
+    // 4年生は来年がないので、後輩に託す言葉にする(1.9.9)
+    final bool yonen = jibun.g.gakunen == 4;
     w.comment(
       senshuCommentJijitsu(
         w,
-        _atoBamen(r.kukanJuni, jm == null ? 0 : jm - r.tuukaJuni, nDaigaku),
+        _atoBamen(r.kukanJuni, jm == null ? 0 : jm - r.tuukaJuni, nDaigaku, gakunen: jibun.g.gakunen),
         myouji(jibun.g.name),
-        jijitsu: ['来年は${daigakuMei(my)}のチームで、この舞台に戻ってきたい'],
+        jijitsu: [
+          yonen
+              ? '後輩たちには、来年は${daigakuMei(my)}のチームで、この舞台に戻ってきてほしい'
+              : '来年は${daigakuMei(my)}のチームで、この舞台に戻ってきたい',
+        ],
         kuyashii: _dan(r.kukanJuni, nDaigaku) == 2,
+        yonensei: yonen,
       ),
     );
   }
@@ -1100,7 +1122,15 @@ Kiji _kekkaTop(KijiKankyou k, List<_GSenshu> list, List<GakurenKukanKekka?> kekk
       // チームで一番良くても中位のこともあるので、区間順位相当の段で変える(1.9.7)
       final int? bm = r.maeTuukaJuni;
       w.comment(
-        _atoComment(w, myouji(xb.g.name), xb.shozoku, r.kukanJuni, bm == null ? 0 : bm - r.tuukaJuni, nDaigaku),
+        _atoComment(
+          w,
+          myouji(xb.g.name),
+          xb.shozoku,
+          r.kukanJuni,
+          bm == null ? 0 : bm - r.tuukaJuni,
+          nDaigaku,
+          gakunen: xb.g.gakunen,
+        ),
       );
     }
   }
@@ -1196,7 +1226,7 @@ Kiji _kekkaZenin(
     // コメント(区間順位相当の上位・中位・下位で変える。1.9.7)
     final int? m = r.maeTuukaJuni;
     final int d = m == null ? 0 : m - r.tuukaJuni;
-    w.comment(_atoComment(w, yobi, x.shozoku, r.kukanJuni, d, n));
+    w.comment(_atoComment(w, yobi, x.shozoku, r.kukanJuni, d, n, gakunen: g.gakunen));
   }
   return _kansei(
     k,

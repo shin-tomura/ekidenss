@@ -2500,7 +2500,16 @@ Kiji? _seedKiji(EkidenKekka e) {
       '${myouji(nAnchor.name)}は区間${nokori.kukanJuni[ks - 1] + 1}位、'
       '${myouji(mAnchor.name)}は区間${morashi.kukanJuni[ks - 1] + 1}位だった。',
     );
-    w.comment(senshuComment(w, CommentBamen.yosenRakusen, myouji(mAnchor.name), kuyashii: true));
+    // 4年生のアンカーは来年がないので、「来年」の言葉は言わない(1.9.9)
+    w.comment(
+      senshuComment(
+        w,
+        CommentBamen.yosenRakusen,
+        myouji(mAnchor.name),
+        kuyashii: true,
+        yonensei: mAnchor.gakunen == 4,
+      ),
+    );
   }
   w.comment(kantokuComment(w, KantokuBamen.seedKakutoku, nokori.u.id));
   w.comment(

@@ -536,22 +536,37 @@ const List<String> _jijitsuKuyashiShime = [
   '。[yobi]は、言葉を絞り出すように話した。',
 ];
 
+/// 場面[bamen]の気持ちの言葉の候補([yonensei]なら「来年」を含む言葉を除く。全部除かれたら元のまま。1.9.9)
+List<String> _kimochiKouho(CommentBamen bamen, bool yonensei) {
+  final List<String> kouho = _senshuComment[bamen] ?? const ['よかった'];
+  if (!yonensei) return kouho;
+  final List<String> nokori = [
+    for (final String x in kouho)
+      if (!x.contains('来年')) x,
+  ];
+  return nokori.isEmpty ? kouho : nokori;
+}
+
 /// 選手のコメント(事実入り。1.9.4)
 /// [jijitsu] その選手の事実の話し言葉(因縁の kotoba や、その日の数字。「。」なし)。
 /// 空なら今まで通りの気持ちだけのコメントにする
+/// [yonensei] 4年生なら、気持ちの言葉から「来年」を含む言葉を除く(1.9.9)
 String senshuCommentJijitsu(
   KijiKakite w,
   CommentBamen bamen,
   String yobi, {
   List<String> jijitsu = const [],
   bool kuyashii = false,
+  bool yonensei = false,
 }) {
   final List<String> j = [
     for (final String x in jijitsu)
       if (x.trim().isNotEmpty) x.trim(),
   ];
-  if (j.isEmpty) return senshuComment(w, bamen, yobi, kuyashii: kuyashii);
-  final List<String> kouho = _senshuComment[bamen] ?? const ['よかった'];
+  if (j.isEmpty) {
+    return senshuComment(w, bamen, yobi, kuyashii: kuyashii, yonensei: yonensei);
+  }
+  final List<String> kouho = _kimochiKouho(bamen, yonensei);
   final String kimochi = w.erabu(kouho);
   // 気持ちの言葉が2文なら事実は1つ、1文なら2つまで(長くなりすぎないように)
   final List<String> tsukau = j.take(kimochi.contains('。') ? 1 : 2).toList();
@@ -621,13 +636,15 @@ String tsugiKotoba(KijiKakite w, {bool kuyashii = false}) =>
 
 /// 選手のコメントの文(「「……」と山田は振り返った。」の形)
 /// [kuyashii] 悔しい場面なら、締めの言葉を悔しいほうにする
+/// [yonensei] 4年生なら、「来年」を含む言葉を除く(来年がないので。1.9.9)
 String senshuComment(
   KijiKakite w,
   CommentBamen bamen,
   String yobi, {
   bool kuyashii = false,
+  bool yonensei = false,
 }) {
-  final List<String> kouho = _senshuComment[bamen] ?? const ['よかった'];
+  final List<String> kouho = _kimochiKouho(bamen, yonensei);
   final String naka = w.erabu(kouho);
   // 締めの言葉はどれも「と」で始まる(「と振り返った」→「と山田は振り返った」)
   final String shime = w.erabu(

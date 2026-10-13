@@ -512,8 +512,15 @@ Kiji _yosenTopKiji(YosenKekka e) {
         '${race == 3 ? '${e.kumiMei(morashi.senshu.first.kumi)}で' : ''}'
         '個人${juniMoji(morashi.senshu.first.juni)}と奮闘したが、あと一歩届かなかった。',
       );
+      // 4年生は来年がないので、「来年」の言葉は言わない(1.9.9)
       w.comment(
-        senshuComment(w, CommentBamen.yosenRakusen, myouji(s.name), kuyashii: true),
+        senshuComment(
+          w,
+          CommentBamen.yosenRakusen,
+          myouji(s.name),
+          kuyashii: true,
+          yonensei: s.gakunen == 4,
+        ),
       );
     }
     if (!e.jitenKijiAri) {

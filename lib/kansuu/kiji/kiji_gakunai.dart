@@ -868,12 +868,14 @@ Kiji _kekkaZenin(EkidenKekka e, EkidenUnivKekka m, String site) {
         '${namae.join('、')}は、当日の朝に体調を崩し、走る予定だった区間を仲間に託した。'
         '走れなかった悔しさを抱えながら、チームの戦いを見届けた。',
       );
+      // 4年生は来年がないので、「来年」の言葉は言わない(1.9.9)
       w.comment(
         senshuComment(
           w,
           CommentBamen.gakunaiTaichouHazureta,
           myouji(taichou.first.name),
           kuyashii: true,
+          yonensei: taichou.first.gakunen == 4,
         ),
       );
     }

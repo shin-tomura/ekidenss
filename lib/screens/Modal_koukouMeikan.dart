@@ -1390,6 +1390,13 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
     }
   }
 
+  /// 今年の新入生(スカウトの候補)の世代の回を、スカウトの途中に見ているか(1.9.9)
+  /// (今年の高校の大会の画面と、スカウトの画面から開いた高校名鑑のとき。名前の出ている3年生はまだ大学に
+  /// 入っていないので、「大学に入った選手」「進学先」と言わずに「今年の新入生」と書く)
+  bool _kotoshiNoKai(KoukouTaikaiKiroku k) =>
+      (widget.kotoshiNomi || widget.scoutKara) &&
+      k.nyuugakuNendo == koukouImaNoNendo();
+
   /// スカウトの途中で、進学先が決まっていない新入生か(仮の振り分けの大学を見せない。1.9.5)
   bool _miteiKa(KoukouKirokuSousha s) {
     if (!_scoutChuu) return false;
@@ -1548,9 +1555,15 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
     }
     final List<KoukouKirokuSousha> jun = List<KoukouKirokuSousha>.of(m)
       ..sort((a, b) => (a.kukan == 0 ? 99 : a.kukan).compareTo(b.kukan == 0 ? 99 : b.kukan));
+    // 今年の新入生の世代をスカウトの途中に見ているときは「今年の新入生」と書く(1.9.9)
+    final bool kotoshi = _kotoshiNoKai(kiroku);
     return [
-      if (j >= 8) const Text('9位以下の高校は、大学に入った選手だけを残しています。', style: _hosoku),
-      if (jun.isEmpty) const Text('大学に入った選手はいません。', style: _hosoku),
+      if (j >= 8)
+        Text(
+          kotoshi ? '9位以下の高校は、今年の新入生だけを残しています。' : '9位以下の高校は、大学に入った選手だけを残しています。',
+          style: _hosoku,
+        ),
+      if (jun.isEmpty) Text(kotoshi ? '今年の新入生はいません。' : '大学に入った選手はいません。', style: _hosoku),
       for (final KoukouKirokuSousha s in jun)
         _soushaGyou(
           kiroku,
@@ -1836,7 +1849,12 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
         midashi: '全国高校駅伝(${k.zenkoku.length}校)',
         hajimeHiraku: zenkokuHiraku,
         naka: [
-          const Text('高校を押すと、走った選手と進学先を見られます。', style: _hosoku),
+          Text(
+            _kotoshiNoKai(k)
+                ? '高校を押すと、走った選手を見られます。名前の出ている3年生が、今年の新入生(スカウトの候補)です。'
+                : '高校を押すと、走った選手と進学先を見られます。',
+            style: _hosoku,
+          ),
           for (int j = 0; j < k.zenkoku.length; j++)
             _Oritatami(
               key: ValueKey<String>('team$erabu-$j'),
@@ -1937,8 +1955,8 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
         ),
         const SizedBox(height: 4),
         const Text(
-          '大学に入る選手には、スカウトの画面と同じ出し方で進学先を出します。'
-          '高校を押すと、走った選手を見られます。$_namaeNashiSetsumei',
+          '選手の後ろには、スカウトの画面と同じく「進路未定」などの今の状況を出します。'
+          '$_namaeNashiSetsumei',
           style: _hosoku,
         ),
         const SizedBox(height: 8),
@@ -1983,7 +2001,7 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
         kotoshi
             ? '一番新しい回が、今年の新入生(スカウトの候補)が高校3年だった世代です。'
                 '下の「大会の結果」で、その回の全国高校駅伝を開いてあります。'
-                '今年の新入生の進学先は、スカウトの画面と同じ出し方です。'
+                '今年の新入生には、スカウトの画面と同じく「進路未定」などを出します。'
                 'お気に入りの高校は、「都道府県別」のタブの一番上に並びます。'
             : '今年の新入生の、高校の大会の記録はまだありません。',
         style: const TextStyle(color: Colors.lightBlueAccent, fontSize: HENSUU.fontsize_honbun - 1),

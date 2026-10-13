@@ -111,6 +111,9 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
   // 表示する地区(-2=今の地区(初期値。地区が進むと次の地区になる)・-1=全地区・0〜10=その地区)
   int _hyoujiSentaku = -2;
   bool _junbanDialogZumi = false; // 地区の順番のダイアログを、この画面で出したか
+  // 今年の高校の大会の画面を出した年(1.9.9。アプリを開いている間だけ覚える。ほかの画面に移って戻っても、
+  // もう一度は出さない。アプリを開き直したときは、1ラウンド目の前ならもう一度出す)
+  static int _kotoshiKoukouTaikaiNen = -1;
   bool _wakuIppaiKiitaZumi = false; // 自校の枠が埋まったときに、残りを進めるかをこの画面で聞いたか(1.9.6)
 
   @override
@@ -276,18 +279,25 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
 
     if (mounted) {
       setState(() => _isLoading = false);
+      // 1ラウンド目の前なら、今年の高校の大会の画面を先に出す(1.9.9。閉じると地区の順番のダイアログに続く)
+      final bool koukouGamen = _kotoshiKoukouTaikaiDasu();
       // 地区めぐりでは、最初の地区のときと、初めての地区めぐりのときに、地区の順番を出す(1.9.6)
+      bool junban = false;
+      bool hajimete = false;
       if (_chikuMeguri && !_junbanDialogZumi) {
         _junbanDialogZumi = true;
         final KantokuData? kantoku = Hive.box<KantokuData>(
           'kantokuBox',
         ).get('KantokuData');
-        final bool hajimete = kantoku != null && !comScoutOshiraseZumi(kantoku);
-        if (hajimete || _ghensuu!.scoutChances >= _roundSuu) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) _showChikuJunbanDialog(hajimete: hajimete);
-          });
-        }
+        hajimete = kantoku != null && !comScoutOshiraseZumi(kantoku);
+        junban = hajimete || _ghensuu!.scoutChances >= _roundSuu;
+      }
+      if (koukouGamen || junban) {
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
+          if (!mounted) return;
+          if (koukouGamen) await _kotoshiKoukouTaikaiHiraku();
+          if (mounted && junban) _showChikuJunbanDialog(hajimete: hajimete);
+        });
       }
     }
   }
@@ -858,6 +868,31 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
   /// 「進路未定」「○○大学に確定」などにする。自分の大学の色も、進学先が決まった選手だけ)
   /// 戻ったら、お気に入りと校名の変更を反映するために作り直す
   Future<void> _koukouMeikanHiraku() async {
+    final ({
+      String? Function(KoukouKirokuSousha) shingakuMoji,
+      bool Function(KoukouKirokuSousha) jibunHantei,
+    }) f = _shingakuKansuu();
+    await Navigator.push(
+      context,
+      MaterialPageRoute<void>(
+        builder: (_) => ModalKoukouMeikan(
+          shokiTab: 2,
+          scoutKara: true,
+          shingakuMoji: f.shingakuMoji,
+          jibunHantei: f.jibunHantei,
+        ),
+      ),
+    );
+    if (!mounted) return;
+    setState(() => _okiniiriKou = null);
+  }
+
+  /// 高校の大会の記録の選手の進学先の文字と、自分の大学の選手として色を変えるかの関数
+  /// (高校名鑑と今年の高校の大会の画面で使う。1.9.9で _koukouMeikanHiraku から切り出した)
+  ({
+    String? Function(KoukouKirokuSousha) shingakuMoji,
+    bool Function(KoukouKirokuSousha) jibunHantei,
+  }) _shingakuKansuu() {
     final Map<int, SenshuData> shinnyuusei = {
       for (final SenshuData s in _senshuBox.values)
         if (s.gakunen == 1) s.id: s,
@@ -869,30 +904,55 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
       return (s != null && s.name == k.name) ? s : null;
     }
 
+    return (
+      shingakuMoji: (KoukouKirokuSousha k) {
+        final SenshuData? s = sagasu(k);
+        if (s == null) return null;
+        if (comScoutOn && s.hirou != 1) return _jyoutaiMoji(s);
+        final String mei = _univBox.get(s.univid)?.name ?? '';
+        return mei.isEmpty ? '' : '→ $mei大学';
+      },
+      jibunHantei: (KoukouKirokuSousha k) {
+        final SenshuData? s = sagasu(k);
+        if (s == null || s.univid != myUnivId) return false;
+        if (comScoutOn && s.hirou != 1) return comScoutKettei(s);
+        return true;
+      },
+    );
+  }
+
+  /// 今年の高校の大会の画面を出すか(1.9.9)
+  /// 1ラウンド目の前で、アプリを開いてからこの年にまだ出しておらず、高校の情報を表示する設定で、
+  /// 今年の新入生の世代の記録があるとき(スキップ中はこの画面に来ない)
+  bool _kotoshiKoukouTaikaiDasu() {
+    final Ghensuu? g = _ghensuu;
+    if (g == null || _kotoshiKoukouTaikaiNen == g.year) return false;
+    // 1ラウンド目の前か(残りの回数が、始めたときの回数のまま。コンピュータスカウトOFFは3回)
+    final int hajime = _comScoutOn ? _roundSuu : 3;
+    if (g.scoutChances < hajime) return false;
+    final KantokuData? kantoku = Hive.box<KantokuData>(
+      'kantokuBox',
+    ).get('KantokuData');
+    if (kantoku == null || koukouHyoujiNashi(kantoku)) return false;
+    return kotoshiKoukouTaikaiKirokuAri();
+  }
+
+  /// 今年の高校の大会の画面を開く(1.9.9。Modal_koukouMeikan.dart の KotoshiKoukouTaikaiGamen)
+  Future<void> _kotoshiKoukouTaikaiHiraku() async {
+    _kotoshiKoukouTaikaiNen = _ghensuu?.year ?? -1;
+    final ({
+      String? Function(KoukouKirokuSousha) shingakuMoji,
+      bool Function(KoukouKirokuSousha) jibunHantei,
+    }) f = _shingakuKansuu();
     await Navigator.push(
       context,
       MaterialPageRoute<void>(
-        builder: (_) => ModalKoukouMeikan(
-          shokiTab: 2,
-          scoutKara: true,
-          shingakuMoji: (KoukouKirokuSousha k) {
-            final SenshuData? s = sagasu(k);
-            if (s == null) return null;
-            if (comScoutOn && s.hirou != 1) return _jyoutaiMoji(s);
-            final String mei = _univBox.get(s.univid)?.name ?? '';
-            return mei.isEmpty ? '' : '→ $mei大学';
-          },
-          jibunHantei: (KoukouKirokuSousha k) {
-            final SenshuData? s = sagasu(k);
-            if (s == null || s.univid != myUnivId) return false;
-            if (comScoutOn && s.hirou != 1) return comScoutKettei(s);
-            return true;
-          },
+        builder: (_) => KotoshiKoukouTaikaiGamen(
+          shingakuMoji: f.shingakuMoji,
+          jibunHantei: f.jibunHantei,
         ),
       ),
     );
-    if (!mounted) return;
-    setState(() => _okiniiriKou = null);
   }
 
   String _jyoutaiMoji(SenshuData s) {

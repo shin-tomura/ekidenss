@@ -1010,6 +1010,7 @@ Future<void> main() async {
       //1.9.3で新入生の成長タイプの割合の初期値を変えた(1年で伸びきる型を減らした。seichou_type.dart)ので、
       //今までのセーブデータも一度だけ新しい初期値にする(1.9.2までは設定がなく、みな以前の割合だったため。
       //そのあと設定タブの「成長タイプ設定」で以前の割合にも戻せる)。在学中の選手の型は変えない
+      //(2.0.0からは seichouTypeShokiti が2.0.0の初期値(ほぼ均等)なので、1.9.2までのデータはそちらになる)
       //save_load_screenの中の _importFromSlot の中にもあるので、そちらも変更すること！
       final checkversionValue = int.tryParse(sortedUnivData[7].name_tanshuku);
       if (checkversionValue == null ||
@@ -1048,6 +1049,20 @@ Future<void> main() async {
       final Ghensuu? gh = ghensuuBox.getAt(0);
       if (gh != null) {
         await choukiIkou(sortedUnivData, gh);
+      }
+    }
+
+    // 成長タイプの割合が1.9.3〜1.9.9の初期値のままなら、2.0.0の初期値(ほぼ均等)にする(一度だけ。seichou_type.dart)
+    // (2.0.0で限界突破の起こり方を成長タイプに合わせたため。自分で変えた割合はそのまま)
+    // 版の番号では判定しない(2.0.0testで開いたデータにも入るように)。移行した印を付ける
+    //save_load_screenの中の _importFromSlot の中にもあるので、そちらも変更すること！
+    {
+      final Ghensuu? gh = ghensuuBox.getAt(0);
+      final KantokuData? kantoku = Hive.box<KantokuData>(
+        'kantokuBox',
+      ).get('KantokuData');
+      if (gh != null && kantoku != null) {
+        await seichouType200Ikou(gh, kantoku);
       }
     }
 

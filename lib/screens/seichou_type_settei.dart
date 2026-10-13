@@ -4,19 +4,22 @@ import 'package:ekiden/constants.dart';
 import 'package:ekiden/ghensuu.dart';
 import 'package:ekiden/kansuu/seichou_type.dart';
 import 'package:ekiden/kantoku_data.dart';
-import 'package:ekiden/kansuu/joukai.dart'; // 13分台の新入生の限界突破の優遇
+import 'package:ekiden/kansuu/joukai.dart'; // 13分台の新入生の限界突破の優遇・限界突破の起こり方(2.0.0)
 
 // ------------------------------------------------------------
 // 説明画面の設定タブの「成長タイプ設定」(1.9.3)
 // 新入生の成長タイプの割合(全大学共通)を、型ごとにプルダウンで決める
 // (保存先と決まりは lib/kansuu/seichou_type.dart)
 // ・合計が100%のときだけ保存できる。画面の上に、合計とあと何%かをいつも出す
-// ・「初期値に戻す」「以前の割合にする」は、画面の値を入れ替えるだけで、保存ボタンで確定する。
+// ・「初期値に戻す」「1.9.9までの設定にする」「1.9.2までの設定にする」(1.9.9までは「以前の割合にする」の1つ)は、画面の値を入れ替えるだけで、保存ボタンで確定する。
 //   誤タップで調整中の割合が消えないように、入れ替える前に確認を出す(画面がすでにその値なら何もしない)
 // ・保存していない変更があるまま閉じようとしたら、確認を出す
 // ・スマホの文字を大きくしていてもはみ出さないように、型ごとに名前・説明・割合を縦に積む
 // ・割合の下で、13分台の新入生の限界突破の優遇(なし(初期値)・あり。保存先と決まりは lib/kansuu/joukai.dart)も選ぶ。
-//   割合と同じ保存ボタンでまとめて保存し、初期化ボタンはどちらも「なし」にする(1.9.2までも優遇はなかったため)
+//   割合と同じ保存ボタンでまとめて保存し、初期化ボタンはどれも「なし」にする(1.9.2までも優遇はなかったため)
+// ・2.0.0から、限界突破の起こり方(成長タイプに合わせる(初期値)・1.9.9まで。joukai.dart)も選ぶ。
+//   初期化ボタンを、初期値(2.0.0)・1.9.9まで・1.9.2までの3つにし、それぞれのバージョンの割合と
+//   限界突破の起こり方にする(ボタン1つで、そのバージョンの成長に丸ごと戻せるように)
 // ------------------------------------------------------------
 
 class ModalSeichouTypeSettei extends StatefulWidget {
@@ -34,6 +37,9 @@ class _ModalSeichouTypeSetteiState extends State<ModalSeichouTypeSettei> {
   // 13分台の新入生の限界突破の優遇(0=なし・1=あり)。保存されている値と、画面で選んでいる値
   int _yuuguuHozonZumi = 0;
   int _yuuguu = 0;
+  // 限界突破の起こり方(0=成長タイプに合わせる・1=1.9.9まで。2.0.0)。保存されている値と、画面で選んでいる値
+  int _okorikataHozonZumi = genkaitoppaOkorikataType;
+  int _okorikata = genkaitoppaOkorikataType;
 
   @override
   void initState() {
@@ -50,6 +56,8 @@ class _ModalSeichouTypeSetteiState extends State<ModalSeichouTypeSettei> {
     if (kantoku != null) {
       _yuuguuHozonZumi = genkaitoppaYuuguuSettei(kantoku);
       _yuuguu = _yuuguuHozonZumi;
+      _okorikataHozonZumi = genkaitoppaOkorikataSettei(kantoku);
+      _okorikata = _okorikataHozonZumi;
     }
   }
 
@@ -64,7 +72,8 @@ class _ModalSeichouTypeSetteiState extends State<ModalSeichouTypeSettei> {
   // 保存していない変更があるか
   bool get _henkouAri =>
       !seichouTypeWariaiOnaji(_wariai, _hozonZumi) ||
-      _yuuguu != _yuuguuHozonZumi;
+      _yuuguu != _yuuguuHozonZumi ||
+      _okorikata != _okorikataHozonZumi;
 
   int get _goukei => seichouTypeGoukei(_wariai);
 
@@ -78,11 +87,15 @@ class _ModalSeichouTypeSetteiState extends State<ModalSeichouTypeSettei> {
     }
     await seichouTypeWariaiHozon(gh, _wariai);
     genkaitoppaYuuguuIreru(kantoku, _yuuguu);
+    genkaitoppaOkorikataIreru(kantoku, _okorikata);
+    // 自分で決めた割合なので、次の起動の2.0.0の移行で変えないように印を付ける(seichou_type.dart)
+    seichouType200IkouShirushi(kantoku);
     await kantoku.save();
     if (!mounted) return;
     setState(() {
       _hozonZumi = List<int>.from(_wariai);
       _yuuguuHozonZumi = genkaitoppaYuuguuSettei(kantoku);
+      _okorikataHozonZumi = genkaitoppaOkorikataSettei(kantoku);
     });
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('成長タイプ設定を保存しました')),
@@ -98,7 +111,7 @@ class _ModalSeichouTypeSetteiState extends State<ModalSeichouTypeSettei> {
           title: Text(midashi, style: const TextStyle(color: Colors.black)),
           content: SingleChildScrollView(
             child: Text(
-              '画面の割合と13分台の新入生の限界突破を、$naiyouにします。'
+              '画面の割合・限界突破の起こり方・13分台の新入生の限界突破を、$naiyouにします。'
               'まだ保存はされず、上の「保存」で確定します。',
               style: const TextStyle(color: Colors.black),
             ),
@@ -131,7 +144,7 @@ class _ModalSeichouTypeSetteiState extends State<ModalSeichouTypeSettei> {
           ),
           content: const SingleChildScrollView(
             child: Text(
-              '変えた割合を保存せずに閉じますか?',
+              '変えた設定を保存せずに閉じますか?',
               style: TextStyle(color: Colors.black),
             ),
           ),
@@ -200,12 +213,14 @@ class _ModalSeichouTypeSetteiState extends State<ModalSeichouTypeSettei> {
   }
 
   // 初期化ボタン(画面の値を入れ替えるだけ。保存は保存ボタンで。
-  // 13分台の新入生の限界突破の優遇は、どちらのボタンでも「なし」にする)
+  // 13分台の新入生の限界突破の優遇は、どのボタンでも「なし」にする)
+  // [okorikata] そのバージョンの限界突破の起こり方(2.0.0)
   // [kakuninMidashi]・[naiyou]・[okMei] 確認画面の見出し・入れ替える値の説明・確定するボタンの文字
   Widget _shokikaButton(
     String mei,
     String setsumei,
     List<int> atai, {
+    required int okorikata,
     required String kakuninMidashi,
     required String naiyou,
     required String okMei,
@@ -217,13 +232,18 @@ class _ModalSeichouTypeSetteiState extends State<ModalSeichouTypeSettei> {
         children: [
           OutlinedButton(
             onPressed: () async {
-              // 画面がすでにその割合(優遇なし)なら、入れ替える必要がない
-              if (seichouTypeWariaiOnaji(_wariai, atai) && _yuuguu == 0) return;
+              // 画面がすでにその割合・起こり方(優遇なし)なら、入れ替える必要がない
+              if (seichouTypeWariaiOnaji(_wariai, atai) &&
+                  _yuuguu == 0 &&
+                  _okorikata == okorikata) {
+                return;
+              }
               final bool yoi = await _shokikaKakunin(kakuninMidashi, naiyou, okMei);
               if (!yoi || !mounted) return;
               setState(() {
                 _wariai = List<int>.from(atai);
                 _yuuguu = 0;
+                _okorikata = okorikata;
               });
             },
             style: OutlinedButton.styleFrom(
@@ -262,7 +282,7 @@ class _ModalSeichouTypeSetteiState extends State<ModalSeichouTypeSettei> {
     );
   }
 
-  // 型1つ分(名前・説明・初期値と以前の割合・プルダウンを縦に積む)
+  // 型1つ分(名前・説明・初期値と以前の割合・プルダウンを縦に積む。2.0.0から、以前の割合は1.9.9までと1.9.2までの2つ)
   Widget _typeRan(int type) {
     return Container(
       width: double.infinity,
@@ -281,10 +301,82 @@ class _ModalSeichouTypeSetteiState extends State<ModalSeichouTypeSettei> {
           ),
           Text(seichouTypeSetsumei[type], style: _honbun),
           Text(
-            '初期値 ${seichouTypeShokiti[type]}%・以前 ${seichouTypeIzen[type]}%',
+            '初期値 ${seichouTypeShokiti[type]}%・1.9.9まで ${seichouType199[type]}%・1.9.2まで ${seichouTypeIzen[type]}%',
             style: _chiisai,
           ),
           _wariaiDropdown(type),
+        ],
+      ),
+    );
+  }
+
+  // 限界突破の起こり方の欄(2.0.0。joukai.dart)
+  Widget _okorikataRan() {
+    Widget chip(int atai, String mei) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: ChoiceChip(
+          label: Text(mei),
+          selected: _okorikata == atai,
+          onSelected: (selected) {
+            if (!selected) return;
+            setState(() {
+              _okorikata = atai;
+            });
+          },
+          selectedColor: Colors.orange.shade700,
+          backgroundColor: Colors.grey.shade800,
+          labelStyle: const TextStyle(color: Colors.white),
+        ),
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 8.0),
+      padding: const EdgeInsets.all(10.0),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.shade700),
+        borderRadius: BorderRadius.circular(8.0),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '限界突破の起こり方',
+            style: _honbun.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '基本走力が上限に届いた選手も、限界突破で上限が上がると、また伸びます。',
+            style: _honbun,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '「成長タイプに合わせる」では、成長タイプの伸びる学年に限界突破が起こりやすく、'
+            'ほかの学年では起こりにくくなります。上限に届いたあとも型の伸びる学年に伸び、'
+            '遅く伸びる型も、4年の秋には、ほぼ追いつきます。',
+            style: _honbun,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '「1.9.9まで」では、上限に届いている間は、学年によらず同じように起こります。'
+            '早く上限に届く型ほど限界突破が多くなり、遅く伸びる型は追いつきにくくなります。',
+            style: _honbun,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '留学生は、どちらでも同じです。在学中の選手にも、次の育成から効きます。',
+            style: _chiisai,
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            runSpacing: 4,
+            children: [
+              chip(genkaitoppaOkorikataType, '成長タイプに合わせる(初期値)'),
+              chip(genkaitoppaOkorikataIzen, '1.9.9まで'),
+            ],
+          ),
         ],
       ),
     );
@@ -328,13 +420,13 @@ class _ModalSeichouTypeSetteiState extends State<ModalSeichouTypeSettei> {
           ),
           const SizedBox(height: 4),
           Text(
-            '入学時の5000mが13分台の選手は、どの型でも1年のうちに伸びきることが多く、'
-            '学年が上がると、遅れて伸びる選手に追いつかれやすくなります。',
+            '入学時の5000mが13分台の選手は、どの型でも1年のうちに上限の近くまで伸び、'
+            'そのあとは限界突破でしか伸びません。',
             style: _honbun,
           ),
           const SizedBox(height: 4),
           Text(
-            '「あり」にすると、13分台の選手が上級生になってからも、限界突破で伸びやすくなります'
+            '「あり」にすると、13分台の選手に、4回目からの限界突破が起こりやすくなります'
             '(記録も少し出やすくなります)。在学中の選手にも、次の育成から効きます。',
             style: _honbun,
           ),
@@ -392,11 +484,13 @@ class _ModalSeichouTypeSetteiState extends State<ModalSeichouTypeSettei> {
                           '新入生の成長タイプを、ここで決めた割合で選びます(全大学共通)。\n\n'
                           '1年に伸びる型が少ないほど、2年以降に伸びる選手が増えます。'
                           'ただ、すぐに使える選手は減り、名声の低い大学ほど選手層が薄くなります。\n\n'
-                          '入学時の記録が良い選手は、どの型でも1年のうちに大きく伸びることが多いです。\n\n'
+                          '入学時の記録が良い選手は、どの型でも1年のうちに上限の近くまで伸びます。'
+                          '限界突破の起こり方が「成長タイプに合わせる」(初期値)なら、そのあとも型の伸びる学年に、'
+                          '限界突破で伸びます。\n\n'
                           '変えた割合は、次の4月の新入生から使います(新規ゲームの1年生を含む)。'
                           '在学中の選手の成長タイプは変わりません。留学生は、この割合を使いません。\n\n'
                           '合計が100%のときに、上の「保存」で保存できます。'
-                          '一番下の「13分台の新入生の限界突破」も、同じ「保存」で保存します。',
+                          '下の「限界突破の起こり方」と「13分台の新入生の限界突破」も、同じ「保存」で保存します。',
                           style: TextStyle(
                             color: HENSUU.textcolor,
                             fontSize: HENSUU.fontsize_honbun,
@@ -406,22 +500,34 @@ class _ModalSeichouTypeSetteiState extends State<ModalSeichouTypeSettei> {
                       ),
                       _shokikaButton(
                         '初期値に戻す',
-                        '1年で伸びきる選手が約4割で、残りは2年以降のどこかで伸びます(13分台の限界突破の優遇はなし)。',
+                        '成長タイプはほぼ均等で、限界突破は成長タイプに合わせて起こります(2.0.0からの初期値。13分台の限界突破の優遇はなし)。',
                         seichouTypeShokiti,
+                        okorikata: genkaitoppaOkorikataType,
                         kakuninMidashi: '初期値に戻しますか?',
-                        naiyou: '初期値(1年で伸びきる選手が約4割、優遇なし)',
+                        naiyou: '初期値(成長タイプはほぼ均等、限界突破は成長タイプに合わせる、優遇なし)',
                         okMei: '初期値にする',
                       ),
                       _shokikaButton(
-                        '以前の割合にする',
-                        '1年で伸びきる選手が約9割です(1.9.2までの割合。13分台の限界突破の優遇はなし)。',
+                        '1.9.9までの設定にする',
+                        '1年で伸びきる選手が約4割で、限界突破は1.9.9までの起こり方です(1.9.3〜1.9.9の初期値。13分台の限界突破の優遇はなし)。',
+                        seichouType199,
+                        okorikata: genkaitoppaOkorikataIzen,
+                        kakuninMidashi: '1.9.9までの設定にしますか?',
+                        naiyou: '1.9.9までの設定(1年で伸びきる選手が約4割、限界突破は1.9.9まで、優遇なし)',
+                        okMei: '1.9.9までにする',
+                      ),
+                      _shokikaButton(
+                        '1.9.2までの設定にする',
+                        '1年で伸びきる選手が約9割で、限界突破は1.9.9までの起こり方です(1.9.2までの割合。13分台の限界突破の優遇はなし)。',
                         seichouTypeIzen,
-                        kakuninMidashi: '以前の割合にしますか?',
-                        naiyou: '以前の割合(1年で伸びきる選手が約9割、優遇なし)',
-                        okMei: '以前の割合にする',
+                        okorikata: genkaitoppaOkorikataIzen,
+                        kakuninMidashi: '1.9.2までの設定にしますか?',
+                        naiyou: '1.9.2までの設定(1年で伸びきる選手が約9割、限界突破は1.9.9まで、優遇なし)',
+                        okMei: '1.9.2までにする',
                       ),
                       const SizedBox(height: 8),
                       for (final int type in seichouTypeNarabi) _typeRan(type),
+                      _okorikataRan(),
                       _yuuguuRan(),
                       const SizedBox(height: 24),
                       Center(

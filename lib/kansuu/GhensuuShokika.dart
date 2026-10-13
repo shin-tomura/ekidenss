@@ -255,6 +255,7 @@ Future<void> GhensuuShokika(Box<Ghensuu> ghensuuBox) async {
   ghensuu.seichouryoku_type_gakunen[10][3] = 170;
   // 新入生の成長タイプの割合(1.9.3から初期値を変えた。1年で伸びきる型を減らした。中身は seichou_type.dart)
   // (1.9.2までは 0:1・1:75・2:7・3:1・4:1・5:10・6:1・7:1・8:1・9:1・10:1 だった)
+  // (2.0.0から、初期値をほぼ均等にした。限界突破の起こり方を成長タイプに合わせたため。joukai.dart)
   seichouTypeWariaiIreru(ghensuu, seichouTypeShokiti);
   for (int i = 0; i < TEISUU.SUU_MAXRACESUU_1YEAR; i++) {
     for (int ii = 0; ii < TEISUU.SUU_BESTKIROKUHOZONJUNISUU; ii++) {

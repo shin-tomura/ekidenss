@@ -6,7 +6,7 @@ import 'package:ekiden/senshu_data.dart'; // SenshuDataクラスのインポー�
 import 'package:ekiden/constants.dart'; // TEISUUクラスをインポート
 import 'package:hive_flutter/hive_flutter.dart'; // 成長タイプ設定を読むため(1.9.3)
 import 'package:ekiden/kantoku_data.dart'; // 成長タイプ設定を読むため(1.9.3)
-import 'package:ekiden/kansuu/joukai.dart'; // 13分台の新入生の限界突破の優遇(1.9.3)
+import 'package:ekiden/kansuu/joukai.dart'; // 13分台の新入生の限界突破の優遇(1.9.3)・限界突破の起こり方(2.0.0)
 // 必要に応じて他のモデルや定数ファイルのインポートを追加してください
 
 /// 選手の育成（成長）処理を行う関数
@@ -73,6 +73,11 @@ Future<void> Ikusei_Com({
   ).get('KantokuData');
   final bool genkaitoppaYuuguu =
       kantoku != null && genkaitoppaYuuguuSettei(kantoku) == 1;
+  // 限界突破の起こり方(2.0.0。成長タイプ設定で選ぶ。初期値は成長タイプに合わせる。joukai.dart)
+  // 成長タイプに合わせるときは、くじの確率に、その学年の成長タイプの倍率をかける(留学生は今まで通り)
+  final bool genkaitoppaTypeAwase =
+      kantoku == null ||
+      genkaitoppaOkorikataSettei(kantoku) == genkaitoppaOkorikataType;
 
   // 全選手をループ
   for (int senshuid = 0; senshuid < TEISUU.SENSHUSUU_TOTAL; senshuid++) {
@@ -277,13 +282,26 @@ Future<void> Ikusei_Com({
 
           sortedsenshudata[senshuid].seichoukaisuu += 1; // 成長回数を加算
 
+          // 限界突破のくじ(2.0.0。成長タイプに合わせるときは、確率[kakuritsu]%にその学年の成長タイプの倍率を
+          // かける(上限95%。joukai.dart)。留学生と「1.9.9まで」の設定のときは、今まで通り0〜99の乱数で引く)
+          bool genkaitoppaKuji(int kakuritsu) {
+            if (!genkaitoppaTypeAwase || sortedsenshudata[senshuid].hirou == 1) {
+              return _random.nextInt(100) < kakuritsu;
+            }
+            final int bairitsu =
+                gh[0].seichouryoku_type_gakunen[sortedsenshudata[senshuid]
+                    .seichoutype][sortedsenshudata[senshuid].gakunen - 1];
+            return _random.nextDouble() * 100.0 <
+                genkaitoppaTypeKakuritsu(kakuritsu, bairitsu);
+          }
+
           // 限界突破ロジック
           if (genkaitoppaflag == 1) {
             if (sortedsenshudata[senshuid].genkaitoppakaisuu <= 47) {
               sortedsenshudata[senshuid].genkaichokumenkaisuu += 1; // 限界直面回数を加算
               if (sortedsenshudata[senshuid].genkaitoppakaisuu < 3) {
-                if (_random.nextInt(100) < 33) {
-                  // 0から99までの乱数が33未満 (33%の確率)
+                if (genkaitoppaKuji(33)) {
+                  // 0から99までの乱数が33未満 (33%の確率。2.0.0から、成長タイプに合わせるときは倍率をかける)
                   // 突破する前の上限(1.8.5。下の a_min_int の計算で使う)
                   final double maeMagicnumber =
                       sortedsenshudata[senshuid].magicnumber;
@@ -322,11 +340,13 @@ Future<void> Ikusei_Com({
                 // 限界突破回数が3回以上の場合のロジック
                 // (1.9.3から、成長タイプ設定で優遇ありのときは、入学時5000mが13分台の選手だけ13%。
                 // ほかは今まで通り10%。joukai.dart)
-                if (_random.nextInt(100) <
-                    genkaitoppaKakuritsu4kaimeIkou(
-                      sortedsenshudata[senshuid],
-                      yuuguu: genkaitoppaYuuguu,
-                    )) {
+                // (2.0.0から、成長タイプに合わせるときは、この確率にも倍率をかける)
+                if (genkaitoppaKuji(
+                  genkaitoppaKakuritsu4kaimeIkou(
+                    sortedsenshudata[senshuid],
+                    yuuguu: genkaitoppaYuuguu,
+                  ),
+                )) {
                   // 0から99までの乱数が確率未満
                   // 突破する前の上限(1.8.5。下の a_min_int の計算で使う)
                   final double maeMagicnumber =

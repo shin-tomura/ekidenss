@@ -242,7 +242,7 @@ class _SettingsQrPageState extends State<SettingsQrPage> {
             '・区間配置の方針(大学ごと。最適解区間配置の使い方を含む)\n'
             '・正月駅伝予選の指示と集団走(コンピュータの大学)\n'
             '・集団走設定\n'
-            '・成長タイプ設定(13分台の新入生の限界突破を含む)\n',
+            '・成長タイプ設定(限界突破の起こり方・13分台の新入生の限界突破を含む)\n',
 
             style: TextStyle(color: Colors.white70, fontSize: 14),
           ),

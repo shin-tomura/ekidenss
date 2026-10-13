@@ -19,7 +19,7 @@ import 'kansuu/kukan_haichi.dart'; // 区間配置の方針の確認(1.9.1)
 import 'kansuu/ikku_pace.dart'; // 集団走設定の確認(1.9.2)
 import 'kansuu/custom_seigen.dart'; // カスタム駅伝の出場制限の確認(1.9.2)
 import 'kansuu/seichou_type.dart'; // 成長タイプ設定の確認(1.9.3)
-import 'kansuu/joukai.dart'; // 13分台の新入生の限界突破の優遇の確認(1.9.3)
+import 'kansuu/joukai.dart'; // 13分台の新入生の限界突破の優遇の確認(1.9.3)・限界突破の起こり方(2.0.0)
 import 'kansuu/yosen_com_siji.dart'; // 正月駅伝予選のコンピュータの大学の指示と集団走の確認(1.9.9)
 
 // 読み込み時に複数枚のデータを一時的に保持する状態管理クラス
@@ -194,6 +194,9 @@ class SettingsQrProcessor {
       data['cg_seichou_type_wariai'] = seichouTypeWariai(currentGhensuu);
       // 13分台の新入生の限界突破の優遇(int) [85] (1.9.3で追加。成長タイプ設定の画面にある設定。joukai.dart)
       data['k_yobiint2_85'] = genkaitoppaYuuguuSettei(kantoku);
+      // 限界突破の起こり方(int) yobiint3[75] (2.0.0で追加。成長タイプ設定の画面にある設定。
+      // 0=成長タイプに合わせる(初期値)・1=1.9.9まで。joukai.dart)
+      data['k_yobiint3_75'] = genkaitoppaOkorikataSettei(kantoku);
       // コンピュータスカウトONのときのスカウトの形と、地区めぐり(声かけ)の周回数(int) [87] (1.9.6で追加。
       // 形+10×周回数のコード。形は0=地区めぐり(声かけ)(初期値)・1=全国一斉・2=地区めぐり(交渉)。scout_com.dart)
       data['k_yobiint2_87'] = kantoku.yobiint2.length > comScoutKatachiIndex
@@ -677,12 +680,20 @@ class SettingsQrProcessor {
           currentGhensuu,
           seichouTypeWariaiQr.cast<int>().toList(),
         );
+        // 読み込んだ割合を、次の起動の2.0.0の移行で変えないように印を付ける(2.0.0。seichou_type.dart)
+        seichouType200IkouShirushi(kantoku);
       }
       // 13分台の新入生の限界突破の優遇(int) kantoku.yobiint2[85] (1.9.3)
       //   0なし(初期値)・1あり(古いQRコードには含まれていないので、そのときは今の設定のまま)
       final dynamic yobiint2_85 = dataMap['k_yobiint2_85'];
       if (yobiint2_85 is int && genkaitoppaYuuguuAtaiTadashii(yobiint2_85)) {
         genkaitoppaYuuguuIreru(kantoku, yobiint2_85);
+      }
+      // 限界突破の起こり方(int) kantoku.yobiint3[75] (2.0.0)
+      //   0=成長タイプに合わせる(初期値)・1=1.9.9まで(古いQRコードには含まれていないので、そのときは今の設定のまま)
+      final dynamic yobiint3_75 = dataMap['k_yobiint3_75'];
+      if (yobiint3_75 is int && genkaitoppaOkorikataAtaiTadashii(yobiint3_75)) {
+        genkaitoppaOkorikataIreru(kantoku, yobiint3_75);
       }
       // コンピュータスカウトONのときのスカウトの形(int) kantoku.yobiint2[87] (1.9.6)
       //   形+10×周回数のコード(形は0=地区めぐり(声かけ)(初期値)・1=全国一斉、周回数のコードは0=1周〜3=10周)

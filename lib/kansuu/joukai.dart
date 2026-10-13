@@ -168,3 +168,58 @@ int genkaitoppaKakuritsu4kaimeIkou(SenshuData senshu, {required bool yuuguu}) {
   }
   return genkaitoppaKakuritsuFutsuu;
 }
+
+// ------------------------------------------------------------
+// 限界突破の起こり方(2.0.0。成長タイプ設定で選ぶ。初期値は「成長タイプに合わせる」)
+// 1.9.9までは、限界突破のくじを「上限に届いている育成のたび」に引いていたので、早く上限に届く
+// 成長タイプ(1年型など)ほどくじを多く引け、遅く伸びる型(4年型など)は4年の秋になっても追いつけなかった
+// (シミュレーションで、4年秋の1万mの理論タイムは、15分台の新入生で1年型27:47・4年型28:08)。
+// また、入学時の記録が良い選手や、2つの学年に伸びる型は、1年のうちに上限に届くので、型の違いがほとんど出なかった。
+// 2.0.0からは、くじの確率に、その学年の成長タイプの倍率(Ghensuu.seichouryoku_type_gakunen。
+// 310%・170%・100%・30%)をかける(上限95%)。倍率の4年間の合計はどの型も400なので、
+// くじの機会はどの型も同じになり、上限に届いたあとも、型の伸びる学年に伸びるようになる
+// (4年秋の型による差は2秒以内。トップ層の速さ・記録の出やすさは今まで通り。
+// 1年に伸びる型が多いと1年生が強くなりすぎるので、成長タイプの割合の初期値もほぼ均等にした。seichou_type.dart)
+// ・留学生(いつも型1)は今まで通り(倍率をかけると2年以降ほとんど突破しなくなるため)
+// ・13分台の新入生の限界突破の優遇(13%)にも、同じく倍率をかける
+// ・「1.9.9まで」にすると、今までの決まりに戻る。在学中の選手にも、次の育成から効く
+// ・保存先は KantokuData.yobiint3[75](0=成長タイプに合わせる(初期値)・1=1.9.9まで)。各種設定のQRコードにも含める
+// ------------------------------------------------------------
+
+/// 限界突破の起こり方の保存先(KantokuData.yobiint3の番号)
+const int genkaitoppaOkorikataIndex = 75;
+
+/// 限界突破の起こり方: 成長タイプに合わせる(2.0.0から。初期値)
+const int genkaitoppaOkorikataType = 0;
+
+/// 限界突破の起こり方: 1.9.9まで(上限に届いている育成のたびに、同じ確率でくじを引く)
+const int genkaitoppaOkorikataIzen = 1;
+
+/// 成長タイプに合わせるときの、くじの確率の上限(%)
+const double genkaitoppaTypeJougen = 95.0;
+
+/// 限界突破の起こり方の値として正しいか(QRコードの読み込みでも使う)
+bool genkaitoppaOkorikataAtaiTadashii(int v) =>
+    v == genkaitoppaOkorikataType || v == genkaitoppaOkorikataIzen;
+
+/// 今の限界突破の起こり方(保存されていない・範囲外なら成長タイプに合わせる)
+int genkaitoppaOkorikataSettei(KantokuData kantoku) {
+  if (kantoku.yobiint3.length <= genkaitoppaOkorikataIndex) {
+    return genkaitoppaOkorikataType;
+  }
+  final int v = kantoku.yobiint3[genkaitoppaOkorikataIndex];
+  return genkaitoppaOkorikataAtaiTadashii(v) ? v : genkaitoppaOkorikataType;
+}
+
+/// 限界突破の起こり方を入れる(保存は呼び出し側で行う)
+void genkaitoppaOkorikataIreru(KantokuData kantoku, int v) {
+  if (kantoku.yobiint3.length <= genkaitoppaOkorikataIndex) return;
+  if (!genkaitoppaOkorikataAtaiTadashii(v)) return;
+  kantoku.yobiint3[genkaitoppaOkorikataIndex] = v;
+}
+
+/// 成長タイプに合わせるときの、限界突破のくじの確率(%)
+/// [kakuritsu] 1.9.9までの確率(最初の3回は33%、4回目以降は10%か13%)、
+/// [bairitsu] その学年の成長タイプの倍率(%。Ghensuu.seichouryoku_type_gakunen)
+double genkaitoppaTypeKakuritsu(int kakuritsu, int bairitsu) =>
+    min(genkaitoppaTypeJougen, kakuritsu * bairitsu / 100.0);

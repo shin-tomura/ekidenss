@@ -12,6 +12,8 @@ import 'package:ekiden/kansuu/gin_tokkun_menu.dart'; // 銀特訓の形の切り
 import 'package:ekiden/kansuu/ikku_pace.dart'; // 集団走設定(1.9.2)
 import 'package:ekiden/kansuu/yosen_com_siji.dart'; // 正月駅伝予選のコンピュータの大学の指示と集団走(1.9.9)
 import 'package:ekiden/kansuu/seichou_type.dart'; // 成長タイプ設定(1.9.3)
+import 'package:ekiden/kansuu/joukai.dart'
+    show genkaitoppaOkorikataSettei, genkaitoppaOkorikataType; // 限界突破の起こり方(2.0.0)
 import 'package:ekiden/kansuu/ToujituHenkou_com.dart'
     show senryakuEntryKakuritu; // 戦略的エントリー確率設定(1.9.4)
 
@@ -555,6 +557,8 @@ ShiyouSetsu shiyouIkusei({bool setsumeisho = false}) {
       '・年間強化練習の効果の大きさは、設定タブの「年間強化練習効果設定」で変えられます。',
       // 成長タイプ設定(1.9.3。seichou_type.dart)
       '・新入生の成長タイプの割合は、設定タブの「成長タイプ設定」で変えられます。',
+      // 限界突破の起こり方(2.0.0。joukai.dart)。生成AI向けには書かない
+      '　・限界突破の起こり方(成長タイプに合わせる・1.9.9まで)も、同じ画面で選べます。',
       // 13分台の新入生の限界突破の優遇(1.9.3。joukai.dart)。生成AI向けには書かない
       '　・入学時の5000mが13分台の選手を、上級生になってからも限界突破で伸びやすくする設定も、同じ画面にあります。',
       '・コンピュータの大学の金銀の使い方は、説明画面の設定タブの「コンピュータ金銀使用」で設定できます。',
@@ -566,6 +570,8 @@ ShiyouSetsu shiyouIkusei({bool setsumeisho = false}) {
 
 /// 成長タイプの行(1.9.3で割合の設定を作ったので書く。seichou_type.dart)
 /// 倍率や割合の数字は書かない。新入生の成長タイプが1つだけになる設定のときは、そのことを書く
+/// 2.0.0から、限界突破も成長タイプの伸びる学年に起こるようにしたので(joukai.dart)、その行を書く。
+/// 限界突破の起こり方を「1.9.9まで」にしているときは、1.9.9までの行にする
 List<String> _seichouTypeGyou(bool setsumeisho) {
   final Ghensuu? gh = Hive.box<Ghensuu>('ghensuuBox').getAt(0);
   final List<int> wariai = gh == null
@@ -575,6 +581,9 @@ List<String> _seichouTypeGyou(bool setsumeisho) {
     for (int t = 0; t < wariai.length; t++)
       if (wariai[t] > 0) t,
   ];
+  final KantokuData? kantoku = _kantoku();
+  final bool typeAwase = kantoku == null ||
+      genkaitoppaOkorikataSettei(kantoku) == genkaitoppaOkorikataType;
   return [
     '・選手には成長タイプがあり、基本走力が大きく伸びる学年が、選手ごとに違います。',
     if (aruType.length == 1)
@@ -582,7 +591,13 @@ List<String> _seichouTypeGyou(bool setsumeisho) {
     else
       '　・1年に大きく伸びるタイプや、2年以降に大きく伸びるタイプがあります。',
     '・成長タイプは、画面には出ません。',
-    '・入学時の記録が良い選手は、どの成長タイプでも、1年のうちに大きく伸びることが多いです。',
+    if (typeAwase) ...[
+      '・限界突破も、成長タイプの大きく伸びる学年に起こりやすいです。',
+      '　・入学時の記録が良い選手も、成長タイプの大きく伸びる学年に、大きく伸びることが多いです。',
+      if (aruType.length > 1)
+        '　・遅く伸びるタイプの選手も、4年生の秋には、早く伸びるタイプの選手に追いつくことが多いです。',
+    ] else
+      '・入学時の記録が良い選手は、どの成長タイプでも、1年のうちに大きく伸びることが多いです。',
   ];
 }
 

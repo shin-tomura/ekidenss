@@ -864,6 +864,18 @@ class _SaveLoadScreenState extends State<SaveLoadScreen> {
         }
       }
 
+      // 成長タイプの割合の2.0.0の移行(mainの中の同じ処理の説明を参照)
+      //mainの中にもあるので、そちらも変更すること！
+      {
+        final Ghensuu? gh = Hive.box<Ghensuu>('ghensuuBox').getAt(0);
+        final KantokuData? kantoku = Hive.box<KantokuData>(
+          'kantokuBox',
+        ).get('KantokuData');
+        if (gh != null && kantoku != null) {
+          await seichouType200Ikou(gh, kantoku);
+        }
+      }
+
       //1.4.3からバージョン番号保存することにした(この処理は一連の処理の中で1番最後にすること)
       //mainの中にもあるので、そちらも変更すること！
       final versionValue = int.tryParse(sortedUnivData[7].name_tanshuku);

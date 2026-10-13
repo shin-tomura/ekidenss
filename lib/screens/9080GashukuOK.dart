@@ -71,7 +71,7 @@ class _OKButtonScreenState extends State<OKButtonScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Text(
-                    "夏合宿です！！\n\n選手画面下部の金特訓または銀特訓から各選手の個性を伸ばしましょう！\n\n金特訓と銀特訓はこの時期にしかできません。",
+                    "夏合宿です！！\n\n選手画面の能力の下にある金特訓または銀特訓のボタンから、各選手の個性を伸ばしましょう！\n\n金特訓と銀特訓はこの時期にしかできません。",
                     style: TextStyle(
                       fontSize: HENSUU.fontsize_honbun,
                       color: HENSUU.textcolor,

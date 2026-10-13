@@ -1186,7 +1186,7 @@ class _Mode0700ContentState extends State<Mode0700Content> {
                                             CrossAxisAlignment.start,
                                         children: [
                                           const Text(
-                                            "夏合宿です！！\n\n選手画面下部の「金特訓」「銀特訓」から各選手の個性を伸ばしましょう！\n\n「金特訓」「銀特訓」はこの時期にしかできません。",
+                                            "夏合宿です！！\n\n選手画面の能力の下にある「金特訓」「銀特訓」のボタンから、各選手の個性を伸ばしましょう！\n\n「金特訓」「銀特訓」はこの時期にしかできません。",
                                             style: TextStyle(
                                               color: HENSUU.textcolor,
                                             ),

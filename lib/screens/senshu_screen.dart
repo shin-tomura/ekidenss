@@ -22,6 +22,8 @@ import 'package:ekiden/kansuu/konki_best.dart'; // 今季ベスト(1.9.1)
 import 'package:ekiden/screens/konki_best_parts.dart';
 import 'package:ekiden/kansuu/gin_tokkun_menu.dart'; // 夏合宿の銀特訓の練習メニュー(1.9.1)
 import 'package:ekiden/kansuu/kingin_kiroku.dart'; // 金銀の記録(1.9.9)
+import 'package:ekiden/screens/kukan_haiti_button.dart'
+    show MedatsuButton; // 夏合宿の金特訓・銀特訓・金銀交換のボタン(1.9.9)
 import 'package:ekiden/kansuu/kiji/kiji_kihon.dart'
     show KijiHyou, SeisekiKiroku, sandaiSeisekiHyouKiroku, taikousenSeisekiHyou, konkiKaisaiZumi; // 成績の表(1.9.8)
 import 'package:ekiden/screens/kiji_hyou_view.dart'; // 表の部品(1.9.8)
@@ -2446,6 +2448,15 @@ class _SenshuScreenState extends State<SenshuScreen> {
                         ),
                         // 金銀で伸ばした能力の表(夏合宿の金特訓・銀特訓。コンピュータの大学の分も。1.9.9。kingin_kiroku.dart)
                         if (kinginHyou != null) KijiHyouView(kinginHyou, ue: 16),
+                        // 金特訓・銀特訓・金銀交換のボタン(夏合宿の日だけ。自分の大学の選手で、留学生でないとき。
+                        // 1.9.9から、一番下のリンクの列から、すぐ上の表と見比べられるここに移した)
+                        if (hokaUnivid == null &&
+                            ghensuu.month == 7 &&
+                            ghensuu.day == 15 &&
+                            (ghensuu.goldenballsuu >= 10 ||
+                                ghensuu.silverballsuu >= 10) &&
+                            currentSenshu.hirou != 1)
+                          _tokkunButtons(ghensuu),
 
                         const SizedBox(height: 16),
                         // 三大駅伝と対校戦の成績の表(1.9.8)
@@ -2901,6 +2912,42 @@ class _SenshuScreenState extends State<SenshuScreen> {
   // リンクボタン用のヘルパーウィジェット
   // リンクボタンをWidgetに分離
   // currentGhensuu を引数として受け取るように変更
+  /// 金特訓・銀特訓・金銀交換のボタン(夏合宿の日の選手画面。1.9.9)
+  /// 押すと、今まで一番下のリンクの列から開いていたのと同じ画面を開く(特訓するのは表示している選手)
+  Widget _tokkunButtons(Ghensuu ghensuu) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Wrap(
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 8,
+        runSpacing: 6,
+        children: [
+          MedatsuButton(
+            label: '金特訓(残り${ghensuu.goldenballsuu})',
+            icon: Icons.fitness_center,
+            iro: Colors.amberAccent,
+            barrierLabel: '金特訓をする',
+            gamen: () => const ModalTokkunGold(),
+          ),
+          MedatsuButton(
+            label: '銀特訓(残り${ghensuu.silverballsuu})',
+            icon: Icons.fitness_center,
+            iro: const Color(0xFFCFD8DC), // 銀色
+            barrierLabel: '銀特訓をする',
+            gamen: () => const ModalTokkunSilver(),
+          ),
+          MedatsuButton(
+            label: '金銀交換',
+            icon: Icons.swap_horiz,
+            iro: Colors.lightGreenAccent,
+            barrierLabel: '金銀交換をする',
+            gamen: () => const ModalBallExchange(),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget LinkButtons(BuildContext context, Ghensuu currentGhensuu) {
     final int myUnivId = currentGhensuu.MYunivid;
 
@@ -2959,130 +3006,7 @@ class _SenshuScreenState extends State<SenshuScreen> {
           ),
         ),
 
-        // ModalKouhanKekkaView は currentGhensuu.hyojiracebangou が 2 の時だけ表示
-        //if (currentGhensuu.hyojiracebangou == 2)
-        if ((currentGhensuu.month == 7 && currentGhensuu.day == 15) &&
-            (currentGhensuu.goldenballsuu >= 10 ||
-                currentGhensuu.silverballsuu >= 10) &&
-            myUnivSenshuList[currentGhensuu.hyojisenshunum].hirou != 1)
-          TextButton(
-            onPressed: () {
-              showGeneralDialog(
-                context: context,
-                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
-                barrierDismissible: true, // 背景タップで閉じられるようにする
-                barrierLabel: '金特訓をする', // アクセシビリティ用ラベル
-                transitionDuration: const Duration(
-                  milliseconds: 300,
-                ), // アニメーション時間
-                pageBuilder: (context, animation, secondaryAnimation) {
-                  // ここに表示したいモーダルのウィジェットを指定
-                  return const ModalTokkunGold(); // const を追加
-                },
-                transitionBuilder:
-                    (context, animation, secondaryAnimation, child) {
-                      // モーダル表示時のアニメーション (例: フェードイン)
-                      return FadeTransition(
-                        opacity: CurvedAnimation(
-                          parent: animation,
-                          curve: Curves.easeOut,
-                        ),
-                        child: child,
-                      );
-                    },
-              );
-            },
-            child: Text(
-              "金特訓をする",
-              style: TextStyle(
-                color: const Color.fromARGB(255, 0, 255, 0),
-                decoration: TextDecoration.underline,
-                decorationColor: HENSUU.textcolor,
-              ),
-            ),
-          ),
-        // ModalKukanshouView は currentGhensuu.hyojiracebangou が 2 以下の時だけ表示
-        //if (currentGhensuu.hyojiracebangou <= 2)
-        if ((currentGhensuu.month == 7 && currentGhensuu.day == 15) &&
-            (currentGhensuu.goldenballsuu >= 10 ||
-                currentGhensuu.silverballsuu >= 10) &&
-            myUnivSenshuList[currentGhensuu.hyojisenshunum].hirou != 1)
-          TextButton(
-            onPressed: () {
-              showGeneralDialog(
-                context: context,
-                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
-                barrierDismissible: true, // 背景タップで閉じられるようにする
-                barrierLabel: '銀特訓をする', // アクセシビリティ用ラベル
-                transitionDuration: const Duration(
-                  milliseconds: 300,
-                ), // アニメーション時間
-                pageBuilder: (context, animation, secondaryAnimation) {
-                  // ここに表示したいモーダルのウィジェットを指定
-                  return const ModalTokkunSilver(); // const を追加
-                },
-                transitionBuilder:
-                    (context, animation, secondaryAnimation, child) {
-                      // モーダル表示時のアニメーション (例: フェードイン)
-                      return FadeTransition(
-                        opacity: CurvedAnimation(
-                          parent: animation,
-                          curve: Curves.easeOut,
-                        ),
-                        child: child,
-                      );
-                    },
-              );
-            },
-            child: Text(
-              "銀特訓をする",
-              style: TextStyle(
-                color: const Color.fromARGB(255, 0, 255, 0),
-                decoration: TextDecoration.underline,
-                decorationColor: HENSUU.textcolor,
-              ),
-            ),
-          ),
-        if ((currentGhensuu.month == 7 && currentGhensuu.day == 15) &&
-            (currentGhensuu.goldenballsuu >= 10 ||
-                currentGhensuu.silverballsuu >= 10) &&
-            myUnivSenshuList[currentGhensuu.hyojisenshunum].hirou != 1)
-          TextButton(
-            onPressed: () {
-              showGeneralDialog(
-                context: context,
-                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
-                barrierDismissible: true, // 背景タップで閉じられるようにする
-                barrierLabel: '金銀交換をする', // アクセシビリティ用ラベル
-                transitionDuration: const Duration(
-                  milliseconds: 300,
-                ), // アニメーション時間
-                pageBuilder: (context, animation, secondaryAnimation) {
-                  // ここに表示したいモーダルのウィジェットを指定
-                  return const ModalBallExchange(); // const を追加
-                },
-                transitionBuilder:
-                    (context, animation, secondaryAnimation, child) {
-                      // モーダル表示時のアニメーション (例: フェードイン)
-                      return FadeTransition(
-                        opacity: CurvedAnimation(
-                          parent: animation,
-                          curve: Curves.easeOut,
-                        ),
-                        child: child,
-                      );
-                    },
-              );
-            },
-            child: Text(
-              "金銀交換をする",
-              style: TextStyle(
-                color: const Color.fromARGB(255, 0, 255, 0),
-                decoration: TextDecoration.underline,
-                decorationColor: HENSUU.textcolor,
-              ),
-            ),
-          ),
+        // 金特訓・銀特訓・金銀交換は、1.9.9から能力の下の「金銀で伸ばした能力」の表のすぐ下に移した(_tokkunButtons)
         TextButton(
           onPressed: () async {
             final Box<Ghensuu> ghensuuBox = Hive.box<Ghensuu>('ghensuuBox');

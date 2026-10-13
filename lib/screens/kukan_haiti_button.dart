@@ -54,7 +54,7 @@ class KukanHaitiKakuninButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _MedatsuButton(
+    return MedatsuButton(
       label: '区間配置確認',
       icon: Icons.view_list,
       iro: Colors.cyanAccent,
@@ -72,7 +72,7 @@ class KonkiTimeIchiranButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _MedatsuButton(
+    return MedatsuButton(
       label: '今季タイム一覧表',
       icon: Icons.table_chart,
       iro: Colors.orangeAccent,
@@ -83,13 +83,15 @@ class KonkiTimeIchiranButton extends StatelessWidget {
 }
 
 /// 枠とアイコン付きの丸いボタン(押すと[gamen]の画面を開く)
-class _MedatsuButton extends StatelessWidget {
+/// 選手画面の夏合宿の金特訓・銀特訓・金銀交換のボタンでも使う(1.9.9)
+class MedatsuButton extends StatelessWidget {
   final String label;
   final IconData icon;
   final Color iro;
   final String barrierLabel;
   final Widget Function() gamen;
-  const _MedatsuButton({
+  const MedatsuButton({
+    super.key,
     required this.label,
     required this.icon,
     required this.iro,

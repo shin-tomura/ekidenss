@@ -353,7 +353,7 @@ class _ModalSeichouTypeSetteiState extends State<ModalSeichouTypeSettei> {
           ),
           const SizedBox(height: 4),
           Text(
-            '「成長タイプに合わせる」では、成長タイプの伸びる学年に限界突破が起こりやすく、'
+            '「成長タイプに合わせる」(初期値)では、成長タイプの伸びる学年に限界突破が起こりやすく、'
             'ほかの学年では起こりにくくなります。上限に届いたあとも型の伸びる学年に伸び、'
             '遅く伸びる型も、4年の秋には、ほぼ追いつきます。',
             style: _honbun,
@@ -373,7 +373,8 @@ class _ModalSeichouTypeSetteiState extends State<ModalSeichouTypeSettei> {
           Wrap(
             runSpacing: 4,
             children: [
-              chip(genkaitoppaOkorikataType, '成長タイプに合わせる(初期値)'),
+              // 文字を大きくしていても切れにくいように、「(初期値)」は上の説明文に書く
+              chip(genkaitoppaOkorikataType, '成長タイプに合わせる'),
               chip(genkaitoppaOkorikataIzen, '1.9.9まで'),
             ],
           ),

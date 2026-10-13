@@ -1851,7 +1851,7 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
         naka: [
           Text(
             _kotoshiNoKai(k)
-                ? '高校を押すと、走った選手を見られます。名前の出ている3年生が、今年の新入生(スカウトの候補)です。'
+                ? '高校を押すと、走った選手を見られます。名前の出ている3年生が、この春に大学に入る今年の新入生(スカウトの候補)です。'
                 : '高校を押すと、走った選手と進学先を見られます。',
             style: _hosoku,
           ),

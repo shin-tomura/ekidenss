@@ -57,6 +57,7 @@ import 'package:ekiden/screens/setting_screen.dart'; // 新しく作ったUnivSc
 import 'package:ekiden/screens/error_screen.dart';
 import 'package:ekiden/toukei.dart';
 import 'package:ekiden/kansuu/toukei_text.dart';
+import 'package:ekiden/kansuu/toukei_joui.dart'; // 学年の上位に入った人数(2.0.0)
 import 'dart:math'; // Randomクラスを使用するため
 import 'package:ekiden/screens/Toujituhenkou.dart';
 import 'package:ekiden/screens/ToujitsuAhenkou.dart';
@@ -3400,6 +3401,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             }
           }
         }
+        // 学年の上位に入った人数(入学時5000mの記録ごと。2.0.0。toukei_joui.dart)
+        toukeiJouiKazoeru(kantoku, sortedSenshuData);
+        await kantoku.save();
         if (skip.skipyear <= ghensuu.year &&
             skip.skipmonth <= ghensuu.month &&
             skip.skipday <= ghensuu.day) {
@@ -3550,6 +3554,19 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           sortedUnivsById[12].name_tanshuku += ryuugakuseiUchiwakeBun(
             sortedUnivsById,
           );
+          // 学年の上位に入った人数(入学時5000mの記録ごと。2.0.0。toukei_joui.dart)
+          final String jouiBun = toukeiJouiBun(kantoku, [
+            skip.count_jap_13pundai,
+            skip.count_jap_14pun00dai,
+            skip.count_jap_14pun10dai,
+            skip.count_jap_14pun20dai,
+            skip.count_jap_14pun30dai,
+            skip.count_jap_14pun40dai,
+            skip.count_jap_14pun50dai,
+            skip.count_jap_15pundai,
+          ]);
+          sortedUnivsById[12].name_tanshuku += jouiBun;
+          print(jouiBun);
 
           print("");
           print("13分台入学サンプル数 ${skip.count_jap_13pundai[0]}");

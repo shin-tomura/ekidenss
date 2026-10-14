@@ -7,6 +7,8 @@ import 'package:ekiden/ghensuu.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/skip.dart';
 import 'package:ekiden/toukei.dart';
+import 'package:ekiden/kantoku_data.dart';
+import 'package:ekiden/kansuu/toukei_joui.dart'; // 学年の上位に入った人数(2.0.0)
 
 class StatisticsSimulationScreen extends StatefulWidget {
   const StatisticsSimulationScreen({super.key});
@@ -149,6 +151,14 @@ class _StatisticsSimulationScreenState
       skip.besttime_jap_14pun50dai = List.filled(4, TEISUU.DEFAULTTIME);
       skip.besttime_jap_15pundai = List.filled(4, TEISUU.DEFAULTTIME);
       await skip.save();
+      // 学年の上位に入った人数(入学時5000mの記録ごと)も0に戻す(2.0.0。toukei_joui.dart)
+      final KantokuData? kantoku = Hive.box<KantokuData>(
+        'kantokuBox',
+      ).get('KantokuData');
+      if (kantoku != null) {
+        toukeiJouiReset(kantoku);
+        await kantoku.save();
+      }
       final List<UnivData> sortedUnivData = _univBox.values.toList();
       sortedUnivData.sort((a, b) => a.id.compareTo(b.id));
       sortedUnivData[12].name_tanshuku = "";

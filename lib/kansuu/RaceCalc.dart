@@ -209,7 +209,8 @@ Future<void> RaceCalc({
             .nowracecalckukan];
   }
 
-  // コンピュータ大学の当日変更(当日変更画面を通らなかった場合はここで実行)
+  // コンピュータ大学の当日変更(当日変更画面を通らなかった場合はここで実行。
+  // 2.0.0から、自分の大学が出ない年の正月駅伝は、1区と6区の指示の画面の前に main.dart で済ませる)
   if ((racebangou >= 0 && racebangou <= 2) || racebangou == 5) {
     if (gh[0].nowracecalckukan == 0) {
       await comToujituHenkou(

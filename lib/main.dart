@@ -28,6 +28,8 @@ import 'package:ekiden/kansuu/goldsilver_com.dart';
 import 'package:ekiden/kansuu/scout_com.dart';
 import 'package:ekiden/kansuu/gakuren_kantoku.dart'; // 学連選抜の監督の移行処理(1.8.2)
 import 'package:ekiden/kansuu/ShoriGuard.dart';
+import 'package:ekiden/kansuu/ToujituHenkou_com.dart'
+    show comToujituHenkouAfterPlayer; // 自分の大学が出ない年の正月駅伝の当日変更(2.0.0)
 import 'package:ekiden/kansuu/NameListKoushin.dart';
 import 'package:ekiden/kansuu/SenshuShokiti.dart';
 import 'package:ekiden/kansuu/asset_loader.dart';
@@ -2653,6 +2655,12 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
 
             gh[0].mode = 345;
           } else {
+            // 自分の大学が出ない年(学連選抜の監督の年など)は当日変更の画面を通らないので、
+            // 他大学の復路の自動の当日変更を、6区の指示の画面より前のここで済ませる
+            // (自分の大学が出る年と同じ順にそろえる。済んでいれば RaceCalc.dart では二重に行わない。2.0.0)
+            if (gh[0].nowracecalckukan == 5 && gh[0].hyojiracebangou == 2) {
+              await comToujituHenkouAfterPlayer(gh[0], day: 2);
+            }
             gh[0].mode = 350;
           }
         } else {
@@ -4906,6 +4914,25 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                     //gh[0].mode = 280;
                     currentGhensuu.mode = 300;
                   } else {
+                    // 自分の大学が出ない年(学連選抜の監督の年など)は当日変更の画面を通らないので、
+                    // 他大学の往路の自動の当日変更を、1区の指示の画面より前のここで済ませる
+                    // (自分の大学が出る年と同じ順にして、1区のペース予想を当日走る選手で出すため。
+                    // 済んでいれば RaceCalc.dart では二重に行わない。2.0.0)
+                    if (currentGhensuu.hyojiracebangou == 2) {
+                      // 処理中に「進む」がもう一度押されたときは何もしない
+                      if (_shoriGuardBusy) return;
+                      _shoriGuardBusy = true;
+                      try {
+                        await ShoriGuard.begin('他大学の当日変更');
+                        await comToujituHenkouAfterPlayer(currentGhensuu, day: 1);
+                        await ShoriGuard.end();
+                      } catch (e) {
+                        ShoriGuard.reportError('他大学の当日変更', e);
+                        return;
+                      } finally {
+                        _shoriGuardBusy = false;
+                      }
+                    }
                     currentGhensuu.mode = 350;
                   }
                 } else if (currentGhensuu.mode == 343) {

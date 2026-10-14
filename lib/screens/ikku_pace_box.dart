@@ -443,8 +443,8 @@ class IkkuPaceKekkaBox extends StatelessWidget {
     if (yosou != null) {
       gyou.add(
         yosou == kekka.midashi
-            ? '予想どおりでした(予想: ${ikkuPaceMidashiMoji[yosou]})'
-            : '予想(${ikkuPaceMidashiMoji[yosou]})とちがいました',
+            ? '予想どおりでした(1区の指示の画面の予想: ${ikkuPaceMidashiMoji[yosou]})'
+            : '1区の指示の画面の予想(${ikkuPaceMidashiMoji[yosou]})とちがいました',
       );
       if (kekka.yosouPacemakerId != null &&
           kekka.yosouPacemakerId != kekka.pacemakerId) {

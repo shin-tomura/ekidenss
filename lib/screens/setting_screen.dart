@@ -1981,7 +1981,7 @@ class _SettingScreenState extends State<SettingScreen>
         crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           const Text(
-            "SS 2.0.0 (22000)",
+            "SS 2.0.1 (22010)",
             style: TextStyle(color: Colors.white),
           ),
           // 変更履歴(ToDo.txtの箱庭小駅伝SSの部分を表示)
@@ -2043,7 +2043,7 @@ class _SettingScreenState extends State<SettingScreen>
                 // 実際のライセンス画面の表示部分
                 child: const LicensePage(
                   applicationName: '箱庭小駅伝SS',
-                  applicationVersion: '2.0.0',
+                  applicationVersion: '2.0.1',
                   // applicationIcon: Image.asset('lib/assets/icon/icon_ss1024.png', width: 48, height: 48),
                 ),
               ),

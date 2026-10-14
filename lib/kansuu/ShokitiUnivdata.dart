@@ -1,9 +1,22 @@
+import 'dart:math' as math;
 import 'package:ekiden/constants.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/kansuu/meisei_rireki.dart'; // 名声の履歴(1.8.8)
 import 'package:ekiden/kansuu/rekidai_kiroku.dart'; // 歴代10位までの記録(1.8.8)
 import 'package:ekiden/kansuu/koukou.dart'; // 高校の大会の記録と優勝回数(1.9.5)
+
+/// 新しいゲームの、大学ごとの初期の名声(1年あたり。過去9年分にこの値を入れる。2.0.1)
+/// 1000×0.8の大学idの乗(最低1)。0番1000、5番327、10番107、20番11、29番1
+/// (2.0.0までは 30−大学id(0番30〜29番1)で、ほぼ一直線に並んでいた。名声の上位3校の倍率が
+///  かかる新入生の振り分けで、4位以下が横並びになって序盤のくじで順位が入れ替わり、そのまま固まるため、
+///  初期の名声の順がほとんど残らなかった(30年後の名声の順位相関が実際のデータで0.36)。
+///  上位ほど大きく下るほど急に小さくなる形にして、中位の順もはっきりさせた。模擬計算では
+///  順位相関が0.62→0.74、初期の上位10校のうち30年後も上位10校にいる数が6.8→8.0校)
+int shokiMeiseiNen(int univid) {
+  final int atai = (1000 * math.pow(0.8, univid)).toInt();
+  return atai < 1 ? 1 : atai;
+}
 
 Future<void> ShokitiUnivdata(
   bool ikuseiryoku_meisei_ijiflag,
@@ -58,7 +71,8 @@ Future<void> ShokitiUnivdata(
       } else {
         univ.meisei_yeargoto[ii] = TEISUU.UNIVSUU - univ.id;
       }*/
-        univ.meisei_yeargoto[ii] = TEISUU.UNIVSUU - univ.id;
+        // 2.0.1から、1年あたり 1000×0.8の大学idの乗(最低1)にした(shokiMeiseiNen の説明を参照)
+        univ.meisei_yeargoto[ii] = shokiMeiseiNen(univ.id);
 
         temptotal += univ.meisei_yeargoto[ii];
       }

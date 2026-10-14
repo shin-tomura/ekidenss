@@ -1249,7 +1249,7 @@ class _Mode0700ContentState extends State<Mode0700Content> {
                                                 tsukuru: kijiTtIchiran,
                                                 hiraku: kijiTtHiraku,
                                                 annai:
-                                                    '夏のタイムトライアル4種目の好タイムの選手を伝えます。'
+                                                    '夏のタイムトライアル4種目の好タイムの選手と、昨夏からの伸びやチームの層を伝えます。'
                                                     '学内メディアの学内TT特集も、記事の画面の上で切り替えて読めます。読めるのは今日だけです',
                                               ),
                                             // 個人順位 (非学内・非個人記録会)

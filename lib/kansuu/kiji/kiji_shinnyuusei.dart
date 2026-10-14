@@ -486,39 +486,6 @@ const int _gIshoku = 11; // ほかの競技の出身
 /// 段落の種類
 enum _Dan { sedai, ikku, soutai, kazu, hokyou, yuushou, onaji, ishoku, ryuu }
 
-/// 前の年の見出しの型(残っていなければnull)と、残す値の読み書き
-class _MidashiKiroku {
-  final int nendo;
-  final int mae;
-  final int kon;
-  const _MidashiKiroku(this.nendo, this.mae, this.kon);
-
-  static _MidashiKiroku? yomu(KijiKankyou k) {
-    if (k.kantoku.yobiint3.length <= shinnyuuseiMidashiIndex) return null;
-    final int v = k.kantoku.yobiint3[shinnyuuseiMidashiIndex];
-    if (v <= 0) return null;
-    return _MidashiKiroku(v ~/ 10000, (v ~/ 100) % 100, v % 100);
-  }
-
-  /// 今年度[nendo]の記事を作るときの、前の年の見出しの型(分からなければnull)
-  static int? maeNoKata(KijiKankyou k, int nendo) {
-    final _MidashiKiroku? m = yomu(k);
-    if (m == null) return null;
-    if (m.nendo == nendo) return m.mae >= 1 && m.mae <= 98 ? m.mae : null;
-    if (m.nendo == nendo - 1) return m.kon >= 1 && m.kon <= 98 ? m.kon : null;
-    return null;
-  }
-
-  /// 今年度の見出しの型を残す(同じ年度でもう残していれば何もしない。保存は待たない)
-  static void nokosu(KijiKankyou k, int nendo, int? mae, int kon) {
-    if (k.kantoku.yobiint3.length <= shinnyuuseiMidashiIndex) return;
-    final _MidashiKiroku? m = yomu(k);
-    if (m != null && m.nendo == nendo) return;
-    k.kantoku.yobiint3[shinnyuuseiMidashiIndex] = nendo * 10000 + (mae ?? 99) * 100 + kon;
-    k.kantoku.save();
-  }
-}
-
 /// 期待のルーキーの記事を書く
 class _Rookie {
   final _Shiryou d;
@@ -1678,10 +1645,10 @@ List<Kiji> shinnyuuseiKiji(KijiKankyou k) {
   if (r.ishokuTen > 0) ire(_gIshoku, r.ishokuTen);
   kouho.sort((a, b) => b.ten.compareTo(a.ten));
   // 前の年と同じ型なら、2番目の観点を見出しにする(三冠はめったにないので、続いてもそのまま)
-  final int? mae = _MidashiKiroku.maeNoKata(k, d.nendo);
+  final int? mae = KijiMidashiKiroku.maeNoKata(k, shinnyuuseiMidashiIndex, d.nendo);
   int g = kouho.first.g;
   if (g == mae && g != _gSankan && kouho.length >= 2) g = kouho[1].g;
-  _MidashiKiroku.nokosu(k, d.nendo, mae, g);
+  KijiMidashiKiroku.nokosu(k, shinnyuuseiMidashiIndex, d.nendo, mae, g);
 
   final String midashi = r.midashiMoji(g);
   final String lead = r.leadMoji(g, kata);

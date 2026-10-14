@@ -313,6 +313,20 @@ void kijiShinnyuuseiHiraku(BuildContext context) {
   ]);
 }
 
+/// 夏のTT特集を開く(8月25日のロード10kmの結果画面から。箱庭スポーツの夏のTT特集と、学内メディアの学内TT特集。2.0.0)
+void kijiTtHiraku(BuildContext context) {
+  _hiraku(context, [
+    KijiBan(
+      site: kijiSiteMei,
+      sub: '陸上ニュース・夏のTT特集',
+      list: kijiTtIchiran(),
+      kekka: true,
+      nashiMoji: '今夏のタイムトライアルの記事はありません',
+    ),
+    ..._gakunaiBan(kijiGakunaiTtIchiran(), sub: '陸上競技部・学内TT特集', kekka: true),
+  ]);
+}
+
 void _hiraku(BuildContext context, List<KijiBan> bans) {
   showGeneralDialog(
     context: context,
@@ -757,6 +771,7 @@ class _KijiIchiranGamenState extends State<KijiIchiranGamen> {
               site: ban.site,
               sokuhou: _sokuhou(list),
               shinnyuusei: list.isNotEmpty && kijiShinnyuuseiKa(list.first), // 新入生の記事(2.0.0)
+              tt: list.isNotEmpty && kijiTtKa(list.first), // 夏のTT特集(2.0.0)
             ) +
             list.map((k) => k.zenbun()).join('\n\n'),
         'すべての記事(依頼文つき)',
@@ -964,6 +979,7 @@ class KijiGamen extends StatelessWidget {
                         site: kiji.site,
                         sokuhou: kiji.category.endsWith('速報'),
                         shinnyuusei: kijiShinnyuuseiKa(kiji), // 新入生の記事(2.0.0)
+                        tt: kijiTtKa(kiji), // 夏のTT特集(2.0.0)
                       ) +
                       kiji.zenbun(),
                   'この記事(依頼文つき)',

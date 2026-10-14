@@ -13,6 +13,7 @@ import 'package:ekiden/kansuu/kiji/kiji_nenkan.dart'; // 年間表彰と学内�
 import 'package:ekiden/kansuu/kiji/kiji_gakuren.dart'; // 学連選抜通信(正月駅伝。1.9.7)
 import 'package:ekiden/kansuu/kiji/kiji_ouro.dart'; // 正月駅伝の往路の記事(2.0.0)
 import 'package:ekiden/kansuu/kiji/kiji_shinnyuusei.dart'; // 新入生の記事(4月5日。2.0.0)
+import 'package:ekiden/kansuu/kiji/kiji_tt.dart'; // 夏のTT特集(8月25日。2.0.0)
 import 'package:ekiden/kansuu/gakuren_text.dart' show gakurenKonnenAri;
 
 export 'package:ekiden/kansuu/kiji/kiji_kihon.dart'
@@ -21,6 +22,7 @@ export 'package:ekiden/kansuu/kiji/kiji_jikkyou.dart' show jikkyouSiteMei;
 export 'package:ekiden/kansuu/kiji/kiji_tenbou.dart' show KijiYosouJin;
 export 'package:ekiden/kansuu/kiji/kiji_gakuren.dart' show gakurenSiteMei;
 export 'package:ekiden/kansuu/kiji/kiji_shinnyuusei.dart' show kijiShinnyuuseiKa;
+export 'package:ekiden/kansuu/kiji/kiji_tt.dart' show kijiTtKa, ttSaishuuRace;
 
 // ------------------------------------------------------------
 // ニュース記事(箱庭スポーツ)の入口(1.9.2)
@@ -43,6 +45,8 @@ export 'package:ekiden/kansuu/kiji/kiji_shinnyuusei.dart' show kijiShinnyuuseiKa
 // 結果号と速報は結果画面の記事の画面の切り替えで読める
 // 2.0.0から、4月5日の最新画面で、箱庭スポーツの「期待のルーキー」と学内メディアの「新入生紹介号」も読める
 // (kiji_shinnyuusei.dart。新入生の世代全体と、自分の大学の新入生の記事)
+// 2.0.0から、8月25日(夏のTTの最終日のロード10km)の結果画面で、箱庭スポーツの「夏のTT特集」と
+// 学内メディアの「学内TT特集」も読める(kiji_tt.dart)
 // ------------------------------------------------------------
 
 /// 表示中の大会の結果の記事
@@ -320,6 +324,34 @@ List<Kiji> kijiGakunaiShinnyuuseiIchiran() {
   }
 }
 
+/// 箱庭スポーツの「夏のTT特集」(8月25日。大会に関係ないので、正月駅伝を記事にする大会として読む。2.0.0)
+List<Kiji> kijiTtIchiran() {
+  try {
+    final KijiKankyou? k = KijiKankyou.yomuRace(2);
+    if (k == null) return [];
+    final List<Kiji> list = ttKiji(k);
+    _log(list);
+    return list;
+  } catch (e, st) {
+    debugPrint('[ニュース記事] 夏のTT特集を作れませんでした: $e\n$st');
+    return [];
+  }
+}
+
+/// 学内メディアの「学内TT特集」(8月25日。2.0.0)
+List<Kiji> kijiGakunaiTtIchiran() {
+  try {
+    final KijiKankyou? k = KijiKankyou.yomuRace(2);
+    if (k == null) return [];
+    final List<Kiji> list = ttGakunaiKiji(k);
+    _log(list);
+    return list;
+  } catch (e, st) {
+    debugPrint('[ニュース記事] 学内TT特集を作れませんでした: $e\n$st');
+    return [];
+  }
+}
+
 // ------------------------------------------------------------
 // 学連選抜通信(1.9.7。kiji_gakuren.dart。正月駅伝だけ)
 // ------------------------------------------------------------
@@ -388,13 +420,28 @@ void _log(List<Kiji> list) {
 /// [gakunai] 学内メディアの記事のとき([site] はそのサイトの名前。1.9.3)
 /// [sokuhou] 区間ごとの速報のとき(学内メディアと学連選抜通信。1.9.7)
 /// [shinnyuusei] 新入生の記事のとき(箱庭スポーツの期待のルーキーと、学内メディアの新入生紹介号。2.0.0)
+/// [tt] 夏のTT特集のとき(箱庭スポーツの夏のTT特集と、学内メディアの学内TT特集。2.0.0)
 String kijiIraibun(
   bool kekka, {
   bool gakunai = false,
   String site = kijiSiteMei,
   bool sokuhou = false,
   bool shinnyuusei = false,
+  bool tt = false,
 }) {
+  // 夏のTT特集(2.0.0)。全体の順位は書かず、タイムで書いている記事なので、順位を足さないように頼む
+  if (tt) {
+    final String dare = gakunai
+        ? '大学の陸上競技部を追う架空の学内メディア「$site」の、夏のタイムトライアルの特集です。あなたは陸上競技部を担当する学生記者として、'
+            '部員の夏の頑張りが伝わる記事に書き直してください。'
+        : '架空のスポーツニュースサイト「$kijiSiteMei」の、夏のタイムトライアルの特集です。あなたはスポーツ紙の駅伝・陸上担当のベテラン記者として、'
+            '読みごたえのある記事に書き直してください。夏のタイムトライアルは、どの大学も同じコース・同じ条件で走っています。'
+            '学生全体の中での順位(1位・最速など)は書き足さないでください。';
+    return '以下は、駅伝ゲーム「箱庭小駅伝SS」の夏のタイムトライアルの結果をもとにした、$dare'
+        'タイム・選手名・大学名などの事実は変えないでください。'
+        '選手の性格や能力など、記事に書かれていない特徴は付け足さないでください。'
+        'コメントは記事の中のものだけを使い、新しい発言は作らないでください。\n\n';
+  }
   // 新入生の記事(2.0.0)。高校の大会の結果に、選手の性質(勝負強さなど)を付け足さないように頼む
   // (高校の大会の計算には駅伝男・平常心を使っていないので、読み違えさせないため)
   if (shinnyuusei) {

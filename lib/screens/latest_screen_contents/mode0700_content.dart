@@ -1237,6 +1237,21 @@ class _Mode0700ContentState extends State<Mode0700Content> {
                                             _buildRaceTitle(
                                               currentGhensuu.hyojiracebangou,
                                             ),
+                                            // 夏のTTの最終日(8月25日のロード10km)は、箱庭スポーツの「夏のTT特集」と
+                                            // 学内メディアの「学内TT特集」(2.0.0。kiji_tt.dart)。読めるのはこの日だけ
+                                            if (currentGhensuu.hyojiracebangou ==
+                                                ttSaishuuRace)
+                                              KijiLinkCard(
+                                                key: ValueKey(
+                                                  'kijiTt_${currentGhensuu.year}',
+                                                ),
+                                                namae: '夏のTT特集(箱庭スポーツ)',
+                                                tsukuru: kijiTtIchiran,
+                                                hiraku: kijiTtHiraku,
+                                                annai:
+                                                    '夏のタイムトライアル4種目の好タイムの選手を伝えます。'
+                                                    '学内メディアの学内TT特集も、記事の画面の上で切り替えて読めます。読めるのは今日だけです',
+                                              ),
                                             // 個人順位 (非学内・非個人記録会)
                                             if (!(currentGhensuu
                                                         .hyojiracebangou >=

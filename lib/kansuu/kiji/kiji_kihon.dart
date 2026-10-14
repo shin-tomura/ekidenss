@@ -257,6 +257,42 @@ KishaKata kishaKataKara(String kishaMei) {
 }
 
 // ------------------------------------------------------------
+// 見出しの型を前の年と重ねないための記録(2.0.0。年に1度の記事で使う。新入生の記事・夏のTT特集)
+// KantokuData.yobiint3[index] に、年度×10000 + 前の年の型×100 + 今年の型 を残す(型は1〜98。前の年がなければ99)。
+// 同じ年度に何度記事を作っても同じ見出しになるように、同じ年度ではもう書き換えない
+// ------------------------------------------------------------
+
+class KijiMidashiKiroku {
+  const KijiMidashiKiroku._();
+
+  /// 残っている値(年度・前の年の型・今年の型。なければnull)
+  static ({int nendo, int mae, int kon})? _yomu(KijiKankyou k, int index) {
+    if (k.kantoku.yobiint3.length <= index) return null;
+    final int v = k.kantoku.yobiint3[index];
+    if (v <= 0) return null;
+    return (nendo: v ~/ 10000, mae: (v ~/ 100) % 100, kon: v % 100);
+  }
+
+  /// 今年度[nendo]の記事を作るときの、前の年の見出しの型(分からなければnull)
+  static int? maeNoKata(KijiKankyou k, int index, int nendo) {
+    final ({int nendo, int mae, int kon})? m = _yomu(k, index);
+    if (m == null) return null;
+    if (m.nendo == nendo) return m.mae >= 1 && m.mae <= 98 ? m.mae : null;
+    if (m.nendo == nendo - 1) return m.kon >= 1 && m.kon <= 98 ? m.kon : null;
+    return null;
+  }
+
+  /// 今年度の見出しの型[kon]を残す(同じ年度でもう残していれば何もしない。保存は待たない)
+  static void nokosu(KijiKankyou k, int index, int nendo, int? mae, int kon) {
+    if (k.kantoku.yobiint3.length <= index) return;
+    final ({int nendo, int mae, int kon})? m = _yomu(k, index);
+    if (m != null && m.nendo == nendo) return;
+    k.kantoku.yobiint3[index] = nendo * 10000 + (mae ?? 99) * 100 + kon;
+    k.kantoku.save();
+  }
+}
+
+// ------------------------------------------------------------
 // 選手の因縁(1.9.4)。年別のデータから、記事の切り口になる事実を見つける
 // ------------------------------------------------------------
 

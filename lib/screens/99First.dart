@@ -4,6 +4,7 @@ import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/ghensuu.dart';
 import 'package:ekiden/save_load_screen.dart';
 import 'package:ekiden/kansuu/ShoriGuard.dart';
+import 'package:ekiden/kansuu/mokuhyou_kimekata.dart'; // 目標順位の決め方を変えたお知らせ(2.0.1)
 
 class FirstScreen extends StatefulWidget {
   const FirstScreen({super.key});
@@ -13,6 +14,16 @@ class FirstScreen extends StatefulWidget {
 }
 
 class _FirstScreen extends State<FirstScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // 起動時の移行で、コンピュータの大学の目標順位の決め方を変えていれば、一度だけお知らせを出す
+    // (2.0.1。mokuhyou_kimekata.dart)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) mokuhyouKimekataOshiraseDialog(context);
+    });
+  }
+
   // 新規ゲーム開始の確認ダイアログを表示する関数
   Future<void> _showNewGameConfirmDialog(BuildContext context) async {
     return showDialog<void>(
@@ -186,6 +197,10 @@ class _FirstScreen extends State<FirstScreen> {
                                 const SaveLoadScreen(hozonmosuruflag: false),
                           ),
                         );
+                        // 読み込んだ保存データで目標順位の決め方を変えていて、読み込みの画面で
+                        // お知らせを出せなかったときは、ここで出す(2.0.1。mokuhyou_kimekata.dart)
+                        if (!mounted) return;
+                        await mokuhyouKimekataOshiraseDialog(context);
                       },
                       icon: const Icon(
                         Icons.folder_open,

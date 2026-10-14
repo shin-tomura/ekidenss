@@ -21,6 +21,7 @@ import 'kansuu/custom_seigen.dart'; // カスタム駅伝の出場制限の確�
 import 'kansuu/seichou_type.dart'; // 成長タイプ設定の確認(1.9.3)
 import 'kansuu/joukai.dart'; // 13分台の新入生の限界突破の優遇の確認(1.9.3)・限界突破の起こり方(2.0.0)
 import 'kansuu/yosen_com_siji.dart'; // 正月駅伝予選のコンピュータの大学の指示と集団走の確認(1.9.9)
+import 'kansuu/mokuhyou_kimekata.dart'; // 目標順位決め方設定の確認(2.0.1)
 
 // 読み込み時に複数枚のデータを一時的に保持する状態管理クラス
 class QrReceiveState {
@@ -405,12 +406,14 @@ class SettingsQrProcessor {
         currentGhensuu.spurtryokuseichousisuu3 = 0;
       }
       // 目標順位決め方設定(int)
+      // (2.0.1から、正しくない値は新しい初期値の対校戦順位追従にする。2.0.0までのQRコードの93
+      //  (向上心豊かの初期値のまま)はそのまま入れ、次の起動の移行で対校戦順位追従にしてお知らせを出す。
+      //  2.0.1からの画面で選んだ向上心豊か(94)は、2.0.0までのアプリでは正しくない値として向上心豊か(93)になる。
+      //  mokuhyou_kimekata.dart)
       currentGhensuu.spurtryokuseichousisuu2 =
           dataMap['cg_spurtryokuseichousisuu2'] as int;
-      if (currentGhensuu.spurtryokuseichousisuu2 != 93 &&
-          currentGhensuu.spurtryokuseichousisuu2 != 1 &&
-          currentGhensuu.spurtryokuseichousisuu2 != 2) {
-        currentGhensuu.spurtryokuseichousisuu2 = 93;
+      if (!mokuhyouKimekataTadashii(currentGhensuu.spurtryokuseichousisuu2)) {
+        currentGhensuu.spurtryokuseichousisuu2 = mokuhyouKimekataTaikousen;
       }
       // カスタム駅伝開催するしない(int)
       currentGhensuu.spurtryokuseichousisuu1 =

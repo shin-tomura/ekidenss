@@ -71,6 +71,7 @@ import 'package:ekiden/kansuu/ChartPanelUniv.dart';
 import 'package:ekiden/kansuu/seichou_type.dart'; // 新入生の成長タイプの割合の移行処理(1.9.3)
 import 'package:ekiden/kansuu/koukou.dart'; // 出身校と高校時代の実績(1.9.5)
 import 'package:ekiden/kansuu/taikai_chouki.dart'; // 大会の長い記録の移行処理(2.0.0)
+import 'package:ekiden/kansuu/mokuhyou_kimekata.dart'; // 目標順位の決め方の移行処理(2.0.1)
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 // ★ここに buildAppTheme() 関数を記述する★
@@ -1066,6 +1067,17 @@ Future<void> main() async {
       ).get('KantokuData');
       if (gh != null && kantoku != null) {
         await seichouType200Ikou(gh, kantoku);
+      }
+    }
+
+    // コンピュータの大学の目標順位の決め方が「向上心豊か」の初期値のまま(93)なら、
+    // 2.0.1の初期値の「対校戦順位追従」にする(変えたときは、最初の画面でお知らせを出す。mokuhyou_kimekata.dart)
+    // 値で見分けるので、版の番号では判定しない(2.0.1testで開いたデータにも入るように)
+    //save_load_screenの中の _importFromSlot の中にもあるので、そちらも変更すること！
+    {
+      final Ghensuu? gh = ghensuuBox.getAt(0);
+      if (gh != null) {
+        await mokuhyouKimekata201Ikou(gh);
       }
     }
 
@@ -4004,8 +4016,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     } else if (ghensuu.month == 6 && ghensuu.day == 5) {
       // 目標順位設定処理
       for (var iUniv = 0; iUniv < sortedUnivsById.length; iUniv++) {
-        if (ghensuu.spurtryokuseichousisuu2 == 93) {
-          //デフォルト設定
+        if (mokuhyouKimekataKoujoushinKa(ghensuu.spurtryokuseichousisuu2)) {
+          //向上心豊か(2.0.0までの初期値。93と、2.0.1から画面で選んだときの94。mokuhyou_kimekata.dart)
           //11月駅伝目標順位
           if (sortedUnivsById[iUniv].juni_race[1][0] < 8) {
             sortedUnivsById[iUniv].mokuhyojuni[1] =

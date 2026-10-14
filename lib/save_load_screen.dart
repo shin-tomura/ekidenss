@@ -26,6 +26,7 @@ import 'package:ekiden/kansuu/gakuren_kantoku.dart'; // 学連選抜の監督の
 import 'package:ekiden/kansuu/seichou_type.dart'; // 新入生の成長タイプの割合の移行処理(1.9.3)
 import 'package:ekiden/kansuu/koukou.dart'; // 出身校と高校時代の実績(1.9.5)
 import 'package:ekiden/kansuu/taikai_chouki.dart'; // 大会の長い記録の移行処理(2.0.0)
+import 'package:ekiden/kansuu/mokuhyou_kimekata.dart'; // 目標順位の決め方の移行処理(2.0.1)
 //import 'dart:io';
 //import 'package:path_provider/path_provider.dart';
 
@@ -876,6 +877,15 @@ class _SaveLoadScreenState extends State<SaveLoadScreen> {
         }
       }
 
+      // 目標順位の決め方の2.0.1の移行(mainの中の同じ処理の説明を参照。変えたときは、読み込んだあとにお知らせを出す)
+      //mainの中にもあるので、そちらも変更すること！
+      {
+        final Ghensuu? gh = Hive.box<Ghensuu>('ghensuuBox').getAt(0);
+        if (gh != null) {
+          await mokuhyouKimekata201Ikou(gh);
+        }
+      }
+
       //1.4.3からバージョン番号保存することにした(この処理は一連の処理の中で1番最後にすること)
       //mainの中にもあるので、そちらも変更すること！
       final versionValue = int.tryParse(sortedUnivData[7].name_tanshuku);
@@ -888,6 +898,10 @@ class _SaveLoadScreenState extends State<SaveLoadScreen> {
 
       await ShoriGuard.end();
       _showSnackbar('スロット $targetSlot から読み込みました！ ✅');
+      // 目標順位の決め方を移行で変えていれば、お知らせを出す(2.0.1。mokuhyou_kimekata.dart)
+      if (mounted) {
+        await mokuhyouKimekataOshiraseDialog(context);
+      }
       // UIの再描画と画面操作を、システム処理が完全に安定するまで遅延させる
     } catch (e) {
       _showSnackbar('読み込みに失敗しました: $e', isError: true);

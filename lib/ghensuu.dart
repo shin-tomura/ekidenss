@@ -52,7 +52,7 @@ class Ghensuu extends HiveObject {
   @HiveField(21)
   int spurtryokuseichousisuu1 = 1; //カスタム駅伝やるフラグ
   @HiveField(22)
-  int spurtryokuseichousisuu2 = 93; //目標順位設定方法フラグ
+  int spurtryokuseichousisuu2 = 1; //目標順位設定方法フラグ(93・94=向上心豊か、1=対校戦順位追従、2=常にシード権意識。2.0.1から初期値は1。mokuhyou_kimekata.dart)
   @HiveField(23)
   int spurtryokuseichousisuu3 = 9; //新入生所属先決定名声影響度指数
   @HiveField(24)
@@ -263,7 +263,7 @@ class Ghensuu extends HiveObject {
       ..name_mae = List.filled(TEISUU.SUU_NAMEMAE, "")
       ..name_ato = List.filled(TEISUU.SUU_NAMEATO, "")
       ..spurtryokuseichousisuu1 = 1
-      ..spurtryokuseichousisuu2 = 93
+      ..spurtryokuseichousisuu2 = 1 // 2.0.1から初期値は対校戦順位追従(mokuhyou_kimekata.dart)
       ..spurtryokuseichousisuu3 = 9
       ..spurtryokuseichousisuu4 = 1
       ..spurtryokuseichousisuu5 = 10

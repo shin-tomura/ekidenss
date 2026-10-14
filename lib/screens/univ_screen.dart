@@ -29,6 +29,11 @@ import 'package:ekiden/kansuu/kiji/kiji_kihon.dart'
     show KijiHyou, univSandaiHyou, konkiKaisaiZumi; // 三大駅伝の成績の表(1.9.8)
 import 'package:ekiden/screens/kiji_hyou_view.dart'; // 表の部品(1.9.8)
 import 'package:ekiden/screens/kukan_haiti_button.dart'; // 今季タイム一覧表を開くボタン(1.9.9)
+import 'package:ekiden/kansuu/mokuhyou_kimekata.dart'
+    show
+        mokuhyouKimekataKoujoushin,
+        mokuhyouKimekataTaikousen,
+        mokuhyouKimekataKoujoushinKa; // 目標順位決め方設定の値(2.0.1)
 import 'package:ekiden/kansuu/kingin_kiroku.dart'
     show kinginIchiranHyou, kinginIchiranChuu; // 金特訓・銀特訓の記録の一覧表(2.0.0)
 import 'package:ekiden/kansuu/taikai_chouki.dart'
@@ -1148,16 +1153,18 @@ class ModalSpurtryokuseichousisuu2 extends StatefulWidget {
 class _ModalSpurtryokuseichousisuu2State
     extends State<ModalSpurtryokuseichousisuu2> {
   // ボタンのデータを定義
+  // (2.0.1から初期値を対校戦順位追従設定にした。向上心豊かを選んだときは94で保存し、
+  //  2.0.0までの初期値のまま(93)と見分ける。mokuhyou_kimekata.dart)
   final List<Map<String, dynamic>> _options = const [
     {
-      'value': 93,
-      'label': '向上心豊か（初期値）',
-      'description': '初期値設定です。\n目標設定の際に、前年の当該駅伝での成績をもとに、上位を目指す傾向があります。',
+      'value': mokuhyouKimekataKoujoushin,
+      'label': '向上心豊か',
+      'description': '目標設定の際に、前年の当該駅伝での成績をもとに、上位を目指す傾向があります。',
     },
     {
-      'value': 1,
-      'label': '対校戦順位追従設定',
-      'description': '当年の対校戦の順位を重視します。\n目標設定が現実的になります。',
+      'value': mokuhyouKimekataTaikousen,
+      'label': '対校戦順位追従設定（初期値）',
+      'description': '初期値設定です。\n当年の対校戦の順位を重視します。\n目標設定が現実的になります。',
     },
     {
       'value': 2,
@@ -1196,15 +1203,21 @@ class _ModalSpurtryokuseichousisuu2State
           );
         }
 
+        // 今の設定の値(向上心豊かの初期値のまま(93)は、画面で選んだ向上心豊か(94)と同じに見せる)
+        final int genzaiAtai =
+            mokuhyouKimekataKoujoushinKa(currentGhensuu.spurtryokuseichousisuu2)
+            ? mokuhyouKimekataKoujoushin
+            : currentGhensuu.spurtryokuseichousisuu2;
+
         // 現在の設定名を取得
         String currentLabel = _options.firstWhere(
-          (option) => option['value'] == currentGhensuu.spurtryokuseichousisuu2,
+          (option) => option['value'] == genzaiAtai,
           orElse: () => {'label': '不明な設定'},
         )['label'];
 
         // 現在の設定の説明を取得
         String currentDescription = _options.firstWhere(
-          (option) => option['value'] == currentGhensuu.spurtryokuseichousisuu2,
+          (option) => option['value'] == genzaiAtai,
           orElse: () => {'description': '現在の設定に関する説明がありません。'},
         )['description'];
 

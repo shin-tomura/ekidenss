@@ -23,6 +23,7 @@ import 'package:ekiden/kansuu/rekidai_kiroku.dart'; // 歴代10位までの記�
 import 'package:ekiden/kansuu/kingin_wariai.dart'; // 難易度ごとの金銀支給量の割合(1.9.1)
 import 'package:ekiden/kansuu/taikai_chouki.dart'; // 大会の長い記録(2.0.0)
 import 'package:ekiden/kansuu/oufuku_kiroku.dart'; // 正月駅伝の往路・復路の成績(2.0.0)
+import 'package:ekiden/kansuu/mokuhyou_kimekata.dart'; // 目標順位の決め方(2.0.1)
 
 String _timeToMinuteSecondString(double time) {
   if (time == TEISUU.DEFAULTTIME) {
@@ -1466,7 +1467,8 @@ Future<void> kirokuKousin({
     for (var iUniv = 0; iUniv < sortedunivdata.length; iUniv++) {
       if (sortedunivdata[iUniv].juni_race[racebangou][0] < 7) {
         sortedunivdata[iUniv].taikaientryflag[1] = 1;
-        if (gh[0].spurtryokuseichousisuu2 == 93 ||
+        // 向上心豊か(93・94。mokuhyou_kimekata.dart)と常にシード権意識
+        if (mokuhyouKimekataKoujoushinKa(gh[0].spurtryokuseichousisuu2) ||
             gh[0].spurtryokuseichousisuu2 == 2) {
           sortedunivdata[iUniv].mokuhyojuni[1] = 7;
         }
@@ -1488,7 +1490,8 @@ Future<void> kirokuKousin({
     for (var iUniv = 0; iUniv < sortedunivdata.length; iUniv++) {
       if (sortedunivdata[iUniv].juni_race[racebangou][0] < 10) {
         sortedunivdata[iUniv].taikaientryflag[2] = 1;
-        if (gh[0].spurtryokuseichousisuu2 == 93 ||
+        // 向上心豊か(93・94。mokuhyou_kimekata.dart)と常にシード権意識
+        if (mokuhyouKimekataKoujoushinKa(gh[0].spurtryokuseichousisuu2) ||
             gh[0].spurtryokuseichousisuu2 == 2) {
           sortedunivdata[iUniv].mokuhyojuni[2] = 9;
         }

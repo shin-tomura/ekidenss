@@ -13,6 +13,7 @@ import 'package:ekiden/kansuu/kiji/kiji_nenkan.dart'; // 年間表彰と学内�
 import 'package:ekiden/kansuu/kiji/kiji_gakuren.dart'; // 学連選抜通信(正月駅伝。1.9.7)
 import 'package:ekiden/kansuu/kiji/kiji_ouro.dart'; // 正月駅伝の往路の記事(2.0.0)
 import 'package:ekiden/kansuu/kiji/kiji_shinnyuusei.dart'; // 新入生の記事(4月5日。2.0.0)
+import 'package:ekiden/kansuu/kiji/kiji_kyouka.dart'; // 強化プロジェクトの記事(4月5日。2.0.1)
 import 'package:ekiden/kansuu/kiji/kiji_tt.dart'; // 夏のTT特集(8月25日。2.0.0)
 import 'package:ekiden/kansuu/gakuren_text.dart' show gakurenKonnenAri;
 
@@ -301,7 +302,9 @@ List<Kiji> kijiShinnyuuseiIchiran() {
   try {
     final KijiKankyou? k = KijiKankyou.yomuRace(2);
     if (k == null) return [];
-    final List<Kiji> list = shinnyuuseiKiji(k);
+    // 強化プロジェクトが今年度始まっていれば、その記事を後ろに足す(2.0.1。kiji_kyouka.dart)
+    // (先頭は期待のルーキーのまま。生成AIに渡すテキストの依頼文を新入生の記事にするため)
+    final List<Kiji> list = [...shinnyuuseiKiji(k), ...kyoukaProjectKiji(k)];
     _log(list);
     return list;
   } catch (e, st) {

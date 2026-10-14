@@ -72,6 +72,7 @@ import 'package:ekiden/kansuu/seichou_type.dart'; // 新入生の成長タイプ
 import 'package:ekiden/kansuu/koukou.dart'; // 出身校と高校時代の実績(1.9.5)
 import 'package:ekiden/kansuu/taikai_chouki.dart'; // 大会の長い記録の移行処理(2.0.0)
 import 'package:ekiden/kansuu/mokuhyou_kimekata.dart'; // 目標順位の決め方の移行処理(2.0.1)
+import 'package:ekiden/kansuu/kyouka_project.dart'; // 強化プロジェクト(2.0.1)
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 // ★ここに buildAppTheme() 関数を記述する★
@@ -3015,6 +3016,11 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       ..sort(
         (a, b) => a.kiroku_nyuugakuji_5000.compareTo(b.kiroku_nyuugakuji_5000),
       );*/
+
+    // 強化プロジェクトの抽選(2.0.1。kyouka_project.dart)
+    // 名声の順位は年度替わりの前(去年度の大会の結果まで)の名声で決める。
+    // RetireNewの中の新入生の振り分けにも効かせるので、その前に行う
+    await kyoukaProjectChuusen(gh: ghensuu, sortedUnivData: sortedUnivData);
 
     // 4. RetireNew 関数を呼び出し
     // RetireNew関数が受け取る引数の型に合わせて変更

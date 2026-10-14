@@ -9,6 +9,7 @@ import 'package:ekiden/constants.dart'; // HENSUUクラスのパスを適宜修�
 import 'dart:math';
 import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/kansuu/scout_com.dart';
+import 'package:ekiden/kansuu/kyouka_project.dart'; // 強化プロジェクト(2.0.1)
 import 'package:ekiden/kansuu/koukou.dart'; // 出身校と高校時代の実績(1.9.5)
 import 'package:ekiden/screens/Modal_koukouMeikan.dart'; // 高校名鑑(1.9.5)
 import 'package:ekiden/kansuu/ShoriGuard.dart';
@@ -1407,6 +1408,21 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
         '(説明画面の設定タブの「新入生の進学先(全大学)」からも、翌年のスカウトまで見られます)。';
   }
 
+  /// 強化プロジェクト中の大学の案内(なければnull。2.0.1。kyouka_project.dart)
+  String? _kyoukaMoji() {
+    final Ghensuu? gh = _ghensuu;
+    if (gh == null) return null;
+    final KyoukaProject? p = kyoukaProjectIma(gh);
+    if (p == null) return null;
+    String mei = '';
+    for (final UnivData u in Hive.box<UnivData>('univBox').values) {
+      if (u.id == p.univid) mei = u.name;
+    }
+    if (mei.isEmpty) return null;
+    return '強化プロジェクト中: $mei大学(${p.owari}年度まで)。'
+        'スカウトに力を入れていて、名声の高い大学と同じくらい選ばれやすくなっています';
+  }
+
   /// コンピュータスカウトONのときの説明
   void _showSetsumeiDialog() {
     showDialog(
@@ -1863,6 +1879,17 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
           ),
           // 地区めぐりの地区の切り替え(1.9.6)
           if (_chikuMeguri) _buildChikuPanel(),
+          // 強化プロジェクト中の大学(2.0.1。kyouka_project.dart)
+          if (_kyoukaMoji() != null)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              color: Colors.orange.withOpacity(0.15),
+              child: Text(
+                _kyoukaMoji()!,
+                style: const TextStyle(color: Colors.orangeAccent, fontSize: 13),
+              ),
+            ),
 
           // 選手リスト
           Expanded(

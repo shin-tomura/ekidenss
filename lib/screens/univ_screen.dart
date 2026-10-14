@@ -29,6 +29,8 @@ import 'package:ekiden/kansuu/kiji/kiji_kihon.dart'
     show KijiHyou, univSandaiHyou, konkiKaisaiZumi; // 三大駅伝の成績の表(1.9.8)
 import 'package:ekiden/screens/kiji_hyou_view.dart'; // 表の部品(1.9.8)
 import 'package:ekiden/screens/kukan_haiti_button.dart'; // 今季タイム一覧表を開くボタン(1.9.9)
+import 'package:ekiden/kansuu/kyouka_project.dart'
+    show KyoukaProject, kyoukaProjectChuu; // 強化プロジェクト(2.0.1)
 import 'package:ekiden/kansuu/mokuhyou_kimekata.dart'
     show
         mokuhyouKimekataKoujoushin,
@@ -3754,6 +3756,16 @@ class _UnivScreenState extends State<UnivScreen> {
                     fontSize: HENSUU.fontsize_honbun,
                   ),
                 ),
+                // 強化プロジェクト中の大学(2.0.1。kyouka_project.dart)
+                if (_kyoukaOwari(kantoku, ghensuu, currentUnivData.id) != null)
+                  Text(
+                    '強化プロジェクト中(${_kyoukaOwari(kantoku, ghensuu, currentUnivData.id)}年度まで)',
+                    style: TextStyle(
+                      color: Colors.orangeAccent,
+                      fontSize: HENSUU.fontsize_honbun,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
 
                 // MARK: - レース履歴のScrollView
                 Expanded(
@@ -4659,4 +4671,11 @@ class _UnivScreenState extends State<UnivScreen> {
       ),
     );
   }
+}
+
+/// 大学[univid]が強化プロジェクト中なら、終わる年度(でなければnull。2.0.1。kyouka_project.dart)
+int? _kyoukaOwari(KantokuData kantoku, Ghensuu gh, int univid) {
+  final KyoukaProject? p = kyoukaProjectChuu(kantoku, choukiNendo(gh));
+  if (p == null || p.univid != univid) return null;
+  return p.owari;
 }

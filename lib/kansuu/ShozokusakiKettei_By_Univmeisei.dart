@@ -6,6 +6,7 @@ import 'package:ekiden/senshu_data.dart'; // SenshuDataクラスのインポー�
 import 'package:ekiden/constants.dart'; // TEISUUクラスをインポート
 import 'package:ekiden/kansuu/ikusei_ryuugakusei.dart';
 import 'package:ekiden/kansuu/joukai.dart';
+import 'package:ekiden/kansuu/kyouka_project.dart'; // 強化プロジェクト(2.0.1)
 import 'package:flutter/services.dart';
 // 必要に応じて他のモデルや定数ファイルのインポートを追加してください
 
@@ -95,6 +96,8 @@ List<int> shozokuChuusenOmomi({
       }
     }
   }
+  // 強化プロジェクト中の大学は、名声N位の大学の重みまで上げる(2.0.1。kyouka_project.dart)
+  kyoukaOmomiHosei(temp_meisei, ghensuu);
   return temp_meisei;
 }
 

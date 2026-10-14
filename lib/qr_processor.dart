@@ -22,6 +22,7 @@ import 'kansuu/seichou_type.dart'; // 成長タイプ設定の確認(1.9.3)
 import 'kansuu/joukai.dart'; // 13分台の新入生の限界突破の優遇の確認(1.9.3)・限界突破の起こり方(2.0.0)
 import 'kansuu/yosen_com_siji.dart'; // 正月駅伝予選のコンピュータの大学の指示と集団走の確認(1.9.9)
 import 'kansuu/mokuhyou_kimekata.dart'; // 目標順位決め方設定の確認(2.0.1)
+import 'kansuu/kyouka_project.dart'; // 強化プロジェクト設定の確認(2.0.1)
 
 // 読み込み時に複数枚のデータを一時的に保持する状態管理クラス
 class QrReceiveState {
@@ -208,6 +209,9 @@ class SettingsQrProcessor {
       data['k_yobiint2_89'] = kantoku.yobiint2.length > yosenComSijiIndex
           ? kantoku.yobiint2[yosenComSijiIndex]
           : 0;
+      // 強化プロジェクト設定(int) yobiint3[80] (2.0.1で追加。起こりやすさ+10×重み+100×期間のコード。
+      // どれも0が初期値。kyouka_project.dart)
+      data['k_yobiint3_80'] = kyoukaSetteiAtai(kantoku);
     } else if (department == SettingsDepartment.octoberTime) {
       //区間ごとタイム調整(int)
       data['k_yobiint5_30_39_time'] = kantoku.yobiint5.sublist(30, 40);
@@ -715,6 +719,12 @@ class SettingsQrProcessor {
           yosenComSijiAtaiTadashii(yobiint2_89) &&
           kantoku.yobiint2.length > yosenComSijiIndex) {
         kantoku.yobiint2[yosenComSijiIndex] = yobiint2_89;
+      }
+      // 強化プロジェクト設定(int) kantoku.yobiint3[80] (2.0.1)
+      //   起こりやすさ+10×重み+100×期間のコード(古いQRコードには含まれていないので、そのときは今の設定のまま)
+      final dynamic yobiint3_80 = dataMap['k_yobiint3_80'];
+      if (yobiint3_80 is int) {
+        kyoukaSetteiAtaiIreru(kantoku, yobiint3_80);
       }
       // 金銀支給量設定の難易度ごとの割合(int) kantoku.yobiint3[70]〜[73] (1.9.1)
       //   鬼・難しい・普通・易しいの順。0なら100%(初期値)、1〜50なら値×10%

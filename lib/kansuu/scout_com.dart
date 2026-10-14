@@ -10,6 +10,7 @@ import 'package:ekiden/kansuu/nouryoku_eikyodo.dart'; // 能力のタイムへ�
 import 'package:ekiden/kansuu/ShozokusakiKettei_By_Univmeisei.dart'; // 振り分けの抽選の重み
 import 'package:ekiden/kansuu/koukou.dart'; // 地区めぐりの出身校(1.9.6)
 import 'package:ekiden/kansuu/koukou_meibo.dart'; // 地区めぐりの地区(1.9.6)
+import 'package:ekiden/kansuu/kyouka_project.dart'; // 強化プロジェクト(2.0.1)
 
 // ------------------------------------------------------------
 // コンピュータ大学の新入生スカウト(1.7.9)
@@ -512,14 +513,18 @@ String _menuMei(int menu) {
 /// 大学の目利きを作る(補強ポイントはこの時点の選手で判定する)
 /// 補強ポイントの判定には、来年も残る2・3年生と、自校に確定した新入生だけを使う
 /// (仮の振り分けの新入生は使わない)
+/// [kyouka] がtrueなら強化プロジェクト中で、性格が自動なら大物狙いにする(2.0.1。kyouka_project.dart)
 _Mekiki _mekikiTsukuru(
   KantokuData kantoku,
   UnivData univ,
-  List<SenshuData> zenSenshu,
-) {
+  List<SenshuData> zenSenshu, {
+  bool kyouka = false,
+}) {
   final int houshin = comScoutHoushin(kantoku, univ.id);
   int seikaku = comScoutSeikaku(kantoku, univ.id);
-  if (seikaku == 0) {
+  if (seikaku == 0 && kyouka) {
+    seikaku = _seikakuOomono;
+  } else if (seikaku == 0) {
     // 自動: 名声順位(0が1位)で決める
     if (univ.meiseijuni <= 4) {
       seikaku = _seikakuOomono;
@@ -648,17 +653,19 @@ String scoutSeikouritsuBun(int kegaflag) {
 /// 成功率 = タイム順位による上限 × 名声の比 ÷ 75%(名声の比が75%以上なら上限のまま)
 /// [kawarimono] が true(変わり者)なら、上限の半分より下がらない(1.9.0)
 /// [kagen] は地区めぐりの成功率の下限(1.9.6。全国一斉は0で、今まで通り)
+/// [meisei] を渡すと、大学の名声の代わりに使う(強化プロジェクト中の大学。2.0.1。kyouka_project.dart)
 double _seikouritsu({
   required UnivData kousyouUniv,
   required double heikinMeisei,
   required int timeJuni,
   bool kawarimono = false,
   double kagen = 0.0,
+  int? meisei,
 }) {
+  final int m = meisei ?? kousyouUniv.meisei_total;
   double meiseiHi;
-  if (kousyouUniv.meisei_total + heikinMeisei > 0) {
-    meiseiHi =
-        kousyouUniv.meisei_total / (kousyouUniv.meisei_total + heikinMeisei);
+  if (m + heikinMeisei > 0) {
+    meiseiHi = m / (m + heikinMeisei);
   } else {
     meiseiHi = 0.5;
   }
@@ -1314,6 +1321,12 @@ Future<List<ComScoutKekka>> comScoutRound({
       .where((s) => s.gakunen == 1)
       .toList();
   final int myUnivid = gh.MYunivid;
+  // 強化プロジェクト中の大学の、交渉の成功率と争奪戦で使う名声(2.0.1。kyouka_project.dart)
+  final Map<int, int> kyoukaMeisei = kyoukaScoutMeiseiHosei(
+    sortedUnivData,
+    kantoku,
+    gh,
+  );
   final List<_Kousyou> kousyouList = [];
   final Map<int, _KoudouMemo> memo = {}; // 大学id → このラウンドの行動
   // 地区めぐりの選手の地区(全国一斉では使わない。1.9.6)
@@ -1377,7 +1390,12 @@ Future<List<ComScoutKekka>> comScoutRound({
       if (univ.id == myUnivid) continue;
       // 積極性(大学ごとの設定がなければ全大学共通の設定。1.9.1)
       final int sekkyoku = comScoutSekkyokuseiUniv(kantoku, univ.id);
-      final _Mekiki m = _mekikiTsukuru(kantoku, univ, zenSenshu);
+      final _Mekiki m = _mekikiTsukuru(
+        kantoku,
+        univ,
+        zenSenshu,
+        kyouka: kyoukaMeisei.containsKey(univ.id),
+      );
       if (comScoutKetteiSuu(shinnyuusei, univ.id) >=
           comScoutWaku(shinnyuusei, univ.id)) {
         memo[univ.id] = _KoudouMemo(
@@ -1411,6 +1429,7 @@ Future<List<ComScoutKekka>> comScoutRound({
               timeJuni: timeJuni[s.id] ?? 999,
               kawarimono: comScoutKawarimono(s, gh.year),
               kagen: univ.id < kagen.length ? kagen[univ.id] : 0.0,
+              meisei: kyoukaMeisei[univ.id],
             ),
           ),
         );
@@ -1518,8 +1537,11 @@ Future<List<ComScoutKekka>> comScoutRound({
                               ? shiganOmomi[k.univid]
                               : 0,
                         ).toDouble()
-                      : max(1, sortedUnivData[k.univid].meisei_total)
-                            .toDouble(),
+                      : max(
+                          1,
+                          kyoukaMeisei[k.univid] ??
+                              sortedUnivData[k.univid].meisei_total,
+                        ).toDouble(),
                 )
                 .toList(),
             rnd,

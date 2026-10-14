@@ -11,6 +11,8 @@ import 'package:ekiden/screens/Modal_shinnyuuseiShingakusaki.dart';
 import 'package:ekiden/screens/kiji_screen.dart'; // 学内メディアの卒業生特集(1.9.3)・新入生の記事(2.0.0)
 import 'package:ekiden/kansuu/kiji/kiji.dart'; // 卒業生特集・新入生の記事(2.0.0)のカードの見出しの予告(1.9.3)
 import 'package:ekiden/kansuu/koukou.dart'; // 新入生の出身校と高校時代の実績(1.9.5)
+import 'package:ekiden/kansuu/kyouka_project.dart'; // 強化プロジェクト(2.0.1)
+import 'package:ekiden/kansuu/taikai_chouki.dart' show choukiNendo; // 年度(2.0.1)
 // KANSUUクラスをインポートするか、必要な関数をここに直接定義
 // 仮で必要な関数をここに定義します。もし kansuu.dart があるならそちらをインポートしてください。
 // import 'package:ekiden/utils/kansuu.dart';
@@ -491,6 +493,7 @@ class Mode0100Content extends StatelessWidget {
                                     hiraku: kijiShinnyuuseiHiraku,
                                     annai:
                                         '新入生の世代トップや、高校駅伝の1区・高校総体で活躍した選手の進学先を伝えます。'
+                                        '${_kyoukaHajimatta(kantoku, currentGhensuu) ? '今年は、強化プロジェクトを始めた大学の記事もあります。' : ''}'
                                         '学内メディアの新入生紹介号も、記事の画面の上で切り替えて読めます。読めるのは今日だけです',
                                   ),
                                   const SizedBox(height: 10),
@@ -760,4 +763,11 @@ class Mode0100Content extends StatelessWidget {
       ),
     );
   }
+}
+
+/// 強化プロジェクトが今年度始まったか(4月5日の記事のカードの案内に使う。2.0.1。kyouka_project.dart)
+bool _kyoukaHajimatta(KantokuData kantoku, Ghensuu gh) {
+  final int nendo = choukiNendo(gh);
+  final KyoukaProject? p = kyoukaProjectChuu(kantoku, nendo);
+  return p != null && p.hajime == nendo;
 }

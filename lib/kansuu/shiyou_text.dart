@@ -12,8 +12,10 @@ import 'package:ekiden/kansuu/gin_tokkun_menu.dart'; // 銀特訓の形の切り
 import 'package:ekiden/kansuu/ikku_pace.dart'; // 集団走設定(1.9.2)
 import 'package:ekiden/kansuu/yosen_com_siji.dart'; // 正月駅伝予選のコンピュータの大学の指示と集団走(1.9.9)
 import 'package:ekiden/kansuu/seichou_type.dart'; // 成長タイプ設定(1.9.3)
-import 'package:ekiden/kansuu/kyouka_project.dart' show kyoukaNashi; // 強化プロジェクト(2.0.1)
-import 'package:ekiden/kansuu/bokou_pipe.dart' show bokouPipeNashi; // 監督の母校パイプ(2.0.1)
+import 'package:ekiden/kansuu/kyouka_project.dart'
+    show kyoukaNashi, kyoukaJibunEraberu; // 強化プロジェクト(2.0.1)
+import 'package:ekiden/kansuu/bokou_pipe.dart'
+    show bokouPipeNashi, bokouPipeJibunKiku; // 監督の母校パイプ(2.0.1)
 import 'package:ekiden/kansuu/joukai.dart'
     show genkaitoppaOkorikataSettei, genkaitoppaOkorikataType; // 限界突破の起こり方(2.0.0)
 import 'package:ekiden/kansuu/ToujituHenkou_com.dart'
@@ -607,15 +609,22 @@ List<String> _seichouTypeGyou(bool setsumeisho) {
 
 /// 強化プロジェクトの行(2.0.1。kyouka_project.dart)
 /// 確率・名声の順位・年数などの数字は書かない。「なし」の設定のときは、起きないことだけを書く
+/// (名声の下限がないことは書く。最底辺で遊んでいる人に「自分の大学には起きない」と思わせないため)
 List<String> _kyoukaGyou(bool setsumeisho) {
   final KantokuData? kantoku = _kantoku();
   if (kantoku != null && kyoukaNashi(kantoku)) {
-    return ['・${_konoData(setsumeisho)}、コンピュータの大学の「強化プロジェクト」は起きません。'];
+    return ['・${_konoData(setsumeisho)}、「強化プロジェクト」は起きません。'];
   }
-  return const [
-    '・正月駅伝の優勝から遠ざかっているコンピュータの大学が、「強化プロジェクト」を始めることがあります。',
+  final bool jibun = kantoku != null && kyoukaJibunEraberu(kantoku);
+  return [
+    '・正月駅伝の優勝から遠ざかっている大学が、「強化プロジェクト」を始めることがあります。',
+    '　・名声の上位の大学と、正月駅伝の優勝から間もない大学は選ばれません。',
+    '　・名声が低い大学も選ばれます。',
     '　・数年間だけスカウトに力を入れ、名声の高い大学と同じくらい、新入生に選ばれやすくなります。',
     '　・始まった年は、4月5日の箱庭スポーツの記事で伝えられます。期間中は、大学画面に出ます。',
+    jibun
+        ? '　・${_anata(setsumeisho)}の大学も選ばれることがあります(めったに起きません)。'
+        : '　・${_konoData(setsumeisho)}、${_anata(setsumeisho)}の大学は選ばれません。',
   ];
 }
 
@@ -630,7 +639,9 @@ List<String> _bokouPipeGyou(bool setsumeisho) {
     '・コンピュータスカウトがONのときは、大学の監督(OB)の母校の新入生が、その大学を選びやすくなります。',
     '　・争奪戦・交渉の成功率・最後に自ら進学先を選ぶときに、名声の高い大学と同じくらいに扱われます。',
     '　・コンピュータの大学は、地区めぐり(声かけ)で、母校の後輩に優先して声をかけます。',
-    '　・${_anata(setsumeisho)}の大学の監督の母校の新入生にも効きます。',
+    kantoku == null || bokouPipeJibunKiku(kantoku)
+        ? '　・${_anata(setsumeisho)}の大学の監督の母校の新入生にも効きます。'
+        : '　・${_konoData(setsumeisho)}、${_anata(setsumeisho)}の大学の監督の母校の新入生には効きません。',
     '　・監督が代わると、母校も代わります。',
   ];
 }
@@ -664,11 +675,11 @@ ShiyouSetsu shiyouMeisei({bool setsumeisho = false}) {
       // 地区めぐり(声かけ)の争奪戦は、最後の志望と同じ重み(1.9.6。scout_com.dart)
       '・地区めぐり(声かけ)の争奪戦での名声の効き方は、設定タブの「入学時名声影響度設定」で変わります。',
       // 強化プロジェクト(2.0.1。kyouka_project.dart)
-      '・強化プロジェクトの起こりやすさ・選ばれやすさ・期間は、設定タブの「強化プロジェクト設定」で変えられます。',
+      '・強化プロジェクトの起こりやすさ・選ばれやすさ・期間と、あなたの大学も選ばれるかは、設定タブの「強化プロジェクト設定」で変えられます。',
       // 監督の母校パイプ(2.0.1。bokou_pipe.dart)
       '・監督の出身校は、大学画面と高校名鑑で分かります。',
       '・スカウトの画面の選手には「○○大学の監督の母校」と出ます。',
-      '・監督の母校の新入生の選ばれやすさは、設定タブの「監督の母校パイプ設定」で変えられます。',
+      '・監督の母校の新入生の選ばれやすさと、あなたの大学にも効くかは、設定タブの「監督の母校パイプ設定」で変えられます。',
       // 名声の履歴(1.8.8。Modal_meiseiRireki.dart)
       '・大学画面の「全大学名声一覧」で大学をタップすると、過去10年の名声の内訳を見られます。',
       '・下の参考資料の表は、倍率を変えていないとき(初期値)の量です。',

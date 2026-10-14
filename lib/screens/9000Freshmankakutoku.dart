@@ -834,7 +834,7 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
 
   /// 監督の母校の後輩の印の文(2.0.1。bokou_pipe.dart。「○○大学の監督の母校」。なければnull)
   /// コンピュータスカウトONで、監督の母校パイプの設定がなしでなく、高校の情報を表示する設定のときだけ出す。
-  /// [jibun] は、あなたの大学の監督の母校か(色を変える)
+  /// 自分の大学に効かない設定なら、自分の大学の分は出さない。[jibun] は、あなたの大学の監督の母校か(色を変える)
   ({String moji, bool jibun})? _bokouMoji(SenshuData s) {
     if (!_comScoutOn || s.hirou == 1) return null;
     final KantokuData? kantoku = Hive.box<KantokuData>(
@@ -846,12 +846,16 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
       return null;
     }
     final Map<int, int> bokou = _bokouCache ??= bokouPipeBokou(kantoku);
-    final List<int> univs = bokouPipeUnivs(bokou, s);
+    final int my = _ghensuu?.MYunivid ?? -1;
+    final bool jibunKiku = bokouPipeJibunKiku(kantoku);
+    final List<int> univs = [
+      for (final int u in bokouPipeUnivs(bokou, s))
+        if (u != my || jibunKiku) u,
+    ];
     if (univs.isEmpty) return null;
     final Map<int, String> meiMap = _univMeiCache ??= {
       for (final UnivData u in _univBox.values) u.id: u.name,
     };
-    final int my = _ghensuu?.MYunivid ?? -1;
     final bool jibun = univs.contains(my);
     final List<String> mei = [
       if (jibun) 'あなたの大学',
@@ -1453,7 +1457,9 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
       if (u.id == p.univid) mei = u.name;
     }
     if (mei.isEmpty) return null;
-    return '強化プロジェクト中: $mei大学(${p.owari}年度まで)。'
+    // 自分の大学のときは「あなたの大学」(設定で自分の大学も選ばれるようにしたとき。2.0.1)
+    final String dare = p.univid == gh.MYunivid ? 'あなたの大学' : '$mei大学';
+    return '強化プロジェクト中: $dare(${p.owari}年度まで)。'
         'スカウトに力を入れていて、名声の高い大学と同じくらい選ばれやすくなっています';
   }
 

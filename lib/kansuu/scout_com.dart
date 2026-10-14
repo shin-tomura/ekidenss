@@ -800,10 +800,18 @@ Map<int, double> comScoutSeikouritsuIchiran({
   final double kagen = chikuMeguriGh == null
       ? 0.0
       : _seikouritsuKagen(sortedUnivData, chikuMeguriGh)[univid];
+  final KantokuData? kantoku = Hive.box<KantokuData>(
+    'kantokuBox',
+  ).get('KantokuData');
+  // 強化プロジェクト中なら、名声N位並みの名声で計算する(2.0.1。kyouka_project.dart。
+  // 自分の大学が選ばれる設定のとき。スカウトは4月なので、年度は今の年)
+  final int? kyouka = kyoukaScoutMeiseiHoseiNendo(
+    sortedUnivData,
+    kantoku,
+    nen,
+  )[univid];
   // 監督の母校の後輩は、名声N位並みの名声で計算する(2.0.1。bokou_pipe.dart)
-  final BokouPipe pipe = BokouPipe.yomu(
-    Hive.box<KantokuData>('kantokuBox').get('KantokuData'),
-  );
+  final BokouPipe pipe = BokouPipe.yomu(kantoku, univid);
   return {
     for (final SenshuData s in shinnyuusei)
       if (s.hirou != 1 && !comScoutKettei(s) && !comScoutKotowarareta(s))
@@ -817,10 +825,10 @@ Map<int, double> comScoutSeikouritsuIchiran({
               ? pipe.meisei(
                   univid,
                   s,
-                  sortedUnivData[univid].meisei_total,
+                  kyouka ?? sortedUnivData[univid].meisei_total,
                   sortedUnivData,
                 )
-              : null,
+              : kyouka,
         ),
   };
 }
@@ -1342,7 +1350,7 @@ Future<List<ComScoutKekka>> comScoutRound({
   );
   // 監督の母校パイプ(2.0.1。bokou_pipe.dart): 監督の母校の後輩の争奪戦・交渉の成功率と、
   // 地区めぐり(声かけ)のコンピュータの大学の声のかけ方に使う
-  final BokouPipe pipe = BokouPipe.yomu(kantoku);
+  final BokouPipe pipe = BokouPipe.yomu(kantoku, gh.MYunivid);
   final List<_Kousyou> kousyouList = [];
   final Map<int, _KoudouMemo> memo = {}; // 大学id → このラウンドの行動
   // 地区めぐりの選手の地区(全国一斉では使わない。1.9.6)
@@ -1700,6 +1708,7 @@ Future<Map<int, int>> comScoutShigan({
   // 監督の母校の後輩は、監督の大学を名声N位並みの重みにする(2.0.1。bokou_pipe.dart)
   final BokouPipe pipe = BokouPipe.yomu(
     Hive.box<KantokuData>('kantokuBox').get('KantokuData'),
+    gh.MYunivid,
   );
   final List<SenshuData> mikakutei =
       shinnyuusei.where((s) => s.hirou != 1 && !comScoutKettei(s)).toList()

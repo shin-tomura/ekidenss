@@ -493,7 +493,7 @@ class Mode0100Content extends StatelessWidget {
                                     hiraku: kijiShinnyuuseiHiraku,
                                     annai:
                                         '新入生の世代トップや、高校駅伝の1区・高校総体で活躍した選手の進学先を伝えます。'
-                                        '${_kyoukaHajimatta(kantoku, currentGhensuu) ? '今年は、強化プロジェクトを始めた大学の記事もあります。' : ''}'
+                                        '${_kyoukaAnnai(kantoku, currentGhensuu)}'
                                         '学内メディアの新入生紹介号も、記事の画面の上で切り替えて読めます。読めるのは今日だけです',
                                   ),
                                   const SizedBox(height: 10),
@@ -765,9 +765,13 @@ class Mode0100Content extends StatelessWidget {
   }
 }
 
-/// 強化プロジェクトが今年度始まったか(4月5日の記事のカードの案内に使う。2.0.1。kyouka_project.dart)
-bool _kyoukaHajimatta(KantokuData kantoku, Ghensuu gh) {
+/// 強化プロジェクトが今年度始まっていれば、4月5日の記事のカードの案内の文(なければ空。2.0.1。kyouka_project.dart)
+/// (自分の大学が選ばれる設定で、自分の大学が始めたときは「あなたの大学が」)
+String _kyoukaAnnai(KantokuData kantoku, Ghensuu gh) {
   final int nendo = choukiNendo(gh);
   final KyoukaProject? p = kyoukaProjectChuu(kantoku, nendo);
-  return p != null && p.hajime == nendo;
+  if (p == null || p.hajime != nendo) return '';
+  return p.univid == gh.MYunivid
+      ? '今年は、あなたの大学が強化プロジェクトを始めた記事もあります。'
+      : '今年は、強化プロジェクトを始めた大学の記事もあります。';
 }

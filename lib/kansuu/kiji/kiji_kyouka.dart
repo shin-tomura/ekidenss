@@ -10,6 +10,11 @@ import 'package:ekiden/kansuu/kiji/kiji_kihon.dart';
 //   (kiji.dart の kijiShinnyuuseiIchiran で、期待のルーキーの後ろに足す)
 // ・理由の型ごとに見出しと段落を変える(創立○周年に向けて・クラウドファンディング・OB会と後援会・名指導者の招へい)
 // ・正月駅伝の優勝から遠ざかっていること(最後の優勝の年度、または優勝なし)と、今年の正月駅伝の順位を書く
+// ・目標は大学の状況で変える(2.0.1。名声の下位の大学も選ばれるようにしたため):
+//   一度も出場がない → 正月駅伝初出場、今年出場していない → ○年ぶりの正月駅伝出場(分からなければ本戦復帰)、
+//   出場しているが優勝がない → 悲願の初優勝、優勝したことがある → ○年ぶりの優勝
+// ・自分の大学が選ばれたとき(設定で選ばれるようにしたとき)は、自分の大学の記事の印を付ける
+//   (コメントは大学関係者のもので、総監督の言葉は作らない)
 // ・守る決まり: 能力名・選手の性質の言葉と、総監督の言葉は書かない。名声の数字や、スカウトでの重みの数字も書かない
 // ------------------------------------------------------------
 
@@ -33,13 +38,38 @@ List<Kiji> kyoukaProjectKiji(KijiKankyou k) {
   final String mei = daigakuMei(u);
   final int nensuu = p.owari - p.hajime + 1;
 
-  // 正月駅伝の優勝から遠ざかっていること
+  // 今年の正月駅伝の順位
+  final int juni = u.juni_race.length > 2 && u.juni_race[2].isNotEmpty
+      ? u.juni_race[2][0]
+      : TEISUU.DEFAULTJUNI;
+  final bool kotoshiShutsujou = juni < TEISUU.DEFAULTJUNI;
+
+  // 目標と、正月駅伝から遠ざかっていること(大学の状況で変える)
   final int tsuusan = choukiTsuusan(u, 2, choukiYuushou);
   final ChoukiKiroku? c = choukiYomu(u, 2, choukiYuushou);
   final int saigo = c?.saigo ?? 0;
+  final int shutsujouTsuusan = choukiTsuusan(u, 2, choukiShutsujou);
+  final int saigoShutsujou = choukiYomu(u, 2, choukiShutsujou)?.saigo ?? 0;
   final String mokuhyou; // 見出しとコメントに使う目標
   final String buriBun;
-  if (tsuusan <= 0) {
+  if (shutsujouTsuusan <= 0 && !kotoshiShutsujou) {
+    // 一度も出場がない
+    mokuhyou = '正月駅伝初出場';
+    buriBun = '正月駅伝にはまだ出場したことがなく、まずは初出場を目指す。';
+  } else if (!kotoshiShutsujou) {
+    // 今年は出場していない(まずは本戦復帰)
+    final String yuushouMae = tsuusan <= 0
+        ? '正月駅伝では、'
+        : (tsuusan == 1 ? '正月駅伝で優勝したこともあるが、' : '正月駅伝では通算$tsuusan回の優勝を誇るが、');
+    if (saigoShutsujou > 0 && nendo > saigoShutsujou) {
+      final int buri = nendo - saigoShutsujou;
+      mokuhyou = '$buri年ぶりの正月駅伝出場';
+      buriBun = '$yuushouMae$saigoShutsujou年度を最後に本戦から遠ざかっていて、まずは本戦復帰を目指す。';
+    } else {
+      mokuhyou = '正月駅伝の本戦復帰';
+      buriBun = '$yuushouMae本戦から遠ざかっていて、まずは本戦復帰を目指す。';
+    }
+  } else if (tsuusan <= 0) {
     mokuhyou = '悲願の初優勝';
     buriBun = '正月駅伝ではまだ優勝がなく、悲願の初優勝を目指す。';
   } else if (saigo > 0) {
@@ -54,14 +84,8 @@ List<Kiji> kyoukaProjectKiji(KijiKankyou k) {
         ? '正月駅伝では優勝の経験があるが、長く頂点から遠ざかっている。'
         : '正月駅伝では通算$tsuusan回の優勝を誇るが、長く頂点から遠ざかっている。';
   }
-
-  // 今年の正月駅伝の順位
-  final int juni = u.juni_race.length > 2 && u.juni_race[2].isNotEmpty
-      ? u.juni_race[2][0]
-      : TEISUU.DEFAULTJUNI;
-  final String kotoshiBun = juni < TEISUU.DEFAULTJUNI
-      ? '今年の正月駅伝は${juni + 1}位だった。'
-      : '今年の正月駅伝には出場できなかった。';
+  // 今年の正月駅伝の順位の文(出場していなければ、上の文で本戦から遠ざかっていることを書いたので空)
+  final String kotoshiBun = kotoshiShutsujou ? '今年の正月駅伝は${juni + 1}位だった。' : '';
 
   // 理由の型ごとの見出しと段落
   String midashi;
@@ -150,7 +174,8 @@ List<Kiji> kyoukaProjectKiji(KijiKankyou k) {
       ],
       haishin: k.haishinMei(_no, asa: true),
       kisha: k.kishaMei(_no),
-      jibun: false,
+      // 自分の大学が選ばれたときは、自分の大学の記事の印を付ける(2.0.1)
+      jibun: u.id == k.gh.MYunivid,
       kekka: false,
     ),
   ];

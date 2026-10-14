@@ -8,33 +8,42 @@ import 'package:ekiden/kansuu/taikai_chouki.dart';
 // ------------------------------------------------------------
 // 強化プロジェクト(2.0.1)
 //
-// 正月駅伝の優勝から遠ざかっているコンピュータの大学が、数年間だけスカウトに本腰を入れる出来事。
+// 正月駅伝の優勝から遠ざかっている大学が、数年間だけスカウトに本腰を入れる出来事
+// (自分の大学は、設定で選んだときだけ。初期値はコンピュータの大学だけ)。
 // 2.0.1の開発中に、1校が何十年も正月駅伝を勝ち続ける形が目立ったため、挑戦者がときどき現れて
 // 王者を脅かすように入れた(現実でも、創立100周年に向けた強化やクラウドファンディングなどがある)。
 // 模擬計算(30年・名声2位並み・4年)では、30年で2回ほど起き、始めた大学の8割が数年で正月駅伝の
-// 3位以内に入り、優勝まで届くのは半分弱だった。最多優勝の大学の回数はあまり変わらない。
+// 3位以内に入り、優勝まで届くのは半分弱だった。最多優勝の大学の回数はあまり変わらない
+// (この模擬計算は、対象を名声15位までにしていたときのもの)。
 //
 // ・起き方: 年度替わり(4月5日の処理。RetireNewの前)に、設定の確率で抽選する(同時に1校まで)。
 //   一度も正月駅伝が開かれていないとき(新しいゲームの1年目)は起きない
-// ・対象: コンピュータの大学(自分の大学は対象外)で、名声の順位(年度替わりの前の名声の合計の順)が
-//   4〜15位、正月駅伝の最後の優勝から15年以上たっているか、優勝がない大学から1校をくじで選ぶ
-//   (最後の優勝は大会の長い記録 taikai_chouki.dart で数える)
+// ・対象: 名声の順位(年度替わりの前の名声の合計の順)が4位以下で、正月駅伝の最後の優勝から15年以上
+//   たっているか、優勝がない大学から1校をくじで選ぶ(最後の優勝は大会の長い記録 taikai_chouki.dart で数える)。
+//   開発中は名声15位までにしていたが、最底辺で遊んでいる人に「自分の大学には起きない」と思わせないように、
+//   また下位の大学の下剋上の物語も生まれるように、下限をなくした(候補が増えるので、王者を脅かせる
+//   中位の大学に回る回数は半分くらいになる)。説明には数字を書かない
+// ・自分の大学: 設定で「選ばれる」にしたときだけ候補に入る(初期値は選ばれない)。選ばれやすさはほかの大学と同じ
+//   (候補が25校ほどなので、年0.4%ほどのまれな出来事)。効き目もコンピュータの大学と同じ
+//   (コンピュータスカウトOFFのときは、新入生の振り分けの重みだけ)
 // ・効き目(期間中だけ。スカウトだけに効く):
 //   ・新入生の振り分けの重み(shozokuChuusenOmomi。地区めぐり(声かけ)の争奪戦・最後の志望・
 //     コンピュータスカウトOFFの振り分け・地区めぐりの成功率の下限)を、名声N位の大学の重みまで上げる
 //   ・全国一斉・地区めぐり(交渉)の交渉の成功率と争奪戦で使う名声を、名声N位の大学の名声まで上げる
 //   ・スカウトの性格が「自動」なら、大物狙いにする(scout_com.dart)
-// ・設定(説明画面の設定タブの「強化プロジェクト設定」): 起こりやすさ・スカウトでの重み(名声何位並み)・期間。
-//   「なし」にすると、実行中のプロジェクトも効かなくなる
+// ・設定(説明画面の設定タブの「強化プロジェクト設定」): 起こりやすさ・スカウトでの重み(名声何位並み)・期間・
+//   自分の大学も選ばれるか。「なし」にすると、実行中のプロジェクトも効かなくなる
 // ・記事: 始まった年の4月5日に、箱庭スポーツの記事(kiji_kyouka.dart。期待のルーキーと一緒に読める)。
 //   理由の型は、創立○周年に向けて・クラウドファンディング・OB会と後援会の支援・名指導者の招へいの4つ。
+//   目標は大学の状況で変える(正月駅伝初出場・○年ぶりの出場(本戦復帰)・悲願の初優勝・○年ぶりの優勝)。
 //   創立○周年は、期間中に創立から25年ごとの区切り(50周年以上)が来るときだけ使う。
 //   創立の年度は大学の番号から計算で決める(kyoukaSouritsuNendo。保存しない。同じ大学ならいつも同じ)ので、
 //   同じ大学で2回目のプロジェクトが起きても、周年の数が合う。同じ大学で同じ型が続かないように、
 //   大学ごとに前回の型を覚えておく
 // ・画面: 大学画面に「強化プロジェクト中(○年度まで)」、スカウト画面に実行中の大学
 // ・保存(KantokuData.yobiint3。新しいゲームでは0に戻る):
-//   [80] 設定(起こりやすさ + 10×重み + 100×期間のコード。どれも0が初期値)
+//   [80] 設定(起こりやすさ + 10×重み + 100×期間のコード + 1000×自分の大学も選ばれるか(0=選ばれない・1=選ばれる)。
+//        どれも0が初期値)
 //   [81] 実行中(最後)のプロジェクト((大学id+1) + 100×型 + 1000×始めた年度 + 10の8乗×終わる年度。0は一度もない)
 //   [82]・[83] 大学ごとの前回の型(1大学1桁、[82]に大学0〜14・[83]に大学15〜29、大学id%15の位。0はまだない)
 // ------------------------------------------------------------
@@ -123,10 +132,17 @@ int kyoukaKikanCode(KantokuData k) {
 /// 設定の値が正しいか(QRコードの読み込みで使う)
 bool kyoukaSetteiTadashii(int atai) =>
     atai >= 0 &&
-    atai < 1000 &&
+    atai < 2000 &&
     atai % 10 < _okoriyasusaPct.length &&
     (atai ~/ 10) % 10 < _omomiJuni.length &&
     (atai ~/ 100) % 10 < _kikanNen.length;
+
+/// 自分の大学も選ばれる設定か(初期値は選ばれない)
+bool kyoukaJibunEraberu(KantokuData k) {
+  final int v = _setteiAtai(k);
+  if (!kyoukaSetteiTadashii(v)) return false;
+  return v ~/ 1000 == 1;
+}
 
 /// 設定の値(QRコードの書き出しで使う)
 int kyoukaSetteiAtai(KantokuData k) {
@@ -135,9 +151,15 @@ int kyoukaSetteiAtai(KantokuData k) {
 }
 
 /// 設定を入れる(保存は呼び出し側で行う)
-void kyoukaSetteiIreru(KantokuData k, int okoriyasusa, int omomi, int kikan) {
+void kyoukaSetteiIreru(
+  KantokuData k,
+  int okoriyasusa,
+  int omomi,
+  int kikan,
+  bool jibun,
+) {
   if (k.yobiint3.length <= kyoukaSetteiIndex) return;
-  final int v = okoriyasusa + 10 * omomi + 100 * kikan;
+  final int v = okoriyasusa + 10 * omomi + 100 * kikan + (jibun ? 1000 : 0);
   if (!kyoukaSetteiTadashii(v)) return;
   k.yobiint3[kyoukaSetteiIndex] = v;
 }
@@ -288,9 +310,8 @@ int kyoukaYuushouKaraNen(UnivData u, int nendo) {
   return i < 0 ? 9999 : i + 1;
 }
 
-/// 対象になる名声の順位(1始まり)
+/// 対象になる名声の順位(1始まり。この順位より下なら、最下位まで対象)
 const int kyoukaJuniUe = 4;
-const int kyoukaJuniShita = 15;
 
 /// 正月駅伝の最後の優勝から、何年以上たっている大学が対象か
 const int kyoukaBuri = 15;
@@ -324,10 +345,12 @@ Future<bool> kyoukaProjectChuusen({
       (a, b) =>
           (b.meisei_total * 100 + b.id).compareTo(a.meisei_total * 100 + a.id),
     );
+  final bool jibunEraberu = kyoukaJibunEraberu(k);
   final List<UnivData> kouho = [];
-  for (int i = kyoukaJuniUe - 1; i < kyoukaJuniShita && i < jun.length; i++) {
+  for (int i = kyoukaJuniUe - 1; i < jun.length; i++) {
     final UnivData u = jun[i];
-    if (u.id == gh.MYunivid) continue;
+    // 自分の大学は、設定で「選ばれる」にしたときだけ(選ばれやすさはほかの大学と同じ)
+    if (u.id == gh.MYunivid && !jibunEraberu) continue;
     if (kyoukaYuushouKaraNen(u, nendo) < kyoukaBuri) continue;
     kouho.add(u);
   }
@@ -375,9 +398,16 @@ Map<int, int> kyoukaScoutMeiseiHosei(
   List<UnivData> univs,
   KantokuData? k,
   Ghensuu gh,
+) => kyoukaScoutMeiseiHoseiNendo(univs, k, choukiNendo(gh));
+
+/// kyoukaScoutMeiseiHosei の、年度[nendo]を渡す形(Ghensuuのない、プレイヤーの成功率の計算で使う)
+Map<int, int> kyoukaScoutMeiseiHoseiNendo(
+  List<UnivData> univs,
+  KantokuData? k,
+  int nendo,
 ) {
   if (k == null) return const {};
-  final KyoukaProject? p = kyoukaProjectChuu(k, choukiNendo(gh));
+  final KyoukaProject? p = kyoukaProjectChuu(k, nendo);
   if (p == null) return const {};
   UnivData? u;
   for (final UnivData x in univs) {

@@ -17,7 +17,8 @@ import 'package:ekiden/kansuu/koukou.dart' show KoukouJouhou;
 // 効き目は、名門・強豪の出身の監督の大学にだけ少し出る程度
 //
 // ・効くのはコンピュータスカウトONのときだけ(OFFのときは、新入生の振り分けが出身校の決まる前なので効かない)。
-//   プレイヤーの大学にも効く(監督の進言で、名門の出身のOBを監督にする楽しみ)
+//   プレイヤーの大学にも効く(初期値。監督の進言で、名門の出身のOBを監督にする楽しみ)。設定で効かなくもできる
+//   (そのときは、スカウトの画面の印にも、自分の大学の分を出さない)
 // ・効き目(その高校の新入生についてだけ。scout_com.dart):
 //   ・争奪戦(声かけは最後の志望と同じ重み、全国一斉・交渉は名声の重み)・最後の志望・交渉の成功率で、
 //     監督の大学を「名声N位並み」として扱う(もとの重みや名声のほうが大きければ、そのまま)
@@ -25,13 +26,15 @@ import 'package:ekiden/kansuu/koukou.dart' show KoukouJouhou;
 //     ゆるめて、優先して声をかける(ラウンドの結果の理由に「監督の母校の後輩」と出す)
 //   ・変わり者(名声をあまり気にしない新入生)の争奪戦は、今まで通り等しい確率
 //   ・地区めぐり(交渉)の成功率の下限には入れない(設定で選べない形なので)
-// ・設定(説明画面の設定タブの「監督の母校パイプ設定」): なし・名声5位並み・名声3位並み・名声1位並み(初期値)
+// ・設定(説明画面の設定タブの「監督の母校パイプ設定」): なし・名声5位並み・名声3位並み・名声1位並み(初期値)と、
+//   自分の大学にも効くか(効く(初期値)・効かない)
 // ・画面: スカウトの画面の選手のカードに「○○大学の監督の母校」(高校の情報を表示しない設定のときと、
 //   なし・OFFのときは出さない)、大学画面の監督の行の下に監督の出身校、高校名鑑の高校のページに
 //   その高校出身の監督。4月5日の「期待のルーキー」(kiji_shinnyuusei.dart)に、監督の母校から入った新入生の段落
 // ・1.9.5より前に卒業したOBには出身校がないので、起動時と読み込み時に、出身地と入学時の記録から
 //   出身校だけを付ける(koukou.dart の koukouObFuyo。高校時代の実績は付けない)
 // ・保存(KantokuData.yobiint3[84]): 強さのコード(0=名声1位並み(初期値)・1=なし・2=名声5位並み・3=名声3位並み)
+//   + 10×自分の大学に効かないか(0=効く(初期値)・1=効かない)
 // ------------------------------------------------------------
 
 /// KantokuData.yobiint3 の使用番号: 監督の母校パイプの強さ
@@ -53,18 +56,30 @@ int _setteiAtai(KantokuData k) =>
     k.yobiint3.length > bokouPipeSetteiIndex ? k.yobiint3[bokouPipeSetteiIndex] : 0;
 
 /// 設定の値が正しいか(QRコードの読み込みで使う)
-bool bokouPipeSetteiTadashii(int atai) => atai >= 0 && atai < _pipeJuni.length;
+bool bokouPipeSetteiTadashii(int atai) =>
+    atai >= 0 && atai < 20 && atai % 10 < _pipeJuni.length;
 
-/// 強さのコード(正しくない値は0)
-int bokouPipeCode(KantokuData k) {
+/// 設定の値(正しくない値は0。QRコードの書き出しで使う)
+int bokouPipeSetteiAtai(KantokuData k) {
   final int v = _setteiAtai(k);
   return bokouPipeSetteiTadashii(v) ? v : 0;
 }
 
-/// 設定を入れる(保存は呼び出し側で行う。QRコードの読み込みでも使う)
-void bokouPipeSetteiIreru(KantokuData k, int code) {
-  if (k.yobiint3.length <= bokouPipeSetteiIndex || !bokouPipeSetteiTadashii(code)) return;
-  k.yobiint3[bokouPipeSetteiIndex] = code;
+/// 強さのコード(正しくない値は0)
+int bokouPipeCode(KantokuData k) => bokouPipeSetteiAtai(k) % 10;
+
+/// 自分の大学にも効く設定か(初期値は効く)
+bool bokouPipeJibunKiku(KantokuData k) => bokouPipeSetteiAtai(k) ~/ 10 == 0;
+
+/// 設定を入れる(保存は呼び出し側で行う)
+void bokouPipeSetteiIreru(KantokuData k, int code, bool jibunKiku) {
+  bokouPipeSetteiAtaiIreru(k, code + (jibunKiku ? 0 : 10));
+}
+
+/// 設定の値をそのまま入れる(保存は呼び出し側で行う。QRコードの読み込みでも使う)
+void bokouPipeSetteiAtaiIreru(KantokuData k, int atai) {
+  if (k.yobiint3.length <= bokouPipeSetteiIndex || !bokouPipeSetteiTadashii(atai)) return;
+  k.yobiint3[bokouPipeSetteiIndex] = atai;
 }
 
 /// 監督の母校パイプを使わない設定か
@@ -148,10 +163,12 @@ class BokouPipe {
   /// 効かないもの
   static const BokouPipe nashi = BokouPipe({}, 0);
 
-  /// 設定とOBのデータから作る(なしの設定のときや、母校の分かる監督がいないときは、効かないもの)
-  static BokouPipe yomu(KantokuData? k) {
+  /// 設定とOBのデータから作る(なしの設定のときや、母校の分かる監督がいないときは、効かないもの)。
+  /// 自分の大学に効かない設定なら、自分の大学([myUnivid])を除く
+  static BokouPipe yomu(KantokuData? k, int myUnivid) {
     if (k == null || bokouPipeNashi(k)) return nashi;
     final Map<int, int> m = bokouPipeBokou(k);
+    if (!bokouPipeJibunKiku(k)) m.remove(myUnivid);
     if (m.isEmpty) return nashi;
     return BokouPipe(m, bokouPipeJuni(k));
   }

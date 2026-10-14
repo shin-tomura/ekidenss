@@ -947,7 +947,8 @@ class _KoukouPageState extends State<_KoukouPage> {
   /// この高校出身の今の大学の監督(大学の順。2.0.1。監督の母校パイプ)
   List<BokouKantoku> _kantoku = const [];
 
-  /// 監督の母校パイプが効くか(コンピュータスカウトONで、設定がなしでない。説明の文を出すかに使う)
+  /// 監督の母校パイプが、この高校の新入生に効くか(コンピュータスカウトONで、設定がなしでなく、
+  /// 効く大学の監督がいる。自分の大学に効かない設定なら、自分の大学の監督は数えない。説明の文を出すかに使う)
   bool _pipeKiku = false;
 
   @override
@@ -981,7 +982,10 @@ class _KoukouPageState extends State<_KoukouPage> {
           for (final BokouKantoku b in bokouPipeKantokuIchiran(kd, g.year))
             if (b.koukou - 1 == widget.ban) b,
         ];
-        _pipeKiku = isComScoutOn(kd) && !bokouPipeNashi(kd);
+        final bool jibunKiku = bokouPipeJibunKiku(kd);
+        _pipeKiku = isComScoutOn(kd) &&
+            !bokouPipeNashi(kd) &&
+            _kantoku.any((BokouKantoku b) => b.univid != _myUnivId || jibunKiku);
       }
     }
   }
@@ -1315,7 +1319,7 @@ class _KoukouPageState extends State<_KoukouPage> {
               '${_univMei[b.univid] ?? ''}大学　${b.mei}監督(${b.nenrei}歳)',
               kin: b.univid == _myUnivId,
             ),
-          if (_kantoku.isNotEmpty && _pipeKiku)
+          if (_pipeKiku)
             _gyouHosoku('この高校の新入生は、スカウトで監督の大学を選びやすくなります。'),
           const SizedBox(height: 24),
           const Text('架空の高校です。実在の学校とは関係ありません。大学のレースや育成には影響しません。', style: _hosoku),

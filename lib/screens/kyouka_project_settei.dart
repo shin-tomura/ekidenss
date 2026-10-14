@@ -7,7 +7,7 @@ import 'package:ekiden/kansuu/kyouka_project.dart';
 // ------------------------------------------------------------
 // 説明画面の設定タブの「強化プロジェクト設定」(2.0.1)
 // 強化プロジェクト(正月駅伝の優勝から遠ざかっているコンピュータの大学が、数年間だけスカウトに本腰を入れる出来事)の
-// 起こりやすさ・スカウトでの重み(名声何位並み)・期間を選ぶ
+// 起こりやすさ・スカウトでの重み(名声何位並み)・期間と、あなたの大学も選ばれるかを選ぶ
 // (保存先は KantokuData.yobiint3[80]。仕組みは lib/kansuu/kyouka_project.dart)
 // ------------------------------------------------------------
 
@@ -22,10 +22,10 @@ class ModalKyoukaProjectSettei extends StatefulWidget {
 class _ModalKyoukaProjectSetteiState extends State<ModalKyoukaProjectSettei> {
   final Box<KantokuData> _kantokuBox = Hive.box<KantokuData>('kantokuBox');
 
-  Future<void> _hozon(int okoriyasusa, int omomi, int kikan) async {
+  Future<void> _hozon(int okoriyasusa, int omomi, int kikan, bool jibun) async {
     final KantokuData? k = _kantokuBox.get('KantokuData');
     if (k == null) return;
-    kyoukaSetteiIreru(k, okoriyasusa, omomi, kikan);
+    kyoukaSetteiIreru(k, okoriyasusa, omomi, kikan, jibun);
     await k.save();
     if (!mounted) return;
     setState(() {});
@@ -68,6 +68,7 @@ class _ModalKyoukaProjectSetteiState extends State<ModalKyoukaProjectSettei> {
     final int okoriyasusa = k == null ? 0 : kyoukaOkoriyasusaCode(k);
     final int omomi = k == null ? 0 : kyoukaOmomiCode(k);
     final int kikan = k == null ? 0 : kyoukaKikanCode(k);
+    final bool jibun = k != null && kyoukaJibunEraberu(k);
     final bool nashi = okoriyasusa == kyoukaOkoriyasusaNashi;
 
     return Scaffold(
@@ -95,10 +96,12 @@ class _ModalKyoukaProjectSetteiState extends State<ModalKyoukaProjectSettei> {
                   border: Border.all(color: Colors.teal.withOpacity(0.3)),
                 ),
                 child: Text(
-                  '正月駅伝の優勝から遠ざかっているコンピュータの大学が、数年間だけスカウトに本腰を入れる'
+                  '正月駅伝の優勝から遠ざかっている大学が、数年間だけスカウトに本腰を入れる'
                   '「強化プロジェクト」を始めることがあります。\n\n'
-                  '・名声が中くらいで、正月駅伝の最後の優勝から長くたっている(または優勝のない)大学から選ばれます。'
-                  'あなたの大学は選ばれません。\n'
+                  '・名声の上位の大学と、正月駅伝の優勝から間もない大学は選ばれません。'
+                  '名声が低い大学も選ばれます。\n'
+                  '・あなたの大学は、下の「あなたの大学」で「選ばれる」にしたときだけ選ばれます'
+                  '(選ばれやすさはほかの大学と同じで、めったに起きません)。\n'
                   '・始まるのは毎年4月の年度替わりで、同時に1校までです。'
                   '始まった年は、4月5日の箱庭スポーツの記事(期待のルーキーと一緒に読めます)で伝えられます。\n'
                   '・期間中は、新入生スカウトの争奪戦や、新入生が自ら志望して進学先を選ぶときなどに、'
@@ -106,7 +109,8 @@ class _ModalKyoukaProjectSetteiState extends State<ModalKyoukaProjectSettei> {
                   'スカウトの性格が「自動」なら、大物狙いになります。\n'
                   '・期間中の大学は、大学画面とスカウトの画面に出ます。\n'
                   '・「なし」にすると、新しく始まらず、実行中のものも効かなくなります。\n'
-                  '・初期値は、起こりやすさ「ふつう(毎年10%)」、重み「名声2位並み」、期間「4年」です。',
+                  '・初期値は、起こりやすさ「ふつう(毎年10%)」、重み「名声2位並み」、期間「4年」、'
+                  'あなたの大学は「選ばれない」です。',
                   style: TextStyle(
                     color: HENSUU.textcolor,
                     fontSize: HENSUU.fontsize_honbun,
@@ -122,7 +126,7 @@ class _ModalKyoukaProjectSetteiState extends State<ModalKyoukaProjectSettei> {
                     _chip(
                       kyoukaOkoriyasusaHyouji(c),
                       okoriyasusa == c,
-                      () => _hozon(c, omomi, kikan),
+                      () => _hozon(c, omomi, kikan, jibun),
                     ),
                 ],
               ),
@@ -134,7 +138,7 @@ class _ModalKyoukaProjectSetteiState extends State<ModalKyoukaProjectSettei> {
                     _chip(
                       kyoukaOmomiHyouji(c),
                       omomi == c,
-                      () => _hozon(okoriyasusa, c, kikan),
+                      () => _hozon(okoriyasusa, c, kikan, jibun),
                     ),
                 ],
               ),
@@ -146,8 +150,24 @@ class _ModalKyoukaProjectSetteiState extends State<ModalKyoukaProjectSettei> {
                     _chip(
                       kyoukaKikanHyouji(c),
                       kikan == c,
-                      () => _hozon(okoriyasusa, omomi, c),
+                      () => _hozon(okoriyasusa, omomi, c, jibun),
                     ),
+                ],
+              ),
+              _midashi('あなたの大学'),
+              Wrap(
+                alignment: WrapAlignment.center,
+                children: [
+                  _chip(
+                    '選ばれない',
+                    !jibun,
+                    () => _hozon(okoriyasusa, omomi, kikan, false),
+                  ),
+                  _chip(
+                    '選ばれる',
+                    jibun,
+                    () => _hozon(okoriyasusa, omomi, kikan, true),
+                  ),
                 ],
               ),
               if (nashi)

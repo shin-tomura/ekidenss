@@ -210,11 +210,12 @@ class SettingsQrProcessor {
       data['k_yobiint2_89'] = kantoku.yobiint2.length > yosenComSijiIndex
           ? kantoku.yobiint2[yosenComSijiIndex]
           : 0;
-      // 強化プロジェクト設定(int) yobiint3[80] (2.0.1で追加。起こりやすさ+10×重み+100×期間のコード。
-      // どれも0が初期値。kyouka_project.dart)
+      // 強化プロジェクト設定(int) yobiint3[80] (2.0.1で追加。起こりやすさ+10×重み+100×期間のコード
+      // +1000×自分の大学も選ばれるか。どれも0が初期値。kyouka_project.dart)
       data['k_yobiint3_80'] = kyoukaSetteiAtai(kantoku);
-      // 監督の母校パイプ設定(int) yobiint3[84] (2.0.1で追加。強さのコード。0(名声1位並み)が初期値。bokou_pipe.dart)
-      data['k_yobiint3_84'] = bokouPipeCode(kantoku);
+      // 監督の母校パイプ設定(int) yobiint3[84] (2.0.1で追加。強さのコード+10×自分の大学に効かないか。
+      // どれも0が初期値。bokou_pipe.dart)
+      data['k_yobiint3_84'] = bokouPipeSetteiAtai(kantoku);
     } else if (department == SettingsDepartment.octoberTime) {
       //区間ごとタイム調整(int)
       data['k_yobiint5_30_39_time'] = kantoku.yobiint5.sublist(30, 40);
@@ -724,16 +725,17 @@ class SettingsQrProcessor {
         kantoku.yobiint2[yosenComSijiIndex] = yobiint2_89;
       }
       // 強化プロジェクト設定(int) kantoku.yobiint3[80] (2.0.1)
-      //   起こりやすさ+10×重み+100×期間のコード(古いQRコードには含まれていないので、そのときは今の設定のまま)
+      //   起こりやすさ+10×重み+100×期間のコード+1000×自分の大学も選ばれるか
+      //   (古いQRコードには含まれていないので、そのときは今の設定のまま)
       final dynamic yobiint3_80 = dataMap['k_yobiint3_80'];
       if (yobiint3_80 is int) {
         kyoukaSetteiAtaiIreru(kantoku, yobiint3_80);
       }
       // 監督の母校パイプ設定(int) kantoku.yobiint3[84] (2.0.1)
-      //   強さのコード(古いQRコードには含まれていないので、そのときは今の設定のまま)
+      //   強さのコード+10×自分の大学に効かないか(古いQRコードには含まれていないので、そのときは今の設定のまま)
       final dynamic yobiint3_84 = dataMap['k_yobiint3_84'];
       if (yobiint3_84 is int) {
-        bokouPipeSetteiIreru(kantoku, yobiint3_84);
+        bokouPipeSetteiAtaiIreru(kantoku, yobiint3_84);
       }
       // 金銀支給量設定の難易度ごとの割合(int) kantoku.yobiint3[70]〜[73] (1.9.1)
       //   鬼・難しい・普通・易しいの順。0なら100%(初期値)、1〜50なら値×10%

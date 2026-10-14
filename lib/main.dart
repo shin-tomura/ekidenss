@@ -1032,6 +1032,9 @@ Future<void> main() async {
     // 版の番号では判定しない(1.9.5testで開いたデータにも付くように)。付いていれば何もしない
     //save_load_screenの中の _importFromSlot の中にもあるので、そちらも変更すること！
     await koukouJouhouFuyo();
+    // 出身校のないOB(1.9.5より前に卒業した選手)に出身校だけを付ける(2.0.1。監督の母校パイプ。koukou.dart)
+    //save_load_screenの中の _importFromSlot の中にもあるので、そちらも変更すること！
+    await koukouObFuyo();
 
     {
       // 選手と大学のチャートの点数を一度計算し直す(1.9.7。1.9.6までは年度替わりで計算し直して

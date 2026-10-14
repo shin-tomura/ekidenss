@@ -5,6 +5,7 @@ import 'package:ekiden/constants.dart';
 import 'package:ekiden/ghensuu.dart'; // 高校の大会の記録の年度(1.9.5)
 import 'package:ekiden/univ_data.dart'; // 高校の大会の記録の保存場所(1.9.5)
 import 'package:ekiden/senshu_data.dart';
+import 'package:ekiden/senshu_r_data.dart'; // 出身校のないOBに出身校を付ける(2.0.1。監督の母校パイプ)
 import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/kansuu/koukou_meibo.dart';
 import 'package:ekiden/kansuu/joukai.dart'; // 留学生の入学時の優秀度(1.9.5)
@@ -1426,6 +1427,59 @@ Future<int> _koukouJouhouFuyoHontai(bool shusshinHenkou) async {
     }
   }
   print('出身校と高校時代の実績を付けた選手: $kazu人'); // 確認用(1.9.5)
+  return kazu;
+}
+
+/// 出身校のないOB(1.9.5より前に卒業した日本人の選手)に、出身校だけを付けて保存する(2.0.1。
+/// 監督の母校パイプ(bokou_pipe.dart)で、監督の母校を使うため)。付けた人数を返す。
+/// 出身地の都道府県の高校から、入学時の5000mの記録に合わせて選ぶ(新入生と同じ選び方。速い選手は県外の名門のことも)。
+/// 高校時代の実績は付けない(大会は計算しない)。留学生のOBは付けない(監督にならないので)。
+/// 起動時・セーブデータの読み込み時に呼ぶ。付いていれば何もしない(版の番号では判定しない)。
+/// エラーが起きても止めずにログに出すだけにする(起動時はアプリの画面を出す前に呼ぶので)
+Future<int> koukouObFuyo() async {
+  try {
+    return await _koukouObFuyoHontai();
+  } catch (e, st) {
+    print('OBの出身校を付ける処理でエラー(ゲームはそのまま続ける): $e\n$st');
+    return 0;
+  }
+}
+
+Future<int> _koukouObFuyoHontai() async {
+  if (!Hive.isBoxOpen('retiredSenshuBox')) return 0;
+  final Box<Senshu_R_Data> box = Hive.box<Senshu_R_Data>('retiredSenshuBox');
+  final List<Senshu_R_Data> nai = [
+    for (final Senshu_R_Data o in box.values)
+      if (o.hirou != 1 && KoukouJouhou.yomu(o.samusataisei).koukou == 0) o,
+  ];
+  if (nai.isEmpty) return 0;
+  final Random r = Random();
+  final int kenSuu = LocationDatabase.allPrefectures.length;
+  int kazu = 0;
+  for (final Senshu_R_Data o in nai) {
+    final int shita = (o.samusataisei < 0 ? 0 : o.samusataisei) % _shitaBit;
+    int ken = PackedIndexHelper.unpackIndices(shita)['prefectureIndex'] ?? -1;
+    if (ken < 0 || ken >= kenSuu) ken = r.nextInt(kenSuu);
+    final double t5 = o.kiroku_nyuugakuji_5000;
+    final _Kousei k = _Kousei(
+      s: null,
+      // 記録がなければ、平凡な持ちタイム(14分40秒)として選ぶ
+      t5: (t5 > 0 && t5 < 1200) ? t5 : 880.0,
+      nobori: _nouryoku(o.noboritekisei),
+      kudari: _nouryoku(o.kudaritekisei),
+      updown: _nouryoku(o.noborikudarikirikaenouryoku),
+      road: _nouryoku(o.tandokusou),
+      pace: _nouryoku(o.paceagesagetaiouryoku),
+      spurt: _nouryoku(o.spurtryoku),
+      ryuugakusei: false,
+      keireki: 0,
+    );
+    final int ban = _koukouErabu(k, ken, r);
+    o.samusataisei = KoukouJouhou(koukou: ban + 1).kakikomi(o.samusataisei);
+    await o.save();
+    kazu++;
+  }
+  print('出身校を付けたOB: $kazu人'); // 確認用(2.0.1)
   return kazu;
 }
 

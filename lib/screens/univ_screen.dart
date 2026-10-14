@@ -31,6 +31,8 @@ import 'package:ekiden/screens/kiji_hyou_view.dart'; // 表の部品(1.9.8)
 import 'package:ekiden/screens/kukan_haiti_button.dart'; // 今季タイム一覧表を開くボタン(1.9.9)
 import 'package:ekiden/kansuu/kyouka_project.dart'
     show KyoukaProject, kyoukaProjectChuu; // 強化プロジェクト(2.0.1)
+import 'package:ekiden/kansuu/koukou.dart'
+    show koukouIchiranMoji; // 監督の出身校(2.0.1。監督の母校パイプ)
 import 'package:ekiden/kansuu/mokuhyou_kimekata.dart'
     show
         mokuhyouKimekataKoujoushin,
@@ -3500,6 +3502,8 @@ class _UnivScreenState extends State<UnivScreen> {
 
         String name_kantoku0 = "";
         int age_kantoku0 = 0;
+        // 監督の出身校(2.0.1。監督の母校パイプ。高校の情報を表示しない設定のときと、分からないときは空)
+        String koukou_kantoku0 = "";
         String name_kantoku1 = "";
         int age_kantoku1 = 0;
         String name_kantoku2 = "";
@@ -3510,6 +3514,11 @@ class _UnivScreenState extends State<UnivScreen> {
           if (rsenshu.id == kantoku.rid[ghensuu.hyojiunivnum]) {
             name_kantoku0 = rsenshu.name;
             age_kantoku0 = ghensuu.year - rsenshu.sijiflag + 22;
+            koukou_kantoku0 = koukouIchiranMoji(
+              rsenshu.samusataisei,
+              rsenshu.hirou,
+              kantoku,
+            );
           }
           if (rsenshu.id ==
               kantoku.rid[ghensuu.hyojiunivnum + TEISUU.UNIVSUU]) {
@@ -3824,6 +3833,22 @@ class _UnivScreenState extends State<UnivScreen> {
                             style: TextStyle(
                               color: HENSUU.textcolor,
                               fontSize: HENSUU.fontsize_honbun,
+                            ),
+                          ),
+                        // 監督の出身校(2.0.1。監督の母校パイプ。ボタンの文に足さず、別の行にする)
+                        if (kantoku.rid[ghensuu.hyojiunivnum] > 0 &&
+                            koukou_kantoku0.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16.0,
+                            ),
+                            child: Text(
+                              '監督の出身校: $koukou_kantoku0',
+                              style: TextStyle(
+                                color: HENSUU.textcolor,
+                                fontSize: HENSUU.fontsize_honbun - 2,
+                              ),
+                              textAlign: TextAlign.center,
                             ),
                           ),
                         if (kantoku.rid[ghensuu.hyojiunivnum + TEISUU.UNIVSUU] >

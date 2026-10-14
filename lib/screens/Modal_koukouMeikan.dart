@@ -8,6 +8,7 @@ import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/kansuu/koukou.dart';
 import 'package:ekiden/kansuu/koukou_meibo.dart';
 import 'package:ekiden/kansuu/scout_com.dart'; // スカウトの途中か(高校のページの卒業生。1.9.5)
+import 'package:ekiden/kansuu/bokou_pipe.dart'; // この高校出身の監督(2.0.1。監督の母校パイプ)
 import 'package:ekiden/kansuu/time_date.dart';
 
 // ------------------------------------------------------------
@@ -18,7 +19,8 @@ import 'package:ekiden/kansuu/time_date.dart';
 //   「大会の記録」(直近10回の全国高校駅伝と高校総体、都道府県予選と地区大会のチームの順位とタイム。
 //   koukou.dart の koukouTaikaiKirokuYomu。見出しごとに折りたたみ)を、タブで切り替える
 // ・名門校のカードと都道府県別の高校を押すと、高校のページ(_KoukouPage)を開く。年度ごとの都道府県予選・
-//   地区大会・全国高校駅伝の成績、お気に入りの付け外し、今大学にいる卒業生。編集はその中から(1.9.5)
+//   地区大会・全国高校駅伝の成績、お気に入りの付け外し、今大学にいる卒業生。編集はその中から(1.9.5)。
+//   この高校出身の大学の監督も出す(2.0.1。監督の母校パイプ。bokou_pipe.dart)
 // ・新入生のスカウトの画面の「高校名鑑」からも開く(1.9.5。「大会の記録」のタブから。進学先はスカウトの画面と
 //   同じ出し方で、一番新しい回(今年の新入生の世代)の全国高校駅伝を開いておく)
 // ・名簿は koukouMeibo(初期値に、この画面で変えた分を重ねたもの)から作る
@@ -942,6 +944,12 @@ class _KoukouPageState extends State<_KoukouPage> {
   bool _scoutChuu = false;
   bool _shoriChuu = false;
 
+  /// この高校出身の今の大学の監督(大学の順。2.0.1。監督の母校パイプ)
+  List<BokouKantoku> _kantoku = const [];
+
+  /// 監督の母校パイプが効くか(コンピュータスカウトONで、設定がなしでない。説明の文を出すかに使う)
+  bool _pipeKiku = false;
+
   @override
   void initState() {
     super.initState();
@@ -963,6 +971,17 @@ class _KoukouPageState extends State<_KoukouPage> {
       if (g != null && g.mode == 9000 && Hive.isBoxOpen('kantokuBox')) {
         final KantokuData? kantoku = Hive.box<KantokuData>('kantokuBox').get('KantokuData');
         _scoutChuu = kantoku != null && isComScoutOn(kantoku);
+      }
+      // この高校出身の今の大学の監督(2.0.1。bokou_pipe.dart)
+      final KantokuData? kd = Hive.isBoxOpen('kantokuBox')
+          ? Hive.box<KantokuData>('kantokuBox').get('KantokuData')
+          : null;
+      if (g != null && kd != null) {
+        _kantoku = [
+          for (final BokouKantoku b in bokouPipeKantokuIchiran(kd, g.year))
+            if (b.koukou - 1 == widget.ban) b,
+        ];
+        _pipeKiku = isComScoutOn(kd) && !bokouPipeNashi(kd);
       }
     }
   }
@@ -1288,6 +1307,16 @@ class _KoukouPageState extends State<_KoukouPage> {
           _midashi('■今、大学にいる卒業生'),
           if (sotsugyousei.isEmpty) const Text('今、大学にいる卒業生はいません。', style: _honbun),
           for (final SenshuData s in sotsugyousei) _sotsugyouseiGyou(s),
+          // ---- この高校出身の監督(2.0.1。監督の母校パイプ) ----
+          _midashi('■この高校出身の大学の監督'),
+          if (_kantoku.isEmpty) const Text('今、この高校出身の大学の監督はいません。', style: _honbun),
+          for (final BokouKantoku b in _kantoku)
+            _gyouMoji(
+              '${_univMei[b.univid] ?? ''}大学　${b.mei}監督(${b.nenrei}歳)',
+              kin: b.univid == _myUnivId,
+            ),
+          if (_kantoku.isNotEmpty && _pipeKiku)
+            _gyouHosoku('この高校の新入生は、スカウトで監督の大学を選びやすくなります。'),
           const SizedBox(height: 24),
           const Text('架空の高校です。実在の学校とは関係ありません。大学のレースや育成には影響しません。', style: _hosoku),
           const SizedBox(height: 24),

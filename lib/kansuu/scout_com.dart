@@ -11,6 +11,7 @@ import 'package:ekiden/kansuu/ShozokusakiKettei_By_Univmeisei.dart'; // 振り�
 import 'package:ekiden/kansuu/koukou.dart'; // 地区めぐりの出身校(1.9.6)
 import 'package:ekiden/kansuu/koukou_meibo.dart'; // 地区めぐりの地区(1.9.6)
 import 'package:ekiden/kansuu/kyouka_project.dart'; // 強化プロジェクト(2.0.1)
+import 'package:ekiden/kansuu/bokou_pipe.dart'; // 監督の母校パイプ(2.0.1)
 
 // ------------------------------------------------------------
 // コンピュータ大学の新入生スカウト(1.7.9)
@@ -799,6 +800,10 @@ Map<int, double> comScoutSeikouritsuIchiran({
   final double kagen = chikuMeguriGh == null
       ? 0.0
       : _seikouritsuKagen(sortedUnivData, chikuMeguriGh)[univid];
+  // 監督の母校の後輩は、名声N位並みの名声で計算する(2.0.1。bokou_pipe.dart)
+  final BokouPipe pipe = BokouPipe.yomu(
+    Hive.box<KantokuData>('kantokuBox').get('KantokuData'),
+  );
   return {
     for (final SenshuData s in shinnyuusei)
       if (s.hirou != 1 && !comScoutKettei(s) && !comScoutKotowarareta(s))
@@ -808,6 +813,14 @@ Map<int, double> comScoutSeikouritsuIchiran({
           timeJuni: timeJuni[s.id] ?? 999,
           kawarimono: comScoutKawarimono(s, nen),
           kagen: kagen,
+          meisei: pipe.kouhai(univid, s)
+              ? pipe.meisei(
+                  univid,
+                  s,
+                  sortedUnivData[univid].meisei_total,
+                  sortedUnivData,
+                )
+              : null,
         ),
   };
 }
@@ -1327,6 +1340,9 @@ Future<List<ComScoutKekka>> comScoutRound({
     kantoku,
     gh,
   );
+  // 監督の母校パイプ(2.0.1。bokou_pipe.dart): 監督の母校の後輩の争奪戦・交渉の成功率と、
+  // 地区めぐり(声かけ)のコンピュータの大学の声のかけ方に使う
+  final BokouPipe pipe = BokouPipe.yomu(kantoku);
   final List<_Kousyou> kousyouList = [];
   final Map<int, _KoudouMemo> memo = {}; // 大学id → このラウンドの行動
   // 地区めぐりの選手の地区(全国一斉では使わない。1.9.6)
@@ -1429,7 +1445,15 @@ Future<List<ComScoutKekka>> comScoutRound({
               timeJuni: timeJuni[s.id] ?? 999,
               kawarimono: comScoutKawarimono(s, gh.year),
               kagen: univ.id < kagen.length ? kagen[univ.id] : 0.0,
-              meisei: kyoukaMeisei[univ.id],
+              // 監督の母校の後輩は、名声N位並みの名声で計算する(2.0.1。bokou_pipe.dart)
+              meisei: pipe.kouhai(univ.id, s)
+                  ? pipe.meisei(
+                      univ.id,
+                      s,
+                      kyoukaMeisei[univ.id] ?? univ.meisei_total,
+                      sortedUnivData,
+                    )
+                  : kyoukaMeisei[univ.id],
             ),
           ),
         );
@@ -1443,10 +1467,29 @@ Future<List<ComScoutKekka>> comScoutRound({
       // 地区めぐりでは、要件は全国の進路未定の中で決め、そのうち今の地区にいる選手だけにする(1.9.6)
       final int youkenNinzuu =
           (mitei.length * _youkenPercent(m.seikaku) + 99) ~/ 100;
-      final List<_Kouho> kouho = mitei
+      List<_Kouho> kouho = mitei
           .take(youkenNinzuu)
           .where((k) => chiku == null || chikuBetsu[k.senshu.id] == chiku)
           .toList();
+      // 監督の母校の後輩(2.0.1。bokou_pipe.dart): 地区めぐり(声かけ)で、今の地区に母校の後輩がいれば、
+      // 要件を堅実(上位50%)までゆるめて、その中から優先して声をかける
+      String riyuu = m.riyuu;
+      if (koekake && chiku != null && pipe.bokou.containsKey(univ.id)) {
+        final int yurumeNinzuu =
+            (mitei.length * _youkenPercent(_seikakuKenjitsu) + 99) ~/ 100;
+        final List<_Kouho> kouhai = mitei
+            .take(yurumeNinzuu)
+            .where(
+              (k) =>
+                  chikuBetsu[k.senshu.id] == chiku &&
+                  pipe.kouhai(univ.id, k.senshu),
+            )
+            .toList();
+        if (kouhai.isNotEmpty) {
+          kouho = kouhai;
+          riyuu = '${m.riyuu}・監督の母校の後輩';
+        }
+      }
       if (kouho.isEmpty) {
         memo[univ.id] = _KoudouMemo(
           shurui: comScoutKoudouMiokuri,
@@ -1480,12 +1523,12 @@ Future<List<ComScoutKekka>> comScoutRound({
           univid: univ.id,
           senshu: nerai.senshu,
           seikou: seikou,
-          riyuu: m.riyuu,
+          riyuu: riyuu,
         ),
       );
       memo[univ.id] = _KoudouMemo(
         shurui: comScoutKoudouKousyou,
-        riyuu: m.riyuu,
+        riyuu: riyuu,
         senshu: nerai.senshu,
         seikou: seikou,
       );
@@ -1498,7 +1541,7 @@ Future<List<ComScoutKekka>> comScoutRound({
             )
             .join(' / ');
         print(
-          '[COMスカウト] ラウンド$roundBangou ${univ.name}(${m.riyuu}) '
+          '[COMスカウト] ラウンド$roundBangou ${univ.name}($riyuu) '
           '要件 交渉できる進路未定${mitei.length}人の上位${_youkenPercent(m.seikaku)}%($youkenNinzuu人) '
           '上位候補: $kouhoStr → ${nerai.senshu.name}に交渉 ${seikou ? '成功' : '失敗'}',
         );
@@ -1511,6 +1554,7 @@ Future<List<ComScoutKekka>> comScoutRound({
   //  変わり者は名声にこだわらないので、成功した大学から等しい確率で選ぶ。1.9.0)
   // 声かけでは、最後の志望と同じ重み(入学時名声影響度設定の重み)にする(1.9.6。成功率がない分、
   // 名声の差を争奪戦で効かせるため。交渉と全国一斉は今まで通り名声そのものの重み)
+  // 監督の母校の後輩は、監督の大学を名声N位並みにする(2.0.1。bokou_pipe.dart。変わり者は今まで通り)
   final List<int> shiganOmomi = koekake
       ? shozokuChuusenOmomi(sortedunivdata: sortedUnivData, ghensuu: gh)
       : const <int>[];
@@ -1533,14 +1577,17 @@ Future<List<ComScoutKekka>> comScoutRound({
                       : koekake
                       ? max(
                           1,
-                          k.univid < shiganOmomi.length
-                              ? shiganOmomi[k.univid]
-                              : 0,
+                          pipe.omomi(k.univid, k.senshu, shiganOmomi),
                         ).toDouble()
                       : max(
                           1,
-                          kyoukaMeisei[k.univid] ??
-                              sortedUnivData[k.univid].meisei_total,
+                          pipe.meisei(
+                            k.univid,
+                            k.senshu,
+                            kyoukaMeisei[k.univid] ??
+                                sortedUnivData[k.univid].meisei_total,
+                            sortedUnivData,
+                          ),
                         ).toDouble(),
                 )
                 .toList(),
@@ -1650,6 +1697,10 @@ Future<Map<int, int>> comScoutShigan({
     sortedunivdata: sortedUnivData,
     ghensuu: gh,
   );
+  // 監督の母校の後輩は、監督の大学を名声N位並みの重みにする(2.0.1。bokou_pipe.dart)
+  final BokouPipe pipe = BokouPipe.yomu(
+    Hive.box<KantokuData>('kantokuBox').get('KantokuData'),
+  );
   final List<SenshuData> mikakutei =
       shinnyuusei.where((s) => s.hirou != 1 && !comScoutKettei(s)).toList()
         ..sort((a, b) {
@@ -1673,8 +1724,7 @@ Future<Map<int, int>> comScoutShigan({
       continue;
     }
     List<double> w = [
-      for (final int k in kouho)
-        max(0, k < omomi.length ? omomi[k] : 0).toDouble(),
+      for (final int k in kouho) max(0, pipe.omomi(k, s, omomi)).toDouble(),
     ];
     if (w.every((x) => x <= 0)) {
       w = [for (int i = 0; i < kouho.length; i++) 1.0];

@@ -10,6 +10,7 @@ import 'dart:math';
 import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/kansuu/scout_com.dart';
 import 'package:ekiden/kansuu/kyouka_project.dart'; // 強化プロジェクト(2.0.1)
+import 'package:ekiden/kansuu/bokou_pipe.dart'; // 監督の母校パイプ(2.0.1)
 import 'package:ekiden/kansuu/koukou.dart'; // 出身校と高校時代の実績(1.9.5)
 import 'package:ekiden/screens/Modal_koukouMeikan.dart'; // 高校名鑑(1.9.5)
 import 'package:ekiden/kansuu/ShoriGuard.dart';
@@ -825,6 +826,39 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
     if (j.mei == null) return '';
     final List<String> jisseki = koukouJissekiList(j);
     return '${koukouMeiKenMoji(j)}${jisseki.isEmpty ? '' : '　${jisseki.join('、')}'}';
+  }
+
+  /// 大学ごとの監督の母校と大学の名前(2.0.1。スカウトの画面を開いている間は監督が代わらないので、一度だけ読む)
+  Map<int, int>? _bokouCache;
+  Map<int, String>? _univMeiCache;
+
+  /// 監督の母校の後輩の印の文(2.0.1。bokou_pipe.dart。「○○大学の監督の母校」。なければnull)
+  /// コンピュータスカウトONで、監督の母校パイプの設定がなしでなく、高校の情報を表示する設定のときだけ出す。
+  /// [jibun] は、あなたの大学の監督の母校か(色を変える)
+  ({String moji, bool jibun})? _bokouMoji(SenshuData s) {
+    if (!_comScoutOn || s.hirou == 1) return null;
+    final KantokuData? kantoku = Hive.box<KantokuData>(
+      'kantokuBox',
+    ).get('KantokuData');
+    if (kantoku == null ||
+        koukouHyoujiNashi(kantoku) ||
+        bokouPipeNashi(kantoku)) {
+      return null;
+    }
+    final Map<int, int> bokou = _bokouCache ??= bokouPipeBokou(kantoku);
+    final List<int> univs = bokouPipeUnivs(bokou, s);
+    if (univs.isEmpty) return null;
+    final Map<int, String> meiMap = _univMeiCache ??= {
+      for (final UnivData u in _univBox.values) u.id: u.name,
+    };
+    final int my = _ghensuu?.MYunivid ?? -1;
+    final bool jibun = univs.contains(my);
+    final List<String> mei = [
+      if (jibun) 'あなたの大学',
+      for (final int u in univs)
+        if (u != my) '${meiMap[u] ?? ''}大学',
+    ];
+    return (moji: '${mei.join('・')}の監督の母校', jibun: jibun);
   }
 
   /// 高校の情報を出すか(1.9.5。表示しない設定のときは、高校時代のフィルターと高校名鑑のボタンを出さない)
@@ -1946,6 +1980,8 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
     if (_koekake && !kettei) rateStr = '未定';
     // 出身校と高校時代の実績(1.9.5)
     final String koukouMoji = _koukouMoji(freshman);
+    // 監督の母校の後輩の印(2.0.1。bokou_pipe.dart)
+    final ({String moji, bool jibun})? bokouMoji = _bokouMoji(freshman);
     // 地区めぐりの地区と順位、交渉できる地区か(1.9.6)
     final String chikuJuniMoji = _chikuMeguri && freshman.hirou != 1
         ? _chikuJuniMoji(freshman)
@@ -2105,6 +2141,17 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
                             color: isMyUniv
                                 ? Colors.amber.withOpacity(0.8)
                                 : Colors.white60,
+                            fontSize: HENSUU.fontsize_honbun - 2,
+                          ),
+                        ),
+                      // 監督の母校の後輩の印(2.0.1。横に並べず1行の文にして、長いときは折り返す)
+                      if (bokouMoji != null)
+                        Text(
+                          bokouMoji.moji,
+                          style: TextStyle(
+                            color: bokouMoji.jibun
+                                ? Colors.amber
+                                : Colors.orangeAccent,
                             fontSize: HENSUU.fontsize_honbun - 2,
                           ),
                         ),

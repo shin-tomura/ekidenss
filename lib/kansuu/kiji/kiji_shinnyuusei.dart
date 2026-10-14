@@ -5,6 +5,7 @@ import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/kansuu/koukou.dart'; // 出身校と高校時代の実績・高校の大会の記録(1.9.5)
 import 'package:ekiden/kansuu/kiji/kiji_kihon.dart';
 import 'package:ekiden/kansuu/kiji/kiji_gakunai.dart' show gakunaiSiteMeiJibun, gakunaiKishaMei;
+import 'package:ekiden/kansuu/bokou_pipe.dart' show bokouPipeBokou; // 監督の母校から入った新入生(2.0.1)
 
 // ------------------------------------------------------------
 // 新入生の記事(2.0.0。4月5日の最新画面のカードから。読めるのはその日だけ)
@@ -20,6 +21,9 @@ import 'package:ekiden/kansuu/kiji/kiji_gakunai.dart' show gakunaiSiteMeiJibun, 
 //  ・13分台の人数: 理論値(例年)と、上の世代との比べ
 //  ・大学の補強: 世代上位30人を何人獲ったか、名声の順位との比べ
 //  ・全国高校駅伝の優勝校のメンバーの進学先、同じ高校の同級生がそろって同じ大学へ、ほかの競技の出身、留学生
+//  ・監督の母校から、その監督の大学に入った新入生(2.0.1。監督の母校パイプ。bokou_pipe.dart)。段落だけで、
+//    見出しの型にはしない(前の年と同じ見出しを避ける仕組みを変えないため)。同じ高校の同級生の組と同じなら、
+//    同級生の段落に「監督の母校でもある」と書き足す。スカウトのいきさつは書かず、事実だけを書く
 //  ・まれな年の見出し: 世代トップ・1区の区間賞・総体5000mの優勝(か日本人トップ)の3つ(2つ)を同じ選手がそろえた
 // ・飽きさせないように: 見出しの型ごとに言い回しを数通り持つ。前の年と同じ型の見出しは避ける
 //   (KantokuData.yobiint3[77] に、年度と前の年の型と今年の型を詰めて残す)。リードと「記者の目」は記者の型で変える。
@@ -484,7 +488,7 @@ const int _gOnaji = 10; // 同じ高校の同級生がそろって同じ大学�
 const int _gIshoku = 11; // ほかの競技の出身
 
 /// 段落の種類
-enum _Dan { sedai, ikku, soutai, kazu, hokyou, yuushou, onaji, ishoku, ryuu }
+enum _Dan { sedai, ikku, soutai, kazu, hokyou, yuushou, onaji, ishoku, ryuu, bokou }
 
 /// 期待のルーキーの記事を書く
 class _Rookie {
@@ -617,6 +621,42 @@ class _Rookie {
     return best;
   }
 
+  /// 監督の母校から、その監督の大学に入った新入生(大学id → 新入生。持ちタイムの順。2.0.1。監督の母校パイプ)
+  /// (高校の情報を出せないときは空)
+  late final Map<int, List<_Shin>> bokouBetsu = _bokouBetsuTsukuru();
+
+  Map<int, List<_Shin>> _bokouBetsuTsukuru() {
+    if (!d.koukouAri) return const {};
+    final Map<int, int> bokou = bokouPipeBokou(k.kantoku);
+    if (bokou.isEmpty) return const {};
+    final Map<int, List<_Shin>> m = {};
+    for (final _Shin x in d.nihon) {
+      final KoukouJouhou? j = x.j;
+      final int? kou = bokou[x.s.univid];
+      if (j == null || kou == null || j.koukou != kou) continue;
+      m.putIfAbsent(x.s.univid, () => []).add(x);
+    }
+    return m;
+  }
+
+  /// 監督の母校から入った組で、一番目立つもの(人数の多い組。同じなら最上位の選手が上の組。なければ空)
+  late final List<_Shin> bokou = _bokouTsukuru();
+
+  List<_Shin> _bokouTsukuru() {
+    List<_Shin> best = const [];
+    for (final List<_Shin> l in bokouBetsu.values) {
+      if (l.length > best.length || (l.length == best.length && l.first.juni < best.first.juni)) best = l;
+    }
+    return best;
+  }
+
+  /// 監督の母校から入った組が、同じ高校の同級生の組と同じか(同じなら、同級生の段落に書き足す)
+  bool get bokouOnaji =>
+      onaji.isNotEmpty &&
+      bokou.isNotEmpty &&
+      onaji.first.s.univid == bokou.first.s.univid &&
+      onaji.first.j?.koukou == bokou.first.j?.koukou;
+
   /// ほかの競技の出身で、持ちタイムが世代60番手までの新入生(一番上の選手。いなければnull)
   late final _Shin? ishoku = _ishokuTsukuru();
 
@@ -681,9 +721,19 @@ class _Rookie {
   }
 
   int get onajiTen {
-    if (onaji.length >= 3) return 70;
-    if (onaji.length == 2) return (onaji.first.j?.mei?.meimon ?? 0) >= 2 ? 45 : 40;
+    // 監督の母校でもあるときは、少し目立つ(2.0.1)
+    final int bokouKasan = bokouOnaji ? 10 : 0;
+    if (onaji.length >= 3) return 70 + bokouKasan;
+    if (onaji.length == 2) return ((onaji.first.j?.mei?.meimon ?? 0) >= 2 ? 45 : 40) + bokouKasan;
     return 0;
+  }
+
+  /// 監督の母校から入った新入生の段落の点(2.0.1。同級生の組と同じなら、同級生の段落に書くので0)
+  int get bokouTen {
+    final List<_Shin> l = bokou;
+    if (l.isEmpty || bokouOnaji) return 0;
+    if (l.length >= 2) return 60;
+    return l.first.juni < _jouiNinzuu ? 50 : 45;
   }
 
   int get ishokuTen {
@@ -736,6 +786,17 @@ class _Rookie {
     final String yobi = w.hito(kagi, kt.name, '', '');
     final String kata = hajimete ? '${d.univMei(x)}の$yobi監督(${kt.nenrei})' : '$yobi監督';
     w.comment('「${w.erabu(_daigakuKantokuKotoba)}」と$kataは${w.erabu(_kantokuShime)}。');
+  }
+
+  /// 大学[uid]の監督の呼び方(初めては「山田太郎監督(45)」、2回目からは「山田監督」。監督がいなければnull)
+  /// (大学の監督の言葉と同じ呼び方。2.0.1。監督の母校パイプ)
+  String? kantokuYobi(int uid) {
+    final ({String name, int nenrei})? kt = k.kantokuMei(uid);
+    if (kt == null) return null;
+    final String kagi = 'K$uid';
+    final bool hajimete = !w.deta(kagi);
+    final String yobi = w.hito(kagi, kt.name, '', '');
+    return hajimete ? '$yobi監督(${kt.nenrei})' : '$yobi監督';
   }
 
   /// 高校の監督(名前は出さない)の言葉
@@ -1121,6 +1182,42 @@ extension _RookieDanraku on _Rookie {
       '$meiは、$kouで一緒に走った同級生だ。そろって$uに進み、大学でも同じチームで走る。',
     ]));
     if ((l.first.j?.mei?.meimon ?? 0) >= 3) b.write('$uは、名門の$kouから新戦力をまとめて迎えた形だ。');
+    // 監督の母校でもあるとき(2.0.1。監督の母校パイプ)
+    if (bokouOnaji) {
+      final String? kt = kantokuYobi(l.first.s.univid);
+      if (kt != null) b.write('$kouは、$uの$ktの母校でもある。');
+    }
+    w.danraku(b.toString());
+  }
+
+  /// 監督の母校から、その監督の大学に入った新入生の段落(2.0.1。監督の母校パイプ。事実だけを書く)
+  void bokouDan() {
+    final List<_Shin> l = bokou;
+    if (l.isEmpty) return;
+    final _Shin x = l.first;
+    final String kou = x.kou;
+    final String u = d.univMei(x);
+    final String? kt = kantokuYobi(x.s.univid);
+    if (kou.isEmpty || kt == null) return;
+    final StringBuffer b = StringBuffer();
+    if (l.length >= 2) {
+      final String mei = [for (final _Shin y in l) yobu(y, kakko: '')].join(l.length == 2 ? 'と' : '、');
+      b.write(w.erabu([
+        '$uには、$ktの母校・$kouから、$meiの${l.length}人が入った。',
+        '$kouの$meiは、そろって$uに進んだ。$kouは、$ktの母校だ。',
+      ]));
+      b.write(w.erabu(['監督にとっては、そろって母校の後輩にあたる。', '監督は、母校の後輩をまとめて迎えた形だ。']));
+    } else {
+      final String mei = yobu(x, kakko: '');
+      b.write(w.erabu([
+        '$uには、$ktの母校・$kouから$meiが入った。持ちタイムは${jikanMoji(x.t)}で、世代${x.juni + 1}番手だ。',
+        '$meiは、$kouから$uに進んだ。持ちタイム${jikanMoji(x.t)}は世代${x.juni + 1}番手。$kouは、$ktの母校だ。',
+      ]));
+      b.write(w.erabu(['監督にとっては、母校の後輩にあたる。', '監督は、母校の後輩を迎えた形だ。']));
+    }
+    // ほかにも監督の母校から新入生を迎えた大学
+    final int hoka = bokouBetsu.length - 1;
+    if (hoka >= 1) b.write('ほかにも$hoka校が、監督の母校から新入生を迎えた。');
     w.danraku(b.toString());
   }
 
@@ -1507,6 +1604,8 @@ extension _RookieMidashi on _Rookie {
         ishokuDan();
       case _Dan.ryuu:
         ryuuDan();
+      case _Dan.bokou:
+        bokouDan();
     }
   }
 
@@ -1665,6 +1764,7 @@ List<Kiji> shinnyuuseiKiji(KijiKankyou k) {
     if (r.onajiTen > 0) _Dan.onaji: r.onajiTen,
     if (r.ishokuTen > 0) _Dan.ishoku: r.ishokuTen,
     if (r.ryuuTen > 0) _Dan.ryuu: r.ryuuTen,
+    if (r.bokouTen > 0) _Dan.bokou: r.bokouTen,
   };
   final Map<_Dan, int> jun = {for (final MapEntry<_Dan, int> e in ten.entries) e.key: e.value + w.r.ikutsu(20)};
   bool kanarazu(_Dan x) => x == _Dan.sedai || x == _Dan.ikku;

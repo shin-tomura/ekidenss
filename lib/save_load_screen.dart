@@ -843,6 +843,9 @@ class _SaveLoadScreenState extends State<SaveLoadScreen> {
       // 出身校と高校時代の実績がまだない日本人選手に付ける(1.9.5。mainの中の同じ処理の説明を参照)
       //mainの中にもあるので、そちらも変更すること！
       await koukouJouhouFuyo();
+      // 出身校のないOBに出身校だけを付ける(2.0.1。mainの中の同じ処理の説明を参照)
+      //mainの中にもあるので、そちらも変更すること！
+      await koukouObFuyo();
 
       {
         // 選手と大学のチャートの点数を一度計算し直す(1.9.7。mainの中の同じ処理の説明を参照)

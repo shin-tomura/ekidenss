@@ -299,6 +299,20 @@ void kijiNenkanHiraku(BuildContext context) {
   ]);
 }
 
+/// 新入生の記事を開く(4月5日の最新画面から。箱庭スポーツの期待のルーキーと、学内メディアの新入生紹介号。2.0.0)
+void kijiShinnyuuseiHiraku(BuildContext context) {
+  _hiraku(context, [
+    KijiBan(
+      site: kijiSiteMei,
+      sub: '陸上ニュース・期待のルーキー',
+      list: kijiShinnyuuseiIchiran(),
+      kekka: false,
+      nashiMoji: '今年の新入生の記事はありません',
+    ),
+    ..._gakunaiBan(kijiGakunaiShinnyuuseiIchiran(), sub: '陸上競技部・新入生紹介号', kekka: false),
+  ]);
+}
+
 void _hiraku(BuildContext context, List<KijiBan> bans) {
   showGeneralDialog(
     context: context,
@@ -737,7 +751,13 @@ class _KijiIchiranGamenState extends State<KijiIchiranGamen> {
     return OutlinedButton.icon(
       onPressed: () => _copy(
         context,
-        kijiIraibun(ban.kekka, gakunai: ban.gakunai, site: ban.site, sokuhou: _sokuhou(list)) +
+        kijiIraibun(
+              ban.kekka,
+              gakunai: ban.gakunai,
+              site: ban.site,
+              sokuhou: _sokuhou(list),
+              shinnyuusei: list.isNotEmpty && kijiShinnyuuseiKa(list.first), // 新入生の記事(2.0.0)
+            ) +
             list.map((k) => k.zenbun()).join('\n\n'),
         'すべての記事(依頼文つき)',
       ),
@@ -943,6 +963,7 @@ class KijiGamen extends StatelessWidget {
                         gakunai: kiji.gakunai,
                         site: kiji.site,
                         sokuhou: kiji.category.endsWith('速報'),
+                        shinnyuusei: kijiShinnyuuseiKa(kiji), // 新入生の記事(2.0.0)
                       ) +
                       kiji.zenbun(),
                   'この記事(依頼文つき)',

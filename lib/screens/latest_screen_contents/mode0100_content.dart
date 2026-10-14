@@ -8,8 +8,8 @@ import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/riji_data.dart';
 import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/screens/Modal_shinnyuuseiShingakusaki.dart';
-import 'package:ekiden/screens/kiji_screen.dart'; // 学内メディアの卒業生特集(1.9.3)
-import 'package:ekiden/kansuu/kiji/kiji.dart'; // 卒業生特集のカードの見出しの予告(1.9.3)
+import 'package:ekiden/screens/kiji_screen.dart'; // 学内メディアの卒業生特集(1.9.3)・新入生の記事(2.0.0)
+import 'package:ekiden/kansuu/kiji/kiji.dart'; // 卒業生特集・新入生の記事(2.0.0)のカードの見出しの予告(1.9.3)
 import 'package:ekiden/kansuu/koukou.dart'; // 新入生の出身校と高校時代の実績(1.9.5)
 // KANSUUクラスをインポートするか、必要な関数をここに直接定義
 // 仮で必要な関数をここに定義します。もし kansuu.dart があるならそちらをインポートしてください。
@@ -478,6 +478,20 @@ class Mode0100Content extends StatelessWidget {
                                   const Text(
                                     "新入生が入りました！",
                                     style: TextStyle(color: HENSUU.textcolor),
+                                  ),
+                                  // 箱庭スポーツの「期待のルーキー」と、学内メディアの「新入生紹介号」(2.0.0。kiji_shinnyuusei.dart)
+                                  // 年度替わりの日の記事なので、年間表彰と同じくこの日だけ読める
+                                  const SizedBox(height: 10),
+                                  KijiLinkCard(
+                                    key: ValueKey(
+                                      'kijiShinnyuusei_${currentGhensuu.year}',
+                                    ),
+                                    namae: '期待のルーキー(箱庭スポーツ)',
+                                    tsukuru: kijiShinnyuuseiIchiran,
+                                    hiraku: kijiShinnyuuseiHiraku,
+                                    annai:
+                                        '新入生の世代トップや、高校駅伝の1区・高校総体で活躍した選手の進学先を伝えます。'
+                                        '学内メディアの新入生紹介号も、記事の画面の上で切り替えて読めます。読めるのは今日だけです',
                                   ),
                                   const SizedBox(height: 10),
                                   const Text(

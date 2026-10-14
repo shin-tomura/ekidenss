@@ -12,6 +12,7 @@ import 'package:ekiden/kansuu/kiji/kiji_jikkyou.dart'; // 駅伝の実況「箱�
 import 'package:ekiden/kansuu/kiji/kiji_nenkan.dart'; // 年間表彰と学内表彰(3月25日。1.9.4)
 import 'package:ekiden/kansuu/kiji/kiji_gakuren.dart'; // 学連選抜通信(正月駅伝。1.9.7)
 import 'package:ekiden/kansuu/kiji/kiji_ouro.dart'; // 正月駅伝の往路の記事(2.0.0)
+import 'package:ekiden/kansuu/kiji/kiji_shinnyuusei.dart'; // 新入生の記事(4月5日。2.0.0)
 import 'package:ekiden/kansuu/gakuren_text.dart' show gakurenKonnenAri;
 
 export 'package:ekiden/kansuu/kiji/kiji_kihon.dart'
@@ -19,6 +20,7 @@ export 'package:ekiden/kansuu/kiji/kiji_kihon.dart'
 export 'package:ekiden/kansuu/kiji/kiji_jikkyou.dart' show jikkyouSiteMei;
 export 'package:ekiden/kansuu/kiji/kiji_tenbou.dart' show KijiYosouJin;
 export 'package:ekiden/kansuu/kiji/kiji_gakuren.dart' show gakurenSiteMei;
+export 'package:ekiden/kansuu/kiji/kiji_shinnyuusei.dart' show kijiShinnyuuseiKa;
 
 // ------------------------------------------------------------
 // ニュース記事(箱庭スポーツ)の入口(1.9.2)
@@ -39,6 +41,8 @@ export 'package:ekiden/kansuu/kiji/kiji_gakuren.dart' show gakurenSiteMei;
 // 1.9.7から、正月駅伝では学連選抜を追う「学連選抜通信」もある(kiji_gakuren.dart)。展望号は学連選抜編成の
 // 画面のカードと直前順位予想の展望記事の切り替え、区間ごとの速報はレース画面の実況のカードから開く記事の画面、
 // 結果号と速報は結果画面の記事の画面の切り替えで読める
+// 2.0.0から、4月5日の最新画面で、箱庭スポーツの「期待のルーキー」と学内メディアの「新入生紹介号」も読める
+// (kiji_shinnyuusei.dart。新入生の世代全体と、自分の大学の新入生の記事)
 // ------------------------------------------------------------
 
 /// 表示中の大会の結果の記事
@@ -288,6 +292,34 @@ List<Kiji> kijiGakunaiHyoushouIchiran() {
   }
 }
 
+/// 箱庭スポーツの「期待のルーキー」(4月5日。大会に関係ないので、正月駅伝を記事にする大会として読む。2.0.0)
+List<Kiji> kijiShinnyuuseiIchiran() {
+  try {
+    final KijiKankyou? k = KijiKankyou.yomuRace(2);
+    if (k == null) return [];
+    final List<Kiji> list = shinnyuuseiKiji(k);
+    _log(list);
+    return list;
+  } catch (e, st) {
+    debugPrint('[ニュース記事] 期待のルーキーを作れませんでした: $e\n$st');
+    return [];
+  }
+}
+
+/// 学内メディアの「新入生紹介号」(4月5日。2.0.0)
+List<Kiji> kijiGakunaiShinnyuuseiIchiran() {
+  try {
+    final KijiKankyou? k = KijiKankyou.yomuRace(2);
+    if (k == null) return [];
+    final List<Kiji> list = shinnyuuseiGakunaiKiji(k);
+    _log(list);
+    return list;
+  } catch (e, st) {
+    debugPrint('[ニュース記事] 新入生紹介号を作れませんでした: $e\n$st');
+    return [];
+  }
+}
+
 // ------------------------------------------------------------
 // 学連選抜通信(1.9.7。kiji_gakuren.dart。正月駅伝だけ)
 // ------------------------------------------------------------
@@ -355,12 +387,28 @@ void _log(List<Kiji> list) {
 /// 生成AIに記事を渡すときの依頼文
 /// [gakunai] 学内メディアの記事のとき([site] はそのサイトの名前。1.9.3)
 /// [sokuhou] 区間ごとの速報のとき(学内メディアと学連選抜通信。1.9.7)
+/// [shinnyuusei] 新入生の記事のとき(箱庭スポーツの期待のルーキーと、学内メディアの新入生紹介号。2.0.0)
 String kijiIraibun(
   bool kekka, {
   bool gakunai = false,
   String site = kijiSiteMei,
   bool sokuhou = false,
+  bool shinnyuusei = false,
 }) {
+  // 新入生の記事(2.0.0)。高校の大会の結果に、選手の性質(勝負強さなど)を付け足さないように頼む
+  // (高校の大会の計算には駅伝男・平常心を使っていないので、読み違えさせないため)
+  if (shinnyuusei) {
+    final String dare = gakunai
+        ? '大学の陸上競技部を追う架空の学内メディア「$site」の新入生紹介の記事です。あなたは陸上競技部を担当する学生記者として、'
+            '新しい仲間を温かく迎える記事に書き直してください。'
+        : '架空のスポーツニュースサイト「$kijiSiteMei」の新入生特集の記事です。あなたはスポーツ紙の駅伝・陸上担当のベテラン記者として、'
+            '読みごたえのある記事に書き直してください。';
+    return '以下は、駅伝ゲーム「箱庭小駅伝SS」の新入生のデータをもとにした、$dare'
+        '持ちタイム・高校時代の実績・選手名・大学名・高校名などの事実は変えないでください。'
+        '大学での活躍や伸び方は決めつけないでください。'
+        '選手の性格や勝負強さなど、記事に書かれていない特徴は付け足さないでください。'
+        'コメントは記事の中のものだけを使い、新しい発言は作らないでください。\n\n';
+  }
   // 区間ごとの速報(1.9.7)
   if (sokuhou) {
     final String dare = site == gakurenSiteMei

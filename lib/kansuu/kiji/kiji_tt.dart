@@ -21,7 +21,10 @@ import 'package:ekiden/kansuu/kiji/kiji_gakunai.dart' show gakunaiSiteMeiJibun, 
 //    上位が留学生なら日本人の好タイム・ロードでは目立たなかったのにその種目で光った選手・関係する区間の候補
 //    (クロカンはアップダウンの続く区間、登りは山登り、下りは山下り。区間はコースのデータから探す)を書く
 //  2本目「夏のTTを読み解く」(観点編): 4種目そろって好タイムの選手、昨夏からの伸び、1年生、大学ごとの層
-//    (ロード10kmで○分を切った人数)、自分の大学を、記録がある限り毎年全部入れる
+//    (種目ごとに、その年のタイムから決めた○分を切った人数。本文はロードを中心に、登り・下り・クロカンも1文ずつ)、
+//    自分の大学を、記録がある限り毎年全部入れる
+//  ・現実の報道では、ロードの次に登り(山登り)が大きく扱われ、クロカンはあまり取り上げられないので、
+//    見出しの重みはロード・登り・下り・クロカンの順にし、表と学内TT特集の種目もこの順に並べる
 // ・前の年と同じ型の見出しは避ける(1本目は KantokuData.yobiint3[78]、2本目は[79]。kiji_kihon.dart の KijiMidashiKiroku)
 //
 // 守る決まり
@@ -56,12 +59,13 @@ const int _no = 193;
 const int _noGakunai = 194;
 const int _noKanten = 195;
 
-/// TTの種目(レースの番号)。紹介する順(ロード・クロカン・登り・下り)
+/// TTの種目(レースの番号)。表や学内TT特集で並べる順(ロード・登り・下り・クロカン。現実の報道にならい、
+/// 駅伝に一番近いロードの次に、山登りにつながる登りを置く)
 const int _road = 15;
 const int _kurokan = 16;
 const int _nobori = 13;
 const int _kudari = 14;
-const List<int> _shumoku = [_road, _kurokan, _nobori, _kudari];
+const List<int> _shumoku = [_road, _nobori, _kudari, _kurokan];
 
 /// 種目の名前(結果画面・選手画面と同じ呼び方)
 String _mei(int race) {
@@ -128,33 +132,50 @@ class _TtShiryou {
     return null;
   }
 
-  /// 層を数えるタイムの区切り(分。ロード10kmで、この分を切った選手が20人以上になる一番小さい分)
-  late final int kugiriFun = _kugiriTsukuru();
+  /// 層を数えるタイムの区切り(分。種目[race]で、この分を切った選手が20人以上になる一番小さい分。
+  /// 種目ごとにその年のタイムから決める)
+  late final Map<int, int> _kugiri = {for (final int race in _shumoku) race: _kugiriTsukuru(race)};
 
-  int _kugiriTsukuru() {
-    final List<SenshuData> r = l(_road);
+  int kugiri(int race) => _kugiri[race] ?? 30;
+
+  int _kugiriTsukuru(int race) {
+    final List<SenshuData> r = l(race);
     if (r.isEmpty) return 30;
-    int m = t(r.first, _road) ~/ 60 + 1;
-    while (m < 40 && r.where((s) => t(s, _road) < m * 60).length < 20) {
+    int m = t(r.first, race) ~/ 60 + 1;
+    while (m < 90 && r.where((s) => t(s, race) < m * 60).length < 20) {
       m++;
     }
     return m;
   }
 
-  /// ロード10kmで区切りを切った人数(大学ごと。多い順)
-  late final List<MapEntry<int, int>> sou = _souTsukuru();
+  /// 種目[race]で区切りを切った人数(大学ごと。多い順。同じなら大学id順)
+  late final Map<int, List<MapEntry<int, int>>> _sou = {for (final int race in _shumoku) race: _souTsukuru(race)};
 
-  List<MapEntry<int, int>> _souTsukuru() {
+  List<MapEntry<int, int>> souOf(int race) => _sou[race] ?? const [];
+
+  List<MapEntry<int, int>> _souTsukuru(int race) {
     final Map<int, int> m = {};
-    for (final SenshuData s in l(_road)) {
-      if (t(s, _road) >= kugiriFun * 60) break;
+    for (final SenshuData s in l(race)) {
+      if (t(s, race) >= kugiri(race) * 60) break;
       m[s.univid] = (m[s.univid] ?? 0) + 1;
     }
-    return m.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+    return m.entries.toList()
+      ..sort((a, b) {
+        final int c = b.value.compareTo(a.value);
+        return c != 0 ? c : a.key.compareTo(b.key);
+      });
   }
 
-  /// 区切りを切った人数(全体)
-  int get kugiriNinzuu => sou.fold<int>(0, (a, e) => a + e.value);
+  /// 種目[race]で区切りを切った人数(全体)
+  int kugiriNinzuuOf(int race) => souOf(race).fold<int>(0, (a, e) => a + e.value);
+
+  /// 大学[univid]の、種目[race]で区切りを切った人数
+  int kugiriKazu(int race, int univid) => souOf(race).where((e) => e.key == univid).fold<int>(0, (a, e) => a + e.value);
+
+  /// ロード10kmの区切り・層・人数(本文の中心はロード)
+  int get kugiriFun => kugiri(_road);
+  List<MapEntry<int, int>> get sou => souOf(_road);
+  int get kugiriNinzuu => kugiriNinzuuOf(_road);
 
   /// 4種目そろって好タイムの選手(4種目の順のうち一番悪いものが一番良い選手と、その順。なければnull)
   late final ({SenshuData s, int warui})? zenshu = _zenshuTsukuru();
@@ -385,13 +406,13 @@ class _Tt {
 
   // ---- 点 ----
 
-  /// 1本目の見出しの点(ロード・クロカンを少し重く。目立った選手がいれば少し足す)
+  /// 1本目の見出しの点(現実の報道にならい、ロード・登り・下り・クロカンの順に重く。目立った選手がいれば少し足す)
   int shumokuTen(int race) {
     if (d.l(race).isEmpty) return 0;
     switch (race) {
       case _road:
         return 75;
-      case _kurokan:
+      case _nobori:
         return 70 + (tokui(race) != null ? 5 : 0);
       default:
         return 65 + (tokui(race) != null ? 5 : 0);
@@ -776,7 +797,7 @@ class _Tt {
     kotoba(s, _ichinenKotoba);
   }
 
-  /// 大学ごとの層の段落(ロード10kmで区切りの分を切った人数)
+  /// 大学ごとの層の段落(ロード10kmを中心に、登り・下り・クロカンも1文ずつ。区切りは種目ごとに決める)
   void souDan() {
     if (d.sou.isEmpty) return;
     final StringBuffer b = StringBuffer();
@@ -791,6 +812,19 @@ class _Tt {
       b.write('${daigakuMei(k.univ[d.sou[1].key])}も${d.sou[1].value}人が続いた。');
     }
     b.write('${d.kugiriFun}分を切った選手がいた大学は、${d.sou.length}校だった。');
+    // 登り・下り・クロカン(区切りはその種目のタイムから決める)
+    for (final int race in const [_nobori, _kudari, _kurokan]) {
+      final List<MapEntry<int, int>> so = d.souOf(race);
+      if (so.isEmpty || so.first.value < 2) continue;
+      final String un = daigakuMei(k.univ[so.first.key]);
+      final String mei = '${_mei(race)}の${d.kugiri(race)}分切り';
+      final String soeru = switch (race) {
+        _nobori => '山登りの区間の候補を多く抱える。',
+        _kudari => '山下りの区間の候補も厚い。',
+        _ => 'アップダウンの区間に向けた駒もそろう。',
+      };
+      b.write(w.erabu(['$meiは、$unが${so.first.value}人。$soeru', '$meiでは、$unの${so.first.value}人が目を引く。']));
+    }
     w.danraku(b.toString());
   }
 
@@ -814,6 +848,12 @@ class _Tt {
       '${daigakuMei(u)}のロード10kmは、${yobu(best)}が${jikanMoji(d.t(best, _road))}でチームを引っ張った。',
     ]));
     b.write(kugiri > 0 ? '${d.kugiriFun}分を切った選手は$kugiri人。' : '${d.kugiriFun}分を切った選手は出なかった。');
+    // 登り・下り・クロカンの区切りを切った人数(いた種目だけ)
+    final List<String> hoka = [
+      for (final int race in const [_nobori, _kudari, _kurokan])
+        if (d.kugiriKazu(race, u.id) > 0) '${_mei(race)}の${d.kugiri(race)}分切りは${d.kugiriKazu(race, u.id)}人',
+    ];
+    if (hoka.isNotEmpty) b.write('${hoka.join('、')}。');
     w.danraku(b.toString());
   }
 
@@ -836,18 +876,30 @@ class _Tt {
     }
   }
 
-  /// 大学ごとの層の表(区切りの分を切った人数と、チームの先頭の選手)
+  /// 大学ごとの層の表(種目ごとに、その年の区切りの分を切った人数。ロードの人数の多い順)
   KijiHyou? souHyou() {
-    if (d.sou.isEmpty) return null;
+    final Set<int> univ = {
+      for (final int race in _shumoku)
+        for (final MapEntry<int, int> e in d.souOf(race)) e.key,
+    };
+    if (univ.isEmpty) return null;
+    final List<int> jun = univ.toList()
+      ..sort((a, b) {
+        for (final int race in _shumoku) {
+          final int c = d.kugiriKazu(race, b).compareTo(d.kugiriKazu(race, a));
+          if (c != 0) return c;
+        }
+        return a.compareTo(b);
+      });
     return KijiHyou(
-      '大学ごとの層(ロード10kmで${d.kugiriFun}分を切った人数)',
-      ['大学', '人数', 'チームの先頭', 'タイム'],
+      '大学ごとの層(種目ごとに、その分を切った人数)',
+      ['大学', for (final int race in _shumoku) '${_mei(race)}(${d.kugiri(race)}分切り)'],
       [
-        for (final MapEntry<int, int> e in d.sou)
-          () {
-            final SenshuData best = d.l(_road).firstWhere((s) => s.univid == e.key);
-            return [daigakuMei(k.univ[e.key]), '${e.value}', fullMei(best.name), jikanMoji(d.t(best, _road))];
-          }(),
+        for (final int u in jun)
+          [
+            daigakuMei(k.univ[u]),
+            for (final int race in _shumoku) '${d.kugiriKazu(race, u)}',
+          ],
       ],
     );
   }
@@ -1012,10 +1064,10 @@ List<Kiji> ttGakunaiKiji(KijiKankyou k) {
     } else if (race == _kudari) {
       final String ku = d.kukanMoji(KukanTokuchou.yamaKudari);
       if (ku.isNotEmpty) b.write('山下りの区間($ku)を占う種目だ。');
-    } else {
-      final int kugiri = l.where((s) => d.t(s, _road) < d.kugiriFun * 60).length;
-      if (kugiri > 0) b.write('${d.kugiriFun}分を切った部員は$kugiri人。');
     }
+    // その種目の区切り(全大学のタイムから決めた分)を切った部員の人数
+    final int kugiri = l.where((s) => d.t(s, race) < d.kugiri(race) * 60).length;
+    if (kugiri > 0) b.write('${d.kugiri(race)}分を切った部員は$kugiri人。');
     w.danraku(b.toString());
   }
 

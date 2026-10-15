@@ -389,6 +389,24 @@ String koukouProfileMoji(int samusataisei, int hirou, KantokuData kantoku) {
       '${jisseki.isEmpty ? '' : '\n高校時代: ${jisseki.join('、')}'}';
 }
 
+/// 選手画面などに出す出身校の行と高校時代の行を、分けて返す(2.0.1。出身校の行を押して高校名鑑の
+/// その高校のページを開けるようにするため。文は koukouProfileMoji と同じ)。[ban]は名簿の番号。
+/// 表示しない設定のときと、出身校が分からない選手はnull
+({String koukou, String jidai, int ban})? koukouProfileBunkatsu(
+  int samusataisei,
+  int hirou,
+  KantokuData kantoku,
+) {
+  final KoukouJouhou? j = koukouHyoujiJouhou(samusataisei, hirou, kantoku);
+  if (j == null) return null;
+  final List<String> jisseki = koukouJissekiList(j);
+  return (
+    koukou: '出身校: ${koukouMeiKenMoji(j)}',
+    jidai: jisseki.isEmpty ? '' : '高校時代: ${jisseki.join('、')}',
+    ban: j.koukou - 1,
+  );
+}
+
 // ------------------------------------------------------------
 // 計算
 // ------------------------------------------------------------

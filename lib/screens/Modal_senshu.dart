@@ -8,6 +8,7 @@ import 'package:ekiden/senshu_data.dart';
 import 'package:ekiden/kansuu/shushou.dart' show shushouShirushi; // 主将の印(2.0.1)
 import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/kansuu/koukou.dart'; // 出身校と高校時代の実績(1.9.5)
+import 'package:ekiden/screens/koukou_profile.dart'; // 出身校を押すと高校名鑑のその高校のページを開く(2.0.1)
 import 'package:ekiden/kansuu/time_date.dart';
 import 'package:ekiden/screens/Modal_editSenshu.dart';
 import 'package:ekiden/screens/Modal_nameedit.dart';
@@ -374,15 +375,8 @@ class _ModalSenshuDetailViewState extends State<ModalSenshuDetailView> {
                 }
               }
             }
-            // 出身校と高校時代の実績(1.9.5。koukou.dart。表示しない設定のときと留学生は空)
-            final String koukouStr = koukouProfileMoji(
-              currentSenshu.samusataisei,
-              currentSenshu.hirou,
-              kantoku,
-            );
-            if (koukouStr.isNotEmpty) {
-              shumi_str = shumi_str.isEmpty ? koukouStr : '$shumi_str\n$koukouStr';
-            }
+            // 出身校と高校時代の実績(1.9.5。koukou.dart。表示しない設定のときと留学生は出ない)は、
+            // 2.0.1から出身校の行を押せるように、下の ShusshinKoukouBun で出身地・趣味の文の下に出す
             final String menuName = TrainingMenu.getMenuString(
               currentSenshu.kaifukuryoku,
             );
@@ -637,12 +631,12 @@ class _ModalSenshuDetailViewState extends State<ModalSenshuDetailView> {
                             ),
                           ),
                           const SizedBox(height: 8),
-                          Text(
-                            shumi_str,
-                            style: const TextStyle(
-                              color: Colors.white, // 白色に変更
-                              fontSize: HENSUU.fontsize_honbun,
-                            ),
+                          // 出身地・趣味と、出身校・高校時代(出身校を押すと高校名鑑のその高校のページを開く。2.0.1)
+                          ShusshinKoukouBun(
+                            shumi: shumi_str,
+                            samusataisei: currentSenshu.samusataisei,
+                            hirou: currentSenshu.hirou,
+                            kantoku: kantoku,
                           ),
                           const SizedBox(height: 8),
                           // 入学時5000m記録

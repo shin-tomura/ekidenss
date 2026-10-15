@@ -4,6 +4,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ekiden/ghensuu.dart'; // Ghensuuクラスをインポート
 import 'package:ekiden/kantoku_data.dart'; //
 import 'package:ekiden/kansuu/koukou.dart'; // 出身校と高校時代の実績(1.9.5)
+import 'package:ekiden/screens/koukou_profile.dart'; // 出身校を押すと高校名鑑のその高校のページを開く(2.0.1)
 import 'package:ekiden/univ_data.dart'; // UnivDataクラスをインポート
 import 'package:ekiden/constants.dart'; // TEISUUクラスをインポート (DEFAULTTIME, DEFAULTJUNIなど)
 import 'package:ekiden/kansuu/time_date.dart';
@@ -572,15 +573,8 @@ class _Senshu_R_ScreenState extends State<Senshu_R_Screen> {
                 }
               }
             }
-            // 出身校と高校時代の実績(1.9.5。koukou.dart。表示しない設定のときと留学生は空)
-            final String koukouStr = koukouProfileMoji(
-              currentSenshu.samusataisei,
-              currentSenshu.hirou,
-              kantoku,
-            );
-            if (koukouStr.isNotEmpty) {
-              shumi_str = shumi_str.isEmpty ? koukouStr : '$shumi_str\n$koukouStr';
-            }
+            // 出身校と高校時代の実績(1.9.5。koukou.dart。表示しない設定のときと留学生は出ない)は、
+            // 2.0.1から出身校の行を押せるように、下の ShusshinKoukouBun で出身地・趣味の文の下に出す
             // 提示されたコードに基づき、表示用の基本走力(aInt)を計算
             int newbint = 1550;
             int b_int = (currentSenshu.b * 10000.0).toInt();
@@ -791,12 +785,12 @@ class _Senshu_R_ScreenState extends State<Senshu_R_Screen> {
                       padding: const EdgeInsets.symmetric(horizontal: 16.0),
                       children: [
                         // ******* ここから下のListView内のコンテンツはSenshuScreenのものをそのまま使用 *******
-                        Text(
-                          shumi_str,
-                          style: const TextStyle(
-                            color: Colors.white, // 白色に変更
-                            fontSize: HENSUU.fontsize_honbun,
-                          ),
+                        // 出身地・趣味と、出身校・高校時代(出身校を押すと高校名鑑のその高校のページを開く。2.0.1)
+                        ShusshinKoukouBun(
+                          shumi: shumi_str,
+                          samusataisei: currentSenshu.samusataisei,
+                          hirou: currentSenshu.hirou,
+                          kantoku: kantoku,
                         ),
                         const SizedBox(height: 8),
 

@@ -1480,11 +1480,21 @@ Future<List<ComScoutKekka>> comScoutRound({
           .where((k) => chiku == null || chikuBetsu[k.senshu.id] == chiku)
           .toList();
       // 監督の母校の後輩(2.0.1。bokou_pipe.dart): 地区めぐり(声かけ)で、今の地区に母校の後輩がいれば、
-      // 要件を堅実(上位50%)までゆるめて、その中から優先して声をかける
+      // 設定の「コンピュータの声かけ」に合わせて、その中から優先して声をかける
+      //   強い: 要件を堅実(上位50%)までゆるめて必ず
+      //   ふつう(初期値): その大学の性格の要件に入る後輩なら必ず
+      //   弱い: ふつうの条件で、半分の確率で
+      //   しない: 優先しない(ふだんの選び方のまま)
       String riyuu = m.riyuu;
-      if (koekake && chiku != null && pipe.bokou.containsKey(univ.id)) {
-        final int yurumeNinzuu =
-            (mitei.length * _youkenPercent(_seikakuKenjitsu) + 99) ~/ 100;
+      final int koekakeDo = pipe.koekake;
+      if (koekake &&
+          chiku != null &&
+          pipe.bokou.containsKey(univ.id) &&
+          koekakeDo != bokouPipeKoekakeShinai &&
+          (koekakeDo != bokouPipeKoekakeYowai || rnd.nextInt(100) < 50)) {
+        final int yurumeNinzuu = koekakeDo == bokouPipeKoekakeTsuyoi
+            ? (mitei.length * _youkenPercent(_seikakuKenjitsu) + 99) ~/ 100
+            : youkenNinzuu;
         final List<_Kouho> kouhai = mitei
             .take(yurumeNinzuu)
             .where(

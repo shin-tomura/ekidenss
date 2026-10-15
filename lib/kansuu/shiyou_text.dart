@@ -15,7 +15,13 @@ import 'package:ekiden/kansuu/seichou_type.dart'; // 成長タイプ設定(1.9.3
 import 'package:ekiden/kansuu/kyouka_project.dart'
     show kyoukaNashi, kyoukaJibunEraberu; // 強化プロジェクト(2.0.1)
 import 'package:ekiden/kansuu/bokou_pipe.dart'
-    show bokouPipeNashi, bokouPipeJibunKiku; // 監督の母校パイプ(2.0.1)
+    show
+        bokouPipeNashi,
+        bokouPipeJibunKiku,
+        bokouPipeKoekakeCode,
+        bokouPipeKoekakeShinai,
+        bokouPipeKoekakeYowai,
+        bokouPipeKoekakeTsuyoi; // 監督の母校パイプ(2.0.1)
 import 'package:ekiden/kansuu/joukai.dart'
     show genkaitoppaOkorikataSettei, genkaitoppaOkorikataType; // 限界突破の起こり方(2.0.0)
 import 'package:ekiden/kansuu/ToujituHenkou_com.dart'
@@ -638,7 +644,17 @@ List<String> _bokouPipeGyou(bool setsumeisho) {
   return [
     '・コンピュータスカウトがONのときは、大学の監督(OB)の母校の新入生が、その大学を選びやすくなります。',
     '　・争奪戦・交渉の成功率・最後に自ら進学先を選ぶときに、名声の高い大学と同じくらいに扱われます。',
-    '　・コンピュータの大学は、地区めぐり(声かけ)で、母校の後輩に優先して声をかけます。',
+    // コンピュータの声かけ(設定で変わる)
+    switch (kantoku == null ? 0 : bokouPipeKoekakeCode(kantoku)) {
+      bokouPipeKoekakeShinai =>
+        '　・${_konoData(setsumeisho)}、コンピュータの大学が母校の後輩に優先して声をかけることはありません。',
+      bokouPipeKoekakeYowai =>
+        '　・コンピュータの大学は、地区めぐり(声かけ)で、ふだんの基準に合う母校の後輩に、ときどき優先して声をかけます。',
+      bokouPipeKoekakeTsuyoi =>
+        '　・コンピュータの大学は、地区めぐり(声かけ)で、母校の後輩に優先して声をかけます。',
+      _ =>
+        '　・コンピュータの大学は、地区めぐり(声かけ)で、ふだんの基準に合う母校の後輩に優先して声をかけます。',
+    },
     if (kantoku == null || bokouPipeJibunKiku(kantoku)) ...[
       '　・${_anata(setsumeisho)}の大学の監督の母校の新入生にも効きます。',
       // 進言には年齢の条件がない(senshu_r_screen.dart。自動で選ぶときは、監督は35歳以上。RetireNew.dart)
@@ -685,7 +701,7 @@ ShiyouSetsu shiyouMeisei({bool setsumeisho = false}) {
       '・監督の出身校は、大学画面と高校名鑑で分かります。',
       '・スカウトの画面の選手には「○○大学の監督の母校」と出ます。',
       '・スカウトの画面の絞り込みで、監督の母校の出身の選手だけを出せます。',
-      '・監督の母校の新入生の選ばれやすさと、あなたの大学にも効くかは、設定タブの「監督の母校パイプ設定」で変えられます。',
+      '・監督の母校の新入生の選ばれやすさ・あなたの大学にも効くか・コンピュータの声かけは、設定タブの「監督の母校パイプ設定」で変えられます。',
       // 名声の履歴(1.8.8。Modal_meiseiRireki.dart)
       '・大学画面の「全大学名声一覧」で大学をタップすると、過去10年の名声の内訳を見られます。',
       '・下の参考資料の表は、倍率を変えていないとき(初期値)の量です。',

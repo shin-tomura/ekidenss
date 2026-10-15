@@ -22,12 +22,16 @@ import 'package:ekiden/kansuu/koukou.dart' show KoukouJouhou;
 // ・効き目(その高校の新入生についてだけ。scout_com.dart):
 //   ・争奪戦(声かけは最後の志望と同じ重み、全国一斉・交渉は名声の重み)・最後の志望・交渉の成功率で、
 //     監督の大学を「名声N位並み」として扱う(もとの重みや名声のほうが大きければ、そのまま)
-//   ・コンピュータの大学は、地区めぐり(声かけ)で今の地区に母校の後輩がいれば、要件を堅実(上位50%)まで
-//     ゆるめて、優先して声をかける(ラウンドの結果の理由に「監督の母校の後輩」と出す)
+//   ・コンピュータの大学は、地区めぐり(声かけ)で今の地区に母校の後輩がいれば、優先して声をかける
+//     (ラウンドの結果の理由に「監督の母校の後輩」と出す)。どれくらい優先するかは設定の「コンピュータの声かけ」:
+//     強い=要件を堅実(上位50%)までゆるめて必ず、ふつう(初期値)=その大学の性格の要件に入る後輩なら必ず、
+//     弱い=ふつうの条件で半分の確率、しない=優先しない(ふだんの選び方のまま)。
+//     初めは強い(決め打ち)で作ったが、名声1位の大学が中くらいの後輩に声かけを使ったり、同じ高校出身の監督の
+//     大学どうしがそろって声をかけて潰し合ったりしやすいので、ふつうを初期値にした
 //   ・変わり者(名声をあまり気にしない新入生)の争奪戦は、今まで通り等しい確率
 //   ・地区めぐり(交渉)の成功率の下限には入れない(設定で選べない形なので)
 // ・設定(説明画面の設定タブの「監督の母校パイプ設定」): なし・名声5位並み・名声3位並み・名声1位並み(初期値)と、
-//   自分の大学にも効くか(効く(初期値)・効かない)
+//   自分の大学にも効くか(効く(初期値)・効かない)と、コンピュータの声かけ(しない・弱い・ふつう(初期値)・強い)
 // ・画面: スカウトの画面の選手のカードに「○○大学の監督の母校」(高校の情報を表示しない設定のときと、
 //   なし・OFFのときは出さない)、大学画面の監督の行の下に監督の出身校、高校名鑑の高校のページに
 //   その高校出身の監督。4月5日の「期待のルーキー」(kiji_shinnyuusei.dart)に、監督の母校から入った新入生の段落
@@ -35,6 +39,7 @@ import 'package:ekiden/kansuu/koukou.dart' show KoukouJouhou;
 //   出身校だけを付ける(koukou.dart の koukouObFuyo。高校時代の実績は付けない)
 // ・保存(KantokuData.yobiint3[84]): 強さのコード(0=名声1位並み(初期値)・1=なし・2=名声5位並み・3=名声3位並み)
 //   + 10×自分の大学に効かないか(0=効く(初期値)・1=効かない)
+//   + 100×コンピュータの声かけのコード(0=ふつう(初期値)・1=しない・2=弱い・3=強い)
 // ------------------------------------------------------------
 
 /// KantokuData.yobiint3 の使用番号: 監督の母校パイプの強さ
@@ -52,12 +57,28 @@ const List<int> bokouPipeNarabi = [1, 2, 3, 0];
 /// 強さのコード: なし
 const int bokouPipeNashiCode = 1;
 
+/// コンピュータの声かけの名前(コード0〜3。0が初期値)
+const List<String> bokouPipeKoekakeMei = ['ふつう', 'しない', '弱い', '強い'];
+
+/// コンピュータの声かけのコードを画面に並べる順(しない・弱い・ふつう・強い)
+const List<int> bokouPipeKoekakeNarabi = [1, 2, 0, 3];
+
+/// コンピュータの声かけのコード
+const int bokouPipeKoekakeFutsuu = 0; // その大学の性格の要件に入る後輩なら必ず優先(初期値)
+const int bokouPipeKoekakeShinai = 1; // 優先しない
+const int bokouPipeKoekakeYowai = 2; // ふつうの条件で、半分の確率で優先
+const int bokouPipeKoekakeTsuyoi = 3; // 要件を堅実(上位50%)までゆるめて必ず優先
+
 int _setteiAtai(KantokuData k) =>
     k.yobiint3.length > bokouPipeSetteiIndex ? k.yobiint3[bokouPipeSetteiIndex] : 0;
 
 /// 設定の値が正しいか(QRコードの読み込みで使う)
 bool bokouPipeSetteiTadashii(int atai) =>
-    atai >= 0 && atai < 20 && atai % 10 < _pipeJuni.length;
+    atai >= 0 &&
+    atai < 400 &&
+    atai % 10 < _pipeJuni.length &&
+    (atai ~/ 10) % 10 <= 1 &&
+    atai ~/ 100 < bokouPipeKoekakeMei.length;
 
 /// 設定の値(正しくない値は0。QRコードの書き出しで使う)
 int bokouPipeSetteiAtai(KantokuData k) {
@@ -69,11 +90,19 @@ int bokouPipeSetteiAtai(KantokuData k) {
 int bokouPipeCode(KantokuData k) => bokouPipeSetteiAtai(k) % 10;
 
 /// 自分の大学にも効く設定か(初期値は効く)
-bool bokouPipeJibunKiku(KantokuData k) => bokouPipeSetteiAtai(k) ~/ 10 == 0;
+bool bokouPipeJibunKiku(KantokuData k) => (bokouPipeSetteiAtai(k) ~/ 10) % 10 == 0;
+
+/// コンピュータの声かけのコード(bokouPipeKoekake〜。初期値はふつう)
+int bokouPipeKoekakeCode(KantokuData k) => bokouPipeSetteiAtai(k) ~/ 100;
 
 /// 設定を入れる(保存は呼び出し側で行う)
-void bokouPipeSetteiIreru(KantokuData k, int code, bool jibunKiku) {
-  bokouPipeSetteiAtaiIreru(k, code + (jibunKiku ? 0 : 10));
+void bokouPipeSetteiIreru(
+  KantokuData k,
+  int code,
+  bool jibunKiku,
+  int koekake,
+) {
+  bokouPipeSetteiAtaiIreru(k, code + (jibunKiku ? 0 : 10) + 100 * koekake);
 }
 
 /// 設定の値をそのまま入れる(保存は呼び出し側で行う。QRコードの読み込みでも使う)
@@ -158,7 +187,10 @@ class BokouPipe {
   /// 監督の大学を、名声何位並みとして扱うか(0は効かない)
   final int juni;
 
-  const BokouPipe(this.bokou, this.juni);
+  /// コンピュータの声かけのコード(bokouPipeKoekake〜)
+  final int koekake;
+
+  const BokouPipe(this.bokou, this.juni, {this.koekake = bokouPipeKoekakeFutsuu});
 
   /// 効かないもの
   static const BokouPipe nashi = BokouPipe({}, 0);
@@ -170,7 +202,7 @@ class BokouPipe {
     final Map<int, int> m = bokouPipeBokou(k);
     if (!bokouPipeJibunKiku(k)) m.remove(myUnivid);
     if (m.isEmpty) return nashi;
-    return BokouPipe(m, bokouPipeJuni(k));
+    return BokouPipe(m, bokouPipeJuni(k), koekake: bokouPipeKoekakeCode(k));
   }
 
   /// 効かないか

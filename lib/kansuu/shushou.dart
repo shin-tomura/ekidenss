@@ -27,7 +27,8 @@ import 'package:ekiden/kansuu/mokuhyou_hosei.dart' show HoseiTsuyosa;
 //   ロード1万の自己ベストが一番速い選手。記録がなければハーフ→1万→5000m→入学時の5000mの順で比べる
 //   (前の種目の記録がある選手が上)。条件に合う選手がいなければ、留学生を除く3・4年生、
 //   それもいなければ3・4年生全員から同じ順で選ぶ
-// ・あなたの大学は、選手画面で3・4年生を主将にできる(9月の終わりまで。10月からは年度の終わりまで代えられない)
+// ・あなたの大学は、選手画面で3・4年生を主将にできる(9月下旬まで。10月からは年度の終わりまで代えられない)
+//   4月上旬の最新画面の「新入生が入りました！」の下に、決まった主将を出す(shushouKetteiBun)
 // ・主将の特典があるとき(目標順位による補正が両方0%のときは除く)は、コンピュータの区間配置で主将を
 //   特典が生きない区間(1区と、正月駅伝の6区。shushouSakeruKukan)に置かない
 //   (kukan_haichi.dart・EntryCalc.dart の最適解区間配置・ToujituHenkou_com.dart・
@@ -363,6 +364,19 @@ Future<void> shushouJunbi({Ghensuu? gh}) async {
   if (g.mode == 2000) return;
   if (shushouKimatteiru(k, choukiNendo(g))) return;
   await shushouKimeru(gh: g);
+}
+
+/// 4月上旬の最新画面に出す、あなたの大学の主将が決まったことの文(主将がいなければ空。mode0100_content.dart)
+String shushouKetteiBun(KantokuData? k, Ghensuu gh) {
+  final Iterable<SenshuData> senshu = Hive.box<SenshuData>('senshuBox').values;
+  final int? id = shushouIdUniv(k, gh, senshu, gh.MYunivid);
+  if (id == null) return '';
+  for (final SenshuData s in senshu) {
+    if (s.id == id) {
+      return '主将は${s.name}(${s.gakunen}年)に決まりました。9月下旬までは、選手画面で代えられます。';
+    }
+  }
+  return '';
 }
 
 /// あなたの大学の選手[s]を主将にする(代えられない時期や、3・4年生でなければfalse)

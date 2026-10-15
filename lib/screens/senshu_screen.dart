@@ -2462,7 +2462,7 @@ class _SenshuScreenState extends State<SenshuScreen> {
                                 ghensuu.silverballsuu >= 10) &&
                             currentSenshu.hirou != 1)
                           _tokkunButtons(ghensuu),
-                        // 主将(2.0.1。shushou.dart)。あなたの大学の3・4年生は、9月まで主将にできる
+                        // 主将(2.0.1。shushou.dart)。あなたの大学の3・4年生は、9月下旬まで主将にできる
                         _shushouBubun(ghensuu, currentSenshu, hokaUnivid == null),
 
                         const SizedBox(height: 16),
@@ -2931,7 +2931,7 @@ class _SenshuScreenState extends State<SenshuScreen> {
     final String shushouMoji = !jibun
         ? 'この選手は主将です。'
         : (shushouHenkouDekiru(ghensuu)
-              ? 'この選手は主将です。9月の終わりまでは、ほかの3・4年生の選手画面から代えられます。'
+              ? 'この選手は主将です。9月下旬までは、ほかの3・4年生の選手画面から代えられます。'
               : 'この選手は主将です。10月からは、年度の終わりまで代えられません。');
     return Padding(
       padding: const EdgeInsets.only(top: 12),
@@ -2991,7 +2991,7 @@ class _SenshuScreenState extends State<SenshuScreen> {
           child: Text(
             '${s.name}選手を主将にしますか？\n'
             '$tokuten'
-            '9月の終わりまでは、ほかの3・4年生に代えられます。',
+            '9月下旬までは、ほかの3・4年生に代えられます。',
             style: const TextStyle(color: Colors.black),
           ),
         ),

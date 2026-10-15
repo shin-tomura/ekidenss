@@ -1198,6 +1198,7 @@ class _Senshu_R_ScreenState extends State<Senshu_R_Screen> {
                               String yakushoku_str = "";
                               int kantokuid = 0;
                               bool okflag = true;
+                              int genzaiSeki = -1; // すでにいる席(2.0.1)
                               // Hive.box() を使って、既に開いているBoxを取得
                               final kantokuBox = Hive.box<KantokuData>(
                                 'kantokuBox',
@@ -1209,6 +1210,7 @@ class _Senshu_R_ScreenState extends State<Senshu_R_Screen> {
                               for (int i = 0; i < TEISUU.UNIVSUU; i++) {
                                 if (currentSenshu.id == kantoku.rid[i]) {
                                   okflag = false;
+                                  genzaiSeki = i;
 
                                   yakushoku_str = "監督";
 
@@ -1225,14 +1227,12 @@ class _Senshu_R_ScreenState extends State<Senshu_R_Screen> {
                                   kantokuid,
                                 );
                               } else {
-                                // 3. 条件が成就していない場合の処理（オプション）：
-                                //    例えば、削除できない理由をユーザーに伝えるSnackBarを表示するなど
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      'この人物は、現在、すでに${yakushoku_str}をしています。',
-                                    ),
-                                  ),
+                                // すでにその席にいるときは、続投の進言か、人選を大学に任せる(2.0.1。
+                                // それまでは「この人物は、現在、すでに${yakushoku_str}をしています。」と出すだけだった)
+                                _zokutouKakunin(
+                                  context,
+                                  currentSenshu,
+                                  genzaiSeki,
                                 );
                               }
                             },
@@ -1253,8 +1253,9 @@ class _Senshu_R_ScreenState extends State<Senshu_R_Screen> {
                                 const SizedBox(width: 8),
                                 // 修正: TextウィジェットをExpandedでラップし、残りの幅をすべて与える
                                 Expanded(
-                                  child: const Text(
-                                    'この人物が監督に就任するよう進言',
+                                  child: Text(
+                                    // すでにその席にいれば「続けるよう進言」か「人選を大学に任せる」(2.0.1)
+                                    _shuuninBotanMoji(currentSenshu, 0),
                                     textAlign: TextAlign.center, // ★ 中央寄せ
                                     softWrap:
                                         true, // ★ 折り返しを有効にする（デフォルトで有効なことが多いですが明示的に）
@@ -1275,6 +1276,7 @@ class _Senshu_R_ScreenState extends State<Senshu_R_Screen> {
                               String yakushoku_str = "";
                               int kantokuid = 0;
                               bool okflag = true;
+                              int genzaiSeki = -1; // すでにいる席(2.0.1)
                               // Hive.box() を使って、既に開いているBoxを取得
                               final kantokuBox = Hive.box<KantokuData>(
                                 'kantokuBox',
@@ -1290,6 +1292,7 @@ class _Senshu_R_ScreenState extends State<Senshu_R_Screen> {
                               ) {
                                 if (currentSenshu.id == kantoku.rid[i]) {
                                   okflag = false;
+                                  genzaiSeki = i;
 
                                   yakushoku_str = "コーチ(トラック)";
 
@@ -1307,14 +1310,12 @@ class _Senshu_R_ScreenState extends State<Senshu_R_Screen> {
                                   kantokuid,
                                 );
                               } else {
-                                // 3. 条件が成就していない場合の処理（オプション）：
-                                //    例えば、削除できない理由をユーザーに伝えるSnackBarを表示するなど
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      'この人物は、現在、すでに${yakushoku_str}をしています。',
-                                    ),
-                                  ),
+                                // すでにその席にいるときは、続投の進言か、人選を大学に任せる(2.0.1。
+                                // それまでは「この人物は、現在、すでに${yakushoku_str}をしています。」と出すだけだった)
+                                _zokutouKakunin(
+                                  context,
+                                  currentSenshu,
+                                  genzaiSeki,
                                 );
                               }
                             },
@@ -1335,8 +1336,9 @@ class _Senshu_R_ScreenState extends State<Senshu_R_Screen> {
                                 const SizedBox(width: 8),
                                 // 修正: TextウィジェットをExpandedでラップし、残りの幅をすべて与える
                                 Expanded(
-                                  child: const Text(
-                                    'この人物がコーチ(トラック)に就任するよう進言',
+                                  child: Text(
+                                    // すでにその席にいれば「続けるよう進言」か「人選を大学に任せる」(2.0.1)
+                                    _shuuninBotanMoji(currentSenshu, 1),
                                     textAlign: TextAlign.center, // ★ 中央寄せ
                                     softWrap:
                                         true, // ★ 折り返しを有効にする（デフォルトで有効なことが多いですが明示的に）
@@ -1357,6 +1359,7 @@ class _Senshu_R_ScreenState extends State<Senshu_R_Screen> {
                               String yakushoku_str = "";
                               int kantokuid = 0;
                               bool okflag = true;
+                              int genzaiSeki = -1; // すでにいる席(2.0.1)
                               // Hive.box() を使って、既に開いているBoxを取得
                               final kantokuBox = Hive.box<KantokuData>(
                                 'kantokuBox',
@@ -1372,6 +1375,7 @@ class _Senshu_R_ScreenState extends State<Senshu_R_Screen> {
                               ) {
                                 if (currentSenshu.id == kantoku.rid[i]) {
                                   okflag = false;
+                                  genzaiSeki = i;
 
                                   yakushoku_str = "監督(長距離)";
 
@@ -1389,14 +1393,12 @@ class _Senshu_R_ScreenState extends State<Senshu_R_Screen> {
                                   kantokuid,
                                 );
                               } else {
-                                // 3. 条件が成就していない場合の処理（オプション）：
-                                //    例えば、削除できない理由をユーザーに伝えるSnackBarを表示するなど
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      'この人物は、現在、すでに${yakushoku_str}をしています。',
-                                    ),
-                                  ),
+                                // すでにその席にいるときは、続投の進言か、人選を大学に任せる(2.0.1。
+                                // それまでは「この人物は、現在、すでに${yakushoku_str}をしています。」と出すだけだった)
+                                _zokutouKakunin(
+                                  context,
+                                  currentSenshu,
+                                  genzaiSeki,
                                 );
                               }
                             },
@@ -1417,8 +1419,9 @@ class _Senshu_R_ScreenState extends State<Senshu_R_Screen> {
                                 const SizedBox(width: 8),
                                 // 修正: TextウィジェットをExpandedでラップし、残りの幅をすべて与える
                                 Expanded(
-                                  child: const Text(
-                                    'この人物がコーチ(長距離)に就任するよう進言',
+                                  child: Text(
+                                    // すでにその席にいれば「続けるよう進言」か「人選を大学に任せる」(2.0.1)
+                                    _shuuninBotanMoji(currentSenshu, 2),
                                     textAlign: TextAlign.center, // ★ 中央寄せ
                                     softWrap:
                                         true, // ★ 折り返しを有効にする（デフォルトで有効なことが多いですが明示的に）
@@ -1943,41 +1946,165 @@ class _Senshu_R_ScreenState extends State<Senshu_R_Screen> {
     }
   }
 
+  // ------------------------------------------------------------
+  // 監督・コーチの進言(2.0.1)
+  // ・自動で決まって今その席にいる人には「続けるよう進言」(印を付ける)、
+  //   進言で決めた人には「人選を大学に任せる」(印を外す。今年度はそのまま、次の4月から選び直し)
+  // ・就任・退任・続投・任せるの4つとも、確認の窓で何が起きるかを説明する
+  // ・印は KantokuData.yobiint0(席ごと。1なら進言で決めた席。RetireNew.dart の年度替わりで選び直さず、
+  //   年齢による退任もしない)
+  // ------------------------------------------------------------
+
+  /// 席の番号(KantokuData.rid の添字)の役職名
+  String _sekiMei(int seki) {
+    if (seki < TEISUU.UNIVSUU) return "監督";
+    if (seki < TEISUU.UNIVSUU * 2) return "コーチ(トラック)";
+    return "コーチ(長距離)";
+  }
+
+  /// OBの今の年齢(大学画面と同じ数え方)
+  int _nenrei(Senshu_R_Data s) {
+    final Ghensuu ghensuu = _ghensuuBox.get(
+      'global_ghensuu',
+      defaultValue: Ghensuu.initial(),
+    )!;
+    return ghensuu.year - s.sijiflag + 22;
+  }
+
+  /// この人物がいる[shurui]の席(0監督・1コーチ(トラック)・2コーチ(長距離))の番号。いなければ-1
+  int _genzaiSeki(KantokuData k, Senshu_R_Data s, int shurui) {
+    for (
+      int i = TEISUU.UNIVSUU * shurui;
+      i < TEISUU.UNIVSUU * (shurui + 1) && i < k.rid.length;
+      i++
+    ) {
+      if (k.rid[i] == s.id) return i;
+    }
+    return -1;
+  }
+
+  /// 就任の進言のボタンの文。すでにその席にいれば「続けるよう進言」か「人選を大学に任せる」
+  String _shuuninBotanMoji(Senshu_R_Data s, int shurui) {
+    final String mei = _sekiMei(TEISUU.UNIVSUU * shurui);
+    final KantokuData? k = Hive.box<KantokuData>(
+      'kantokuBox',
+    ).get('KantokuData');
+    if (k == null) return 'この人物が${mei}に就任するよう進言';
+    final int seki = _genzaiSeki(k, s, shurui);
+    if (seki < 0) return 'この人物が${mei}に就任するよう進言';
+    if (seki < k.yobiint0.length && k.yobiint0[seki] == 1) {
+      return '${mei}の人選を大学に任せる';
+    }
+    return 'この人物が${mei}を続けるよう進言';
+  }
+
+  /// 説明つきの確認の窓(押したのが決定ならtrue)
+  Future<bool?> _setsumeiKakunin(
+    BuildContext context, {
+    required String title,
+    required List<String> gyou,
+    String kettei = '進言する',
+    Color ketteiIro = Colors.black,
+  }) {
+    return showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(title, style: const TextStyle(color: Colors.black)),
+          content: SingleChildScrollView(
+            child: Text(
+              gyou.join('\n'),
+              style: const TextStyle(color: Colors.black),
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('キャンセル'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text(kettei, style: TextStyle(color: ketteiIro)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  /// すでに席[seki]にいる人物の、続投の進言か、人選を大学に任せるの確認と実行
+  Future<void> _zokutouKakunin(
+    BuildContext context,
+    Senshu_R_Data senshu,
+    int seki,
+  ) async {
+    final KantokuData kantoku = Hive.box<KantokuData>(
+      'kantokuBox',
+    ).get('KantokuData')!;
+    if (seki < 0 ||
+        seki >= kantoku.rid.length ||
+        seki >= kantoku.yobiint0.length ||
+        kantoku.rid[seki] != senshu.id) {
+      return;
+    }
+    final String str = _sekiMei(seki);
+    final bool shingenZumi = kantoku.yobiint0[seki] == 1;
+    final int nenrei = _nenrei(senshu);
+    final bool? ok = await _setsumeiKakunin(
+      context,
+      title: shingenZumi ? '${str}の人選を大学に任せる' : '${str}の続投の進言',
+      gyou: shingenZumi
+          ? [
+              '・${senshu.name}(${nenrei}歳)は、今年度はそのまま${str}を続けます。',
+              '・次の4月の年度替わりで、条件に合うOBから選び直されます。同じ人が選ばれることもあります。',
+              '・ふだんは、監督は35歳以上、コーチは30歳以上のOBから選ばれます。',
+              '・年齢が高いと、年度替わりで退任することがあります。',
+            ]
+          : [
+              '・${senshu.name}(${nenrei}歳)は、自動で選ばれて${str}をしています。',
+              '・進言すると、来年度からも${str}を続けます。年度替わりでも代わらず、年齢による退任もありません。',
+              '・あとで「人選を大学に任せる」で、自動の選び方に戻せます。',
+            ],
+      kettei: shingenZumi ? '任せる' : '進言する',
+    );
+    if (ok != true) return;
+    final Ghensuu ghensuu = _ghensuuBox.get(
+      'global_ghensuu',
+      defaultValue: Ghensuu.initial(),
+    )!;
+    final List<UnivData> sortedUnivData = _univBox.values.toList()
+      ..sort((a, b) => a.id.compareTo(b.id));
+    final String univMei =
+        senshu.univid >= 0 && senshu.univid < sortedUnivData.length
+        ? sortedUnivData[senshu.univid].name
+        : '';
+    kantoku.yobiint0[seki] = shingenZumi ? 0 : 1;
+    await kantoku.save();
+    senshu.string_racesetumei += shingenZumi
+        ? "${ghensuu.year}年${ghensuu.month}月 ${univMei}大学${str}の人選を総監督が大学に任せた(次の4月から選び直し)\n"
+        : "${ghensuu.year}年${ghensuu.month}月 ${univMei}大学${str}を総監督からの進言により続投\n";
+    await senshu.save();
+    if (!mounted) return;
+    setState(() {});
+  }
+
   // 解任進言確認ダイアログを表示する関数
   Future<void> _showDeleteConfirmationDialog_kantokukainin(
     BuildContext context,
     Senshu_R_Data senshu,
     int kantokuid,
   ) async {
-    String str = "";
-    if (kantokuid < TEISUU.UNIVSUU) {
-      str = "監督";
-    } else if (kantokuid < TEISUU.UNIVSUU * 2) {
-      str = "コーチ(トラック)";
-    } else {
-      str = "コーチ(長距離)";
-    }
-    final bool? confirmed = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('退任進言確認', style: TextStyle(color: Colors.black)),
-          content: Text(
-            '${senshu.name} が ${str} を退任するよう進言しますか？',
-            style: const TextStyle(color: Colors.black),
-          ),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false), // キャンセル
-              child: const Text('キャンセル'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(true), // 削除実行
-              child: const Text('進言する', style: TextStyle(color: Colors.red)),
-            ),
-          ],
-        );
-      },
+    final String str = _sekiMei(kantokuid);
+    // 確認の窓で、何が起きるかを説明する(2.0.1)
+    final bool? confirmed = await _setsumeiKakunin(
+      context,
+      title: '${str}の退任の進言',
+      gyou: [
+        '・${senshu.name}(${_nenrei(senshu)}歳)が${str}を退任します。',
+        '・${str}は次の4月の年度替わりまで不在になり、そのとき条件に合うOBから選ばれます。',
+        '・すぐに別の人に代えたいときは、退任の進言ではなく、その人の画面から就任を進言してください。今の${str}は自動で退任します。',
+      ],
+      ketteiIro: Colors.red,
     );
     if (confirmed == true) {
       // ユーザーが「進言する」を選択した場合
@@ -2007,35 +2134,43 @@ class _Senshu_R_ScreenState extends State<Senshu_R_Screen> {
     Senshu_R_Data senshu,
     int kantokuid,
   ) async {
-    String str = "";
-    if (kantokuid < TEISUU.UNIVSUU) {
-      str = "監督";
-    } else if (kantokuid < TEISUU.UNIVSUU * 2) {
-      str = "コーチ(トラック)";
-    } else {
-      str = "コーチ(長距離)";
+    final String str = _sekiMei(kantokuid);
+    // 確認の窓で、何が起きるかを説明する(2.0.1)
+    final KantokuData? kd = Hive.box<KantokuData>(
+      'kantokuBox',
+    ).get('KantokuData');
+    // 今その席にいる人(退任する人)と、この人物が今いるほかの席
+    String imaNoHito = '';
+    final List<String> hokaNoSeki = [];
+    if (kd != null) {
+      final int imaId = kantokuid < kd.rid.length ? kd.rid[kantokuid] : 0;
+      if (imaId > 0 && imaId != senshu.id) {
+        for (final Senshu_R_Data r in Hive.box<Senshu_R_Data>(
+          'retiredSenshuBox',
+        ).values) {
+          if (r.id == imaId) {
+            imaNoHito = r.name;
+            break;
+          }
+        }
+      }
+      for (int i = 0; i < TEISUU.UNIVSUU * 3 && i < kd.rid.length; i++) {
+        if (i != kantokuid && kd.rid[i] == senshu.id) {
+          hokaNoSeki.add(_sekiMei(i));
+        }
+      }
     }
-    final bool? confirmed = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('就任進言確認', style: TextStyle(color: Colors.black)),
-          content: Text(
-            '${str} に ${senshu.name} が就任するよう進言しますか？',
-            style: const TextStyle(color: Colors.black),
-          ),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false), // キャンセル
-              child: const Text('キャンセル'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(true), // 削除実行
-              child: const Text('進言する', style: TextStyle(color: Colors.black)),
-            ),
-          ],
-        );
-      },
+    final bool? confirmed = await _setsumeiKakunin(
+      context,
+      title: '${str}の就任の進言',
+      gyou: [
+        '・${senshu.name}(${_nenrei(senshu)}歳)が${str}に就任します。',
+        if (imaNoHito.isNotEmpty) '・今の${str}の${imaNoHito}は退任します。',
+        for (final String h in hokaNoSeki)
+          '・この人物が今している${h}の席は、次の4月まで空きます。',
+        '・進言で決めた席は、年度替わりでも代わらず、年齢による退任もありません。',
+        '・あとで「人選を大学に任せる」か、退任の進言で代えられます。',
+      ],
     );
     if (confirmed == true) {
       // ユーザーが「進言する」を選択した場合

@@ -3823,7 +3823,7 @@ class _UnivScreenState extends State<UnivScreen> {
                               });
                             },
                             child: Text(
-                              "監督: ${name_kantoku0} (${age_kantoku0}歳)",
+                              "監督: ${name_kantoku0} (${age_kantoku0}歳${_shingenShirushi(kantoku, ghensuu, ghensuu.hyojiunivnum)})",
                               style: TextStyle(
                                 color: HENSUU.LinkColor,
                                 //decoration: TextDecoration.underline,
@@ -3909,7 +3909,7 @@ class _UnivScreenState extends State<UnivScreen> {
                               });
                             },
                             child: Text(
-                              "コーチ(トラック): ${name_kantoku1} (${age_kantoku1}歳)",
+                              "コーチ(トラック): ${name_kantoku1} (${age_kantoku1}歳${_shingenShirushi(kantoku, ghensuu, ghensuu.hyojiunivnum + TEISUU.UNIVSUU)})",
                               style: TextStyle(
                                 color: HENSUU.LinkColor,
                                 //decoration: TextDecoration.underline,
@@ -3955,7 +3955,7 @@ class _UnivScreenState extends State<UnivScreen> {
                               });
                             },
                             child: Text(
-                              "コーチ(長距離): ${name_kantoku2} (${age_kantoku2}歳)",
+                              "コーチ(長距離): ${name_kantoku2} (${age_kantoku2}歳${_shingenShirushi(kantoku, ghensuu, ghensuu.hyojiunivnum + TEISUU.UNIVSUU * 2)})",
                               style: TextStyle(
                                 color: HENSUU.LinkColor,
                                 //decoration: TextDecoration.underline,
@@ -4763,6 +4763,14 @@ class _UnivScreenState extends State<UnivScreen> {
       ),
     );
   }
+}
+
+/// 監督・コーチの席[seki](KantokuData.rid の添字)が、あなたの大学の進言で決めた席なら「・進言」(2.0.1)
+/// (進言の印は KantokuData.yobiint0。年度替わりでも代わらない席。ほかの大学には印の仕組みがないので出さない)
+String _shingenShirushi(KantokuData kantoku, Ghensuu gh, int seki) {
+  if (gh.hyojiunivnum != gh.MYunivid) return '';
+  if (seki < 0 || seki >= kantoku.yobiint0.length) return '';
+  return kantoku.yobiint0[seki] == 1 ? '・進言' : '';
 }
 
 /// 大学[univid]の主将の文(「主将: ○○(4年)」。いなければ空。2.0.1。shushou.dart)

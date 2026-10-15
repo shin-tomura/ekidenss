@@ -564,10 +564,11 @@ class _Tt {
           '最終日のロード10kmは、駅伝の舞台と同じロードの平坦なコースで行われた。',
         ]));
     }
-    // 好タイムの選手
+    // 好タイムの選手(名前は候補を並べる前に1度だけ作る。候補ごとに呼ぶと、2つ目の候補が名字だけになるため。2.0.2)
+    final String ys = yobu(s);
     b.write(w.erabu([
-      '目を引いたのは${yobu(s)}の${jikanMoji(d.t(s, race))}だ。',
-      'ここで${yobu(s)}が${jikanMoji(d.t(s, race))}をマークした。',
+      '目を引いたのは$ysの${jikanMoji(d.t(s, race))}だ。',
+      'ここで$ysが${jikanMoji(d.t(s, race))}をマークした。',
     ]));
     final String hoka = _narabe(race, race == _road ? 3 : 2, nozoku: {s.id});
     if (hoka.isNotEmpty) b.write('$hokaと好タイムが続いた。');
@@ -748,9 +749,10 @@ class _Tt {
       for (final int race in _nittei) '${_mei(race)}${jikanMoji(d.t(s, race))}',
     ];
     w.koMidashi('4種目そろって');
+    final String ys = yobu(s); // 名前は候補を並べる前に1度だけ作る(2.0.2)
     w.danraku(w.erabu([
-      '4種目そろって好タイムを並べたのが、${yobu(s)}だ。${t.join('、')}と、どの種目でも上位に顔を出した。',
-      '${yobu(s)}は、${t.join('、')}。どの種目でも好タイムを並べた。',
+      '4種目そろって好タイムを並べたのが、$ysだ。${t.join('、')}と、どの種目でも上位に顔を出した。',
+      '$ysは、${t.join('、')}。どの種目でも好タイムを並べた。',
     ]));
     kotoba(s, _ttKotoba);
   }
@@ -761,9 +763,10 @@ class _Tt {
     final StringBuffer b = StringBuffer();
     final ({SenshuData s, int race, int sa}) n = d.nobi.first;
     w.koMidashi('昨夏からの伸び');
+    final String ys = yobu(n.s); // 名前は候補を並べる前に1度だけ作る(2.0.2)
     b.write(w.erabu([
-      '昨夏からの伸びが目立ったのは${yobu(n.s)}。${_mei(n.race)}は${jikanMoji(d.t(n.s, n.race))}で、昨夏から${saMoji(n.sa)}縮めた。',
-      '${yobu(n.s)}は${_mei(n.race)}で${jikanMoji(d.t(n.s, n.race))}。昨夏の記録から${saMoji(n.sa)}縮め、大きく成長した姿を見せた。',
+      '昨夏からの伸びが目立ったのは$ys。${_mei(n.race)}は${jikanMoji(d.t(n.s, n.race))}で、昨夏から${saMoji(n.sa)}縮めた。',
+      '$ysは${_mei(n.race)}で${jikanMoji(d.t(n.s, n.race))}。昨夏の記録から${saMoji(n.sa)}縮め、大きく成長した姿を見せた。',
     ]));
     if (d.nobi.length >= 2) {
       final ({SenshuData s, int race, int sa}) n2 = d.nobi[1];
@@ -779,9 +782,10 @@ class _Tt {
     if (s == null) return;
     final StringBuffer b = StringBuffer();
     w.koMidashi('1年生');
+    final String ys = yobu(s); // 名前は候補を並べる前に1度だけ作る(2.0.2)
     b.write(w.erabu([
-      '1年生では、${yobu(s)}がロード10kmで${jikanMoji(d.t(s, _road))}をマークした。',
-      '初めての夏を迎えた1年生の中で、ロード10kmの${yobu(s)}の${jikanMoji(d.t(s, _road))}が光った。',
+      '1年生では、$ysがロード10kmで${jikanMoji(d.t(s, _road))}をマークした。',
+      '初めての夏を迎えた1年生の中で、ロード10kmの$ysの${jikanMoji(d.t(s, _road))}が光った。',
     ]));
     // 入学時の持ちタイムが世代トップだった1年生(期待のルーキーで取り上げた選手)の今夏
     final SenshuData? top = d.sedaiTop;
@@ -843,9 +847,10 @@ class _Tt {
     final int kugiri = d.sou.where((e) => e.key == u.id).fold<int>(0, (a, e) => a + e.value);
     final StringBuffer b = StringBuffer();
     w.koMidashi(daigakuMei(u));
+    final String yb = yobu(best); // 名前は候補を並べる前に1度だけ作る(2.0.2)
     b.write(w.erabu([
-      '${daigakuMei(u)}は、ロード10kmで${yobu(best)}の${jikanMoji(d.t(best, _road))}がチームの先頭だった。',
-      '${daigakuMei(u)}のロード10kmは、${yobu(best)}が${jikanMoji(d.t(best, _road))}でチームを引っ張った。',
+      '${daigakuMei(u)}は、ロード10kmで$ybの${jikanMoji(d.t(best, _road))}がチームの先頭だった。',
+      '${daigakuMei(u)}のロード10kmは、$ybが${jikanMoji(d.t(best, _road))}でチームを引っ張った。',
     ]));
     b.write(kugiri > 0 ? '${d.kugiriFun}分を切った選手は$kugiri人。' : '${d.kugiriFun}分を切った選手は出なかった。');
     // 登り・下り・クロカンの区切りを切った人数(いた種目だけ)
@@ -1086,9 +1091,10 @@ List<Kiji> ttGakunaiKiji(KijiKankyou k) {
   final ({SenshuData s, int race, int sa})? nb = nobi;
   if (nb != null) {
     w.koMidashi('昨夏からの伸び');
+    final String ys = w.senshu(nb.s); // 名前は候補を並べる前に1度だけ作る(2.0.2)
     w.danraku(w.erabu([
-      '昨夏から一番伸びたのは${w.senshu(nb.s)}。${_mei(nb.race)}で昨夏から${saMoji(nb.sa)}縮めた。',
-      '${w.senshu(nb.s)}は${_mei(nb.race)}で、昨夏の記録から${saMoji(nb.sa)}縮めた。1年間の積み重ねが、タイムに表れた。',
+      '昨夏から一番伸びたのは$ys。${_mei(nb.race)}で昨夏から${saMoji(nb.sa)}縮めた。',
+      '$ysは${_mei(nb.race)}で、昨夏の記録から${saMoji(nb.sa)}縮めた。1年間の積み重ねが、タイムに表れた。',
     ]));
     w.comment('「${w.erabu(_nobiKotoba)}」と${myouji(nb.s.name)}は${w.erabu(_senshuShime)}。');
   }
@@ -1104,9 +1110,10 @@ List<Kiji> ttGakunaiKiji(KijiKankyou k) {
   if (ic != null) {
     final int jj = buin(_road).indexWhere((x) => x.id == ic.id) + 1;
     w.koMidashi('1年生');
+    final String yi = w.senshu(ic); // 名前は候補を並べる前に1度だけ作る(2.0.2)
     w.danraku(w.erabu([
-      '1年生では、${w.senshu(ic)}がロード10kmで${jikanMoji(d.t(ic, _road))}。学内$jj位に入った。',
-      '初めての夏を迎えた1年生の中では、${w.senshu(ic)}のロード10km${jikanMoji(d.t(ic, _road))}(学内$jj位)が光った。',
+      '1年生では、$yiがロード10kmで${jikanMoji(d.t(ic, _road))}。学内$jj位に入った。',
+      '初めての夏を迎えた1年生の中では、$yiのロード10km${jikanMoji(d.t(ic, _road))}(学内$jj位)が光った。',
     ]));
     w.comment('「${w.erabu(_ichinenKotoba)}」と${myouji(ic.name)}は${w.erabu(_senshuShime)}。');
   }

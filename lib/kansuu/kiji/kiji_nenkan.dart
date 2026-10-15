@@ -766,9 +766,10 @@ List<Kiji> gakunaiHyoushouKiji(KijiKankyou k) {
   if (nobi != null) tsukatta.add(nobi.id);
   if (mvp == null && shinjin == null && kourou == null && nobi == null) return [];
 
-  // 見出し・リード
+  // 見出し・リード(見出しの名前は「山田太郎」と書き、本文の名前の出し方には数えない。
+  // 数えると、リードで初めて出す名前が名字だけになるため。2.0.2)
   final String midashi = mvp != null
-      ? w.erabu(['$nendo 学内表彰　MVPは${w.senshu(mvp.s)}', '陸上競技部の$nendo　学内MVPに${w.senshu(mvp.s)}'])
+      ? w.erabu(['$nendo 学内表彰　MVPは${fullMei(mvp.s.name)}', '陸上競技部の$nendo　学内MVPに${fullMei(mvp.s.name)}'])
       : '陸上競技部の$nendo　学内表彰';
   final StringBuffer lead = StringBuffer();
   lead.write('陸上競技部の$nendoを締めくくる学内表彰を、編集部が選んだ。');

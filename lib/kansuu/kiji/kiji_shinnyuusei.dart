@@ -1011,9 +1011,11 @@ extension _RookieDanraku on _Rookie {
     final ({_Shin x, int juni})? jt = nihonjinTop;
     if (w5 != null && !w5.ryuugakusei) {
       final String u = d.univMei(w5);
+      // 名前は候補を並べる前に1度だけ作る(候補ごとに呼ぶと、2つ目の候補が名字だけになるため。2.0.2)
+      final String y5 = yobu(w5);
       b.write(w.erabu([
-        '昨夏の高校総体5000mを制したのは、${yobu(w5)}だった。この春、$uに進んだ。',
-        '${yobu(w5)}は昨夏、高校総体5000mで優勝し、$uに進んだ。',
+        '昨夏の高校総体5000mを制したのは、$y5だった。この春、$uに進んだ。',
+        '$y5は昨夏、高校総体5000mで優勝し、$uに進んだ。',
       ]));
       if (f5.isNotEmpty) b.write('優勝タイムは${jikanMoji(f5.first.time)}。');
       if (identical(w5, top)) {
@@ -1031,9 +1033,10 @@ extension _RookieDanraku on _Rookie {
       b.write('昨夏の高校総体5000mは、${_nanashiMei(d.rec!, f5.first)}が制した。');
     }
     if (jt != null) {
+      final String yj = yobu(jt.x); // 名前は候補を並べる前に1度だけ作る(2.0.2)
       b.write(w.erabu([
-        '日本人トップは${jt.juni}位の${yobu(jt.x)}で、${d.univMei(jt.x)}に進んだ。',
-        '日本人トップの${jt.juni}位に入った${yobu(jt.x)}は、${d.univMei(jt.x)}へ。',
+        '日本人トップは${jt.juni}位の$yjで、${d.univMei(jt.x)}に進んだ。',
+        '日本人トップの${jt.juni}位に入った$yjは、${d.univMei(jt.x)}へ。',
       ]));
     } else if (f5.isNotEmpty && (w5 == null || w5.ryuugakusei)) {
       // 優勝が新入生でなく、日本人トップも新入生でないときは、大学に進んだ日本人の最上位
@@ -1049,9 +1052,10 @@ extension _RookieDanraku on _Rookie {
       for (int i = 1; i < f5.length; i++) {
         final _Shin? x = d.shin(f5[i]);
         if (x != null && identical(x, top)) {
+          final String yt = yobu(top); // 名前は候補を並べる前に1度だけ作る(2.0.2)
           b.write(w.erabu([
-            'この日、持ちタイム世代トップの${yobu(top)}は${i + 1}位にとどまった。雪辱の舞台は大学に移る。',
-            '持ちタイム世代トップの${yobu(top)}は、この日は${i + 1}位だった。',
+            'この日、持ちタイム世代トップの$ytは${i + 1}位にとどまった。雪辱の舞台は大学に移る。',
+            '持ちタイム世代トップの$ytは、この日は${i + 1}位だった。',
           ]));
           break;
         }
@@ -1228,10 +1232,14 @@ extension _RookieDanraku on _Rookie {
     if (x == null || j == null) return;
     final String bu = koukouHokaKyougi(j);
     _jissekiZumi.add(x.s.id);
+    // 名前は候補を並べる前に1度だけ作る(候補ごとに呼ぶと、2つ目の候補が名字だけになるため。2.0.2)。
+    // どちらの候補も校名を文の中に書くので、名前のかっこは付けない
+    final String yx = yobu(x, kakko: '');
+    final String kouNo = x.kou.isNotEmpty ? '${x.kou}の' : '';
     w.danraku(w.erabu([
-      '異色の経歴を持つ新入生もいる。${x.kou}時代は$buだった${yobu(x, kakko: '')}は、持ちタイム${jikanMoji(x.t)}で${d.univMei(x)}に進んだ。'
+      '異色の経歴を持つ新入生もいる。${x.kou}時代は$buだった$yxは、持ちタイム${jikanMoji(x.t)}で${d.univMei(x)}に進んだ。'
           '世代では${x.juni + 1}番手だ。',
-      '$bu出身の${yobu(x)}は、陸上の大会の実績がないまま${d.univMei(x)}に進んだ。持ちタイムは${jikanMoji(x.t)}で、世代${x.juni + 1}番手だ。',
+      '$kouNo${bu}出身の$yxは、陸上の大会の実績がないまま${d.univMei(x)}に進んだ。持ちタイムは${jikanMoji(x.t)}で、世代${x.juni + 1}番手だ。',
     ]));
     senshuKotoba(x, _ishokuKotoba);
   }
@@ -1273,9 +1281,10 @@ extension _RookieDanraku on _Rookie {
     final StringBuffer b = StringBuffer();
     if (l.isNotEmpty) {
       final _Shin x = l.first;
+      final String yx = yobu(x); // 名前は候補を並べる前に1度だけ作る(2.0.2)
       b.write(w.erabu([
-        '$umには${l.length + ryuu}人が入った。持ちタイムの最上位は、世代${x.juni + 1}番手の${yobu(x)}で${jikanMoji(x.t)}。',
-        '$umの新入生は${l.length + ryuu}人。最上位は${jikanMoji(x.t)}の${yobu(x)}で、世代では${x.juni + 1}番手だ。',
+        '$umには${l.length + ryuu}人が入った。持ちタイムの最上位は、世代${x.juni + 1}番手の$yxで${jikanMoji(x.t)}。',
+        '$umの新入生は${l.length + ryuu}人。最上位は${jikanMoji(x.t)}の$yxで、世代では${x.juni + 1}番手だ。',
       ]));
       final int c30 = l.where((y) => y.juni < _jouiNinzuu).length;
       final int c13 = l.where((y) => y.t < _juusan).length;

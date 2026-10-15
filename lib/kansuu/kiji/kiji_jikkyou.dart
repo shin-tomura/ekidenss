@@ -600,18 +600,21 @@ Kiji? _kukanJikkyou(
   // 本文: 首位の攻防
   w.koMidashi('首位の攻防');
   final StringBuffer sb = StringBuffer();
+  // 首位の選手の名前は、候補を並べる前に1度だけ作る(候補ごとに呼ぶと、2つ目の候補が名字だけになるため。2.0.2)
+  final String? shuiMei = shui.s != null ? w.senshu(shui.s!) : null;
+  final String shuiYobi = shuiMei != null ? '${shui.mei}・$shuiMei' : '${shui.mei}の走者'; // _yobi と同じ形
   if (kk == 0) {
     sb.write(
       w.erabu([
-        '1区を制したのは${_yobi(w, shui)}！ 2位の${ni.mei}に${kinsaMoji(sa12)}をつけて、先頭でたすきを渡しました！',
-        '${_yobi(w, shui)}がトップでたすきリレー！ ${ni.mei}が${kinsaMoji(sa12)}で続きます。',
+        '1区を制したのは$shuiYobi！ 2位の${ni.mei}に${kinsaMoji(sa12)}をつけて、先頭でたすきを渡しました！',
+        '$shuiYobiがトップでたすきリレー！ ${ni.mei}が${kinsaMoji(sa12)}で続きます。',
       ]),
     );
   } else if (shuiMae != null && shuiMae.u.id != shui.u.id) {
     sb.write(
       w.erabu([
-        '首位交代です！ ${_yobi(w, shui)}が${shuiMae.mei}を捉えて先頭に立ちました！',
-        '${_yobi(w, shui)}、前を行く${shuiMae.mei}をかわしてトップへ！',
+        '首位交代です！ $shuiYobiが${shuiMae.mei}を捉えて先頭に立ちました！',
+        '$shuiYobi、前を行く${shuiMae.mei}をかわしてトップへ！',
       ]),
     );
     sb.write(saigo ? '' : '2位の${ni.mei}との差は${kinsaMoji(sa12)}。');
@@ -619,8 +622,8 @@ Kiji? _kukanJikkyou(
   } else {
     sb.write(
       w.erabu([
-        '${_yobi(w, shui)}、首位を守りました！',
-        '先頭は変わらず${shui.mei}。${shui.s != null ? '${w.senshu(shui.s!)}が' : ''}区間${juniMoji(shui.kukanJuni)}の走りで押し切りました。',
+        '$shuiYobi、首位を守りました！',
+        '先頭は変わらず${shui.mei}。${shuiMei != null ? '$shuiMeiが' : ''}区間${juniMoji(shui.kukanJuni)}の走りで押し切りました。',
       ]),
     );
     if (!saigo) {
@@ -810,10 +813,11 @@ Kiji? _kukanJikkyou(
   if (kukanshou.s != null) {
     final int ksa = kjJun.length >= 2 ? saByou(kjJun[1].kukanTime, kukanshou.kukanTime) : 0;
     final StringBuffer kb = StringBuffer();
+    final String ky = _yobi(w, kukanshou); // 名前は候補を並べる前に1度だけ作る(2.0.2)
     kb.write(
       w.erabu([
-        'この区間を一番速く走ったのは${_yobi(w, kukanshou)}、${jikanMoji(kukanshou.kukanTime)}！',
-        '区間トップは${_yobi(w, kukanshou)}。タイムは${jikanMoji(kukanshou.kukanTime)}です！',
+        'この区間を一番速く走ったのは$ky、${jikanMoji(kukanshou.kukanTime)}！',
+        '区間トップは$ky。タイムは${jikanMoji(kukanshou.kukanTime)}です！',
       ]),
     );
     kb.write(ksa >= 20 ? '2位に${saMoji(ksa)}差をつける快走です。' : '2位とは${kinsaMoji(ksa)}の争いでした。');

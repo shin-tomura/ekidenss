@@ -1834,10 +1834,12 @@ Kiji? _jibunKiji(EkidenKekka e) {
     if (k.ichinenDake) break; // 1年生だけの大会では、1年生を特別扱いしない
     if (s == null || s.gakunen != 1 || kaita.contains(kk)) continue;
     if (m.kukanJuni[kk] <= 2) {
+      // 名前は候補を並べる前に1度だけ作る(候補ごとに呼ぶと、2つ目の候補が名字だけになるため。2.0.2)
+      final String yr = w.senshu(s);
       w.danraku(
         w.erabu([
-          'ルーキーの${w.senshu(s)}も${e.kukanMei(kk)}で区間${m.kukanJuni[kk] + 1}位と存在感を示した。',
-          '${e.kukanMei(kk)}では、1年生の${w.senshu(s)}が区間${m.kukanJuni[kk] + 1}位。上級生顔負けの走りだった。',
+          'ルーキーの$yrも${e.kukanMei(kk)}で区間${m.kukanJuni[kk] + 1}位と存在感を示した。',
+          '${e.kukanMei(kk)}では、1年生の$yrが区間${m.kukanJuni[kk] + 1}位。上級生顔負けの走りだった。',
         ]),
       );
       w.comment(

@@ -282,9 +282,10 @@ extension _Danraku on _Kakite {
     // 花の1区(区間賞を短く)
     if (rec.kukan.isNotEmpty && rec.kukan[0].isNotEmpty) {
       final KoukouKirokuSousha y = rec.kukan[0].first;
+      final String yy = yobuKiroku(y); // 名前は候補を並べる前に1度だけ作る(2.0.2)
       w.danraku(w.erabu([
-        '花の1区は、${yobuKiroku(y)}が${jikanMoji(y.time)}で区間賞を取った。',
-        'エースが集う1区の区間賞は、${yobuKiroku(y)}の${jikanMoji(y.time)}だった。',
+        '花の1区は、$yyが${jikanMoji(y.time)}で区間賞を取った。',
+        'エースが集う1区の区間賞は、$yyの${jikanMoji(y.time)}だった。',
       ]));
     }
   }
@@ -381,9 +382,11 @@ extension _Danraku on _Kakite {
             deta.add(e.key);
             final String yobi = w.hito('K${e.key}', kt.name, '', '');
             final String um = daigakuMei(k.univ[e.key]);
+            // 後輩の名前も候補を並べる前に1度だけ作る(候補ごとに呼ぶと、2つ目の候補が名字だけになるため。2.0.2)
+            final String yx = yobu(x, kakko: '');
             bun.add(w.erabu([
-              '$umの$yobi監督の母校・${x.kou}からは、${yobu(x, kakko: '')}(${jikanMoji(x.t)})が大学へ進む。母校の後輩の行き先が注目される。',
-              '${x.kou}の${yobu(x, kakko: '')}(${jikanMoji(x.t)})にとって、$umの$yobi監督は高校の先輩にあたる。',
+              '$umの$yobi監督の母校・${x.kou}からは、$yx(${jikanMoji(x.t)})が大学へ進む。母校の後輩の行き先が注目される。',
+              '${x.kou}の$yx(${jikanMoji(x.t)})にとって、$umの$yobi監督は高校の先輩にあたる。',
             ]));
             break;
           }

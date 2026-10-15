@@ -221,7 +221,7 @@ class _ModalHoseiTsuyosaState extends State<ModalHoseiTsuyosa> {
           ),
           const SizedBox(height: 4),
           Text(
-            'どの大学にも、3年生か4年生の中から1人、主将がいます。「あり」(初期値)なら、主将は指示なしで走っても、目標順位による補正(上の2つ)がかかりません。また、コンピュータの大学は主将を1区に置きません。「なし」にしても主将は決まりますが、ほかの選手と同じになります(全大学共通)。',
+            'どの大学にも、3年生か4年生の中から1人、主将がいます。「あり」(初期値)なら、主将は指示なしで走っても、目標順位による補正(上の2つ)がかかりません。また、コンピュータの大学は主将を1区と正月駅伝の6区に置きません。「なし」にしても主将は決まりますが、ほかの選手と同じになります(全大学共通)。',
             style: TextStyle(
               color: HENSUU.textcolor.withOpacity(0.8),
               fontSize: HENSUU.fontsize_honbun - 2,

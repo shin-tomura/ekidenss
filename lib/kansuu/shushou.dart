@@ -29,10 +29,13 @@ import 'package:ekiden/kansuu/mokuhyou_hosei.dart' show HoseiTsuyosa;
 //   それもいなければ3・4年生全員から同じ順で選ぶ
 // ・あなたの大学は、選手画面で3・4年生を主将にできる(9月の終わりまで。10月からは年度の終わりまで代えられない)
 // ・主将の特典があるとき(目標順位による補正が両方0%のときは除く)は、コンピュータの区間配置で主将を
-//   1区に置かない(kukan_haichi.dart・EntryCalc.dart の最適解区間配置・ToujituHenkou_com.dart・
+//   特典が生きない区間(1区と、正月駅伝の6区。shushouSakeruKukan)に置かない
+//   (kukan_haichi.dart・EntryCalc.dart の最適解区間配置・ToujituHenkou_com.dart・
 //   1区のペース予想 ikku_pace.dart)。あなたの大学の区間エントリーの初期案も同じ。
-//   ほかに手がないとき(選手が足りない、体調不良の交代で補欠が主将しかいない)は1区に入ることがある
-//   (1区に入っても、特典が生きないだけで、おかしな状態ではない)
+//   ほかに手がないとき(選手が足りない、体調不良の交代で補欠が主将しかいない)はその区間に入ることがある
+//   (入っても、特典が生きないだけで、おかしな状態ではない)
+//   正月駅伝の6区は、往路のゴールで目標順位の判定を「ちょうど」に戻すので(RaceCalc.dart)、
+//   目標順位による補正がかからない(6区も置かないようにしたのは2.0.1の開発中)
 //
 // KantokuData.yobiint4 の使用番号
 //   [67]〜[72] 大学ごとの主将の選手id+1(1大学3桁、1つの番号に5大学。[67]に大学0〜4・[68]に大学5〜9…、
@@ -59,8 +62,8 @@ const int shushouKonjouJougen = 84;
 /// コンピュータの大学が前半抑えの指示を出さない平常心の上限(80以上で出す)
 const int shushouHeijousinJougen = 79;
 
-/// 主将を1区に置かないために、区間配置の計算で主将の1区の見積もりに足す秒(大きな値だが、無限大にはしない。
-/// ほかに手がないときは1区に入れられるように)
+/// 主将を1区(と正月駅伝の6区)に置かないために、区間配置の計算で主将のその区間の見積もりに足す秒
+/// (大きな値だが、無限大にはしない。ほかに手がないときはその区間に入れられるように)
 const double shushouIkkuFuri = 1.0e6;
 
 /// 補正の説明(SenshuData.string_racesetumei)に書く、主将なので目標順位の補正がかからなかったことの行の頭
@@ -267,7 +270,12 @@ bool shushouTokutenKikuIma(SenshuData s) {
   return shushouTokutenAri(k) && shushouKaIma(s);
 }
 
-/// 区間配置で1区に置かない主将の選手id
+/// 主将を置かない区間か(主将の特典が生きない区間。1区と、正月駅伝の6区)
+/// [racebangou] 大会番号(2が正月駅伝)、[kukan] 区間(0が1区)
+bool shushouSakeruKukan(int racebangou, int kukan) =>
+    kukan == 0 || (racebangou == 2 && kukan == 5);
+
+/// 区間配置で1区(と正月駅伝の6区)に置かない主将の選手id
 /// (主将の特典がないときと、目標順位による補正が両方0%で特典が意味を持たないときは空)
 Set<int> shushouIkkuSakeruIds(
   KantokuData k,
@@ -280,7 +288,7 @@ Set<int> shushouIkkuSakeruIds(
   return shushouIchiran(k, gh, senshu).values.toSet();
 }
 
-/// 1区の交代の候補[kouho]から主将を外す(主将を1区に置かない)
+/// 1区(と正月駅伝の6区)の交代の候補[kouho]から主将を外す(主将をその区間に置かない)
 /// [taichouFuryou] 体調不良の走者の交代なら、主将しか候補がいないときは主将を残す
 /// (体調不良の選手を走らせるよりは良いので)
 List<SenshuData> shushouIkkuNozoku(

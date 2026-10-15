@@ -14,6 +14,7 @@ import 'package:ekiden/screens/Modal_matrix3.dart';
 import 'package:ekiden/kansuu/custom_seigen.dart'; // カスタム駅伝の出場制限(1.9.1)
 import 'package:ekiden/screens/custom_seigen_parts.dart';
 import 'package:ekiden/screens/kukan_haiti_button.dart'; // 今季タイム一覧表を開くボタン(1.9.9)
+import 'package:ekiden/kansuu/shushou.dart' show shushouShirushi; // 主将の印(2.0.1)
 
 class Mode0150Content extends StatefulWidget {
   final Ghensuu ghensuu;
@@ -653,7 +654,8 @@ class _Mode0150ContentState extends State<Mode0150Content> {
                                 child: Padding(
                                   padding: const EdgeInsets.only(left: 8.0),
                                   child: Text(
-                                    '${senshu.name} (${senshu.gakunen}年)$seigenHyouji',
+                                    // 主将なら「(4年・主将)」(2.0.1。shushou.dart)
+                                    '${senshu.name} (${senshu.gakunen}年${shushouShirushi(senshu)})$seigenHyouji',
                                     style: TextStyle(
                                       color: erabenai
                                           ? Colors.white38

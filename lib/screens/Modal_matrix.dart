@@ -10,6 +10,8 @@ import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/senshu_data.dart';
 import 'package:ekiden/senshu_gakuren_data.dart';
 import 'package:ekiden/screens/Modal_senshu.dart';
+import 'package:ekiden/kansuu/shushou.dart'
+    show shushouIdUniv, shushouShirushiMoji; // 主将(2.0.1)
 import 'dart:io';
 import 'package:csv/csv.dart';
 import 'package:path_provider/path_provider.dart';
@@ -125,6 +127,9 @@ class _KonkiSeisekiHyou {
   // 種目(レース番号)ごとの、この表の選手の中での順位(選手id → 順位)
   final Map<int, Map<int, int>> rankMap = {};
 
+  // この大学の主将の選手id(学連選抜の表と、いないときはnull。2.0.1。shushou.dart)
+  int? shushouId;
+
   _KonkiSeisekiHyou({required int univId, this.gakuren = false}) {
     _junbi(univId);
   }
@@ -164,6 +169,13 @@ class _KonkiSeisekiHyou {
       univName = univBox.get(univId)?.name ?? "";
 
       senshuList = senshuBox.values.where((s) => s.univid == univId).toList();
+      // 主将(2.0.1)。名前の欄の色と「(4年・主将)」に使う
+      shushouId = shushouIdUniv(
+        Hive.box<KantokuData>('kantokuBox').get('KantokuData'),
+        currentGhensuu,
+        senshuList,
+        univId,
+      );
       senshuList.sort((a, b) {
         int gradeComp = b.gakunen.compareTo(a.gakunen);
         return gradeComp != 0 ? gradeComp : a.id.compareTo(b.id);
@@ -188,6 +200,13 @@ class _KonkiSeisekiHyou {
   }
 
   String shozoku(SenshuData senshu) => _shozokuMei[senshu.univid] ?? '---';
+
+  /// 主将か(2.0.1)
+  bool shushouKa(SenshuData senshu) => senshu.id == shushouId;
+
+  /// 名前の後ろのかっこの中の学年(主将なら「4年・主将」。2.0.1)
+  String gakunenMoji(SenshuData senshu) =>
+      '${senshu.gakunen}年${shushouKa(senshu) ? shushouShirushiMoji : ''}';
 
   // 正月駅伝予選の個人順位(1始まり)(学連選抜の表で使う。走っていなければnull)
   int? yosenJuni(SenshuData senshu) {
@@ -233,7 +252,7 @@ class _KonkiSeisekiHyou {
     List<List<dynamic>> rows = [header];
 
     for (var senshu in senshuList) {
-      List<dynamic> row = ['${senshu.name}(${senshu.gakunen}年)'];
+      List<dynamic> row = ['${senshu.name}(${gakunenMoji(senshu)})'];
       if (gakuren) {
         row.add(shozoku(senshu));
         final int? yosen = yosenJuni(senshu);
@@ -317,6 +336,14 @@ class _KonkiSeisekiHyou {
 String konkiSeisekiHyouText({required int univId, bool gakuren = false}) {
   return _KonkiSeisekiHyou(univId: univId, gakuren: gakuren).copyText();
 }
+
+/// 主将の名前の欄の背景と線の色(2.0.1。表のほかの色付けで使っていない緑)
+const Color _shushouHaikei = Color(0x4D2E7D32); // 緑(Colors.green.shade800)の30%
+const Color _shushouSen = Color(0xFF69F0AE); // Colors.greenAccent
+const BoxDecoration _shushouKazari = BoxDecoration(
+  color: _shushouHaikei,
+  border: Border(left: BorderSide(color: _shushouSen, width: 4)),
+);
 
 class ModalUnivSenshuMatrixView extends StatefulWidget {
   final int targetUnivId;
@@ -683,10 +710,14 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
                       padding: const EdgeInsets.all(8),
                       constraints: const BoxConstraints(minHeight: 65),
                       alignment: Alignment.centerLeft,
+                      // 主将は、名前の欄の背景を薄い緑にし、左端に緑の線を引く(2.0.1)
+                      decoration: _hyou.shushouKa(senshu)
+                          ? _shushouKazari
+                          : null,
                       child: Text(
                         widget.gakuren
                             ? '${senshu.name}(${senshu.gakunen}年)\n${_shozokuToYosen(senshu)}'
-                            : '${senshu.name}\n(${senshu.gakunen}年)',
+                            : '${senshu.name}\n(${_hyou.gakunenMoji(senshu)})',
                         style: TextStyle(
                           color: HENSUU.LinkColor,
                           fontSize: 10,
@@ -1318,6 +1349,8 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
   }
 
   TableViewCell _buildNameCell(SenshuData p, int rowIdx) {
+    // 主将は、名前の欄の背景を薄い緑にし、左端に緑の線を引く(2.0.1。ほかの色付けと見分けられる色)
+    final bool shushou = _hyou.shushouKa(p);
     return TableViewCell(
       child: GestureDetector(
         onTap: () => _showSenshuDetail(context, p.id),
@@ -1325,16 +1358,21 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
           padding: const EdgeInsets.all(8),
           alignment: Alignment.centerLeft,
           decoration: BoxDecoration(
-            color: rowIdx.isEven
-                ? Colors.transparent
-                : Colors.white.withOpacity(0.03),
+            color: shushou
+                ? _shushouHaikei
+                : (rowIdx.isEven
+                      ? Colors.transparent
+                      : Colors.white.withOpacity(0.03)),
             border: Border(
+              left: shushou
+                  ? const BorderSide(color: _shushouSen, width: 4)
+                  : BorderSide.none,
               bottom: BorderSide(color: Colors.white.withOpacity(0.05)),
               right: BorderSide(color: Colors.white.withOpacity(0.1)),
             ),
           ),
           child: AutoSizeText(
-            '${p.name}\n(${p.gakunen}年)',
+            '${p.name}\n(${_hyou.gakunenMoji(p)})',
             maxLines: 2,
             minFontSize: 8,
             style: TextStyle(

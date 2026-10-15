@@ -14,7 +14,7 @@ import 'package:ekiden/senshu_gakuren_data.dart';
 import 'package:ekiden/screens/Modal_senshu.dart';
 import 'package:ekiden/kansuu/konki_best.dart'; // 今季ベスト(1.9.1)
 import 'package:ekiden/kansuu/shushou.dart'
-    show shushouIchiranIma, shushouShirushiMoji; // 主将(2.0.1)
+    show shushouIchiranIma, shushouShirushiMoji, shushouKaIma; // 主将(2.0.1)
 import 'package:ekiden/screens/konki_best_parts.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
@@ -172,14 +172,21 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
     String kukanLabel = "${kukanIdx + 1}区";
     if (gh.hyojiracebangou == 3) kukanLabel = "${kukanIdx + 1}組";
     if (gh.hyojiracebangou == 4) kukanLabel = "記録会";
+    // 主将は、枠を緑にし、学年の後ろに「・主将」を付ける(2.0.1。今季タイム一覧表と同じ緑)
+    final bool shushou = shushouKaIma(s);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
+        color: shushou
+            ? const Color(0x4D2E7D32)
+            : Colors.white.withOpacity(0.1),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white24),
+        border: Border.all(
+          color: shushou ? const Color(0xFF69F0AE) : Colors.white24,
+          width: shushou ? 2 : 1,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -207,7 +214,7 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
               ),
               //const Spacer(),
               Text(
-                " (${s.gakunen}年)",
+                " (${s.gakunen}年${shushou ? shushouShirushiMoji : ''})",
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 16,
@@ -1046,10 +1053,18 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
     if (gh.hyojiracebangou == 4) kukanLabel = "記録会";
     if (hoketsuLabel != null) kukanLabel = hoketsuLabel;
     final Color fudaIro = kukanAri ? Colors.cyanAccent : Colors.orangeAccent;
+    // 主将は、カードを薄い緑にして緑の枠を付け、距離の行に「主将」と出す(2.0.1。今季タイム一覧表と同じ緑。
+    // 名前の行は横に並ぶものが多いので、文字は下の行に足す)
+    final bool shushou = shushouKaIma(s);
 
     return Card(
-      color: Colors.white.withOpacity(0.09),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+      color: shushou ? const Color(0x4D2E7D32) : Colors.white.withOpacity(0.09),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(15),
+        side: shushou
+            ? const BorderSide(color: Color(0xFF69F0AE), width: 2)
+            : BorderSide.none,
+      ),
       margin: const EdgeInsets.only(bottom: 12),
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
@@ -1103,11 +1118,15 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
           subtitle: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                kukanAri
-                    ? "${_formatDoubleToFixed(gh.kyori_taikai_kukangoto[gh.hyojiracebangou][kukanIdx], 0)}m"
-                    : "",
-                style: const TextStyle(color: Colors.white70, fontSize: 13),
+              Flexible(
+                child: Text(
+                  [
+                    if (kukanAri)
+                      "${_formatDoubleToFixed(gh.kyori_taikai_kukangoto[gh.hyojiracebangou][kukanIdx], 0)}m",
+                    if (shushou) "主将",
+                  ].join('　'),
+                  style: const TextStyle(color: Colors.white70, fontSize: 13),
+                ),
               ),
               Container(
                 height: 28,
@@ -1526,7 +1545,9 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
         String kukanLabel = "${i + 1}${raceIdx == 3 ? "組" : "区"}";
         if (raceIdx == 4) kukanLabel = "正月駅伝予選";
 
-        sb.writeln('$kukanLabel ${s.name} (${s.gakunen}年)');
+        sb.writeln(
+          '$kukanLabel ${s.name} (${s.gakunen}年${shushouKaIma(s) ? shushouShirushiMoji : ''})',
+        );
         if (raceIdx != 3 && raceIdx != 4) {
           sb.writeln(
             ' ${_formatDoubleToFixed(currentGhensuu.kyori_taikai_kukangoto[currentGhensuu.hyojiracebangou][i], 0)}m',

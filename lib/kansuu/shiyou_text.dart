@@ -647,7 +647,7 @@ List<String> _bokouPipeGyou(bool setsumeisho) {
       '　・${_konoData(setsumeisho)}、${_anata(setsumeisho)}の大学の監督の母校の新入生には効きません。',
     '　・監督が代わると、母校も代わります。',
     '　・監督のいない大学には効きません。',
-    '　・ゲームを始めてしばらくは、監督のいない大学があります。',
+    '　・ゲームを始めた年は、どの大学にも監督がいません。',
   ];
 }
 

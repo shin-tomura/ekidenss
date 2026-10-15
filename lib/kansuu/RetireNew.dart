@@ -13,6 +13,7 @@ import 'package:ekiden/kansuu/ShozokusakiKettei_By_Univmeisei.dart';
 import 'package:ekiden/kansuu/SenshuShokiti.dart';
 import 'package:ekiden/kansuu/meisei_rireki.dart'; // 名声の履歴(1.8.8)
 import 'package:ekiden/kansuu/koukou.dart'; // 出身校と高校時代の実績(1.9.5)
+import 'package:ekiden/kansuu/wakate_shuunin.dart'; // 若いOBの監督・コーチ(2.0.1)
 
 /// 年度替わりの選手引退、新入生入学、データ更新処理をまとめて実行します。
 ///
@@ -279,6 +280,16 @@ Future<void> RetireNew({
       }
     }
 
+    // 監督の席が空いたままなら、若いOBから就任させる(2.0.1。wakate_shuunin.dart)
+    await wakateShuunin(
+      kantoku: kantoku,
+      ghensuu: ghensuu,
+      sortedUnivData: sortedUnivData,
+      univid: i_univid,
+      seki: 0,
+      lastrid: lastrid0,
+    );
+
     //トラックコーチ就任
     univagenotryuugakuseiFilteredrSenshuData = retiredSenshuBox.values
         .where(
@@ -343,6 +354,16 @@ Future<void> RetireNew({
       }
     }
 
+    // トラックのコーチの席が空いたままなら、若いOBから就任させる(2.0.1。wakate_shuunin.dart)
+    await wakateShuunin(
+      kantoku: kantoku,
+      ghensuu: ghensuu,
+      sortedUnivData: sortedUnivData,
+      univid: i_univid,
+      seki: 1,
+      lastrid: lastrid1,
+    );
+
     //長距離コーチ就任
     univagenotryuugakuseiFilteredrSenshuData = retiredSenshuBox.values
         .where(
@@ -406,6 +427,16 @@ Future<void> RetireNew({
         }
       }
     }
+
+    // 長距離のコーチの席が空いたままなら、若いOBから就任させる(2.0.1。wakate_shuunin.dart)
+    await wakateShuunin(
+      kantoku: kantoku,
+      ghensuu: ghensuu,
+      sortedUnivData: sortedUnivData,
+      univid: i_univid,
+      seki: 2,
+      lastrid: lastrid2,
+    );
 
     //ここから、もしデータが10人を超えていて、自分で追加した選手(sijiseikouflag==100)でなくて、監督・コーチになっていなくて順位の合計が大きい引退選手は削除処理
     //if (i_univid != ghensuu.MYunivid) {

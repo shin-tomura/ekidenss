@@ -92,22 +92,25 @@ Widget _senshuAnalysisPanelNakami(
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  senshu.name,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
+            // 名前が長くても右にはみ出さず折り返すように、残りの幅に収める(大学のチャートと同じ。2.0.2)
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    senshu.name,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
-                Text(
-                  "${senshu.gakunen}年生",
-                  style: const TextStyle(color: Colors.white, fontSize: 14),
-                ),
-              ],
+                  Text(
+                    "${senshu.gakunen}年生",
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
+                  ),
+                ],
+              ),
             ),
             if (onDetailTap != null)
               TextButton(

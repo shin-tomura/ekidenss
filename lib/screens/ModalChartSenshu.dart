@@ -394,23 +394,26 @@ class _SenshuRadarAnalysisViewState extends State<SenshuRadarAnalysisView> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      data.senshu.name,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
+                // 名前が長くても右にはみ出さず折り返すように、残りの幅に収める(大学のチャートと同じ。2.0.2)
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        data.senshu.name,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      "${data.senshu.gakunen}年生",
-                      style: const TextStyle(color: Colors.white, fontSize: 14),
-                    ),
-                  ],
+                      const SizedBox(height: 4),
+                      Text(
+                        "${data.senshu.gakunen}年生",
+                        style: const TextStyle(color: Colors.white, fontSize: 14),
+                      ),
+                    ],
+                  ),
                 ),
                 TextButton(
                   onPressed: () => _showSenshuDetail(data.senshu.id),

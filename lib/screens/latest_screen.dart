@@ -41,6 +41,23 @@ class LatestScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 「進む」を押したときは、出ているスナックバーを消してから進める(2.0.2)
+    // (「おまかせで組みました」やスキップの準備のスナックバーが出ているうちに進むと、
+    // 画面が丸ごと切り替わるあいだに消えず、出たままになることがあったため。
+    // 待っているものも消し、今のものはアニメーションを待たずにすぐ消す)
+    final VoidCallback? susumu = onAdvanceMode == null
+        ? null
+        : () {
+            if (context.mounted) {
+              final ScaffoldMessengerState? sm = ScaffoldMessenger.maybeOf(
+                context,
+              );
+              sm?.clearSnackBars();
+              sm?.removeCurrentSnackBar();
+            }
+            onAdvanceMode!();
+          };
+
     // ghensuu.mode の値に基づいて、表示するウィジェットを切り替える
     Widget contentWidget;
 
@@ -49,67 +66,67 @@ class LatestScreen extends StatelessWidget {
         // mode 100 の場合は、onAdvanceMode コールバックも渡す
         contentWidget = Mode0100Content(
           ghensuu: ghensuu,
-          onAdvanceMode: onAdvanceMode,
+          onAdvanceMode: susumu,
         );
         break;
       case 150:
         // mode 100 の場合は、onAdvanceMode コールバックも渡す
         contentWidget = Mode0150Content(
           ghensuu: ghensuu,
-          onAdvanceMode: onAdvanceMode,
+          onAdvanceMode: susumu,
         );
         break;
       case 280:
         // mode 100 の場合は、onAdvanceMode コールバックも渡す
         contentWidget = Mode0280Content(
           ghensuu: ghensuu,
-          onAdvanceMode: onAdvanceMode,
+          onAdvanceMode: susumu,
         );
         break;
       case 290:
         // mode 100 の場合は、onAdvanceMode コールバックも渡す
         contentWidget = Mode0290Content(
           ghensuu: ghensuu,
-          onAdvanceMode: onAdvanceMode,
+          onAdvanceMode: susumu,
         );
         break;
       case 343:
         // mode 100 の場合は、onAdvanceMode コールバックも渡す
         contentWidget = Mode0280Content(
           ghensuu: ghensuu,
-          onAdvanceMode: onAdvanceMode,
+          onAdvanceMode: susumu,
         );
         break;
       case 1111:
         // mode 100 の場合は、onAdvanceMode コールバックも渡す
         contentWidget = Mode1111Content(
           ghensuu: ghensuu,
-          onAdvanceMode: onAdvanceMode,
+          onAdvanceMode: susumu,
         );
         break;
       case 110:
         // mode 100 の場合は、onAdvanceMode コールバックも渡す
         contentWidget = Mode0100Content(
           ghensuu: ghensuu,
-          onAdvanceMode: onAdvanceMode,
+          onAdvanceMode: susumu,
         );
         break;
       case 300:
-        contentWidget = Mode0300Content(onAdvanceMode: onAdvanceMode);
+        contentWidget = Mode0300Content(onAdvanceMode: susumu);
         break;
       case 330:
         contentWidget = Mode0330Content(
           ghensuu: ghensuu,
-          onAdvanceMode: onAdvanceMode,
+          onAdvanceMode: susumu,
         );
         break;
       case 350:
-        contentWidget = Mode0350Content(onAdvanceMode: onAdvanceMode);
+        contentWidget = Mode0350Content(onAdvanceMode: susumu);
         break;
       case 700:
         contentWidget = Mode0700Content(
           ghensuu: ghensuu,
-          onAdvanceMode: onAdvanceMode,
+          onAdvanceMode: susumu,
         );
         break;
       default:

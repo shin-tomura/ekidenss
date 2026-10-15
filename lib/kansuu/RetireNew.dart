@@ -14,6 +14,8 @@ import 'package:ekiden/kansuu/SenshuShokiti.dart';
 import 'package:ekiden/kansuu/meisei_rireki.dart'; // 名声の履歴(1.8.8)
 import 'package:ekiden/kansuu/koukou.dart'; // 出身校と高校時代の実績(1.9.5)
 import 'package:ekiden/kansuu/wakate_shuunin.dart'; // 若いOBの監督・コーチ(2.0.1)
+import 'package:ekiden/kansuu/shushou.dart'
+    show shushouSotsugyouGyou, shushouMaeHozon; // 主将を務めた年度をOBの経歴に書く(2.0.2)
 
 /// 年度替わりの選手引退、新入生入学、データ更新処理をまとめて実行します。
 ///
@@ -82,12 +84,24 @@ Future<void> RetireNew({
         final int currentYear = ghensuu.year;
         retiredSenshu.sijiflag = currentYear;
         retiredSenshu.id += currentYear * 1000;
-        retiredSenshu.string_racesetumei = "";
+        // 経歴の最初に、主将を務めた年度を書く(2.0.2。主将でなければ空。shushou.dart)
+        // 卒業は「卒業年の3月」なので、4年生だった年度は卒業年の前の年度
+        final int u = sortedSenshuData[i].univid;
+        retiredSenshu.string_racesetumei = shushouSotsugyouGyou(
+          kantoku,
+          sortedSenshuData[i],
+          currentYear - 1,
+          u >= 0 && u < sortedUnivData.length ? sortedUnivData[u].name : '',
+        );
         // Hive Boxに保存
         await retiredSenshuBox.put(retiredSenshu.id, retiredSenshu);
       }
     }
   }
+  // 終わった年度の主将を、前の年度の主将の欄に写す(次の年度替わりに、3年生で主将だった選手が
+  // 卒業するときに使う。主将の欄はこのあと main.dart で新しい年度の主将に決め直す。2.0.2。shushou.dart)
+  shushouMaeHozon(kantoku);
+  await kantoku.save();
   for (int i_univid = 0; i_univid < sortedUnivData.length; i_univid++) {
     //if (i_univid != ghensuu.MYunivid) {
 

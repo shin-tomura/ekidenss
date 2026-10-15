@@ -34,7 +34,7 @@ String _timeToMinuteSecondString(double time) {
 /// 「監督に就任」が「コーチを退任」より先に書かれる。そこで、同じ年月の年度替わりの行(「4月(45歳) 」の
 /// ように年齢の付いた行)がひとかたまりに続くところだけ、退任の行を先、ほかの行(就任)を後にする
 /// (それぞれの中の順はそのまま)。総監督の進言の行(年齢なし)は、あとから同じ月に起きたことも
-/// あるので動かさない
+/// あるので動かさない。主将を務めた年度の行(「5年度・6年度 〜」。卒業のときに先頭に書く)も動かさない
 String obRirekiNarabe(String rireki) {
   final RegExp jidou = RegExp(r'^(-?\d+)年(\d+)月\(\d+歳\)');
   final List<String> gyou = rireki.split('\n');
@@ -1105,7 +1105,7 @@ class _Senshu_R_ScreenState extends State<Senshu_R_Screen> {
                         if (currentSenshu.string_racesetumei != "")
                           Text(
                             // 同じ年月の年度替わりの行は、退任を先に出す(2.0.2)
-                            '【監督・コーチ就任退任履歴】\n${obRirekiNarabe(currentSenshu.string_racesetumei)}',
+                            '【経歴】\n${obRirekiNarabe(currentSenshu.string_racesetumei)}',
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: HENSUU.fontsize_honbun,
@@ -1113,7 +1113,7 @@ class _Senshu_R_ScreenState extends State<Senshu_R_Screen> {
                           )
                         else
                           Text(
-                            '【監督・コーチ就任退任履歴】\nなし',
+                            '【経歴】\nなし',
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: HENSUU.fontsize_honbun,

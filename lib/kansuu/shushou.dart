@@ -43,6 +43,13 @@ import 'package:ekiden/kansuu/mokuhyou_hosei.dart' show HoseiTsuyosa;
 //              下の位から大学id%5番目の3桁。0は未定)
 //   [73] 主将を決めた年度(0は未定。今の年度と違えば、決め直す)
 //   [74] 主将の特典(0=あり(初期値)・1=なし)
+//   [24]〜[29] 前の年度の主将の選手id+1([67]〜[72]と同じ形。年度替わりの卒業の処理で写す。2.0.2)
+//   [75] [24]〜[29]がどの年度の主将か(0はなし。2.0.2)
+//
+// ・卒業アルバムのOBの経歴に、主将を務めた年度を書く(2.0.2。shushouSotsugyouGyou・shushouMaeHozon)
+//   年度替わりの卒業の処理(RetireNew)で、卒業する4年生について、4年生の年度の主将(今の[67]〜[72])と、
+//   3年生の年度の主将(前の年度替わりに写しておいた[24]〜[29])を見る。どちらも、その年度の終わりの主将
+//   (あなたの大学で9月までに代えたときは、代えたあとの主将)。2.0.2より前の年度の主将は分からないので書かない
 // ------------------------------------------------------------
 
 /// KantokuData.yobiint4 の使用番号: 大学ごとの主将の選手id+1([67]〜[72])
@@ -56,6 +63,12 @@ const int shushouNendoIndex = 73;
 
 /// KantokuData.yobiint4 の使用番号: 主将の特典(0=あり(初期値)・1=なし)
 const int shushouTokutenIndex = 74;
+
+/// KantokuData.yobiint4 の使用番号: 前の年度の主将の選手id+1([24]〜[29]。[67]〜[72]と同じ形。2.0.2)
+const int shushouMaeIdIndex0 = 24;
+
+/// KantokuData.yobiint4 の使用番号: [24]〜[29]がどの年度の主将か(0はなし。2.0.2)
+const int shushouMaeNendoIndex = 75;
 
 /// コンピュータの大学が前半突っ込み・飛び出しの指示を出さない駅伝男の上限(85以上で出す)
 const int shushouKonjouJougen = 84;
@@ -92,9 +105,10 @@ int _ketaBai(int n) {
 }
 
 /// 保存してある大学[univid]の主将の選手id(未定ならnull)
-int? _hozonId(KantokuData k, int univid) {
+/// [base] どの欄か(省くと今の主将の欄。前の年度の主将の欄は shushouMaeIdIndex0。2.0.2)
+int? _hozonId(KantokuData k, int univid, {int base = shushouIdIndex0}) {
   if (univid < 0) return null;
-  final int b = shushouIdIndex0 + univid ~/ _shushouDaigakuSuu;
+  final int b = base + univid ~/ _shushouDaigakuSuu;
   if (k.yobiint4.length <= b) return null;
   final int v =
       (k.yobiint4[b] ~/ _ketaBai(univid % _shushouDaigakuSuu)) % 1000;
@@ -102,9 +116,15 @@ int? _hozonId(KantokuData k, int univid) {
 }
 
 /// 大学[univid]の主将の選手idを保存する(nullなら未定。保存(save)は呼び出し側で行う)
-void _hozonIdIreru(KantokuData k, int univid, int? id) {
+/// [base] どの欄か(省くと今の主将の欄。前の年度の主将の欄は shushouMaeIdIndex0。2.0.2)
+void _hozonIdIreru(
+  KantokuData k,
+  int univid,
+  int? id, {
+  int base = shushouIdIndex0,
+}) {
   if (univid < 0) return;
-  final int b = shushouIdIndex0 + univid ~/ _shushouDaigakuSuu;
+  final int b = base + univid ~/ _shushouDaigakuSuu;
   if (k.yobiint4.length <= b) return;
   final int bai = _ketaBai(univid % _shushouDaigakuSuu);
   final int mae = (k.yobiint4[b] ~/ bai) % 1000;
@@ -311,6 +331,43 @@ bool shushouHoseiNashiDatta(SenshuData s) =>
 
 /// 主将を代えられる時期か(4月〜9月。10月からは年度の終わりまで代えられない)
 bool shushouHenkouDekiru(Ghensuu gh) => gh.month >= 4 && gh.month <= 9;
+
+/// 卒業の処理(RetireNew)で、卒業する選手[s]が主将を務めた年度の、OBの経歴の行(2.0.2。主将でなければ空)
+/// [owattaNendo] 終わった年度(卒業する選手が4年生だった年度)、[univMei] 大学名(「大学」は付けない)。
+/// 4年生の年度の主将は今の主将の欄で、3年生の年度の主将は前の年度替わりに写しておいた欄で見る
+/// (どちらも、その年度の終わりの主将)。両方なら「5年度・6年度 東西大学 主将」のように1行にまとめる
+String shushouSotsugyouGyou(
+  KantokuData k,
+  SenshuData s,
+  int owattaNendo,
+  String univMei,
+) {
+  if (k.yobiint4.length <= shushouMaeNendoIndex) return '';
+  final List<int> nendo = [];
+  // 3年生の年度(前の年度の主将の欄は、選手のidがそのときと同じ選手を指す。
+  // 4年生は3年生のときから同じidで在籍しているため)
+  if (k.yobiint4[shushouMaeNendoIndex] == owattaNendo - 1 &&
+      _hozonId(k, s.univid, base: shushouMaeIdIndex0) == s.id) {
+    nendo.add(owattaNendo - 1);
+  }
+  // 4年生の年度
+  if (k.yobiint4[shushouNendoIndex] == owattaNendo &&
+      _hozonId(k, s.univid) == s.id) {
+    nendo.add(owattaNendo);
+  }
+  if (nendo.isEmpty) return '';
+  return '${nendo.map((int n) => '$n年度').join('・')} $univMei大学 主将\n';
+}
+
+/// 年度替わりの卒業の処理(RetireNew)のあとで、終わった年度の主将を前の年度の主将の欄に写す
+/// (次の年度替わりに、3年生で主将だった選手が卒業するときに使う。2.0.2。保存(save)は呼び出し側で行う)
+void shushouMaeHozon(KantokuData k) {
+  if (k.yobiint4.length <= shushouMaeNendoIndex) return;
+  for (int u = 0; u < TEISUU.UNIVSUU; u++) {
+    _hozonIdIreru(k, u, _hozonId(k, u), base: shushouMaeIdIndex0);
+  }
+  k.yobiint4[shushouMaeNendoIndex] = k.yobiint4[shushouNendoIndex];
+}
 
 /// 全大学の主将を決めて保存する(年度の初めと、まだ決めていないとき)
 /// 前の年度の主将が、続けて同じ大学の4年生にいれば(3年生で主将だった選手)、続けて主将にする。

@@ -13,6 +13,8 @@ import 'package:ekiden/kansuu/kyouka_project.dart'; // 強化プロジェクト(
 import 'package:ekiden/kansuu/bokou_pipe.dart'; // 監督の母校パイプ(2.0.1)
 import 'package:ekiden/kansuu/koukou.dart'; // 出身校と高校時代の実績(1.9.5)
 import 'package:ekiden/screens/Modal_koukouMeikan.dart'; // 高校名鑑(1.9.5)
+import 'package:ekiden/kansuu/kiji/kiji.dart' show Kiji, koukouTaikaiKiji; // スカウト解禁の記事(2.0.1)
+import 'package:ekiden/screens/kiji_screen.dart' show KijiGamen; // スカウト解禁の記事(2.0.1)
 import 'package:ekiden/kansuu/ShoriGuard.dart';
 import 'package:ekiden/screens/ScoutRoundKekka_screen.dart';
 import 'package:ekiden/screens/Modal_shinnyuuseiShingakusaki.dart';
@@ -1021,9 +1023,59 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
     return kotoshiKoukouTaikaiKirokuAri();
   }
 
-  /// 今年の高校の大会の画面を開く(1.9.9。Modal_koukouMeikan.dart の KotoshiKoukouTaikaiGamen)
+  /// 1ラウンド目の前に、今年の高校の大会を出す(1.9.9。2.0.1から、結果の画面の代わりに
+  /// 箱庭スポーツの「スカウト解禁」の記事を出す。記事を作れなければ、今までの結果の画面)
   Future<void> _kotoshiKoukouTaikaiHiraku() async {
     _kotoshiKoukouTaikaiNen = _ghensuu?.year ?? -1;
+    await _scoutKijiHiraku();
+  }
+
+  /// スカウト解禁の記事を開く(2.0.1。kiji_koukou_taikai.dart。記事の下に「大会の結果を見る」ボタン。
+  /// 記事を作れなければ、今年の高校の大会の結果の画面を開く)
+  Future<void> _scoutKijiHiraku() async {
+    final List<Kiji> kiji = koukouTaikaiKiji();
+    if (!mounted) return;
+    if (kiji.isEmpty) {
+      await _kotoshiKekkaHiraku();
+      return;
+    }
+    await Navigator.push(
+      context,
+      MaterialPageRoute<void>(
+        builder: (_) => KijiGamen(
+          list: kiji,
+          bangou: 0,
+          shitaBotan: Center(
+            child: ElevatedButton.icon(
+              onPressed: () => _kotoshiKekkaHiraku(modoruMoji: '記事に戻る'),
+              icon: const Icon(Icons.emoji_events_outlined),
+              label: const Text('大会の結果を見る'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.teal[700],
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 上の帯の新聞のアイコンから、スカウト解禁の記事を読み返す(2.0.1)
+  Future<void> _scoutKijiYomikaesu() async {
+    if (!kotoshiKoukouTaikaiKirokuAri()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('今年の高校の大会の記録がありません。')),
+      );
+      return;
+    }
+    await _scoutKijiHiraku();
+  }
+
+  /// 今年の高校の大会の結果の画面を開く(1.9.9。Modal_koukouMeikan.dart の KotoshiKoukouTaikaiGamen)
+  /// [modoruMoji] 一番下の戻るボタンの文字(記事から開いたときは「記事に戻る」。2.0.1)
+  Future<void> _kotoshiKekkaHiraku({String modoruMoji = 'スカウトへ進む'}) async {
+    if (!mounted) return;
     final ({
       String? Function(KoukouKirokuSousha) shingakuMoji,
       bool Function(KoukouKirokuSousha) jibunHantei,
@@ -1034,6 +1086,7 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
         builder: (_) => KotoshiKoukouTaikaiGamen(
           shingakuMoji: f.shingakuMoji,
           jibunHantei: f.jibunHantei,
+          modoruMoji: modoruMoji,
         ),
       ),
     );
@@ -1932,22 +1985,40 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
         backgroundColor: Colors.grey[900],
         elevation: 0,
         actions: [
-          Container(
-            margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: BoxDecoration(
-              color: Colors.blueAccent.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.blueAccent.withOpacity(0.5)),
+          // スカウト解禁の記事を読み返す(2.0.1。アイコンだけなので、文字の大きさで幅が変わらない)
+          if (_koukouHyouji())
+            IconButton(
+              tooltip: '今年の高校の大会の記事',
+              icon: const Icon(Icons.newspaper, color: Colors.white),
+              onPressed: _scoutKijiYomikaesu,
             ),
-            child: Center(
-              child: Text(
-                _chikuMeguri
-                    ? '残り${_ghensuu!.scoutChances}地区'
-                    : 'チャンス: ${_ghensuu!.scoutChances}回',
-                style: const TextStyle(
-                  color: Colors.blueAccent,
-                  fontWeight: FontWeight.bold,
+          // 残りの地区・チャンスの数(2.0.1から、幅を画面の4割までにし、入りきらなければ文字を小さくする。
+          // 文字を大きくしていても、上の帯からはみ出さないように)
+          ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: MediaQuery.of(context).size.width * 0.4,
+            ),
+            child: Container(
+              margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                color: Colors.blueAccent.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.blueAccent.withOpacity(0.5)),
+              ),
+              child: Center(
+                widthFactor: 1.0,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    _chikuMeguri
+                        ? '残り${_ghensuu!.scoutChances}地区'
+                        : 'チャンス: ${_ghensuu!.scoutChances}回',
+                    style: const TextStyle(
+                      color: Colors.blueAccent,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ),
             ),

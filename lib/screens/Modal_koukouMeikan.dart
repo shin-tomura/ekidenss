@@ -240,10 +240,18 @@ bool kotoshiKoukouTaikaiKirokuAri() {
 /// 一番新しい回(今年の新入生の世代)の全国高校駅伝・区間の上位3人・高校総体の決勝を開いて出し、
 /// 下の「スカウトへ進む」で閉じる。進学先の文字と色は、高校名鑑と同じくスカウトの画面に決めてもらう
 class KotoshiKoukouTaikaiGamen extends StatelessWidget {
-  const KotoshiKoukouTaikaiGamen({super.key, this.shingakuMoji, this.jibunHantei});
+  const KotoshiKoukouTaikaiGamen({
+    super.key,
+    this.shingakuMoji,
+    this.jibunHantei,
+    this.modoruMoji = 'スカウトへ進む',
+  });
 
   final String? Function(KoukouKirokuSousha s)? shingakuMoji;
   final bool Function(KoukouKirokuSousha s)? jibunHantei;
+
+  /// 一番下の戻るボタンの文字(2.0.1。スカウト解禁の記事から開いたときは「記事に戻る」)
+  final String modoruMoji;
 
   @override
   Widget build(BuildContext context) {
@@ -260,6 +268,7 @@ class KotoshiKoukouTaikaiGamen extends StatelessWidget {
         kotoshiNomi: true,
         shingakuMoji: shingakuMoji,
         jibunHantei: jibunHantei,
+        modoruMoji: modoruMoji,
       ),
     );
   }
@@ -1370,7 +1379,11 @@ class _TaikaiKiroku extends StatefulWidget {
     this.kotoshiNomi = false,
     this.shingakuMoji,
     this.jibunHantei,
+    this.modoruMoji = 'スカウトへ進む',
   });
+
+  /// 今年の高校の大会の画面の、一番下の戻るボタンの文字(2.0.1)
+  final String modoruMoji;
 
   final bool scoutKara;
 
@@ -2009,9 +2022,9 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
               foregroundColor: HENSUU.buttonTextColor,
               padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
             ),
-            child: const Text(
-              'スカウトへ進む',
-              style: TextStyle(fontSize: HENSUU.fontsize_honbun, fontWeight: FontWeight.bold),
+            child: Text(
+              widget.modoruMoji,
+              style: const TextStyle(fontSize: HENSUU.fontsize_honbun, fontWeight: FontWeight.bold),
             ),
           ),
         ),

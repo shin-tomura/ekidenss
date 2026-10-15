@@ -771,6 +771,7 @@ class _KijiIchiranGamenState extends State<KijiIchiranGamen> {
               site: ban.site,
               sokuhou: _sokuhou(list),
               shinnyuusei: list.isNotEmpty && kijiShinnyuuseiKa(list.first), // 新入生の記事(2.0.0)
+              scoutMae: list.isNotEmpty && kijiKoukouTaikaiKa(list.first), // スカウト解禁の記事(2.0.1)
               tt: list.isNotEmpty && kijiTtKa(list.first), // 夏のTT特集(2.0.0)
             ) +
             list.map((k) => k.zenbun()).join('\n\n'),
@@ -796,7 +797,15 @@ class KijiGamen extends StatelessWidget {
   final List<Kiji> list;
   final int bangou;
 
-  const KijiGamen({super.key, required this.list, required this.bangou});
+  /// 記事の表の下(生成AIの枠の上)に置くもの(なければnull。スカウト解禁の記事の「大会の結果を見る」ボタン。2.0.1)
+  final Widget? shitaBotan;
+
+  const KijiGamen({
+    super.key,
+    required this.list,
+    required this.bangou,
+    this.shitaBotan,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -845,6 +854,10 @@ class KijiGamen extends StatelessWidget {
           const SizedBox(height: 8),
           for (final KijiBlock b in kiji.honbun) _block(b, _iroKiji(kiji)),
           for (final KijiHyou h in kiji.hyou) _hyou(h),
+          if (shitaBotan != null) ...[
+            const SizedBox(height: 20),
+            shitaBotan!,
+          ],
           const SizedBox(height: 28),
           _aiWaku(context, kiji),
           if (list.length > 1) ...[
@@ -950,7 +963,10 @@ class KijiGamen extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            kiji.category.endsWith('速報')
+            kijiKoukouTaikaiKa(kiji)
+                // スカウト解禁の記事(2.0.1)
+                ? 'この記事を依頼文つきでコピーして生成AIに貼り付けると、記者になりきって書き直してくれます。'
+                : kiji.category.endsWith('速報')
                 ? 'この速報を依頼文つきでコピーして生成AIに貼り付けると、記者になりきって書き直してくれます。'
                 : kiji.gakunai
                 ? 'この記事を依頼文つきでコピーして生成AIに貼り付けると、学生記者になりきって書き直してくれます。'
@@ -979,6 +995,7 @@ class KijiGamen extends StatelessWidget {
                         site: kiji.site,
                         sokuhou: kiji.category.endsWith('速報'),
                         shinnyuusei: kijiShinnyuuseiKa(kiji), // 新入生の記事(2.0.0)
+                        scoutMae: kijiKoukouTaikaiKa(kiji), // スカウト解禁の記事(2.0.1)
                         tt: kijiTtKa(kiji), // 夏のTT特集(2.0.0)
                       ) +
                       kiji.zenbun(),
@@ -994,7 +1011,11 @@ class KijiGamen extends StatelessWidget {
                 ),
               ),
               // 卒業生特集・年間表彰・学内表彰は大会の記事ではないので、大会のまとめのボタンは出さない(1.9.3)
-              if (kiji.category != '卒業生特集' && kiji.category != '年間表彰' && kiji.category != '学内表彰')
+              // (スカウト解禁の記事も、大学の大会の記事ではないので出さない。2.0.1)
+              if (kiji.category != '卒業生特集' &&
+                  kiji.category != '年間表彰' &&
+                  kiji.category != '学内表彰' &&
+                  !kijiKoukouTaikaiKa(kiji))
                 AiCopyMatomeButton(kekkaGamen: kiji.kekka),
             ],
           ),

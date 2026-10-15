@@ -24,6 +24,8 @@ export 'package:ekiden/kansuu/kiji/kiji_tenbou.dart' show KijiYosouJin;
 export 'package:ekiden/kansuu/kiji/kiji_gakuren.dart' show gakurenSiteMei;
 export 'package:ekiden/kansuu/kiji/kiji_shinnyuusei.dart' show kijiShinnyuuseiKa;
 export 'package:ekiden/kansuu/kiji/kiji_tt.dart' show kijiTtKa, ttSaishuuRace;
+// スカウト前の高校の大会の記事(2.0.1。新入生のスカウトの画面で出す)
+export 'package:ekiden/kansuu/kiji/kiji_koukou_taikai.dart' show kijiKoukouTaikaiKa, koukouTaikaiKiji;
 
 // ------------------------------------------------------------
 // ニュース記事(箱庭スポーツ)の入口(1.9.2)
@@ -424,6 +426,7 @@ void _log(List<Kiji> list) {
 /// [sokuhou] 区間ごとの速報のとき(学内メディアと学連選抜通信。1.9.7)
 /// [shinnyuusei] 新入生の記事のとき(箱庭スポーツの期待のルーキーと、学内メディアの新入生紹介号。2.0.0)
 /// [tt] 夏のTT特集のとき(箱庭スポーツの夏のTT特集と、学内メディアの学内TT特集。2.0.0)
+/// [scoutMae] スカウト前の高校の大会の記事のとき(箱庭スポーツの「スカウト解禁」。2.0.1)
 String kijiIraibun(
   bool kekka, {
   bool gakunai = false,
@@ -431,7 +434,18 @@ String kijiIraibun(
   bool sokuhou = false,
   bool shinnyuusei = false,
   bool tt = false,
+  bool scoutMae = false,
 }) {
+  // スカウト前の高校の大会の記事(2.0.1)。進学先はまだ決まっていないので、決めつけないように頼む
+  if (scoutMae) {
+    return '以下は、駅伝ゲーム「箱庭小駅伝SS」の高校の大会の結果をもとにした、架空のスポーツニュースサイト'
+        '「$kijiSiteMei」の、大学の新入生スカウトが始まる前の記事です。あなたはスポーツ紙の駅伝・陸上担当のベテラン記者として、'
+        '読みごたえのある記事に書き直してください。'
+        'この時点では、高校3年生の進学先はまだ決まっていません。進学先や、どの大学に入るかは決めつけないでください。'
+        '順位・タイム・持ちタイム・選手名・高校名・大学名などの事実は変えないでください。'
+        '選手の性格や勝負強さなど、記事に書かれていない特徴は付け足さないでください。'
+        'コメントは記事の中のものだけを使い、新しい発言は作らないでください。\n\n';
+  }
   // 夏のTT特集(2.0.0)。全体の順位は書かず、タイムで書いている記事なので、順位を足さないように頼む
   if (tt) {
     final String dare = gakunai

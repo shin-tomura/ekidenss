@@ -8,6 +8,7 @@ import 'package:ekiden/kansuu/time_date.dart';
 import 'package:ekiden/kansuu/setsumei_sontoku.dart'; // 補正の損得と指示の成否の書き足し(1.8.8)
 import 'package:ekiden/kansuu/mokuhyou_hosei.dart'; // 補正の強さが0%なら「タイム悪化あり」を書かない(1.9.8)
 import 'package:ekiden/kansuu/shushou.dart'; // 主将には目標順位による補正がかからない(2.0.1)
+import 'package:ekiden/kantoku_data.dart'; // 主将(2.0.1)
 
 // ------------------------------------------------------------
 // 自分の大学のレース経過のテキスト(1.8.2)
@@ -51,6 +52,15 @@ String jibunRaceKeikaText(Ghensuu currentGhensuu) {
           if (gakunenComparison != 0) return gakunenComparison;
           return a.id.compareTo(b.id);
         });
+  // 主将(2.0.1。shushou.dart)。選手名に「・主将」を付ける
+  final int? shushouId = shushouIdUniv(
+    Hive.box<KantokuData>('kantokuBox').get('KantokuData'),
+    currentGhensuu,
+    senshu,
+    currentGhensuu.MYunivid,
+  );
+  String gakunenMoji(SenshuData x) =>
+      '${x.gakunen}年${x.id == shushouId ? shushouShirushiMoji : ''}';
   String raceMei;
   switch (race) {
     case 0:
@@ -96,7 +106,7 @@ String jibunRaceKeikaText(Ghensuu currentGhensuu) {
         .toList();
     final String namae = hashiru.isEmpty
         ? '(選手が決まっていません)'
-        : hashiru.map((x) => '${x.name}(${x.gakunen}年)').join('、');
+        : hashiru.map((x) => '${x.name}(${gakunenMoji(x)})').join('、');
     sb.writeln('${k + 1}$kuLabel(${kyori}m) $namae');
     if (k >= hashitta) {
       sb.writeln('  これから走る');
@@ -142,7 +152,7 @@ String jibunRaceKeikaText(Ghensuu currentGhensuu) {
     if (saList.isNotEmpty) sb.writeln('  (${saList.join('、')})');
     // 走った選手ごとの指示の内容と結果、補正の説明(画面と同じ決まり。結果分析は出さない。1.8.4)
     for (final SenshuData x in hashiru) {
-      if (hashiru.length > 1 || kumi) sb.writeln('  ${x.name}(${x.gakunen}年)');
+      if (hashiru.length > 1 || kumi) sb.writeln('  ${x.name}(${gakunenMoji(x)})');
       if (kumi) {
         sb.writeln(
           '  組内順位:${x.temp_juni + 1}位 '

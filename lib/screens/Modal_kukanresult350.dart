@@ -15,6 +15,8 @@ import 'package:screenshot/screenshot.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:ekiden/kansuu/setsumei_sontoku.dart'; // 説明文に損得と指示の成否を書き足す(1.8.8)
+import 'package:ekiden/kansuu/shushou.dart'
+    show shushouIchiran, shushouShirushiMoji; // 主将(2.0.1)
 //import 'dart:typed_data';
 
 // --------------------------------------------------
@@ -1089,6 +1091,15 @@ String kojinJuniSokuhouHonbun({
     kukanBangou,
   );
   bool gakurenKaita = false;
+  // 大学ごとの主将(駅伝のときだけ、選手名に「・主将」を付ける。2.0.1。shushou.dart)
+  final Map<int, int> shushou =
+      (raceBangou <= 2 || raceBangou == 5)
+      ? shushouIchiran(
+          kantoku,
+          currentGhensuu,
+          Hive.box<SenshuData>('senshuBox').values,
+        )
+      : const <int, int>{};
 
   // 分析は、その区間(組)を走った選手の中だけの相対値。説明文の「○位」も区間内の順位(1.8.4)
   if (viewMode == ViewMode.analysis) {
@@ -1117,7 +1128,9 @@ String kojinJuniSokuhouHonbun({
               univ.time_taikai_total[kukanBangou - 1];
 
     final SenshuData? senshu = senshuMap[univ.id];
-    final String gakunenStr = senshu != null ? '(${senshu.gakunen}年)' : '';
+    final String gakunenStr = senshu != null
+        ? '(${senshu.gakunen}年${shushou[univ.id] == senshu.id ? shushouShirushiMoji : ''})'
+        : '';
 
     // 基本情報：順位 タイム 氏名(学年) 大学名
     shareText +=

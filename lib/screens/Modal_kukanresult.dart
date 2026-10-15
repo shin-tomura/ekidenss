@@ -30,6 +30,8 @@ import 'package:share_plus/share_plus.dart';
 
 import 'package:flutter/services.dart';
 import 'package:ekiden/kansuu/setsumei_sontoku.dart'; // 説明文に損得と指示の成否を書き足す(1.8.8)
+import 'package:ekiden/kansuu/shushou.dart'
+    show shushouIchiran, shushouShirushiMoji; // 主将(2.0.1)
 
 // --------------------------------------------------
 
@@ -1526,6 +1528,15 @@ String kojinSeisekiHonbun({
     kukanBangou,
   );
   bool gakurenKaita = false;
+  // 大学ごとの主将(駅伝のときだけ、選手名に「・主将」を付ける。2.0.1。shushou.dart)
+  final Map<int, int> shushou =
+      (raceBangou <= 2 || raceBangou == 5)
+      ? shushouIchiran(
+          kantoku,
+          currentGhensuu,
+          Hive.box<SenshuData>('senshuBox').values,
+        )
+      : const <int, int>{};
 
   // ★ここから追加: 生成AI等へのコピペ用補足説明★
 
@@ -1563,7 +1574,7 @@ String kojinSeisekiHonbun({
 
     shareText +=
         '$kukanJuni位 ${TimeDate.timeToFunByouString(kukanTime)} '
-        '${senshu.name}(${senshu.gakunen}年) ${univ?.name ?? '不明'}';
+        '${senshu.name}(${senshu.gakunen}年${shushou[senshu.univid] == senshu.id ? shushouShirushiMoji : ''}) ${univ?.name ?? '不明'}';
 
     if (raceBangou != 3 && raceBangou != 4) {
       if (senshu.chokuzentaikai_zentaikukansinflag == 1) {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ekiden/ghensuu.dart';
 import 'package:ekiden/senshu_data.dart';
+import 'package:ekiden/kansuu/shushou.dart' show shushouShirushi; // 主将の印(2.0.1)
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/constants.dart';
 import 'package:ekiden/screens/Modal_senshu.dart';
@@ -395,7 +396,7 @@ class _All0300 extends State<All0300> {
                                 ),
                                 child: ListTile(
                                   title: Text(
-                                    '${senshu.name} (${senshu.gakunen}年) 調子${senshu.chousi}',
+                                    '${senshu.name} (${senshu.gakunen}年${shushouShirushi(senshu)}) 調子${senshu.chousi}',
                                     style: const TextStyle(
                                       color: HENSUU.textcolor,
                                     ),

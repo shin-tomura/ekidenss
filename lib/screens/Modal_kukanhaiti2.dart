@@ -15,6 +15,7 @@ import 'package:ekiden/screens/Modal_senshu.dart';
 import 'package:ekiden/kansuu/konki_best.dart'; // 今季ベスト(1.9.1)
 import 'package:ekiden/kansuu/shushou.dart'
     show shushouIchiranIma, shushouShirushiMoji, shushouKaIma; // 主将(2.0.1)
+import 'package:ekiden/screens/shushou_iro.dart'; // 主将を示す色(2.0.1)
 import 'package:ekiden/screens/konki_best_parts.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
@@ -179,12 +180,10 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: shushou
-            ? const Color(0x4D2E7D32)
-            : Colors.white.withOpacity(0.1),
+        color: shushou ? shushouIroHaikei : Colors.white.withOpacity(0.1),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: shushou ? const Color(0xFF69F0AE) : Colors.white24,
+          color: shushou ? shushouIroSen : Colors.white24,
           width: shushou ? 2 : 1,
         ),
       ),
@@ -1058,11 +1057,11 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
     final bool shushou = shushouKaIma(s);
 
     return Card(
-      color: shushou ? const Color(0x4D2E7D32) : Colors.white.withOpacity(0.09),
+      color: shushou ? shushouIroHaikei : Colors.white.withOpacity(0.09),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(15),
         side: shushou
-            ? const BorderSide(color: Color(0xFF69F0AE), width: 2)
+            ? const BorderSide(color: shushouIroSen, width: 2)
             : BorderSide.none,
       ),
       margin: const EdgeInsets.only(bottom: 12),

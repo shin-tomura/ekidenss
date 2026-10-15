@@ -4,6 +4,7 @@ import 'package:ekiden/ghensuu.dart';
 import 'package:ekiden/constants.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/senshu_data.dart';
+import 'package:ekiden/kansuu/shushou.dart' show shushouShirushi; // 主将の印(2.0.1)
 import 'package:ekiden/screens/Modal_senshu.dart';
 import 'dart:math';
 
@@ -189,12 +190,15 @@ class _ModalKukanInstructionViewState extends State<ModalKukanInstructionView> {
                                 mainAxisAlignment:
                                     MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Text(
-                                    '${univ.name}\n${senshu.name} (${senshu.gakunen}年)',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
+                                  // 主将の印を足したので、右の順位の欄に押されても折り返せるように Flexible にした(2.0.1)
+                                  Flexible(
+                                    child: Text(
+                                      '${univ.name}\n${senshu.name} (${senshu.gakunen}年${shushouShirushi(senshu)})',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
                                     ),
                                   ),
                                   if (kukanIndex > 0)

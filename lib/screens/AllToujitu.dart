@@ -3,6 +3,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ekiden/ghensuu.dart';
 import 'package:ekiden/constants.dart';
 import 'package:ekiden/senshu_data.dart';
+import 'package:ekiden/kansuu/shushou.dart' show shushouShirushi; // 主将の印(2.0.1)
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/screens/Modal_senshu.dart';
 import 'package:ekiden/screens/kukan_haiti_button.dart'; // 区間配置確認を開くボタン(1.9.9)
@@ -210,9 +211,9 @@ class _AllToujitsuHenkouScreenState extends State<AllToujitsuHenkouScreen> {
 
   String _getSenshuDisplayName(SenshuData s) {
     if (s.chousi == 0) {
-      return '【体調不良】${s.name} (${s.gakunen}年)';
+      return '【体調不良】${s.name} (${s.gakunen}年${shushouShirushi(s)})';
     } else {
-      return '${s.name} (${s.gakunen}年) 調子${s.chousi}';
+      return '${s.name} (${s.gakunen}年${shushouShirushi(s)}) 調子${s.chousi}';
     }
   }
 

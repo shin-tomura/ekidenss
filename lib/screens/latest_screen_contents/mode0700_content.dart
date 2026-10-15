@@ -625,7 +625,7 @@ class ModalKukanshouView extends StatelessWidget {
                               ),
                             ),
                             Text(
-                              "(${senshu.gakunen}年)",
+                              "(${senshu.gakunen}年${shushouShirushi(senshu)})",
                               style: TextStyle(
                                 color: HENSUU.textcolor,
                                 fontSize: HENSUU.fontsize_honbun,
@@ -2355,7 +2355,7 @@ class _Mode0700ContentState extends State<Mode0700Content> {
               ),
               Text(senshu.name, style: TextStyle(color: HENSUU.textcolor)),
               Text(
-                "(${senshu.gakunen}年)",
+                "(${senshu.gakunen}年${shushouShirushi(senshu)})",
                 style: TextStyle(color: HENSUU.textcolor),
               ),
               //Text("$univName ", style: TextStyle(color: HENSUU.textcolor)),
@@ -2478,7 +2478,7 @@ class _Mode0700ContentState extends State<Mode0700Content> {
               ),
               Text(senshu.name, style: TextStyle(color: HENSUU.textcolor)),
               Text(
-                "(${senshu.gakunen}年)",
+                "(${senshu.gakunen}年${shushouShirushi(senshu)})",
                 style: TextStyle(color: HENSUU.textcolor),
               ),
               Text("$univName ", style: TextStyle(color: HENSUU.textcolor)),
@@ -2791,7 +2791,7 @@ class _Mode0700ContentState extends State<Mode0700Content> {
                       style: TextStyle(color: HENSUU.textcolor),
                     ),
                     Text(
-                      "(${senshu.gakunen}年)",
+                      "(${senshu.gakunen}年${shushouShirushi(senshu)})",
                       style: TextStyle(color: HENSUU.textcolor),
                     ),
                     Text(
@@ -2860,7 +2860,7 @@ class _Mode0700ContentState extends State<Mode0700Content> {
                       style: TextStyle(color: HENSUU.textcolor),
                     ),
                     Text(
-                      "(${senshu.gakunen}年)",
+                      "(${senshu.gakunen}年${shushouShirushi(senshu)})",
                       style: TextStyle(color: HENSUU.textcolor),
                     ),
                     Text(
@@ -3002,7 +3002,7 @@ class _Mode0700ContentState extends State<Mode0700Content> {
                   ),
                 ),
                 Text(
-                  "${senshu.name} ${senshu.gakunen}年",
+                  "${senshu.name} ${senshu.gakunen}年${shushouShirushi(senshu)}",
                   style: const TextStyle(color: HENSUU.textcolor),
                 ),
                 if (kumi)
@@ -3309,7 +3309,7 @@ class _Mode0700ContentState extends State<Mode0700Content> {
                       Wrap(
                         children: [
                           Text(
-                            "${gakunenJunUnivFilteredSenshuData[number].name} (${gakunenJunUnivFilteredSenshuData[number].gakunen}年)",
+                            "${gakunenJunUnivFilteredSenshuData[number].name} (${gakunenJunUnivFilteredSenshuData[number].gakunen}年${shushouShirushi(gakunenJunUnivFilteredSenshuData[number])})",
                             style: TextStyle(
                               color: HENSUU.textcolor,
                               //fontWeight: FontWeight.bold,

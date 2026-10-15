@@ -4,6 +4,7 @@ import 'package:ekiden/ghensuu.dart';
 import 'package:ekiden/constants.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/senshu_data.dart';
+import 'package:ekiden/kansuu/shushou.dart' show shushouShirushi; // 主将の印(2.0.1)
 import 'package:ekiden/kansuu/time_date.dart';
 import 'package:ekiden/screens/Modal_senshu.dart';
 import 'package:ekiden/senshu_gakuren_data.dart';
@@ -305,7 +306,7 @@ class _ModalKukanEntryListViewState extends State<ModalKukanEntryListView> {
                                             // 選手名・学年・大学名
                                             Flexible(
                                               child: Text(
-                                                '${univIndex + 1}. ${senshu.name}\n    (${senshu.gakunen}年 / ${univ?.name ?? '不明'})',
+                                                '${univIndex + 1}. ${senshu.name}\n    (${senshu.gakunen}年${shushouShirushi(senshu)} / ${univ?.name ?? '不明'})',
                                                 style: TextStyle(
                                                   color: HENSUU.textcolor,
                                                   fontSize:

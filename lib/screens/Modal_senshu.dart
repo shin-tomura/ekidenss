@@ -5,6 +5,7 @@ import 'package:ekiden/ghensuu.dart';
 import 'package:ekiden/constants.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/senshu_data.dart';
+import 'package:ekiden/kansuu/shushou.dart' show shushouShirushi; // 主将の印(2.0.1)
 import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/kansuu/koukou.dart'; // 出身校と高校時代の実績(1.9.5)
 import 'package:ekiden/kansuu/time_date.dart';
@@ -450,8 +451,10 @@ class _ModalSenshuDetailViewState extends State<ModalSenshuDetailView> {
                         fontSize: HENSUU.fontsize_honbun,
                       ),
                     ),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                    // 主将の印を足したので、文字を大きくしても折り返せるように Row から Wrap にした(2.0.1)
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
                         Text(
                           currentSenshu.name,
@@ -463,7 +466,7 @@ class _ModalSenshuDetailViewState extends State<ModalSenshuDetailView> {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          '(${currentSenshu.gakunen}年)',
+                          '(${currentSenshu.gakunen}年${shushouShirushi(currentSenshu)})',
                           style: const TextStyle(
                             color: Colors.white70, // 選手名より少し目立たない色
                             fontSize: HENSUU.fontsize_honbun,

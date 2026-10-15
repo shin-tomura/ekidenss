@@ -31,7 +31,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:flutter/services.dart';
 import 'package:ekiden/kansuu/setsumei_sontoku.dart'; // 説明文に損得と指示の成否を書き足す(1.8.8)
 import 'package:ekiden/kansuu/shushou.dart'
-    show shushouIchiran, shushouShirushiMoji; // 主将(2.0.1)
+    show shushouIchiran, shushouShirushiMoji, shushouShirushi; // 主将(2.0.1)
 
 // --------------------------------------------------
 
@@ -235,7 +235,7 @@ class _ModalKukanResultListViewState extends State<ModalKukanResultListView> {
                               ),
 
                               Text(
-                                '${univ?.name ?? '不明'} (${senshu.gakunen}年)',
+                                '${univ?.name ?? '不明'} (${senshu.gakunen}年${shushouShirushi(senshu)})',
 
                                 style: const TextStyle(
                                   color: Colors.white,
@@ -794,7 +794,7 @@ class _ModalKukanResultListViewState extends State<ModalKukanResultListView> {
                                               children: [
                                                 Flexible(
                                                   child: Text(
-                                                    '$junistr ${senshu.name}\n (${senshu.gakunen}年 / ${univ?.name ?? '不明'})',
+                                                    '$junistr ${senshu.name}\n (${senshu.gakunen}年${shushouShirushi(senshu)} / ${univ?.name ?? '不明'})',
 
                                                     style: TextStyle(
                                                       color: HENSUU.textcolor,

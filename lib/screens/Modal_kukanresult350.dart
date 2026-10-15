@@ -16,7 +16,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:ekiden/kansuu/setsumei_sontoku.dart'; // 説明文に損得と指示の成否を書き足す(1.8.8)
 import 'package:ekiden/kansuu/shushou.dart'
-    show shushouIchiran, shushouShirushiMoji; // 主将(2.0.1)
+    show shushouIchiran, shushouShirushiMoji, shushouShirushi; // 主将(2.0.1)
 //import 'dart:typed_data';
 
 // --------------------------------------------------
@@ -159,7 +159,7 @@ class _ModalKukanResultListViewState350
                                 ),
                               ),
                               Text(
-                                '${univ.name} (${senshu?.gakunen ?? "-"}年)',
+                                '${univ.name} (${senshu?.gakunen ?? "-"}年${senshu == null ? '' : shushouShirushi(senshu)})',
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 14,
@@ -543,7 +543,7 @@ class _ModalKukanResultListViewState350
                                           ),
                                         ),
                                         Text(
-                                          "${univ.name}（${senshu?.gakunen ?? "-"}年）",
+                                          "${univ.name}（${senshu?.gakunen ?? "-"}年${senshu == null ? '' : shushouShirushi(senshu)}）",
                                           style: TextStyle(
                                             color: HENSUU.textcolor,
                                             fontSize: HENSUU.fontsize_honbun,

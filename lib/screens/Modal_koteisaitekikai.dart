@@ -4,6 +4,7 @@ import 'package:ekiden/ghensuu.dart';
 import 'package:ekiden/constants.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/senshu_data.dart';
+import 'package:ekiden/kansuu/shushou.dart' show shushouShirushi; // 主将の印(2.0.1)
 import 'package:ekiden/kansuu/TrialTime.dart';
 import 'package:ekiden/screens/Modal_senshu.dart';
 import 'package:ekiden/kantoku_data.dart';
@@ -632,7 +633,7 @@ class _KukanHaitiScreenState extends State<KukanHaitiScreen> {
                         Expanded(
                           // 氏名テキストの色調整
                           child: Text(
-                            '${senshu.name} (${senshu.gakunen}年)',
+                            '${senshu.name} (${senshu.gakunen}年${shushouShirushi(senshu)})',
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
                               color: nameTextColor,

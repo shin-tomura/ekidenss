@@ -16,6 +16,10 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:screenshot/screenshot.dart';
 import 'package:ekiden/kansuu/rireki_text.dart';
+import 'package:ekiden/kantoku_data.dart';
+import 'package:ekiden/kansuu/shushou.dart'
+    show shushouIdUniv, shushouShirushiMoji; // 主将(2.0.1)
+import 'package:ekiden/screens/shushou_iro.dart'; // 主将を示す色(2.0.1)
 
 class ModalEkidenHistoryMatrixView extends StatefulWidget {
   final int targetUnivId;
@@ -62,6 +66,13 @@ class _ModalEkidenHistoryMatrixViewState
     }
   }
 
+  // この大学の主将の選手id(いなければnull。2.0.1)
+  int? _shushouId;
+
+  /// 名前の後ろのかっこの中の学年(主将なら「4年・主将」。2.0.1)
+  String _gakunenMoji(SenshuData s) =>
+      '${s.gakunen}年${s.id == _shushouId ? shushouShirushiMoji : ''}';
+
   void _prepareData() {
     final Box<Ghensuu> ghensuuBox = Hive.box<Ghensuu>('ghensuuBox');
     final Box<UnivData> univBox = Hive.box<UnivData>('univBox');
@@ -82,6 +93,14 @@ class _ModalEkidenHistoryMatrixViewState
       return gradeComp != 0 ? gradeComp : a.id.compareTo(b.id);
     });
 
+    // 主将(2.0.1。名前の欄の色と「(4年・主将)」に使う)
+    _shushouId = shushouIdUniv(
+      Hive.box<KantokuData>('kantokuBox').get('KantokuData'),
+      currentGhensuu,
+      _sortedSenshu,
+      widget.targetUnivId,
+    );
+
     _isInitialized = true;
   }
 
@@ -99,7 +118,7 @@ class _ModalEkidenHistoryMatrixViewState
       List<List<dynamic>> rows = [header];
 
       for (var senshu in _sortedSenshu) {
-        List<dynamic> row = ['${senshu.name}(${senshu.gakunen}年)'];
+        List<dynamic> row = ['${senshu.name}(${_gakunenMoji(senshu)})'];
         for (var config in _columnConfigs) {
           final int rIdx = config['raceIdx']!;
           final int gIdx = config['gradeIdx']!;
@@ -248,9 +267,12 @@ class _ModalEkidenHistoryMatrixViewState
                       padding: const EdgeInsets.all(8),
                       constraints: const BoxConstraints(minHeight: 70),
                       alignment: Alignment.centerLeft,
-                      color: rowBg,
+                      // 主将は、名前の欄の背景を薄い緑にし、左端に緑の線を引く(2.0.1。shushou_iro.dart)
+                      decoration: senshu.id == _shushouId
+                          ? shushouKazari
+                          : BoxDecoration(color: rowBg),
                       child: Text(
-                        '${senshu.name}\n(${senshu.gakunen}年)',
+                        '${senshu.name}\n(${_gakunenMoji(senshu)})',
                         style: TextStyle(
                           color: HENSUU.LinkColor,
                           fontSize: 14,
@@ -568,6 +590,8 @@ class _ModalEkidenHistoryMatrixViewState
   }
 
   TableViewCell _buildNameCell(SenshuData p, int rowIdx) {
+    // 主将は、名前の欄の背景を薄い緑にし、左端に緑の線を引く(2.0.1。shushou_iro.dart)
+    final bool shushou = p.id == _shushouId;
     return TableViewCell(
       child: GestureDetector(
         onTap: () => _showSenshuDetail(context, p.id),
@@ -575,16 +599,21 @@ class _ModalEkidenHistoryMatrixViewState
           padding: const EdgeInsets.all(8),
           alignment: Alignment.centerLeft,
           decoration: BoxDecoration(
-            color: rowIdx.isEven
-                ? Colors.white.withOpacity(0.05)
-                : Colors.transparent,
+            color: shushou
+                ? shushouIroHaikei
+                : (rowIdx.isEven
+                      ? Colors.white.withOpacity(0.05)
+                      : Colors.transparent),
             border: Border(
+              left: shushou
+                  ? const BorderSide(color: shushouIroSen, width: 4)
+                  : BorderSide.none,
               bottom: BorderSide(color: Colors.white.withOpacity(0.15)),
               right: const BorderSide(color: Colors.white, width: 0.8),
             ),
           ),
           child: AutoSizeText(
-            '${p.name}\n(${p.gakunen}年)',
+            '${p.name}\n(${_gakunenMoji(p)})',
             maxLines: 2,
             minFontSize: 8,
             style: TextStyle(

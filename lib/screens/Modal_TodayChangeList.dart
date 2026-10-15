@@ -4,6 +4,7 @@ import 'package:ekiden/ghensuu.dart';
 import 'package:ekiden/constants.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/senshu_data.dart';
+import 'package:ekiden/kansuu/shushou.dart' show shushouShirushi; // 主将の印(2.0.1)
 import 'package:ekiden/kansuu/ToujituHenkou_com.dart';
 
 // 当日変更選手一覧を表示するウィジェット
@@ -125,7 +126,7 @@ class _ModalTodayChangeListViewState extends State<ModalTodayChangeListView> {
 
   // 選手の表示を整形するヘルパー関数
   String _formatSenshu(SenshuData senshu) {
-    return '${senshu.name} (${senshu.gakunen})';
+    return '${senshu.name} (${senshu.gakunen}${shushouShirushi(senshu)})';
   }
 
   @override

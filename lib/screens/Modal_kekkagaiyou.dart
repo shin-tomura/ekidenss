@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ekiden/ghensuu.dart';
 import 'package:ekiden/senshu_data.dart';
+import 'package:ekiden/kansuu/shushou.dart' show shushouShirushi; // 主将の印(2.0.1)
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/constants.dart';
 import 'package:ekiden/kansuu/time_date.dart';
@@ -248,7 +249,7 @@ class _ModalEkidenResultListViewState extends State<ModalEkidenResultListView> {
         for (var senshu in filteredSenshuData) {
           if (senshu.entrykukan_race[racebangou][senshu.gakunen - 1] ==
               i_kukan) {
-            tempstr += "◆${i_kukan + 1}区 ${senshu.name} ${senshu.gakunen}年\n";
+            tempstr += "◆${i_kukan + 1}区 ${senshu.name} ${senshu.gakunen}年${shushouShirushi(senshu)}\n";
             tempstr +=
                 "区間${senshu.kukanjuni_race[racebangou][senshu.gakunen - 1] + 1}位 ${TimeDate.timeToFunByouString(senshu.kukantime_race[racebangou][senshu.gakunen - 1])} ${univ.tuukajuni_taikai[i_kukan] + 1}位通過\n";
             if (senshu.chokuzentaikai_zentaikukansinflag == 1) {

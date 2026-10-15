@@ -3,6 +3,7 @@ import 'package:flutter/services.dart'; // Clipboard用
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ekiden/ghensuu.dart';
 import 'package:ekiden/senshu_data.dart';
+import 'package:ekiden/kansuu/shushou.dart' show shushouShirushi; // 主将の印(2.0.1)
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/constants.dart';
@@ -124,7 +125,7 @@ class _ModalKukanHaitiResultView extends State<ModalKukanHaitiResultView> {
           kukanLabel = "";
         }
 
-        sb.writeln('$kukanLabel ${s.name} (${s.gakunen}年)');
+        sb.writeln('$kukanLabel ${s.name} (${s.gakunen}年${shushouShirushi(s)})');
 
         sb.writeln('  タイム: ${TimeDate.timeToFunByouString(time)} ($rank位)');
 
@@ -647,8 +648,9 @@ class _ModalKukanHaitiResultView extends State<ModalKukanHaitiResultView> {
                 ),
               ),
             ),
+            // 主将なら「4年・主将」(2.0.1。shushou.dart)
             Text(
-              "${s.gakunen}年",
+              "${s.gakunen}年${shushouShirushi(s)}",
               style: const TextStyle(color: Colors.white, fontSize: 13),
             ),
           ],

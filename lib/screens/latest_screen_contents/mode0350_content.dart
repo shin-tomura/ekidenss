@@ -2588,7 +2588,8 @@ class _Mode0350ContentState extends State<Mode0350Content> {
                       ),
 
                       Text(
-                        "${senshu.name} ${senshu.gakunen}年",
+                        // 主将なら「4年・主将」(2.0.1。shushou.dart)
+                        "${senshu.name} ${senshu.gakunen}年${shushouShirushi(senshu)}",
                         style: TextStyle(
                           color: HENSUU.textcolor,
                           //fontWeight: FontWeight.bold,
@@ -2739,7 +2740,8 @@ class _Mode0350ContentState extends State<Mode0350Content> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        "${senshu.name} ${senshu.gakunen}年",
+                        // 主将なら「4年・主将」(2.0.1。shushou.dart)
+                        "${senshu.name} ${senshu.gakunen}年${shushouShirushi(senshu)}",
                         style: TextStyle(
                           color: HENSUU.textcolor,
                           //fontWeight: FontWeight.bold,

@@ -4,6 +4,7 @@ import 'package:ekiden/ghensuu.dart';
 import 'package:ekiden/constants.dart';
 //import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/senshu_data.dart';
+import 'package:ekiden/kansuu/shushou.dart' show shushouShirushi; // 主将の印(2.0.1)
 import 'package:ekiden/screens/Modal_senshu.dart';
 import 'package:ekiden/screens/Modal_kukanentry.dart';
 import 'package:ekiden/screens/ModalAverageTimeRankingView.dart';
@@ -879,11 +880,11 @@ class _ToujitsuHenkouScreenState extends State<ToujitsuHenkouScreen> {
                         if (hoken.chousi == 0) {
                           // hoken.chousiが0の場合の表示
                           displayText =
-                              '【体調不良】${hoken.name} (${hoken.gakunen}年)';
+                              '【体調不良】${hoken.name} (${hoken.gakunen}年${shushouShirushi(hoken)})';
                         } else {
                           // hoken.chousiが0以外の場合の従来の表示
                           displayText =
-                              '${hoken.name} (${hoken.gakunen}年) 調子${hoken.chousi}';
+                              '${hoken.name} (${hoken.gakunen}年${shushouShirushi(hoken)}) 調子${hoken.chousi}';
                         }
 
                         return DropdownMenuItem(
@@ -928,13 +929,13 @@ class _ToujitsuHenkouScreenState extends State<ToujitsuHenkouScreen> {
                                     ),
                                     (entrySenshu.chousi > 0)
                                         ? Text(
-                                            '${entrySenshu.name} (${entrySenshu.gakunen}年) 調子${entrySenshu.chousi}',
+                                            '${entrySenshu.name} (${entrySenshu.gakunen}年${shushouShirushi(entrySenshu)}) 調子${entrySenshu.chousi}',
                                             style: baseTextStyle,
                                             overflow: TextOverflow.ellipsis,
                                             maxLines: 2, // 複数行に対応
                                           )
                                         : Text(
-                                            '【体調不良】${entrySenshu.name} (${entrySenshu.gakunen}年)',
+                                            '【体調不良】${entrySenshu.name} (${entrySenshu.gakunen}年${shushouShirushi(entrySenshu)})',
                                             style: baseTextStyle,
                                             overflow: TextOverflow.ellipsis,
                                             maxLines: 2, // 複数行に対応
@@ -1041,7 +1042,7 @@ class _ToujitsuHenkouScreenState extends State<ToujitsuHenkouScreen> {
                             (hoken.chousi > 0)
                                 ? Flexible(
                                     child: Text(
-                                      '${hoken.name} (${hoken.gakunen}年) 調子${hoken.chousi}',
+                                      '${hoken.name} (${hoken.gakunen}年${shushouShirushi(hoken)}) 調子${hoken.chousi}',
                                       style: const TextStyle(
                                         color: Colors.white,
                                         fontSize: HENSUU.fontsize_honbun,
@@ -1052,7 +1053,7 @@ class _ToujitsuHenkouScreenState extends State<ToujitsuHenkouScreen> {
                                   )
                                 : Flexible(
                                     child: Text(
-                                      '【体調不良】${hoken.name} (${hoken.gakunen}年)',
+                                      '【体調不良】${hoken.name} (${hoken.gakunen}年${shushouShirushi(hoken)})',
                                       style: const TextStyle(
                                         color: Colors.white,
                                         fontSize: HENSUU.fontsize_honbun,

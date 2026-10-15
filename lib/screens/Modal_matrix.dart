@@ -12,6 +12,7 @@ import 'package:ekiden/senshu_gakuren_data.dart';
 import 'package:ekiden/screens/Modal_senshu.dart';
 import 'package:ekiden/kansuu/shushou.dart'
     show shushouIdUniv, shushouShirushiMoji; // 主将(2.0.1)
+import 'package:ekiden/screens/shushou_iro.dart'; // 主将を示す色(2.0.1)
 import 'dart:io';
 import 'package:csv/csv.dart';
 import 'package:path_provider/path_provider.dart';
@@ -336,14 +337,6 @@ class _KonkiSeisekiHyou {
 String konkiSeisekiHyouText({required int univId, bool gakuren = false}) {
   return _KonkiSeisekiHyou(univId: univId, gakuren: gakuren).copyText();
 }
-
-/// 主将の名前の欄の背景と線の色(2.0.1。表のほかの色付けで使っていない緑)
-const Color _shushouHaikei = Color(0x4D2E7D32); // 緑(Colors.green.shade800)の30%
-const Color _shushouSen = Color(0xFF69F0AE); // Colors.greenAccent
-const BoxDecoration _shushouKazari = BoxDecoration(
-  color: _shushouHaikei,
-  border: Border(left: BorderSide(color: _shushouSen, width: 4)),
-);
 
 class ModalUnivSenshuMatrixView extends StatefulWidget {
   final int targetUnivId;
@@ -712,7 +705,7 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
                       alignment: Alignment.centerLeft,
                       // 主将は、名前の欄の背景を薄い緑にし、左端に緑の線を引く(2.0.1)
                       decoration: _hyou.shushouKa(senshu)
-                          ? _shushouKazari
+                          ? shushouKazari
                           : null,
                       child: Text(
                         widget.gakuren
@@ -1359,13 +1352,13 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
           alignment: Alignment.centerLeft,
           decoration: BoxDecoration(
             color: shushou
-                ? _shushouHaikei
+                ? shushouIroHaikei
                 : (rowIdx.isEven
                       ? Colors.transparent
                       : Colors.white.withOpacity(0.03)),
             border: Border(
               left: shushou
-                  ? const BorderSide(color: _shushouSen, width: 4)
+                  ? const BorderSide(color: shushouIroSen, width: 4)
                   : BorderSide.none,
               bottom: BorderSide(color: Colors.white.withOpacity(0.05)),
               right: BorderSide(color: Colors.white.withOpacity(0.1)),

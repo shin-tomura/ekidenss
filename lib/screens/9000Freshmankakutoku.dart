@@ -72,6 +72,10 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
   KoukouSaishinSeiseki? _koukouSeiseki; // 直近の大会の成績(初めて使うときに読む)
   // お気に入りの高校の出身だけにするか(1.9.5。お気に入りは高校名鑑の高校のページの☆で付ける)
   bool _okiniiriFilter = false;
+  // 監督の母校の出身だけにするか(2.0.1。あなたの大学の監督の母校・ほかの大学の監督の母校。
+  // 両方なら、どちらかに当てはまる選手。bokou_pipe.dart)
+  bool _bokouJibunFilter = false;
+  bool _bokouHokaFilter = false;
   Set<int>? _okiniiriKou; // お気に入りの高校(名簿の番号。初めて使うときに読む。高校名鑑から戻ったら読み直す)
 
   // ★追加: フィルタリング/並び替え可能な能力値の定義
@@ -832,11 +836,10 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
   Map<int, int>? _bokouCache;
   Map<int, String>? _univMeiCache;
 
-  /// 監督の母校の後輩の印の文(2.0.1。bokou_pipe.dart。「○○大学の監督の母校」。なければnull)
-  /// コンピュータスカウトONで、監督の母校パイプの設定がなしでなく、高校の情報を表示する設定のときだけ出す。
-  /// 自分の大学に効かない設定なら、自分の大学の分は出さない。[jibun] は、あなたの大学の監督の母校か(色を変える)
-  ({String moji, bool jibun})? _bokouMoji(SenshuData s) {
-    if (!_comScoutOn || s.hirou == 1) return null;
+  /// 監督の母校の印に使う設定(2.0.1。コンピュータスカウトONで、監督の母校パイプの設定がなしでなく、
+  /// 高校の情報を表示する設定のときだけ。出せないときはnull)
+  KantokuData? _bokouSettei() {
+    if (!_comScoutOn) return null;
     final KantokuData? kantoku = Hive.box<KantokuData>(
       'kantokuBox',
     ).get('KantokuData');
@@ -845,14 +848,45 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
         bokouPipeNashi(kantoku)) {
       return null;
     }
+    return kantoku;
+  }
+
+  /// 新入生[s]が監督の母校の後輩になる大学(印に出す大学。2.0.1。bokou_pipe.dart)
+  /// 自分の大学に効かない設定なら、自分の大学は入れない。印を出せないときと留学生は空
+  List<int> _bokouUnivs(SenshuData s) {
+    if (s.hirou == 1) return const [];
+    final KantokuData? kantoku = _bokouSettei();
+    if (kantoku == null) return const [];
     final Map<int, int> bokou = _bokouCache ??= bokouPipeBokou(kantoku);
     final int my = _ghensuu?.MYunivid ?? -1;
     final bool jibunKiku = bokouPipeJibunKiku(kantoku);
-    final List<int> univs = [
+    return [
       for (final int u in bokouPipeUnivs(bokou, s))
         if (u != my || jibunKiku) u,
     ];
+  }
+
+  /// 絞り込みに「監督の母校の出身だけ」のチェックを出すか(2.0.1。[jibun] はあなたの大学の分、[hoka] はほかの大学の分)
+  /// あなたの大学の分は、自分の大学に効く設定で、自分の大学に母校の分かる監督がいるときだけ。
+  /// ほかの大学の分は、ほかの大学に母校の分かる監督がいるときだけ(だれも当てはまらないチェックは出さない)
+  ({bool jibun, bool hoka}) _bokouFilterDasu() {
+    final KantokuData? kantoku = _bokouSettei();
+    if (kantoku == null) return (jibun: false, hoka: false);
+    final Map<int, int> bokou = _bokouCache ??= bokouPipeBokou(kantoku);
+    final int my = _ghensuu?.MYunivid ?? -1;
+    return (
+      jibun: bokouPipeJibunKiku(kantoku) && bokou.containsKey(my),
+      hoka: bokou.keys.any((int u) => u != my),
+    );
+  }
+
+  /// 監督の母校の後輩の印の文(2.0.1。bokou_pipe.dart。「○○大学の監督の母校」。なければnull)
+  /// コンピュータスカウトONで、監督の母校パイプの設定がなしでなく、高校の情報を表示する設定のときだけ出す。
+  /// 自分の大学に効かない設定なら、自分の大学の分は出さない。[jibun] は、あなたの大学の監督の母校か(色を変える)
+  ({String moji, bool jibun})? _bokouMoji(SenshuData s) {
+    final List<int> univs = _bokouUnivs(s);
     if (univs.isEmpty) return null;
+    final int my = _ghensuu?.MYunivid ?? -1;
     final Map<int, String> meiMap = _univMeiCache ??= {
       for (final UnivData u in _univBox.values) u.id: u.name,
     };
@@ -876,6 +910,8 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
   /// 高校時代(直近の大会)のフィルターが入っているか(1.9.5)
   bool get _koukouFilterAri =>
       _okiniiriFilter ||
+      _bokouJibunFilter ||
+      _bokouHokaFilter ||
       _koukouMeiFilter.trim().isNotEmpty ||
       _ekidenTeamJuniFilter > 0 ||
       _ekidenKukanJuniFilter > 0 ||
@@ -891,6 +927,15 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
     if (!koukouMeiAtaru(j, _koukouMeiFilter)) return false;
     // お気に入りの高校の出身だけ(1.9.5)
     if (_okiniiriFilter && !(_okiniiriKou ??= koukouOkiniiriYomu().toSet()).contains(j.koukou - 1)) return false;
+    // 監督の母校の出身だけ(2.0.1。両方にチェックしたら、どちらかに当てはまれば出す)
+    if (_bokouJibunFilter || _bokouHokaFilter) {
+      final List<int> us = _bokouUnivs(s);
+      final int my = _ghensuu?.MYunivid ?? -1;
+      final bool ok =
+          (_bokouJibunFilter && us.contains(my)) ||
+          (_bokouHokaFilter && us.any((int u) => u != my));
+      if (!ok) return false;
+    }
     final KoukouSaishinSeiseki seiseki = _koukouSeiseki ??= koukouSaishinSeisekiYomu();
     // 「○位以内」(0は条件なし。順位が0の選手は、出ていない・走っていない)
     bool inai(int juni, int joukan) => joukan <= 0 || (juni >= 1 && juni <= joukan);
@@ -2651,6 +2696,10 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
     final bool koukouHyouji = _koukouHyouji();
     String tempKoukouMei = _koukouMeiFilter;
     bool tempOkiniiri = _okiniiriFilter;
+    // 監督の母校の出身だけ(2.0.1)
+    final ({bool jibun, bool hoka}) bokouDasu = _bokouFilterDasu();
+    bool tempBokouJibun = _bokouJibunFilter;
+    bool tempBokouHoka = _bokouHokaFilter;
     int tempTeamJuni = _ekidenTeamJuniFilter;
     int tempKukanJuni = _ekidenKukanJuniFilter;
     final List<int> tempSoutaiJuni = List<int>.of(_soutaiJuniFilter);
@@ -2848,6 +2897,37 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
                                 side: const BorderSide(color: Colors.black54, width: 1.5),
                               ),
                               const Divider(height: 1),
+                              // 監督の母校の出身だけ(2.0.1。両方にチェックすると、どちらかに当てはまる選手)
+                              if (bokouDasu.jibun) ...[
+                                CheckboxListTile(
+                                  value: tempBokouJibun,
+                                  onChanged: (v) => setDialogState(() => tempBokouJibun = v ?? false),
+                                  title: const Text(
+                                    'あなたの大学の監督の母校の出身だけ',
+                                    style: TextStyle(fontSize: 15, color: Colors.black87),
+                                  ),
+                                  dense: true,
+                                  controlAffinity: ListTileControlAffinity.leading,
+                                  activeColor: Colors.blueAccent,
+                                  side: const BorderSide(color: Colors.black54, width: 1.5),
+                                ),
+                                const Divider(height: 1),
+                              ],
+                              if (bokouDasu.hoka) ...[
+                                CheckboxListTile(
+                                  value: tempBokouHoka,
+                                  onChanged: (v) => setDialogState(() => tempBokouHoka = v ?? false),
+                                  title: const Text(
+                                    'ほかの大学の監督の母校の出身だけ',
+                                    style: TextStyle(fontSize: 15, color: Colors.black87),
+                                  ),
+                                  dense: true,
+                                  controlAffinity: ListTileControlAffinity.leading,
+                                  activeColor: Colors.blueAccent,
+                                  side: const BorderSide(color: Colors.black54, width: 1.5),
+                                ),
+                                const Divider(height: 1),
+                              ],
                               juniGyou(
                                 '全国高校駅伝 高校の順位',
                                 tempTeamJuni,
@@ -2930,6 +3010,8 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
                                 _anteikanFilter = 0;
                                 // 高校時代(1.9.5)
                                 _okiniiriFilter = false;
+                                _bokouJibunFilter = false; // 監督の母校(2.0.1)
+                                _bokouHokaFilter = false;
                                 _koukouMeiFilter = '';
                                 _ekidenTeamJuniFilter = 0;
                                 _ekidenKukanJuniFilter = 0;
@@ -2946,6 +3028,9 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
                                 // 高校時代(1.9.5)
                                 _okiniiriFilter = tempOkiniiri;
                                 _okiniiriKou = null;
+                                // 監督の母校(2.0.1。チェックを出していないほうは外す)
+                                _bokouJibunFilter = tempBokouJibun && bokouDasu.jibun;
+                                _bokouHokaFilter = tempBokouHoka && bokouDasu.hoka;
                                 _koukouMeiFilter = tempKoukouMei.trim();
                                 _ekidenTeamJuniFilter = tempTeamJuni;
                                 _ekidenKukanJuniFilter = tempKukanJuni;

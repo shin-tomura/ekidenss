@@ -34,7 +34,7 @@ import 'package:ekiden/kansuu/kyouka_project.dart'
 import 'package:ekiden/kansuu/koukou.dart'
     show koukouIchiranMoji; // 監督の出身校(2.0.1。監督の母校パイプ)
 import 'package:ekiden/kansuu/shushou.dart' show shushouIdUniv; // 主将(2.0.1)
-import 'package:ekiden/screens/shushou_setsumei.dart'; // 主将の説明のリンク(2.0.1)
+import 'package:ekiden/screens/setsumei_mado.dart'; // 主将・母校パイプの説明のリンク(2.0.1)
 import 'package:ekiden/kansuu/mokuhyou_kimekata.dart'
     show
         mokuhyouKimekataKoujoushin,
@@ -3837,22 +3837,34 @@ class _UnivScreenState extends State<UnivScreen> {
                               fontSize: HENSUU.fontsize_honbun,
                             ),
                           ),
-                        // 監督の出身校(2.0.1。監督の母校パイプ。ボタンの文に足さず、別の行にする)
-                        if (kantoku.rid[ghensuu.hyojiunivnum] > 0 &&
-                            koukou_kantoku0.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16.0,
-                            ),
-                            child: Text(
-                              '監督の出身校: $koukou_kantoku0',
-                              style: TextStyle(
-                                color: HENSUU.textcolor,
+                        // 監督の出身校(2.0.1。監督の母校パイプ。ボタンの文に足さず、別の行にする)と、
+                        // 「母校パイプとは」のリンク(監督がいないときや、出身校を出さない設定のときは、リンクだけ。
+                        // 監督の名前のリンクと同じ行には並べない。文字を大きくしても次の行へ回るように Wrap にする)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16.0,
+                          ),
+                          child: Wrap(
+                            alignment: WrapAlignment.center,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 4,
+                            children: [
+                              if (kantoku.rid[ghensuu.hyojiunivnum] > 0 &&
+                                  koukou_kantoku0.isNotEmpty)
+                                Text(
+                                  '監督の出身校: $koukou_kantoku0',
+                                  style: TextStyle(
+                                    color: HENSUU.textcolor,
+                                    fontSize: HENSUU.fontsize_honbun - 2,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              const BokouPipeSetsumeiLink(
                                 fontSize: HENSUU.fontsize_honbun - 2,
                               ),
-                              textAlign: TextAlign.center,
-                            ),
+                            ],
                           ),
+                        ),
                         if (kantoku.rid[ghensuu.hyojiunivnum + TEISUU.UNIVSUU] >
                             0)
                           TextButton(

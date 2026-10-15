@@ -9,6 +9,8 @@ import 'package:ekiden/kansuu/koukou.dart';
 import 'package:ekiden/kansuu/koukou_meibo.dart';
 import 'package:ekiden/kansuu/scout_com.dart'; // スカウトの途中か(高校のページの卒業生。1.9.5)
 import 'package:ekiden/kansuu/bokou_pipe.dart'; // この高校出身の監督(2.0.1。監督の母校パイプ)
+import 'package:ekiden/screens/setsumei_mado.dart'
+    show BokouPipeSetsumeiLink; // 「母校パイプとは」のリンク(2.0.1)
 import 'package:ekiden/kansuu/time_date.dart';
 
 // ------------------------------------------------------------
@@ -1330,6 +1332,11 @@ class _KoukouPageState extends State<_KoukouPage> {
             ),
           if (_pipeKiku)
             _gyouHosoku('この高校の新入生は、スカウトで監督の大学を選びやすくなります。'),
+          // 母校パイプの説明(説明書の「名声」の中の母校パイプの部分と同じ文。setsumei_mado.dart)
+          const Align(
+            alignment: Alignment.centerLeft,
+            child: BokouPipeSetsumeiLink(),
+          ),
           const SizedBox(height: 24),
           const Text('架空の高校です。実在の学校とは関係ありません。大学のレースや育成には影響しません。', style: _hosoku),
           const SizedBox(height: 24),

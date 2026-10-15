@@ -30,7 +30,7 @@ import 'package:ekiden/screens/kiji_hyou_view.dart'; // 表の部品(1.9.8)
 import 'package:ekiden/screens/Modal_nameedit.dart'
     show ModalSenshuNameHenkou_modalsenshugamen; // 他大学の選手の名前の変更(箱庭モード。1.9.9)
 import 'package:ekiden/kansuu/shushou.dart'; // 主将(2.0.1)
-import 'package:ekiden/screens/shushou_setsumei.dart'; // 主将の説明のリンク(2.0.1)
+import 'package:ekiden/screens/setsumei_mado.dart'; // 主将の説明のリンク(2.0.1)
 
 String _getCombinedDifficultyText(KantokuData kantoku, Ghensuu currentGhensuu) {
   // 難易度モードを取得 (0:通常, 1:極, 2:天)
@@ -2968,7 +2968,7 @@ class _SenshuScreenState extends State<SenshuScreen> {
                 ),
               ),
             ),
-          // 主将の説明(説明書の「主将」と同じ文。shushou_setsumei.dart)
+          // 主将の説明(説明書の「主将」と同じ文。setsumei_mado.dart)
           const ShushouSetsumeiLink(),
         ],
       ),

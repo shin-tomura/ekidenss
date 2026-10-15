@@ -18,11 +18,16 @@ import 'package:ekiden/univ_data.dart';
 //   付いていて毎年空けないので、ここでは埋めない(空いている席だけを埋める))
 // ・選ぶ順番は、今の選び方と同じ(監督は記録の全体順位の合計、トラックのコーチは5000m・10000m、
 //   長距離のコーチはハーフ・フルの記録)。同じ人を、その大学のほかの席と重ねない
-// ・去年この席にいた人がまだいれば、その人のまま据え置く(記録の良い新卒が出るたびに代わらないように)。
-//   年齢の条件に合うOBが出てくれば、今まで通りそちらに代わる
+// ・今の選び方と同じく、毎年選び直す(据え置きはしない。開発中は据え置きにしていたが、今の選び方と
+//   同じ動きのほうが分かりやすいので、選び直しにした)。代わるのは、記録のより良いOBが卒業した年など。
+//   年齢の条件に合うOBが出てくれば、その席は今まで通りの選び方になる
+// ・監督の席は、コーチの年齢の条件(30+(id%10)歳以上)に合うOBを先に候補にする(いなければ若いOBから)。
+//   監督の条件に合うOBがいない数年の間に、年上のコーチを若い監督が率いる形が全大学でそろって起きないように。
+//   そのため、去年のコーチが監督になる「昇格」や、記録のより良いOBが30歳になった年に前の監督がコーチに回る
+//   「降格」も起きる(35歳を過ぎてからの今の選び方と同じ動き)
 // ・年齢の上限(65+(id%10)歳)は今まで通り守る(加齢で退任した人を、ここで戻さない)
 // ・RetireNew の監督・トラックのコーチ・長距離のコーチを選んだそれぞれの直後に呼ぶ(席ごとに呼ぶので、
-//   据え置きの監督が先に席を押さえ、30歳を過ぎた若い監督がコーチの選考で先に拾われることがない)
+//   監督が先に席を押さえ、コーチの選考で監督と同じ人が選ばれることがない)
 // ・就任・退任の記録(選手画面の監督・コーチ就任退任履歴)と、席が代わった印(KantokuData.yobiint1。
 //   4月5日の「監督・コーチ陣に変更があったようです」)は、今の処理と同じ形で書く。
 //   年齢の条件に合うOBに代わったときは、今の処理が若い人の退任を書かないので、ここで書く
@@ -56,8 +61,9 @@ double _jun(int seki, Senshu_R_Data o) {
 }
 
 /// 大学[univid]の席[seki](0=監督・1=コーチ(トラック)・2=コーチ(長距離))が、今まで通りに選んでも
-/// 空いたままなら、年齢に関係なく、その大学のOBから就任させる(保存もする)。
-/// [lastrid] は去年この席にいた人(0はいない。RetireNew の lastrid0〜2)。
+/// 空いたままなら、年齢の下限に関係なく、その大学のOBから就任させる(保存もする)。
+/// 監督の席は、コーチの年齢の条件に合うOBを先に候補にする。
+/// [lastrid] は去年この席にいた人(0はいない。RetireNew の lastrid0〜2。就任・退任の記録に使う)。
 /// RetireNew で、その席を選んだ直後に呼ぶ
 Future<void> wakateShuunin({
   required KantokuData kantoku,
@@ -120,21 +126,21 @@ Future<void> wakateShuunin({
         o,
   ];
   if (kouho.isEmpty) return;
-  // 去年この席にいた人がまだいれば、据え置く
-  Senshu_R_Data? suechi;
-  for (final Senshu_R_Data o in kouho) {
-    if (lastrid > 0 && o.id == lastrid) {
-      suechi = o;
-      break;
-    }
+  // 監督の席は、コーチの年齢の条件(30+(id%10)歳以上)に合うOBを先に候補にする(いなければ若いOBから)
+  List<Senshu_R_Data> narabe = kouho;
+  if (seki == 0) {
+    final List<Senshu_R_Data> nenchou = [
+      for (final Senshu_R_Data o in kouho)
+        if (_nenrei(ghensuu, o) >= _nenreiKagen(1, o)) o,
+    ];
+    if (nenchou.isNotEmpty) narabe = nenchou;
   }
-  if (suechi == null) {
-    kouho.sort((a, b) {
-      final int c = _jun(seki, a).compareTo(_jun(seki, b));
-      return c != 0 ? c : a.id.compareTo(b.id);
-    });
-  }
-  final Senshu_R_Data erabu = suechi ?? kouho.first;
+  // 記録の順(今の選び方と同じ)で一番の人
+  narabe.sort((a, b) {
+    final int c = _jun(seki, a).compareTo(_jun(seki, b));
+    return c != 0 ? c : a.id.compareTo(b.id);
+  });
+  final Senshu_R_Data erabu = narabe.first;
   kantoku.rid[idx] = erabu.id;
   if (erabu.id != lastrid) {
     kantoku.yobiint1[idx] = 1; // 異動あったフラグ(今の処理と同じ)

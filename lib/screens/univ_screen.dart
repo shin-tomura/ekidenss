@@ -33,6 +33,7 @@ import 'package:ekiden/kansuu/kyouka_project.dart'
     show KyoukaProject, kyoukaProjectChuu; // 強化プロジェクト(2.0.1)
 import 'package:ekiden/kansuu/koukou.dart'
     show koukouIchiranMoji; // 監督の出身校(2.0.1。監督の母校パイプ)
+import 'package:ekiden/kansuu/shushou.dart' show shushouIdUniv; // 主将(2.0.1)
 import 'package:ekiden/kansuu/mokuhyou_kimekata.dart'
     show
         mokuhyouKimekataKoujoushin,
@@ -3941,6 +3942,26 @@ class _UnivScreenState extends State<UnivScreen> {
                               fontSize: HENSUU.fontsize_honbun,
                             ),
                           ),
+                        // 主将(2.0.1。shushou.dart)
+                        if (_shushouMoji(kantoku, ghensuu, ghensuu.hyojiunivnum)
+                            .isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16.0,
+                            ),
+                            child: Text(
+                              _shushouMoji(
+                                kantoku,
+                                ghensuu,
+                                ghensuu.hyojiunivnum,
+                              ),
+                              style: TextStyle(
+                                color: HENSUU.textcolor,
+                                fontSize: HENSUU.fontsize_honbun,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
                         if (currentUnivData.sankankaisuu > 0)
                           Text(
                             '駅伝三冠 ${currentUnivData.sankankaisuu}回',
@@ -4696,6 +4717,17 @@ class _UnivScreenState extends State<UnivScreen> {
       ),
     );
   }
+}
+
+/// 大学[univid]の主将の文(「主将: ○○(4年)」。いなければ空。2.0.1。shushou.dart)
+String _shushouMoji(KantokuData kantoku, Ghensuu gh, int univid) {
+  final Iterable<SenshuData> senshu = Hive.box<SenshuData>('senshuBox').values;
+  final int? id = shushouIdUniv(kantoku, gh, senshu, univid);
+  if (id == null) return '';
+  for (final SenshuData s in senshu) {
+    if (s.id == id) return '主将: ${s.name}(${s.gakunen}年)';
+  }
+  return '';
 }
 
 /// 大学[univid]が強化プロジェクト中なら、終わる年度(でなければnull。2.0.1。kyouka_project.dart)

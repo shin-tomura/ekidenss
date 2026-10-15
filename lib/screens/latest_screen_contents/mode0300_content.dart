@@ -31,6 +31,7 @@ import 'package:ekiden/screens/All0300.dart';
 import 'package:ekiden/screens/Modal_Taichoufuryou.dart';
 import 'package:ekiden/kansuu/ShoriGuard.dart';
 import 'package:ekiden/screens/kukan_haiti_button.dart'; // 今季タイム一覧表を開くボタン(1.9.9)
+import 'package:ekiden/kansuu/shushou.dart' show shushouShirushi; // 主将の印(2.0.1)
 
 String _getCombinedDifficultyText(KantokuData kantoku, Ghensuu currentGhensuu) {
   // 難易度モードを取得 (0:通常, 1:極, 2:天)
@@ -2371,7 +2372,7 @@ class _Mode0300ContentState extends State<Mode0300Content> {
                                                                                   0)
                                                                               ? Expanded(
                                                                                   child: Text(
-                                                                                    "${senshu.name} (${senshu.gakunen}年) 調子${senshu.chousi}",
+                                                                                    "${senshu.name} (${senshu.gakunen}年${shushouShirushi(senshu)}) 調子${senshu.chousi}",
                                                                                     style: TextStyle(
                                                                                       fontSize: HENSUU.fontsize_honbun,
                                                                                       color: HENSUU.LinkColor,
@@ -2383,7 +2384,7 @@ class _Mode0300ContentState extends State<Mode0300Content> {
                                                                                 )
                                                                               : Expanded(
                                                                                   child: Text(
-                                                                                    "【体調不良】${senshu.name} (${senshu.gakunen}年)",
+                                                                                    "【体調不良】${senshu.name} (${senshu.gakunen}年${shushouShirushi(senshu)})",
                                                                                     style: TextStyle(
                                                                                       fontSize: HENSUU.fontsize_honbun,
                                                                                       color: HENSUU.LinkColor,
@@ -2566,7 +2567,7 @@ class _Mode0300ContentState extends State<Mode0300Content> {
                                                                                     ? Expanded(
                                                                                         // テキストが長くなってもはみ出さないようにExpandedで囲む
                                                                                         child: Text(
-                                                                                          "${senshu.name} (${senshu.gakunen}年) 調子${senshu.chousi}",
+                                                                                          "${senshu.name} (${senshu.gakunen}年${shushouShirushi(senshu)}) 調子${senshu.chousi}",
                                                                                           style: TextStyle(
                                                                                             fontSize: HENSUU.fontsize_honbun,
                                                                                             color: HENSUU.LinkColor,
@@ -2578,7 +2579,7 @@ class _Mode0300ContentState extends State<Mode0300Content> {
                                                                                     : Expanded(
                                                                                         // テキストが長くなってもはみ出さないようにExpandedで囲む
                                                                                         child: Text(
-                                                                                          "【体調不良】${senshu.name} (${senshu.gakunen}年)",
+                                                                                          "【体調不良】${senshu.name} (${senshu.gakunen}年${shushouShirushi(senshu)})",
                                                                                           style: TextStyle(
                                                                                             fontSize: HENSUU.fontsize_honbun,
                                                                                             color: HENSUU.LinkColor,
@@ -2695,7 +2696,7 @@ class _Mode0300ContentState extends State<Mode0300Content> {
                                                           (hoken.chousi > 0)
                                                               ? Flexible(
                                                                   child: Text(
-                                                                    '${entrykukannumberstr}${hoken.name} (${hoken.gakunen}年) 調子${hoken.chousi}',
+                                                                    '${entrykukannumberstr}${hoken.name} (${hoken.gakunen}年${shushouShirushi(hoken)}) 調子${hoken.chousi}',
                                                                     style: const TextStyle(
                                                                       color: Colors
                                                                           .white,
@@ -2712,7 +2713,7 @@ class _Mode0300ContentState extends State<Mode0300Content> {
                                                                 )
                                                               : Flexible(
                                                                   child: Text(
-                                                                    '${entrykukannumberstr}【体調不良】${hoken.name} (${hoken.gakunen}年)',
+                                                                    '${entrykukannumberstr}【体調不良】${hoken.name} (${hoken.gakunen}年${shushouShirushi(hoken)})',
                                                                     style: const TextStyle(
                                                                       color: Colors
                                                                           .white,

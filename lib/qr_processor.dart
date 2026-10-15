@@ -24,6 +24,7 @@ import 'kansuu/yosen_com_siji.dart'; // 正月駅伝予選のコンピュータ�
 import 'kansuu/mokuhyou_kimekata.dart'; // 目標順位決め方設定の確認(2.0.1)
 import 'kansuu/kyouka_project.dart'; // 強化プロジェクト設定の確認(2.0.1)
 import 'kansuu/bokou_pipe.dart'; // 監督の母校パイプ設定の確認(2.0.1)
+import 'kansuu/shushou.dart'; // 主将の特典の設定の確認(2.0.1)
 
 // 読み込み時に複数枚のデータを一時的に保持する状態管理クラス
 class QrReceiveState {
@@ -216,6 +217,9 @@ class SettingsQrProcessor {
       // 監督の母校パイプ設定(int) yobiint3[84] (2.0.1で追加。強さのコード+10×自分の大学に効かないか。
       // どれも0が初期値。bokou_pipe.dart)
       data['k_yobiint3_84'] = bokouPipeSetteiAtai(kantoku);
+      // 主将の特典(int) yobiint4[74] (2.0.1で追加。目標順位・指示の補正設定の画面にある設定。
+      // 0=あり(初期値)・1=なし。shushou.dart)
+      data['k_yobiint4_74'] = shushouTokutenAtai(kantoku);
     } else if (department == SettingsDepartment.octoberTime) {
       //区間ごとタイム調整(int)
       data['k_yobiint5_30_39_time'] = kantoku.yobiint5.sublist(30, 40);
@@ -736,6 +740,12 @@ class SettingsQrProcessor {
       final dynamic yobiint3_84 = dataMap['k_yobiint3_84'];
       if (yobiint3_84 is int) {
         bokouPipeSetteiAtaiIreru(kantoku, yobiint3_84);
+      }
+      // 主将の特典(int) kantoku.yobiint4[74] (2.0.1)
+      //   0=あり(初期値)・1=なし(古いQRコードには含まれていないので、そのときは今の設定のまま)
+      final dynamic yobiint4_74 = dataMap['k_yobiint4_74'];
+      if (yobiint4_74 is int && shushouTokutenAtaiTadashii(yobiint4_74)) {
+        shushouTokutenIreru(kantoku, yobiint4_74 == 0);
       }
       // 金銀支給量設定の難易度ごとの割合(int) kantoku.yobiint3[70]〜[73] (1.9.1)
       //   鬼・難しい・普通・易しいの順。0なら100%(初期値)、1〜50なら値×10%

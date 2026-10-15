@@ -9,6 +9,7 @@ import 'package:ekiden/kansuu/chousi_keiken_hosei.dart';
 import 'package:ekiden/senshu_gakuren_data.dart';
 import 'package:ekiden/univ_gakuren_data.dart';
 import 'package:ekiden/kansuu/gakuren_kantoku.dart';
+import 'package:ekiden/kansuu/shushou.dart'; // 主将の特典(2.0.1)
 
 // ------------------------------------------------------------
 // 「指示ごとの損得予測」の画面の計算(1.8.1)
@@ -26,6 +27,8 @@ import 'package:ekiden/kansuu/gakuren_kantoku.dart';
 // ・1.8.2から、学連選抜の監督をしているときの学連選抜の選手の分も出す(sijiSontokuKeisanGakuren)
 //   監督をしているときの学連選抜は、プレイヤーが決めた目標順位で、大学と同じく
 //   ほっと一息があり、正月駅伝の6区は判定しない(RaceCalc_gakuren.dartと同じ)
+// ・2.0.1から、主将(shushou.dart)は指示なしのときに目標順位による補正がかからないので、
+//   指示なしの損得を0にする(学連選抜の選手には主将の特典はない)
 // ------------------------------------------------------------
 
 /// 襷を受けた時点の、目標順位との関係
@@ -80,6 +83,9 @@ class SijiSontoku {
   /// 補正の強さを初期値(100%)から変えているか(1.8.2)
   final bool tsuyosaHenkouChuu;
 
+  /// 主将の特典で、指示なしのときに目標順位による補正がかからない選手か(2.0.1)
+  final bool shushou;
+
   const SijiSontoku({
     required this.joukyou,
     required this.juni,
@@ -93,6 +99,7 @@ class SijiSontoku {
     required this.osaeSeikou,
     required this.osaeShippai,
     required this.tsuyosaHenkouChuu,
+    this.shushou = false,
   });
 }
 
@@ -173,16 +180,22 @@ Future<SijiSontoku?> sijiSontokuKeisan(int senshuId) async {
   // 差が分からない場合(通常は起こらない)は、RaceCalcと同じく最大の悪化にする
   final double timeSaKeisan = timeSa ?? double.infinity;
 
+  // 主将(2.0.1)。指示なしのときは目標順位による補正がかからない(RaceCalcと同じ)
+  final bool shushou = shushouTokutenAri(kantoku) &&
+      shushouIdUniv(kantoku, gh, sortedSenshu, senshu.univid) == senshu.id;
+
   // 倍率(RaceCalc.dartの指示の補正と同じ分け方)
   final double nashiBairitsu;
   final double osaeSeikouBairitsu;
   final double osaeShippaiBairitsu;
   if (flag == 1) {
-    nashiBairitsu = mokuhyouTsukkomiBairitsu(
-      timeSa: timeSaKeisan,
-      kyoriMeter: kyoriMeter,
-      tsuyosa: tsuyosa,
-    );
+    nashiBairitsu = shushou
+        ? 1.0
+        : mokuhyouTsukkomiBairitsu(
+            timeSa: timeSaKeisan,
+            kyoriMeter: kyoriMeter,
+            tsuyosa: tsuyosa,
+          );
     osaeSeikouBairitsu = sijiOsaeSeikouShitamawariBairitsu(tsuyosa);
     osaeShippaiBairitsu = mokuhyouOsaeShippaiBairitsu(
       timeSa: timeSaKeisan,
@@ -191,7 +204,7 @@ Future<SijiSontoku?> sijiSontokuKeisan(int senshuId) async {
     );
   } else {
     final int uwamawari = flag < 0 ? -flag : 0;
-    nashiBairitsu = flag < 0
+    nashiBairitsu = (flag < 0 && !shushou)
         ? mokuhyouHitoikiBairitsu(uwamawari, tsuyosa)
         : 1.0;
     osaeSeikouBairitsu = sijiOsaeSeikouBairitsu(tsuyosa);
@@ -216,6 +229,7 @@ Future<SijiSontoku?> sijiSontokuKeisan(int senshuId) async {
   double byou(double bairitsu) => mikomiTime * (bairitsu - 1.0);
 
   return SijiSontoku(
+    shushou: shushou,
     joukyou: joukyou,
     juni: univ.tuukajuni_taikai[idx],
     mokuhyou: mokuhyou,

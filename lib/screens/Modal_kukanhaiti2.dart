@@ -13,6 +13,8 @@ import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/senshu_gakuren_data.dart';
 import 'package:ekiden/screens/Modal_senshu.dart';
 import 'package:ekiden/kansuu/konki_best.dart'; // 今季ベスト(1.9.1)
+import 'package:ekiden/kansuu/shushou.dart'
+    show shushouIchiranIma, shushouShirushiMoji; // 主将(2.0.1)
 import 'package:ekiden/screens/konki_best_parts.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
@@ -1695,6 +1697,9 @@ String kukanZenDaigakuText(int targetKukanIdx, {KonkiBestJuni? konkiJuni}) {
       ? (konkiJuni ?? KonkiBestJuni())
       : null;
 
+  // 大学ごとの主将(選手名に「・主将」を付ける。2.0.1。shushou.dart)
+  final Map<int, int> shushou = shushouIchiranIma();
+
   StringBuffer sb = StringBuffer();
   String kyoristring =
       "${currentGhensuu.kyori_taikai_kukangoto[raceIdx][targetKukanIdx].toStringAsFixed(0)}m";
@@ -1720,7 +1725,9 @@ String kukanZenDaigakuText(int targetKukanIdx, {KonkiBestJuni? konkiJuni}) {
 
         // ヘッダー: 【大学名】 区間 選手名 (学年)
         //sb.writeln('【${univ.name}】 $kukanLabel ${s.name} (${s.gakunen}年)');
-        sb.writeln('【${univ.name}】  ${s.name} (${s.gakunen}年)');
+        sb.writeln(
+          '【${univ.name}】  ${s.name} (${s.gakunen}年${shushou[univ.id] == s.id ? shushouShirushiMoji : ''})',
+        );
 
         // 距離表示 (駅伝の場合のみ)
         /*if (raceIdx != 3 && raceIdx != 4) {

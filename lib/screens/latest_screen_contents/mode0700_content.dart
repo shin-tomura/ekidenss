@@ -31,6 +31,7 @@ import 'package:ekiden/screens/Modal_timesasuii.dart';
 import 'package:ekiden/kansuu/gakuren_text.dart';
 import 'package:ekiden/kansuu/gakuren_kantoku.dart'; // 学連選抜の監督をした年か(1.8.3)
 import 'package:ekiden/kansuu/mokuhyou_hosei.dart'; // 補正の強さが0%なら「タイム悪化あり」を出さない(1.9.8)
+import 'package:ekiden/kansuu/shushou.dart'; // 主将には目標順位による補正がかからない(2.0.1)
 import 'package:ekiden/screens/Modal_senshu_race_bunseki.dart'
     show ModalSenshuAnalysisView; // 最終区の選手の結果分析(1.9.9)
 import 'package:ekiden/screens/kiji_hyou_view.dart'; // 金特訓・銀特訓の記録の一覧表(1.9.9)
@@ -3444,6 +3445,12 @@ class _Mode0700ContentState extends State<Mode0700Content> {
             Text(
               "結果: ${_getInstructionResult(senshu.sijiseikouflag)}",
               style: TextStyle(color: HENSUU.textcolor),
+            )
+          // 主将は、指示なしでも目標順位による補正がかからない(2.0.1。走った時点の補正の説明で見る)
+          else if (shushouHoseiNashiDatta(senshu))
+            Text(
+              shushouHoseiNashiKekka,
+              style: const TextStyle(color: HENSUU.textcolor),
             )
           else if (mokuhyoJuniFlagIndex >= 0 &&
               idJunUnivData.length > senshu.univid &&

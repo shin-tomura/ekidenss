@@ -26,6 +26,7 @@ import 'package:ekiden/kansuu/joukai.dart'
     show genkaitoppaOkorikataSettei, genkaitoppaOkorikataType; // 限界突破の起こり方(2.0.0)
 import 'package:ekiden/kansuu/ToujituHenkou_com.dart'
     show senryakuEntryKakuritu; // 戦略的エントリー確率設定(1.9.4)
+import 'package:ekiden/kansuu/shushou.dart' show shushouTokutenAri; // 主将(2.0.1)
 
 // ------------------------------------------------------------
 // ゲームの仕様の文(1.8.3で生成AI向けに作り、1.8.4から説明書と共通にした)
@@ -80,6 +81,7 @@ String gameShiyouText() {
     shiyouShuudansou(),
     shiyouMokuhyou(),
     shiyouSiji(),
+    shiyouShushou(),
     shiyouIkusei(),
     shiyouMeisei(),
     shiyouRyuugakusei(),
@@ -96,6 +98,7 @@ String shiyouMokuhyouSijiText() {
   final StringBuffer sb = StringBuffer();
   _kakuSetsu(sb, shiyouMokuhyou());
   _kakuSetsu(sb, shiyouSiji());
+  _kakuSetsu(sb, shiyouShushou());
   return '${sb.toString().trimRight()}\n';
 }
 
@@ -397,6 +400,9 @@ ShiyouSetsu shiyouMokuhyou({bool setsumeisho = false}) {
     '・判定は、その選手が襷を受けた時点(前の区間が終わった時点)の通過順位で行います。',
     '・1区と、正月駅伝の6区は判定しません。目標順位ちょうどで襷を受けたときは悪化しません。',
     '・前半突っ込み・前半抑えの指示を出した選手には、この悪化はかからず、代わりに指示の成否による補正がかかります。',
+    // 主将(2.0.1。shushou.dart)
+    if (_shushouTokutenHataraku(kantoku))
+      '・各大学の主将は、指示なしで走っても、この悪化がかかりません(「主将」を参照)。',
     '・コンピュータの大学にも目標順位があり、同じ仕組みがかかります。',
     '・目標順位が低いほど、駅伝の結果順位で得られる名声は小さくなります。',
     '　・目標1位のときを100とすると、目標2位は50、目標3位は33のように、目標順位で割った量になります。',
@@ -408,6 +414,53 @@ ShiyouSetsu shiyouMokuhyou({bool setsumeisho = false}) {
     );
   }
   return ShiyouSetsu('チームの目標順位', gyou);
+}
+
+/// 主将の特典が働くか(特典ありの設定で、目標順位による悪化かほっと一息のどちらかが0%でない。2.0.1)
+bool _shushouTokutenHataraku(KantokuData? kantoku) {
+  if (!shushouTokutenAri(kantoku)) return false;
+  if (kantoku == null) return true;
+  return hoseiTsuyosaPercent(kantoku, hoseiTsuyosaShitamawariIndex) > 0 ||
+      hoseiTsuyosaPercent(kantoku, hoseiTsuyosaHitoikiIndex) > 0;
+}
+
+/// 主将(2.0.1。shushou.dart)
+ShiyouSetsu shiyouShushou({bool setsumeisho = false}) {
+  final KantokuData? kantoku = _kantoku();
+  final String kd = _konoData(setsumeisho);
+  final bool tokuten = shushouTokutenAri(kantoku);
+  final bool hataraku = _shushouTokutenHataraku(kantoku);
+  final String anata = _anata(setsumeisho);
+  final List<String> gyou = [
+    '・どの大学にも、3年生か4年生の中から1人、主将がいます。',
+    if (!tokuten)
+      '・$kd、主将の特典はありません(主将はいますが、ほかの選手と同じです)。'
+    else if (!hataraku)
+      '・$kd、目標順位による悪化がないので、主将の特典も働きません。'
+    else ...[
+      '・主将は、駅伝の2区以降を指示なしで走るとき、目標順位による悪化がかかりません。',
+      '　・目標順位を下回ったときの悪化も、上回ったときのほっと一息もかかりません。',
+      '・主将に前半突っ込み・前半抑えの指示を出したときは、ほかの選手と同じく指示の成否による補正がかかります。',
+    ],
+    '・主将は、年度の初め(4月)に決まります。',
+    '・3年生で主将になった選手は、4年生になっても続けて主将を務めます。',
+    '・コンピュータの大学は、指示を出さない3・4年生の中から、ロード1万の自己ベストが一番速い選手を主将にします。',
+    '　・留学生は選びません。',
+    '　・当てはまる選手がいないときは、ほかの3・4年生から選びます。',
+    if (hataraku) '・コンピュータの大学は、主将を1区に置きません。',
+    '・$anataの大学の主将も、最初は同じ決め方で決まります。',
+    '・$anataの大学の主将は、9月の終わりまで代えられます。10月からは、年度の終わりまで代えられません。',
+    '・学連選抜の選手として走るときは、主将の特典はありません。',
+  ];
+  if (setsumeisho) {
+    gyou.addAll([
+      '・主将は、3・4年生の選手画面の「主将にする」で代えられます。',
+      '・主将は、大学画面・選手画面・区間エントリーの画面で分かります。',
+      if (hataraku) '・区間エントリーの初期案でも、主将は1区に置きません。',
+      '・主将の特典は、設定タブの「目標順位・指示の補正設定」でなしにできます(全大学共通)。',
+    ]);
+  }
+  return ShiyouSetsu('主将', gyou);
 }
 
 /// レース中の指示

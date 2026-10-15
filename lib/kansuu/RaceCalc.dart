@@ -20,6 +20,7 @@ import 'package:ekiden/kansuu/chousi_keiken_hosei.dart';
 import 'package:ekiden/kansuu/nouryoku_eikyodo.dart';
 import 'package:ekiden/kansuu/ikku_pace.dart'; // 1区の集団のペースの結果(1.9.2)
 import 'package:ekiden/kansuu/yosen_com_siji.dart'; // 正月駅伝予選のコンピュータの大学の指示と集団走(1.9.9)
+import 'package:ekiden/kansuu/shushou.dart'; // 主将の特典(2.0.1)
 
 String _timeToMinuteSecondString(double time) {
   if (time == TEISUU.DEFAULTTIME) {
@@ -58,6 +59,12 @@ Future<void> RaceCalc({
   final KantokuData kantoku = kantokuBox.get('KantokuData')!;
   // 目標順位・指示の補正の強さ(全大学共通の設定。1.8.2)
   final HoseiTsuyosa hoseiTsuyosa = HoseiTsuyosa.fromKantoku(kantoku);
+  // 主将の特典がかかる選手(2.0.1。shushou.dart)。指示なしで走る主将には、目標順位による補正をかけない
+  final Set<int> shushouIds = shushouTokutenIds(
+    kantoku,
+    gh[0],
+    sortedsenshudata,
+  );
   // 能力のタイムへの影響度(全大学共通の設定。駅伝と駅伝予選だけ。1.8.2)
   final NouryokuEikyodo nouryokuEikyodo = NouryokuEikyodo.forRace(
     kantoku,
@@ -944,6 +951,17 @@ Future<void> RaceCalc({
                     "指示(前半抑え)補正:${sontokutime.isNegative ? '' : '+'}${sontokutime.toStringAsFixed(1)}秒\n";
                 //atai_hosei[senshuid][12] = sontokutime;
                 atai_hosei[senshuid][9] = sontokutime;
+              }
+            } else if (shushouIds.contains(sortedsenshudata[senshuid].id)) {
+              // 主将は、指示なしでも目標順位による補正(前半突っ込みの悪化・ほっと一息)がかからない
+              // (2.0.1。shushou.dart)。下回り・上回りのときだけ、その旨を補正の説明に書く
+              // (行の頭は「目標順位下回って」にしない。記事が焦りと読み違えないように)
+              if (sortedunivdata[sortedsenshudata[senshuid].univid]
+                      .mokuhyojuniwositamawatteruflag[gh[0].nowracecalckukan -
+                      1] !=
+                  0) {
+                sortedsenshudata[senshuid].string_racesetumei +=
+                    "$shushouHoseiNashiMidashi(${_mokuhyouKonkyo(sortedunivdata[sortedsenshudata[senshuid].univid], racebangou, gh[0].nowracecalckukan, univs: sortedunivdata)})\n";
               }
             } else {
               if (sortedunivdata[sortedsenshudata[senshuid].univid]

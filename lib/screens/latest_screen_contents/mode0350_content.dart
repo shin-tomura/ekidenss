@@ -24,6 +24,7 @@ import 'package:ekiden/screens/Modal_GakurenKukan.dart';
 import 'package:ekiden/screens/Modal_tuukajunisuii.dart';
 import 'package:ekiden/screens/Modal_timesasuii.dart';
 import 'package:ekiden/kansuu/mokuhyou_hosei.dart';
+import 'package:ekiden/kansuu/shushou.dart'; // 主将(2.0.1)
 import 'package:ekiden/screens/Modal_senshu_race_bunseki.dart';
 import 'package:ekiden/screens/Modal_sijiSontoku.dart';
 import 'package:ekiden/kansuu/siji_sontoku.dart';
@@ -2288,6 +2289,8 @@ class _Mode0350ContentState extends State<Mode0350Content> {
                 .hyojiracebangou][senshu.gakunen - 1] ==
             currentGhensuu.nowracecalckukan) {
           String playerInfoText = "";
+          // 主将の特典の案内を出すか(駅伝の2区以降。上の文は3行までなので、別の行に出す。2.0.1)
+          bool shushouBun = false;
           if (currentGhensuu.hyojiracebangou == 3) {
             playerInfoText =
                 "${currentGhensuu.nowracecalckukan + 1}組目の選手(${senshu.name}(${senshu.gakunen}))へ指示をしますか？\n駅伝男${senshu.konjou}";
@@ -2319,6 +2322,8 @@ class _Mode0350ContentState extends State<Mode0350Content> {
             } else {
               playerInfoText =
                   "${currentGhensuu.nowracecalckukan + 1}区の選手(${senshu.name}(${senshu.gakunen}))へ指示をしますか？\n駅伝男${senshu.konjou} 平常心${senshu.heijousin}";
+              // 主将は、指示なしでも目標順位による補正がかからない(2.0.1。shushou.dart)
+              shushouBun = shushouTokutenKikuIma(senshu);
             }
           }
 
@@ -2389,6 +2394,11 @@ class _Mode0350ContentState extends State<Mode0350Content> {
                 overflow: TextOverflow.ellipsis, // はみ出しを「...」で表示
                 maxLines: 3, // 必要に応じて複数行を許可
               ),
+              if (shushouBun)
+                Text(
+                  '主将なので、指示なしでも目標順位による補正はかかりません',
+                  style: TextStyle(color: HENSUU.textcolor),
+                ),
               _buildDetailButton(senshu),
               const SizedBox(height: 20),
               // ここでDropdownButtonを修正
@@ -2524,6 +2534,10 @@ class _Mode0350ContentState extends State<Mode0350Content> {
                     sijiContent = "指示内容:${options[senshu.sijiflag]}";
                     if (senshu.sijiflag >= 1) {
                       sijiResult = "結果:${kekka[senshu.sijiseikouflag]}";
+                    } else if (i_kukan > 0 &&
+                        shushouHoseiNashiDatta(senshu)) {
+                      // 主将は、指示なしでも目標順位による補正がかからない(2.0.1。走った時点の補正の説明で見る)
+                      sijiResult = shushouHoseiNashiKekka;
                     } else if (i_kukan > 0 &&
                         idjununivdata[currentGhensuu.MYunivid]
                                 .mokuhyojuniwositamawatteruflag[i_kukan - 1] ==
@@ -2697,6 +2711,10 @@ class _Mode0350ContentState extends State<Mode0350Content> {
                     sijiContent = "指示内容:${options[senshu.sijiflag]}";
                     if (senshu.sijiflag >= 1) {
                       sijiResult = "結果:${kekka[senshu.sijiseikouflag]}";
+                    } else if (i_kukan > 0 &&
+                        shushouHoseiNashiDatta(senshu)) {
+                      // 主将は、指示なしでも目標順位による補正がかからない(2.0.1。走った時点の補正の説明で見る)
+                      sijiResult = shushouHoseiNashiKekka;
                     } else if (i_kukan > 0 &&
                         idjununivdata[currentGhensuu.MYunivid]
                                 .mokuhyojuniwositamawatteruflag[i_kukan - 1] ==

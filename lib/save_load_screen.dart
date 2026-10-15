@@ -25,6 +25,7 @@ import 'package:ekiden/kansuu/scout_com.dart';
 import 'package:ekiden/kansuu/gakuren_kantoku.dart'; // 学連選抜の監督の移行処理(1.8.2)
 import 'package:ekiden/kansuu/seichou_type.dart'; // 新入生の成長タイプの割合の移行処理(1.9.3)
 import 'package:ekiden/kansuu/koukou.dart'; // 出身校と高校時代の実績(1.9.5)
+import 'package:ekiden/kansuu/shushou.dart'; // 主将(2.0.1)
 import 'package:ekiden/kansuu/taikai_chouki.dart'; // 大会の長い記録の移行処理(2.0.0)
 import 'package:ekiden/kansuu/mokuhyou_kimekata.dart'; // 目標順位の決め方の移行処理(2.0.1)
 //import 'dart:io';
@@ -846,6 +847,9 @@ class _SaveLoadScreenState extends State<SaveLoadScreen> {
       // 出身校のないOBに出身校だけを付ける(2.0.1。mainの中の同じ処理の説明を参照)
       //mainの中にもあるので、そちらも変更すること！
       await koukouObFuyo();
+      // 今の年度の主将をまだ決めていなければ決める(2.0.1。mainの中の同じ処理の説明を参照)
+      //mainの中にもあるので、そちらも変更すること！
+      await shushouJunbi();
 
       {
         // 選手と大学のチャートの点数を一度計算し直す(1.9.7。mainの中の同じ処理の説明を参照)

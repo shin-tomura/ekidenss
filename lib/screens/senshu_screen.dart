@@ -29,6 +29,7 @@ import 'package:ekiden/kansuu/kiji/kiji_kihon.dart'
 import 'package:ekiden/screens/kiji_hyou_view.dart'; // 表の部品(1.9.8)
 import 'package:ekiden/screens/Modal_nameedit.dart'
     show ModalSenshuNameHenkou_modalsenshugamen; // 他大学の選手の名前の変更(箱庭モード。1.9.9)
+import 'package:ekiden/kansuu/shushou.dart'; // 主将(2.0.1)
 
 String _getCombinedDifficultyText(KantokuData kantoku, Ghensuu currentGhensuu) {
   // 難易度モードを取得 (0:通常, 1:極, 2:天)
@@ -1971,8 +1972,10 @@ class _SenshuScreenState extends State<SenshuScreen> {
                       ),
                     ),
                   ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  // 主将の印を足したので、文字を大きくしても折り返せるように Row から Wrap にした(2.0.1)
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       //Text("id=${currentSenshu.id}"),
                       Text(
@@ -1985,8 +1988,9 @@ class _SenshuScreenState extends State<SenshuScreen> {
                       ),
                       const SizedBox(width: 8),
                       // 学年表示は引き続き `Colors.white70` を維持し、少し目立たなくします
+                      // 主将なら「・主将」を足す(2.0.1。shushou.dart)
                       Text(
-                        '(${currentSenshu.gakunen}年)',
+                        '(${currentSenshu.gakunen}年${shushouShirushi(currentSenshu)})',
                         //'(${currentSenshu.gakunen}年 ID${currentSenshu.id})',
                         style: const TextStyle(
                           color: Colors.white,
@@ -2457,6 +2461,8 @@ class _SenshuScreenState extends State<SenshuScreen> {
                                 ghensuu.silverballsuu >= 10) &&
                             currentSenshu.hirou != 1)
                           _tokkunButtons(ghensuu),
+                        // 主将(2.0.1。shushou.dart)。あなたの大学の3・4年生は、9月まで主将にできる
+                        _shushouBubun(ghensuu, currentSenshu, hokaUnivid == null),
 
                         const SizedBox(height: 16),
                         // 三大駅伝と対校戦の成績の表(1.9.8)
@@ -2912,6 +2918,104 @@ class _SenshuScreenState extends State<SenshuScreen> {
   // リンクボタン用のヘルパーウィジェット
   // リンクボタンをWidgetに分離
   // currentGhensuu を引数として受け取るように変更
+  /// 主将の表示と「主将にする」ボタン(2.0.1。shushou.dart)
+  /// 主将なら「この選手は主将です」と出す。あなたの大学の3・4年生で、主将でない選手には、
+  /// 代えられる時期(4月〜9月)だけ「主将にする」ボタンを出す
+  Widget _shushouBubun(Ghensuu ghensuu, SenshuData s, bool jibunHyouji) {
+    final bool jibun = jibunHyouji && s.univid == ghensuu.MYunivid;
+    final bool shushou = shushouKaIma(s);
+    final bool kaerareru =
+        jibun && shushouNareru(s) && shushouHenkouDekiru(ghensuu);
+    if (!shushou && !kaerareru) return const SizedBox.shrink();
+    final String shushouMoji = !jibun
+        ? 'この選手は主将です。'
+        : (shushouHenkouDekiru(ghensuu)
+              ? 'この選手は主将です。9月の終わりまでは、ほかの3・4年生の選手画面から代えられます。'
+              : 'この選手は主将です。10月からは、年度の終わりまで代えられません。');
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (shushou)
+            Text(
+              shushouMoji,
+              style: const TextStyle(
+                color: Colors.amber,
+                fontSize: HENSUU.fontsize_honbun,
+              ),
+            )
+          else
+            ElevatedButton(
+              onPressed: () => _shushouNinmeiKakunin(ghensuu, s),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.amber.shade700,
+                foregroundColor: Colors.black,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
+              ),
+              child: const Text(
+                '主将にする',
+                style: TextStyle(
+                  fontSize: HENSUU.fontsize_honbun,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// 確かめてから、選手[s]を主将にする(2.0.1)
+  Future<void> _shushouNinmeiKakunin(Ghensuu ghensuu, SenshuData s) async {
+    final KantokuData? kantoku = Hive.box<KantokuData>(
+      'kantokuBox',
+    ).get('KantokuData');
+    final String tokuten = shushouTokutenAri(kantoku)
+        ? '主将は、駅伝の2区以降を指示なしで走るとき、目標順位による補正(下回ったときの悪化とほっと一息)がかかりません。\n'
+        : '';
+    final bool? ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('主将にする', style: TextStyle(color: Colors.black)),
+        content: SingleChildScrollView(
+          child: Text(
+            '${s.name}選手を主将にしますか？\n'
+            '$tokuten'
+            '9月の終わりまでは、ほかの3・4年生に代えられます。',
+            style: const TextStyle(color: Colors.black),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('やめる'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('主将にする'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final bool dekita = await shushouNinmei(s, ghensuu);
+    if (!mounted) return;
+    setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(dekita ? '${s.name}選手を主将にしました' : '主将にできませんでした'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
   /// 金特訓・銀特訓・金銀交換のボタン(夏合宿の日の選手画面。1.9.9)
   /// 押すと、今まで一番下のリンクの列から開いていたのと同じ画面を開く(特訓するのは表示している選手)
   Widget _tokkunButtons(Ghensuu ghensuu) {

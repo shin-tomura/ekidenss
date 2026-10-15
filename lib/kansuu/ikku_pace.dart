@@ -7,6 +7,7 @@ import 'package:ekiden/kansuu/TrialTime.dart';
 import 'package:ekiden/kansuu/chousi_keiken_hosei.dart';
 import 'package:ekiden/kansuu/time_date.dart';
 import 'package:ekiden/kansuu/ToujituHenkou_com.dart'; // 戦略的エントリー確率と、自動の当日変更の前か(1.9.5)
+import 'package:ekiden/kansuu/shushou.dart'; // 主将を1区に入れない(2.0.1)
 
 // ------------------------------------------------------------
 // 駅伝の1区の集団のペースの予想と結果(1.9.2)
@@ -455,6 +456,8 @@ class IkkuTaikou {
 // ・その補欠を入れ替えたときの予想をやり直し、本命か対抗になる選手を出す(最大2人。本命になる選手が先、
 //   同じならカリスマの高い順)
 // ・自動の当日変更が済んだ日と、箱庭モードの他大学変更で確定した大学の補欠は出さない
+// ・コンピュータの大学は主将を1区に入れないので(2.0.1。shushou.dart)、主将の補欠は出さない
+//   (体調不良の交代で、補欠が主将しかいないときは出す。ToujituHenkou_com.dart と同じ)
 // ・添え書きは1つ(前回1区 → 1区の経験あり → ペース変動対応力が持ち味の順)。
 //   ペース変動対応力は、ロード適性とペース変動対応力の両方を見抜く力がついているときだけ比べる
 // ------------------------------------------------------------
@@ -553,6 +556,9 @@ List<IkkuHoketsuKouho> ikkuHoketsuKouho({
     }
   }
 
+  // 1区に入れない主将(2.0.1。主将の特典がないときは空)
+  final Set<int> shushouIds = shushouIkkuSakeruIds(kantoku, gh, sortedSenshu);
+
   final List<IkkuHoketsuKouho> kekka = [];
   for (final MapEntry<int, SenshuData> e in ikkuSenshu.entries) {
     final int u = e.key;
@@ -603,10 +609,14 @@ List<IkkuHoketsuKouho> ikkuHoketsuKouho({
 
     // 1区に入りそうな補欠
     final List<SenshuData> hairu = [];
-    final List<SenshuData> kouho = [
-      for (final SenshuData r in hl)
-        if (!(chousiIreru && r.chousi == 0)) r,
-    ];
+    final List<SenshuData> kouho = shushouIkkuNozoku(
+      [
+        for (final SenshuData r in hl)
+          if (!(chousiIreru && r.chousi == 0)) r,
+      ],
+      shushouIds,
+      taichouFuryou: taichouFuryou,
+    );
     if (taichouFuryou) {
       // 体調不良の交代は、1区で一番速い補欠
       SenshuData? best;

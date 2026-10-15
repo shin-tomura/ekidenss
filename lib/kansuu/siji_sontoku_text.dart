@@ -56,6 +56,12 @@ String sijiSontokuJoukyouBun(SijiSontoku s, {bool gakuren = false}) {
 
 /// 指示なしの損得の理由(補正の強さが0%などで損得がないときと、理由がないときは空)
 String sijiSontokuNashiRiyuu(SijiSontoku s) {
+  // 主将は、指示なしでも目標順位による補正がかからない(2.0.1。shushou.dart)
+  if (s.shushou &&
+      (s.joukyou == SijiSontokuJoukyou.shitamawari ||
+          s.joukyou == SijiSontokuJoukyou.uwamawari)) {
+    return '主将なので、指示なしでも目標順位による補正はかかりません';
+  }
   if (s.nashi == 0.0) return '';
   if (s.joukyou == SijiSontokuJoukyou.shitamawari) {
     return '目標順位を下回ったため、前半無理に突っ込んでしまう分';
@@ -157,7 +163,7 @@ Future<String> sijiSontokuAiText(Ghensuu gh) async {
 
   final String senshuMei = gakuren
       ? '学連選抜 ${taishou.gakurenSenshu!.name}(${taishou.gakurenSenshu!.gakunen}年・所属:${gakurenShozoku(taishou.gakurenSenshu!)})'
-      : '${taishou.senshu!.name}(${taishou.senshu!.gakunen}年)';
+      : '${taishou.senshu!.name}(${taishou.senshu!.gakunen}年${s.shushou ? '・主将' : ''})';
   final String nashiRiyuu = sijiSontokuNashiRiyuu(s);
   final List<String> gyou = [
     '【指示ごとの損得予測(${kukan + 1}区・$senshuMei)】',

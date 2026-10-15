@@ -7,6 +7,7 @@ import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/constants.dart';
 import 'package:ekiden/kansuu/TrialTime.dart';
 import 'package:ekiden/kansuu/chousi_keiken_hosei.dart';
+import 'package:ekiden/kansuu/shushou.dart'; // 主将を1区に置かない(2.0.1)
 import 'package:hive_flutter/hive_flutter.dart';
 
 // ------------------------------------------------------------
@@ -33,6 +34,10 @@ import 'package:hive_flutter/hive_flutter.dart';
 // ・箱庭モードの「他大学変更」で確定した大学は、その日の自動当日変更をしない
 // ・区間エントリーの整合性チェックと自動修復(全大学、学連選抜は除く)
 //     区間エントリー決定後とレース計算開始時に、1区間に走者がちょうど1人になるよう直す
+// ・主将(2.0.1。shushou.dart): 主将の特典があるときは、1区の交代の候補から主将を外す
+//     (体調不良の交代で、補欠が主将しかいないときだけ主将を入れる。戦略的エントリーで空いた1区には
+//      主将を入れず、ほかに候補がいなければ今まで通り温存をやめる)。
+//     整合性チェックと自動修復は安全網なので変えない(まれに主将が1区に入っても、特典が生きないだけ)
 //
 // KantokuData.yobiint2 の使用番号
 //   [34] 戦略的エントリー確率(0〜100、初期値0)
@@ -284,6 +289,12 @@ Future<void> comEntryAtoshori({
     kantoku,
     shisouTime: entryShisouTimeCache, // EntryCalcで計算済みの試走タイムを使い回す
   );
+  // 1区に置かない主将(2.0.1。主将の特典がないときは空)
+  final Set<int> shushouIds = shushouIkkuSakeruIds(
+    kantoku,
+    gh[0],
+    sortedSenshuData,
+  );
 
   for (final univ in sortedUnivData) {
     if (univ.taikaientryflag[racebangou] != 1) continue;
@@ -320,9 +331,13 @@ Future<void> comEntryAtoshori({
         }
       }
       if (runner == null || runner.chousi != 0) continue;
-      final List<SenshuData> subs = team
+      List<SenshuData> subs = team
           .where((s) => _entry(s, racebangou) == -1 && s.chousi != 0)
           .toList();
+      // 1区には主将を入れない(補欠が主将しかいないときは入れる。2.0.1)
+      if (k == 0) {
+        subs = shushouIkkuNozoku(subs, shushouIds, taichouFuryou: true);
+      }
       final SenshuData? sub = await mitumori.fastest(subs, k);
       if (sub == null) continue;
       _setEntry(runner, racebangou, -1);
@@ -393,7 +408,7 @@ Future<void> comEntryAtoshori({
           .toList();
       for (final ace in aces) {
         final int k = _entry(ace, racebangou);
-        final List<SenshuData> subs = team
+        List<SenshuData> subs = team
             .where(
               (s) =>
                   _entry(s, racebangou) == -1 &&
@@ -401,6 +416,8 @@ Future<void> comEntryAtoshori({
                   !_isOnzon(s), // 温存したエースは代わりの選手にしない
             )
             .toList();
+        // 空いた1区には主将を入れない(ほかに候補がいなければ、今まで通り温存をやめる。2.0.1)
+        if (k == 0) subs = shushouIkkuNozoku(subs, shushouIds);
         final SenshuData? kawari = await mitumori.fastest(subs, k);
         if (kawari == null) break;
         _setEntry(ace, racebangou, -1);
@@ -466,6 +483,12 @@ Future<void> comToujituHenkou({
   final random = Random();
   final mitumori = _Mitumori(gh[0], sortedSenshuData, sortedUnivData, kantoku);
   bool henkouAri = false;
+  // 1区に置かない主将(2.0.1。主将の特典がないときは空)
+  final Set<int> shushouIds = shushouIkkuSakeruIds(
+    kantoku,
+    gh[0],
+    sortedSenshuData,
+  );
 
   for (final univ in sortedUnivData) {
     if (univ.id == gh[0].MYunivid) continue;
@@ -504,11 +527,19 @@ Future<void> comToujituHenkou({
       final int k = _entry(runner, racebangou);
       // 調子100の走者は、温存したエースを起用する場合のみ交代を検討する
       // (温存したエースは、その日の区間ならどこにでも起用できる)
-      final List<SenshuData> kentouSubs = runner.chousi < 100
+      List<SenshuData> kentouSubs = runner.chousi < 100
           ? subs
           : subs
                 .where((s) => _onzonKiyouKanou(s, racebangou, day))
                 .toList();
+      // 1区には主将を入れない(体調不良の走者の交代で、補欠が主将しかいないときは入れる。2.0.1)
+      if (k == 0) {
+        kentouSubs = shushouIkkuNozoku(
+          kentouSubs,
+          shushouIds,
+          taichouFuryou: runner.chousi == 0,
+        );
+      }
       if (kentouSubs.isEmpty) continue;
       final double genzai = await mitumori.time(runner, k);
       for (final sub in kentouSubs) {

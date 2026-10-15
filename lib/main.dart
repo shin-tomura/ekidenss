@@ -73,6 +73,7 @@ import 'package:ekiden/kansuu/koukou.dart'; // 出身校と高校時代の実績
 import 'package:ekiden/kansuu/taikai_chouki.dart'; // 大会の長い記録の移行処理(2.0.0)
 import 'package:ekiden/kansuu/mokuhyou_kimekata.dart'; // 目標順位の決め方の移行処理(2.0.1)
 import 'package:ekiden/kansuu/kyouka_project.dart'; // 強化プロジェクト(2.0.1)
+import 'package:ekiden/kansuu/shushou.dart'; // 主将(2.0.1)
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 // ★ここに buildAppTheme() 関数を記述する★
@@ -1035,6 +1036,10 @@ Future<void> main() async {
     // 出身校のないOB(1.9.5より前に卒業した選手)に出身校だけを付ける(2.0.1。監督の母校パイプ。koukou.dart)
     //save_load_screenの中の _importFromSlot の中にもあるので、そちらも変更すること！
     await koukouObFuyo();
+    // 今の年度の主将をまだ決めていなければ決める(2.0.1。この版より前のデータなど。shushou.dart)
+    // 版の番号では判定しない(決めた年度を覚えていて、今の年度と違えば決める)
+    //save_load_screenの中の _importFromSlot の中にもあるので、そちらも変更すること！
+    await shushouJunbi();
 
     {
       // 選手と大学のチャートの点数を一度計算し直す(1.9.7。1.9.6までは年度替わりで計算し直して
@@ -1468,6 +1473,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     // 出身校と高校時代の実績(1.9.5。学年ごとに、その学年が高校3年のときの大会を計算する。koukou.dart)
     // (新しいゲームの選手はまだだれにも見せていないので、下級生の引き継ぎで越境した選手の出身地を変えてよい)
     await koukouJouhouFuyo(shusshinHenkou: true);
+    // 全大学の主将を決める(2.0.1。shushou.dart)
+    await shushouKimeru(gh: ghensuu);
 
     final Skip? skip = _skipBox.get('SkipData');
     if (skip!.skipflag == 0) {
@@ -1664,6 +1671,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     // 出身校と高校時代の実績(1.9.5。学年ごとに、その学年が高校3年のときの大会を計算する。koukou.dart)
     // (新しいゲームの選手はまだだれにも見せていないので、下級生の引き継ぎで越境した選手の出身地を変えてよい)
     await koukouJouhouFuyo(shusshinHenkou: true);
+    // 全大学の主将を決める(2.0.1。shushou.dart)
+    await shushouKimeru(gh: ghensuu);
 
     final Skip? skip = _skipBox.get('SkipData');
     if (skip!.skipflag == 0) {
@@ -3039,6 +3048,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     // 作るので、計算し直さないと、次の個人のレースまで卒業した選手の点数が出ていた)
     await updateAllSenshuChartdata_atusataisei();
     await refreshAllUnivAnalysisData();
+
+    // 新しい年度の主将を決める(2.0.1。卒業と学年の更新のあと。前の年度に3年生で主将だった選手は続けて主将。
+    // shushou.dart)
+    await shushouKimeru(gh: ghensuu);
 
     // 5. 念の為セーブ (RetireNew内でsaveChangesが呼び出される場合は不要な場合もありますが、
     // ここでは明示的に保存することを推奨)

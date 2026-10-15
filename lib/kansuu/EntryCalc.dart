@@ -20,6 +20,7 @@ import 'package:ekiden/kansuu/gakuren_kantoku.dart';
 import 'package:ekiden/kansuu/konki_best.dart'; // 今季ベスト(1.9.1)
 import 'package:ekiden/kansuu/kukan_haichi.dart'; // 区間配置の見積もりと方針(1.9.1)
 import 'package:ekiden/kansuu/oufuku_kiroku.dart' show oufukuJuraiHozon; // 従来の往路記録・復路記録(2.0.0)
+import 'package:ekiden/kansuu/shushou.dart'; // 主将を1区に置かない(2.0.1)
 
 List<int> kukanIDs = [];
 
@@ -186,6 +187,8 @@ Future<List<int>> EntryCalc({
     // 持ちタイムと能力から区間ごとのタイムを見積もり、差がつく区間から決める。
     // 最適解区間配置を使う大学は、このあと試走タイムで決め直す
     // 戻り値(区間を決めた順)は、プレイヤーの大学のもの(コース編集の画面で表示する)
+    // 主将をまだ決めていなければ、ここで決める(2.0.1。主将は1区に置かない。shushou.dart)
+    await shushouJunbi(gh: gh[0]);
     kukanIDs = await kukanHaichiZenDaigaku(
       racebangou: racebangou,
       gh: gh[0],
@@ -200,6 +203,12 @@ Future<List<int>> EntryCalc({
     // 必要なデータをここで取得し、computeに渡す
     int NUMBER_OF_KUKAN = gh[0].kukansuu_taikaigoto[racebangou];
     //final hivePath = await getApplicationDocumentsDirectory();
+    // 1区に置かない主将(2.0.1。主将の特典がないときは空。shushou.dart)
+    final Set<int> shushouIds = shushouIkkuSakeruIds(
+      kantoku,
+      gh[0],
+      sortedSenshuData,
+    );
 
     for (
       int targetunivid = 0;
@@ -305,7 +314,12 @@ Future<List<int>> EntryCalc({
                 nigosu: false,
               );
               // 最適配置には、今まで通り±0.5%の乱数をかけた値を使う
-              trialTimesCache[playerId]![kukanIndex] = shisouTimeNigosu(time0);
+              // (主将の1区は、大きな秒を足して選ばれないようにする。2.0.1)
+              trialTimesCache[playerId]![kukanIndex] =
+                  shisouTimeNigosu(time0) +
+                  ((kukanIndex == 0 && shushouIds.contains(playerId))
+                      ? shushouIkkuFuri
+                      : 0.0);
               // 区間エントリー後処理(戦略的エントリー)では乱数なしの値を使い回す
               entryShisouTimeCache[playerId * 100 + kukanIndex] = time0;
             }

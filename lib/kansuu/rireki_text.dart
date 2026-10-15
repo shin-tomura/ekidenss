@@ -7,6 +7,9 @@ import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/kansuu/time_date.dart';
 import 'package:ekiden/kansuu/gakuren_text.dart';
 import 'package:ekiden/screens/Modal_courseshoukai.dart';
+import 'package:ekiden/kantoku_data.dart';
+import 'package:ekiden/kansuu/shushou.dart'
+    show shushouIdUniv, shushouShirushiMoji; // 主将(2.0.1)
 
 // ------------------------------------------------------------
 // 駅伝出場履歴(選手ごと)のテキスト(1.8.2)
@@ -212,11 +215,20 @@ String entryJoukyouText(
     return s.entrykukan_race[race][s.gakunen - 1];
   }
 
-  // 選手の書き方(当日変更の相談用では、当日の調子も付ける。1.8.3)
+  // 主将(2.0.1。shushou.dart)
+  final int? shushouId = shushouIdUniv(
+    Hive.box<KantokuData>('kantokuBox').get('KantokuData'),
+    gh,
+    senshuList,
+    univId,
+  );
+
+  // 選手の書き方(当日変更の相談用では、当日の調子も付ける。1.8.3。主将には「・主将」を付ける。2.0.1)
   String senshuMei(SenshuData s) {
-    if (!toujitsu) return '${s.name}(${s.gakunen}年)';
-    if (s.chousi == 0) return '${s.name}(${s.gakunen}年・体調不良)';
-    return '${s.name}(${s.gakunen}年・調子${s.chousi})';
+    final String shushou = s.id == shushouId ? shushouShirushiMoji : '';
+    if (!toujitsu) return '${s.name}(${s.gakunen}年$shushou)';
+    if (s.chousi == 0) return '${s.name}(${s.gakunen}年$shushou・体調不良)';
+    return '${s.name}(${s.gakunen}年$shushou・調子${s.chousi})';
   }
 
   String meibo(List<SenshuData> list) =>

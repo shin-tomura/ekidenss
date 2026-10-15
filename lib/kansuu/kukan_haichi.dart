@@ -8,6 +8,7 @@ import 'package:ekiden/constants.dart';
 import 'package:ekiden/kansuu/konki_best.dart'; // 持ちタイム(今季ベスト。なければ自己ベスト)
 import 'package:ekiden/kansuu/nouryoku_eikyodo.dart'; // 能力のタイムへの影響度
 import 'package:ekiden/kansuu/mokuhyou_hosei.dart'; // 目標順位を下回ったときの悪化の強さ
+import 'package:ekiden/kansuu/shushou.dart'; // 主将を1区に置かない(2.0.1)
 
 // ------------------------------------------------------------
 // 駅伝の区間配置(最適解区間配置を使わないやり方。1.9.1で作り直した。EntryCalc.dart から使う)
@@ -43,6 +44,11 @@ import 'package:ekiden/kansuu/mokuhyou_hosei.dart'; // 目標順位を下回っ�
 // ・後半重視: 1区1.0倍から最終区1.25倍まで上げる(悪化の強さに関係なし)
 // ・プレイヤーの大学の方針は、区間エントリーの初期案に使う。学連選抜はいつも標準
 // ・最適解区間配置を使う大学(コンピュータの大学で、最適解区間配置確率による)には効かない
+//
+// ■ 主将(2.0.1。shushou.dart)
+// ・主将の特典があるときは、主将を1区に置かない(1区の見積もりに大きな秒を足して決める。
+//   ほかに手がないときだけ1区に入る)。プレイヤーの大学の初期案も同じ。学連選抜には主将はいない
+// ・足すのは配置を決めるときだけで、見積もりの表(kukanMitsumoriHyou)そのものには入れない
 // ------------------------------------------------------------
 
 /// KantokuData.yobiint2 の使用番号: 大学ごとの区間配置の方針(1大学1桁)
@@ -577,6 +583,12 @@ Future<List<int>> kukanHaichiZenDaigaku({
   final double ikkuPace = _ikkuShuudan(racebangou)
       ? ikkuShuudanPace(kouhoJouhou.values.toList(), j)
       : 0.0;
+  // 1区に置かない主将(2.0.1。主将の特典がないときは空)
+  final Set<int> shushouIds = shushouIkkuSakeruIds(
+    kantoku,
+    gh,
+    sortedSenshuData,
+  );
 
   List<int> myJunban = [];
   for (final MapEntry<int, List<SenshuData>> e in kouho.entries) {
@@ -588,6 +600,12 @@ Future<List<int>> kukanHaichiZenDaigaku({
       j,
       ikkuPace,
     );
+    // 主将の1区の見積もりに大きな秒を足して、1区に置かないようにする(2.0.1)
+    for (int i = 0; i < senshu.length && i < mitsumori.length; i++) {
+      if (shushouIds.contains(senshu[i].id) && mitsumori[i].isNotEmpty) {
+        mitsumori[i][0] += shushouIkkuFuri;
+      }
+    }
     final List<double> omomi = kukanOmomi(
       kantoku,
       kukanHaichiHoushin(kantoku, univid),

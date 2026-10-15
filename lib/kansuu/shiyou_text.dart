@@ -639,11 +639,15 @@ List<String> _bokouPipeGyou(bool setsumeisho) {
     '・コンピュータスカウトがONのときは、大学の監督(OB)の母校の新入生が、その大学を選びやすくなります。',
     '　・争奪戦・交渉の成功率・最後に自ら進学先を選ぶときに、名声の高い大学と同じくらいに扱われます。',
     '　・コンピュータの大学は、地区めぐり(声かけ)で、母校の後輩に優先して声をかけます。',
-    kantoku == null || bokouPipeJibunKiku(kantoku)
-        ? '　・${_anata(setsumeisho)}の大学の監督の母校の新入生にも効きます。'
-        : '　・${_konoData(setsumeisho)}、${_anata(setsumeisho)}の大学の監督の母校の新入生には効きません。',
+    if (kantoku == null || bokouPipeJibunKiku(kantoku)) ...[
+      '　・${_anata(setsumeisho)}の大学の監督の母校の新入生にも効きます。',
+      // 進言には年齢の条件がない(senshu_r_screen.dart。自動で選ぶときは、監督は35歳以上。RetireNew.dart)
+      '　・${_anata(setsumeisho)}の大学は、年齢に関係なく、OBを監督に進言できます。',
+    ] else
+      '　・${_konoData(setsumeisho)}、${_anata(setsumeisho)}の大学の監督の母校の新入生には効きません。',
     '　・監督が代わると、母校も代わります。',
-    '　・監督のいない大学には効きません(OBが30歳になるまでは、監督がいないことがあります)。',
+    '　・監督のいない大学には効きません。',
+    '　・ゲームを始めてしばらくは、監督のいない大学があります。',
   ];
 }
 

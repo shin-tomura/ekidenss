@@ -599,6 +599,15 @@ class _KenBetsu extends StatelessWidget {
   }
 }
 
+/// 名簿の番号[ban]の高校のページを、高校名鑑の外から開く(大学画面の監督の出身校から。2.0.1)
+/// 番号が名簿の外なら何もしない
+Future<void> koukouPageHirakuBan(BuildContext context, int ban) async {
+  if (ban < 0 || ban >= koukouMeiboGenzai().length) return;
+  await Navigator.of(context).push<void>(
+    MaterialPageRoute<void>(builder: (_) => _KoukouPage(ban: ban)),
+  );
+}
+
 /// 高校のページを開き、戻ったら名鑑のタブを作り直す(編集やお気に入りを反映する。1.9.5)
 Future<void> _koukouPageHiraku(BuildContext context, int ban, VoidCallback onHenkou) async {
   await Navigator.of(context).push<void>(

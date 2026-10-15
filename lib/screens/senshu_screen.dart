@@ -30,6 +30,7 @@ import 'package:ekiden/screens/kiji_hyou_view.dart'; // 表の部品(1.9.8)
 import 'package:ekiden/screens/Modal_nameedit.dart'
     show ModalSenshuNameHenkou_modalsenshugamen; // 他大学の選手の名前の変更(箱庭モード。1.9.9)
 import 'package:ekiden/kansuu/shushou.dart'; // 主将(2.0.1)
+import 'package:ekiden/screens/shushou_setsumei.dart'; // 主将の説明のリンク(2.0.1)
 
 String _getCombinedDifficultyText(KantokuData kantoku, Ghensuu currentGhensuu) {
   // 難易度モードを取得 (0:通常, 1:極, 2:天)
@@ -2920,7 +2921,7 @@ class _SenshuScreenState extends State<SenshuScreen> {
   // currentGhensuu を引数として受け取るように変更
   /// 主将の表示と「主将にする」ボタン(2.0.1。shushou.dart)
   /// 主将なら「この選手は主将です」と出す。あなたの大学の3・4年生で、主将でない選手には、
-  /// 代えられる時期(4月〜9月)だけ「主将にする」ボタンを出す
+  /// 代えられる時期(4月〜9月)だけ「主将にする」ボタンを出す。どちらも下に「主将とは」のリンクを置く
   Widget _shushouBubun(Ghensuu ghensuu, SenshuData s, bool jibunHyouji) {
     final bool jibun = jibunHyouji && s.univid == ghensuu.MYunivid;
     final bool shushou = shushouKaIma(s);
@@ -2967,6 +2968,8 @@ class _SenshuScreenState extends State<SenshuScreen> {
                 ),
               ),
             ),
+          // 主将の説明(説明書の「主将」と同じ文。shushou_setsumei.dart)
+          const ShushouSetsumeiLink(),
         ],
       ),
     );

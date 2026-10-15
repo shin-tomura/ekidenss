@@ -34,6 +34,7 @@ import 'package:ekiden/kansuu/kyouka_project.dart'
 import 'package:ekiden/kansuu/koukou.dart'
     show koukouIchiranMoji; // 監督の出身校(2.0.1。監督の母校パイプ)
 import 'package:ekiden/kansuu/shushou.dart' show shushouIdUniv; // 主将(2.0.1)
+import 'package:ekiden/screens/shushou_setsumei.dart'; // 主将の説明のリンク(2.0.1)
 import 'package:ekiden/kansuu/mokuhyou_kimekata.dart'
     show
         mokuhyouKimekataKoujoushin,
@@ -3942,24 +3943,33 @@ class _UnivScreenState extends State<UnivScreen> {
                               fontSize: HENSUU.fontsize_honbun,
                             ),
                           ),
-                        // 主将(2.0.1。shushou.dart)
+                        // 主将(2.0.1。shushou.dart)。そばに「主将とは」のリンクを置く
+                        // (文字を大きくしても、はみ出さずに次の行へ回るように Wrap にする)
                         if (_shushouMoji(kantoku, ghensuu, ghensuu.hyojiunivnum)
                             .isNotEmpty)
                           Padding(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 16.0,
                             ),
-                            child: Text(
-                              _shushouMoji(
-                                kantoku,
-                                ghensuu,
-                                ghensuu.hyojiunivnum,
-                              ),
-                              style: TextStyle(
-                                color: HENSUU.textcolor,
-                                fontSize: HENSUU.fontsize_honbun,
-                              ),
-                              textAlign: TextAlign.center,
+                            child: Wrap(
+                              alignment: WrapAlignment.center,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              spacing: 4,
+                              children: [
+                                Text(
+                                  _shushouMoji(
+                                    kantoku,
+                                    ghensuu,
+                                    ghensuu.hyojiunivnum,
+                                  ),
+                                  style: TextStyle(
+                                    color: HENSUU.textcolor,
+                                    fontSize: HENSUU.fontsize_honbun,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                                const ShushouSetsumeiLink(),
+                              ],
                             ),
                           ),
                         if (currentUnivData.sankankaisuu > 0)

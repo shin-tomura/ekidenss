@@ -29,6 +29,44 @@ String _timeToMinuteSecondString(double time) {
   return '${minutes.toString().padLeft(2, '0')}分${seconds.toString().padLeft(2, '0')}秒';
 }
 
+/// 監督・コーチ・理事の就任退任履歴を、表示する順に並べ替える(2.0.2。保存されている文は変えない)
+/// 年度替わりの処理(RetireNew・wakate_shuunin)は席の順に書くので、コーチから監督に上がる人などは
+/// 「監督に就任」が「コーチを退任」より先に書かれる。そこで、同じ年月の年度替わりの行(「4月(45歳) 」の
+/// ように年齢の付いた行)がひとかたまりに続くところだけ、退任の行を先、ほかの行(就任)を後にする
+/// (それぞれの中の順はそのまま)。総監督の進言の行(年齢なし)は、あとから同じ月に起きたことも
+/// あるので動かさない
+String obRirekiNarabe(String rireki) {
+  final RegExp jidou = RegExp(r'^(-?\d+)年(\d+)月\(\d+歳\)');
+  final List<String> gyou = rireki.split('\n');
+  final List<String> kekka = [];
+  int i = 0;
+  while (i < gyou.length) {
+    final RegExpMatch? m = jidou.firstMatch(gyou[i]);
+    if (m == null) {
+      kekka.add(gyou[i]);
+      i++;
+      continue;
+    }
+    // 同じ年月の年度替わりの行のかたまり
+    final String nengetsu = '${m.group(1)}年${m.group(2)}月';
+    final List<String> tainin = [];
+    final List<String> hoka = [];
+    while (i < gyou.length) {
+      final RegExpMatch? m2 = jidou.firstMatch(gyou[i]);
+      if (m2 == null || '${m2.group(1)}年${m2.group(2)}月' != nengetsu) break;
+      if (gyou[i].trimRight().endsWith('退任')) {
+        tainin.add(gyou[i]);
+      } else {
+        hoka.add(gyou[i]);
+      }
+      i++;
+    }
+    kekka.addAll(tainin);
+    kekka.addAll(hoka);
+  }
+  return kekka.join('\n');
+}
+
 //---------------------------------------------------------
 
 class Senshu_R_Screen extends StatefulWidget {
@@ -1066,7 +1104,8 @@ class _Senshu_R_ScreenState extends State<Senshu_R_Screen> {
                         const SizedBox(height: 16),
                         if (currentSenshu.string_racesetumei != "")
                           Text(
-                            '【監督・コーチ就任退任履歴】\n${currentSenshu.string_racesetumei}',
+                            // 同じ年月の年度替わりの行は、退任を先に出す(2.0.2)
+                            '【監督・コーチ就任退任履歴】\n${obRirekiNarabe(currentSenshu.string_racesetumei)}',
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: HENSUU.fontsize_honbun,

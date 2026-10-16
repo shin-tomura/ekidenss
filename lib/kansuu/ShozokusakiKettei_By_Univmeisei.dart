@@ -98,7 +98,7 @@ List<int> shozokuChuusenOmomi({
       }
     }
   }
-  // 名声上位の横並びの設定なら、上位K校の重みを、平均か名声1位の重みにそろえる(2.0.2。meisei_yokonarabi.dart。
+  // 名声の横並びの設定なら、ブロックごとに重みを、平均か一番上の重みにそろえる(2.0.2。2.0.3からブロックを複数。meisei_yokonarabi.dart。
   // 強化プロジェクトの「名声N位並み」は、そろえたあとの重みで見るので、その前に行う)
   yokonarabiOmomi(
     temp_meisei,

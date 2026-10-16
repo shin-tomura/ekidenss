@@ -1489,7 +1489,7 @@ class _ModalSpurtryokuseichousisuu3State
                             ],
                           );
                         }),
-                        // 名声上位の横並び(スカウトのとき)(2.0.2。meisei_yokonarabi.dart)
+                        // 名声の横並び(スカウトのとき)(2.0.2。2.0.3から名声の順位のブロックを複数。meisei_yokonarabi.dart)
                         // (上のレベルと組み合わせて使う別の項目。押しても画面は閉じない)
                         const SizedBox(height: 16),
                         const _YokonarabiSettei(),
@@ -1531,7 +1531,8 @@ class _ModalSpurtryokuseichousisuu3State
   }
 }
 
-/// 入学時名声影響度設定の画面の「名声上位の横並び(スカウトのとき)」(2.0.2。meisei_yokonarabi.dart)
+/// 入学時名声影響度設定の画面の「名声の横並び(スカウトのとき)」(2.0.2。meisei_yokonarabi.dart)
+/// 2.0.3から、名声の順位のブロックを複数決められる(ブロックは「ブロックを編集」の画面で決める)
 class _YokonarabiSettei extends StatefulWidget {
   const _YokonarabiSettei();
 
@@ -1545,15 +1546,22 @@ class _YokonarabiSetteiState extends State<_YokonarabiSettei> {
     if (mounted) setState(() {});
   }
 
+  /// ブロックの編集の画面を開き、戻ったら描き直す
+  Future<void> _blockHenshuu() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(builder: (_) => const _YokonarabiBlockHenshuu()),
+    );
+    if (mounted) setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     final KantokuData? k = Hive.box<KantokuData>(
       'kantokuBox',
     ).get('KantokuData');
     if (k == null) return const SizedBox.shrink();
-    final int ima = yokonarabiSuu(k);
+    final int tsunagi = yokonarabiTsunagi(k);
     final int houhou = yokonarabiHouhou(k);
-    String mei(int v) => v == 0 ? 'なし(初期値)' : yokonarabiMei(v);
     final TextStyle honbun = TextStyle(
       color: HENSUU.textcolor,
       fontSize: HENSUU.fontsize_honbun,
@@ -1562,13 +1570,13 @@ class _YokonarabiSetteiState extends State<_YokonarabiSettei> {
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Text(
-          '名声上位の横並び(スカウトのとき)',
+          '名声の横並び(スカウトのとき)',
           style: honbun.copyWith(fontWeight: FontWeight.bold),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 12),
         Text(
-          '名声の上位の大学を、新入生のスカウトでは同じ名声として扱います。'
+          '名声の順位のブロック(例えば1〜3位・4〜8位)ごとに、新入生のスカウトでは同じ名声として扱います。'
           '名声1位の大学が、スカウトで抜け出しにくくなります。'
           '名声の表示や、目標順位・獲得名声などには影響しません。\n'
           '上のレベルと組み合わせて使えます。この設定は次の新入生スカウトから影響します。',
@@ -1576,31 +1584,22 @@ class _YokonarabiSetteiState extends State<_YokonarabiSettei> {
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 16),
-        // 校数(なし・2〜29。プルダウン。文字が大きくてもメニューはスクロールできる)
-        Text('横並びにする校数', style: honbun, textAlign: TextAlign.center),
-        const SizedBox(height: 8),
-        DropdownButton<int>(
-          value: ima,
-          dropdownColor: Colors.grey[900],
+        // 今のブロック(2.0.3。編集は別の画面)
+        Text(
+          'ブロック: ${tsunagi == 0 ? 'なし(初期値)' : yokonarabiBlockMoji(tsunagi)}',
           style: honbun.copyWith(fontWeight: FontWeight.bold),
-          items: [
-            for (final int v in [
-              0,
-              for (int n = yokonarabiSaishou; n <= yokonarabiSaidai; n++) n,
-            ])
-              DropdownMenuItem<int>(value: v, child: Text(mei(v))),
-          ],
-          onChanged: (int? v) async {
-            if (v == null) return;
-            yokonarabiIreru(k, v);
-            await _hozon(k);
-          },
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 8),
+        ElevatedButton(
+          onPressed: _blockHenshuu,
+          child: const Text('ブロックを編集'),
         ),
         const SizedBox(height: 16),
-        // そろえ方(平均(初期値)・名声1位)
+        // そろえ方(平均(初期値)・一番上。全部のブロックで共通)
         // (監督の母校パイプ設定と同じ選択チップ。選んでいるほうに✓を付け、色を変える。
         //  表示の設定で✓が出なくならないように、✓は必ず出す)
-        Text('そろえ方', style: honbun, textAlign: TextAlign.center),
+        Text('そろえ方(全部のブロックで共通)', style: honbun, textAlign: TextAlign.center),
         const SizedBox(height: 8),
         Wrap(
           alignment: WrapAlignment.center,
@@ -1632,11 +1631,11 @@ class _YokonarabiSetteiState extends State<_YokonarabiSettei> {
               ),
           ],
         ),
-        // 校数が「なし」のときは、そろえ方は効かない
-        if (ima == 0) ...[
+        // ブロックが「なし」のときは、そろえ方は効かない
+        if (tsunagi == 0) ...[
           const SizedBox(height: 8),
           Text(
-            'そろえ方は、横並びにする校数を選ぶと効きます。',
+            'そろえ方は、ブロックを決めると効きます。',
             style: honbun,
             textAlign: TextAlign.center,
           ),
@@ -1644,12 +1643,180 @@ class _YokonarabiSetteiState extends State<_YokonarabiSettei> {
         const SizedBox(height: 8),
         Text(
           houhou == yokonarabiIchii
-              ? '名声1位にそろえる: 上位の大学がみな名声1位と同じくらい選ばれやすくなり、その分、それより下の大学は選ばれにくくなります。'
-              : '平均にそろえる: 上位の大学の名声の平均にそろえます。上位の大学をまとめた選ばれやすさは今のままで、それより下の大学の選ばれやすさは変わりません。',
+              ? '一番上にそろえる: ブロックの大学がみな、ブロックの中で名声が一番高い大学と同じくらい選ばれやすくなり、その分、ほかの大学は選ばれにくくなります。'
+              : '平均にそろえる: ブロックの大学の名声の平均にそろえます。ブロックをまとめた選ばれやすさは今のままで、ほかの大学の選ばれやすさは変わりません。',
           style: honbun,
           textAlign: TextAlign.center,
         ),
       ],
+    );
+  }
+}
+
+/// 名声の横並びのブロックを編集する画面(2.0.3。meisei_yokonarabi.dart)
+/// ・2位〜30位の行ごとに「上の順位と同じブロック」のチェックを付ける(重なりやすき間が起きない)
+/// ・よく使う形(なし・上位N校・5校ずつ・10校ずつ)をまとめて選べる
+/// ・ブロックは名声の順位で決まるので、行に大学名は出さない(大学で決まると読み違えないように)
+/// ・30校を1つのブロックにはできない(名声の影響がなくなるため)
+/// ・変えるたびに保存する
+class _YokonarabiBlockHenshuu extends StatefulWidget {
+  const _YokonarabiBlockHenshuu();
+
+  @override
+  State<_YokonarabiBlockHenshuu> createState() => _YokonarabiBlockHenshuuState();
+}
+
+class _YokonarabiBlockHenshuuState extends State<_YokonarabiBlockHenshuu> {
+  Future<void> _ireru(KantokuData k, int tsunagi) async {
+    if (yokonarabiTsunagiZenbu(tsunagi)) {
+      ScaffoldMessenger.of(context)
+        ..clearSnackBars()
+        ..showSnackBar(
+          const SnackBar(content: Text('30校すべてを1つのブロックにはできません(名声の影響がなくなるため)。')),
+        );
+      return;
+    }
+    yokonarabiTsunagiIreru(k, tsunagi);
+    await k.save();
+    if (mounted) setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final KantokuData? k = Hive.box<KantokuData>(
+      'kantokuBox',
+    ).get('KantokuData');
+    final TextStyle honbun = TextStyle(
+      color: HENSUU.textcolor,
+      fontSize: HENSUU.fontsize_honbun,
+    );
+    final TextStyle hosoku = TextStyle(
+      color: HENSUU.textcolor.withOpacity(0.7),
+      fontSize: HENSUU.fontsize_honbun - 2,
+    );
+    if (k == null) {
+      return Scaffold(
+        backgroundColor: HENSUU.backgroundcolor,
+        appBar: AppBar(
+          title: const Text('ブロックの編集', style: TextStyle(color: Colors.white)),
+          backgroundColor: Colors.grey[900],
+          foregroundColor: Colors.white,
+        ),
+        body: const SizedBox.shrink(),
+      );
+    }
+    final int tsunagi = yokonarabiTsunagi(k);
+    // 順位ごとのブロックの番号(2校以上のブロックだけ。上から0,1,2…。ブロックでない順位は-1)。行の色分けに使う
+    final List<int> blockBan = List<int>.filled(yokonarabiJuniSuu + 1, -1);
+    final List<({int kara, int made})> block = yokonarabiBlock(tsunagi);
+    for (int i = 0; i < block.length; i++) {
+      for (int juni = block[i].kara; juni <= block[i].made; juni++) {
+        blockBan[juni] = i;
+      }
+    }
+    Color? gyouIro(int juni) {
+      final int b = blockBan[juni];
+      if (b < 0) return null;
+      return b.isEven ? Colors.teal.shade900 : Colors.indigo.shade900;
+    }
+
+    // 今のつなぎが上位N校の形なら、その校数(プルダウンに出す)
+    int? jouiSuu;
+    for (int n = yokonarabiSaishou; n <= yokonarabiSaidai; n++) {
+      if (yokonarabiJouiTsunagi(n) == tsunagi) jouiSuu = n;
+    }
+    return Scaffold(
+      backgroundColor: HENSUU.backgroundcolor,
+      appBar: AppBar(
+        title: const Text('ブロックの編集', style: TextStyle(color: Colors.white)),
+        backgroundColor: Colors.grey[900],
+        foregroundColor: Colors.white,
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Text(
+            'ブロックは名声の順位で決まります。名声の順が入れ替わると、ブロックに入る大学も入れ替わります。'
+            '同じブロックの大学は、新入生のスカウトでは同じ名声として扱います。',
+            style: honbun,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            '今のブロック: ${yokonarabiBlockMoji(tsunagi)}',
+            style: honbun.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 16),
+          // よく使う形
+          Text('よく使う形', style: honbun.copyWith(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              OutlinedButton(
+                onPressed: () => _ireru(k, 0),
+                child: Text('なし', style: honbun),
+              ),
+              OutlinedButton(
+                onPressed: () => _ireru(k, yokonarabiZutsuTsunagi(5)),
+                child: Text('5校ずつ', style: honbun),
+              ),
+              OutlinedButton(
+                onPressed: () => _ireru(k, yokonarabiZutsuTsunagi(10)),
+                child: Text('10校ずつ', style: honbun),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // 上位N校を1つのブロックにする(2.0.2の形。プルダウン。文字が大きくてもメニューはスクロールできる)
+          Text('上位の何校を1つのブロックにする', style: honbun),
+          DropdownButton<int>(
+            value: jouiSuu,
+            hint: Text('選ぶ', style: honbun),
+            dropdownColor: Colors.grey[900],
+            style: honbun.copyWith(fontWeight: FontWeight.bold),
+            items: [
+              for (int n = yokonarabiSaishou; n <= yokonarabiSaidai; n++)
+                DropdownMenuItem<int>(value: n, child: Text(yokonarabiMei(n))),
+            ],
+            onChanged: (int? n) {
+              if (n == null) return;
+              _ireru(k, yokonarabiJouiTsunagi(n));
+            },
+          ),
+          const SizedBox(height: 16),
+          // 順位ごと
+          Text('順位ごとに決める', style: honbun.copyWith(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          Text(
+            '「上の順位と同じブロック」にチェックを付けると、その順位は上の順位と同じブロックになります。'
+            '同じブロックの順位は、同じ色で並びます。',
+            style: hosoku,
+          ),
+          const SizedBox(height: 8),
+          for (int juni = 1; juni <= yokonarabiJuniSuu; juni++)
+            if (juni == 1)
+              ListTile(
+                tileColor: gyouIro(juni),
+                title: Text('1位', style: honbun.copyWith(fontWeight: FontWeight.bold)),
+              )
+            else
+              CheckboxListTile(
+                tileColor: gyouIro(juni),
+                value: yokonarabiTsunagaru(tsunagi, juni - 1),
+                onChanged: (bool? v) {
+                  if (v == null) return;
+                  _ireru(k, yokonarabiTsunagiKae(tsunagi, juni - 1, v));
+                },
+                title: Text('$juni位', style: honbun.copyWith(fontWeight: FontWeight.bold)),
+                subtitle: Text('上の順位(${juni - 1}位)と同じブロック', style: hosoku),
+                activeColor: Colors.teal,
+                checkColor: Colors.white,
+                side: const BorderSide(color: Colors.white70, width: 2),
+              ),
+          const SizedBox(height: 24),
+        ],
+      ),
     );
   }
 }

@@ -117,8 +117,8 @@ class SettingsQrProcessor {
       // 入学時名声影響度設定(int)
       data['cg_spurtryokuseichousisuu3'] =
           currentGhensuu.spurtryokuseichousisuu3;
-      // 名声上位の横並び(スカウトのとき)(int) yobiint3[86] (2.0.2で追加。入学時名声影響度設定の画面にある設定。
-      // 校数(0=なし(初期値)・2〜29)+100×そろえ方(0=平均(初期値)・1=名声1位)。meisei_yokonarabi.dart)
+      // 名声の横並び(スカウトのとき)(int) yobiint3[86] (2.0.2で追加。入学時名声影響度設定の画面にある設定。
+      // 2.0.2の形は校数+100×そろえ方、2.0.3の形は1000+そろえ方+10×形+100×名声の順位のつなぎ。meisei_yokonarabi.dart)
       data['k_yobiint3_86'] = yokonarabiAtai(kantoku);
       // 目標順位決め方設定(int)
       data['cg_spurtryokuseichousisuu2'] =
@@ -421,8 +421,8 @@ class SettingsQrProcessor {
           currentGhensuu.spurtryokuseichousisuu3 > 9) {
         currentGhensuu.spurtryokuseichousisuu3 = 0;
       }
-      // 名声上位の横並び(スカウトのとき)(int) kantoku.yobiint3[86] (2.0.2)
-      //   校数+100×そろえ方(古いQRコードには含まれていないので、そのときは今の設定のまま)
+      // 名声の横並び(スカウトのとき)(int) kantoku.yobiint3[86] (2.0.2)
+      //   2.0.2の形(校数+100×そろえ方)も2.0.3の形も読める(古いQRコードには含まれていないので、そのときは今の設定のまま)
       final dynamic yobiint3_86 = dataMap['k_yobiint3_86'];
       if (yobiint3_86 is int && yokonarabiTadashii(yobiint3_86)) {
         yokonarabiAtaiIreru(kantoku, yobiint3_86);

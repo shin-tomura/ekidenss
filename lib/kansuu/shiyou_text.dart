@@ -28,7 +28,11 @@ import 'package:ekiden/kansuu/ToujituHenkou_com.dart'
     show senryakuEntryKakuritu; // 戦略的エントリー確率設定(1.9.4)
 import 'package:ekiden/kansuu/shushou.dart' show shushouTokutenAri; // 主将(2.0.1)
 import 'package:ekiden/kansuu/meisei_yokonarabi.dart'
-    show yokonarabiSuu, yokonarabiSaishou; // 名声上位の横並び(2.0.2)
+    show
+        yokonarabiSuu,
+        yokonarabiSaishou,
+        yokonarabiHouhou,
+        yokonarabiIchii; // 名声上位の横並び(2.0.2)
 
 // ------------------------------------------------------------
 // ゲームの仕様の文(1.8.3で生成AI向けに作り、1.8.4から説明書と共通にした)
@@ -746,8 +750,16 @@ List<String> bokouPipeSetsumeiGyou() => [
 /// 名声上位の横並びの行(2.0.2。meisei_yokonarabi.dart。設定していないときは空)
 /// 校数は、このデータでのスカウトの仕組みなので、生成AI向けにも書く(設定の名前は説明書だけ)
 List<String> _yokonarabiGyou(bool setsumeisho) {
-  final int suu = yokonarabiSuu(_kantoku());
+  final KantokuData? k = _kantoku();
+  final int suu = yokonarabiSuu(k);
   if (suu < yokonarabiSaishou) return const [];
+  if (yokonarabiHouhou(k) == yokonarabiIchii) {
+    return [
+      '・${_konoData(setsumeisho)}、新入生のスカウトでは、名声の上位$suu校を、名声1位と同じ名声として扱います。',
+      '　・上位$suu校がみな名声1位と同じくらい選ばれやすくなり、それより下の大学は選ばれにくくなります。',
+      '　・名声の表示や目標順位などは、もとの名声のままです。',
+    ];
+  }
   return [
     '・${_konoData(setsumeisho)}、新入生のスカウトでは、名声の上位$suu校を、その平均の同じ名声として扱います。',
     '　・それより下の大学の選ばれやすさは変わりません。名声の表示や目標順位などは、もとの名声のままです。',
@@ -785,7 +797,7 @@ ShiyouSetsu shiyouMeisei({bool setsumeisho = false}) {
       // 地区めぐり(声かけ)の争奪戦は、最後の志望と同じ重み(1.9.6。scout_com.dart)
       '・地区めぐり(声かけ)の争奪戦での名声の効き方は、設定タブの「入学時名声影響度設定」で変わります。',
       // 名声上位の横並び(2.0.2。meisei_yokonarabi.dart)
-      '・名声の上位の何校を、スカウトで同じ名声として扱うかは、設定タブの「入学時名声影響度設定」の「名声上位の横並び」で変えられます(初期値はなし)。',
+      '・名声の上位の何校を、スカウトで同じ名声として扱うかと、そろえ方(平均・名声1位)は、設定タブの「入学時名声影響度設定」の「名声上位の横並び」で変えられます(初期値はなし・平均)。',
       // 強化プロジェクト(2.0.1。kyouka_project.dart)
       '・強化プロジェクトの起こりやすさ・選ばれやすさ・期間と、あなたの大学も選ばれるかは、設定タブの「強化プロジェクト設定」で変えられます。',
       // 監督の母校パイプ(2.0.1。bokou_pipe.dart。「母校パイプとは」の窓と同じ行)

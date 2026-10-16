@@ -813,8 +813,11 @@ Map<int, double> comScoutSeikouritsuIchiran({
   )[univid];
   // 監督の母校の後輩は、名声N位並みの名声で計算する(2.0.1。bokou_pipe.dart)
   final BokouPipe pipe = BokouPipe.yomu(kantoku, univid);
-  // スカウトで使う名声(名声上位の横並びの設定なら、上位K校を平均にそろえたもの。2.0.2。meisei_yokonarabi.dart)
-  final Map<int, int> sm = scoutMeiseiMap(sortedUnivData, yokonarabiSuu(kantoku));
+  // スカウトで使う名声(名声上位の横並びの設定なら、上位K校を平均か名声1位にそろえたもの。2.0.2。meisei_yokonarabi.dart)
+  final Map<int, int> sm = scoutMeiseiMap(
+    sortedUnivData,
+    YokonarabiSettei.yomu(kantoku),
+  );
   return {
     for (final SenshuData s in shinnyuusei)
       if (s.hirou != 1 && !comScoutKettei(s) && !comScoutKotowarareta(s))
@@ -1351,8 +1354,11 @@ Future<List<ComScoutKekka>> comScoutRound({
     kantoku,
     gh,
   );
-  // スカウトで使う名声(名声上位の横並びの設定なら、上位K校を平均にそろえたもの。2.0.2。meisei_yokonarabi.dart)
-  final Map<int, int> sm = scoutMeiseiMap(sortedUnivData, yokonarabiSuu(kantoku));
+  // スカウトで使う名声(名声上位の横並びの設定なら、上位K校を平均か名声1位にそろえたもの。2.0.2。meisei_yokonarabi.dart)
+  final Map<int, int> sm = scoutMeiseiMap(
+    sortedUnivData,
+    YokonarabiSettei.yomu(kantoku),
+  );
   // 監督の母校パイプ(2.0.1。bokou_pipe.dart): 監督の母校の後輩の争奪戦・交渉の成功率と、
   // 地区めぐり(声かけ)のコンピュータの大学の声のかけ方に使う
   final BokouPipe pipe = BokouPipe.yomu(kantoku, gh.MYunivid);

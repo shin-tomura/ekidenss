@@ -1335,10 +1335,12 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
     final targetUniv = _univBox.get(freshman.univid)!;
 
     // 1. 大学の名声値に基づく基本成功確率の計算
-    // (名声上位の横並びの設定なら、上位K校を平均にそろえた名声で計算する。2.0.2。meisei_yokonarabi.dart)
+    // (名声上位の横並びの設定なら、上位K校を平均か名声1位にそろえた名声で計算する。2.0.2。meisei_yokonarabi.dart)
     final Map<int, int> sm = scoutMeiseiMap(
       _univBox.values.toList(),
-      yokonarabiSuu(Hive.box<KantokuData>('kantokuBox').get('KantokuData')),
+      YokonarabiSettei.yomu(
+        Hive.box<KantokuData>('kantokuBox').get('KantokuData'),
+      ),
     );
     final int myMeisei = sm[myUniv.id] ?? myUniv.meisei_total;
     final int targetMeisei = sm[targetUniv.id] ?? targetUniv.meisei_total;

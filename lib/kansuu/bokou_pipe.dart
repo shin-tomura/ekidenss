@@ -191,14 +191,14 @@ class BokouPipe {
   /// コンピュータの声かけのコード(bokouPipeKoekake〜)
   final int koekake;
 
-  /// 名声上位の横並びの校数(0はなし。名声N位並みを、そろえたあとの名声で見るため。2.0.2。meisei_yokonarabi.dart)
-  final int yokonarabi;
+  /// 名声上位の横並びの設定(名声N位並みを、そろえたあとの名声で見るため。2.0.2。meisei_yokonarabi.dart)
+  final YokonarabiSettei yokonarabi;
 
   const BokouPipe(
     this.bokou,
     this.juni, {
     this.koekake = bokouPipeKoekakeFutsuu,
-    this.yokonarabi = 0,
+    this.yokonarabi = YokonarabiSettei.nashi,
   });
 
   /// 効かないもの
@@ -215,7 +215,7 @@ class BokouPipe {
       m,
       bokouPipeJuni(k),
       koekake: bokouPipeKoekakeCode(k),
-      yokonarabi: yokonarabiSuu(k),
+      yokonarabi: YokonarabiSettei.yomu(k),
     );
   }
 

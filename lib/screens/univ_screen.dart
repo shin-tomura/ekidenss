@@ -1539,6 +1539,11 @@ class _YokonarabiSettei extends StatefulWidget {
 }
 
 class _YokonarabiSetteiState extends State<_YokonarabiSettei> {
+  Future<void> _hozon(KantokuData k) async {
+    await k.save();
+    if (mounted) setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     final KantokuData? k = Hive.box<KantokuData>(
@@ -1546,60 +1551,68 @@ class _YokonarabiSetteiState extends State<_YokonarabiSettei> {
     ).get('KantokuData');
     if (k == null) return const SizedBox.shrink();
     final int ima = yokonarabiSuu(k);
+    final int houhou = yokonarabiHouhou(k);
     String mei(int v) => v == 0 ? 'なし(初期値)' : yokonarabiMei(v);
+    final TextStyle honbun = TextStyle(
+      color: HENSUU.textcolor,
+      fontSize: HENSUU.fontsize_honbun,
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Text(
           '名声上位の横並び(スカウトのとき)',
-          style: TextStyle(
-            color: HENSUU.textcolor,
-            fontSize: HENSUU.fontsize_honbun,
-            fontWeight: FontWeight.bold,
-          ),
+          style: honbun.copyWith(fontWeight: FontWeight.bold),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 12),
         Text(
-          '名声の上位の大学を、新入生のスカウトでは同じ名声として扱います(上位の大学の名声の平均にそろえます)。'
-          '名声1位の大学が、スカウトで抜け出しにくくなります。それより下の大学の選ばれやすさは変わりません。'
+          '名声の上位の大学を、新入生のスカウトでは同じ名声として扱います。'
+          '名声1位の大学が、スカウトで抜け出しにくくなります。'
           '名声の表示や、目標順位・獲得名声などには影響しません。\n'
           '上のレベルと組み合わせて使えます。この設定は次の新入生スカウトから影響します。',
-          style: TextStyle(
-            color: HENSUU.textcolor,
-            fontSize: HENSUU.fontsize_honbun,
-          ),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 12),
-        Text(
-          '現在: ${mei(ima)}',
-          style: TextStyle(
-            color: HENSUU.textcolor,
-            fontSize: HENSUU.fontsize_honbun,
-            fontWeight: FontWeight.bold,
-          ),
+          style: honbun,
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 16),
+        // 校数(なし・2〜29。プルダウン。文字が大きくてもメニューはスクロールできる)
+        Text('横並びにする校数', style: honbun, textAlign: TextAlign.center),
+        const SizedBox(height: 8),
+        DropdownButton<int>(
+          value: ima,
+          dropdownColor: Colors.grey[900],
+          style: honbun.copyWith(fontWeight: FontWeight.bold),
+          items: [
+            for (final int v in [
+              0,
+              for (int n = yokonarabiSaishou; n <= yokonarabiSaidai; n++) n,
+            ])
+              DropdownMenuItem<int>(value: v, child: Text(mei(v))),
+          ],
+          onChanged: (int? v) async {
+            if (v == null) return;
+            yokonarabiIreru(k, v);
+            await _hozon(k);
+          },
+        ),
+        const SizedBox(height: 16),
+        // そろえ方(平均(初期値)・名声1位)
+        Text('そろえ方', style: honbun, textAlign: TextAlign.center),
+        const SizedBox(height: 8),
         Wrap(
           alignment: WrapAlignment.center,
           spacing: 8,
           runSpacing: 8,
           children: [
-            for (final int v in [
-              0,
-              for (int n = yokonarabiSaishou; n <= yokonarabiSaidai; n++) n,
-            ])
+            for (final int h in const [yokonarabiHeikin, yokonarabiIchii])
               ElevatedButton(
                 onPressed: () async {
-                  yokonarabiIreru(k, v);
-                  await k.save();
-                  if (mounted) setState(() {});
+                  yokonarabiHouhouIreru(k, h);
+                  await _hozon(k);
                 },
                 style: ElevatedButton.styleFrom(
                   // 今の設定はオレンジ
-                  backgroundColor: v == ima ? Colors.orange : Colors.green,
+                  backgroundColor: h == houhou ? Colors.orange : Colors.green,
                   foregroundColor: Colors.black,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8),
@@ -1610,7 +1623,9 @@ class _YokonarabiSetteiState extends State<_YokonarabiSettei> {
                   ),
                 ),
                 child: Text(
-                  mei(v),
+                  h == yokonarabiHeikin
+                      ? '${yokonarabiHouhouMei(h)}(初期値)'
+                      : yokonarabiHouhouMei(h),
                   style: TextStyle(
                     fontSize: HENSUU.fontsize_honbun,
                     fontWeight: FontWeight.bold,
@@ -1618,6 +1633,14 @@ class _YokonarabiSetteiState extends State<_YokonarabiSettei> {
                 ),
               ),
           ],
+        ),
+        const SizedBox(height: 8),
+        Text(
+          houhou == yokonarabiIchii
+              ? '名声1位にそろえる: 上位の大学がみな名声1位と同じくらい選ばれやすくなり、その分、それより下の大学は選ばれにくくなります。'
+              : '平均にそろえる: 上位の大学の名声の平均にそろえます。上位の大学をまとめた選ばれやすさは今のままで、それより下の大学の選ばれやすさは変わりません。',
+          style: honbun,
+          textAlign: TextAlign.center,
         ),
       ],
     );

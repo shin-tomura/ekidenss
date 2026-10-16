@@ -446,7 +446,7 @@ Map<int, int> kyoukaScoutMeiseiHoseiNendo(
   }
   if (u == null) return const {};
   // 名声上位の横並びの設定なら、そろえたあとの名声で見る(2.0.2。meisei_yokonarabi.dart)
-  final Map<int, int> sm = scoutMeiseiMap(univs, yokonarabiSuu(k));
+  final Map<int, int> sm = scoutMeiseiMap(univs, YokonarabiSettei.yomu(k));
   final List<int> jun = sm.values.toList()..sort((a, b) => b.compareTo(a));
   final int n = min(kyoukaOmomiJuni(k), jun.length);
   if (n <= 0) return const {};

@@ -118,8 +118,8 @@ class SettingsQrProcessor {
       data['cg_spurtryokuseichousisuu3'] =
           currentGhensuu.spurtryokuseichousisuu3;
       // 名声上位の横並び(スカウトのとき)(int) yobiint3[86] (2.0.2で追加。入学時名声影響度設定の画面にある設定。
-      // 0=なし(初期値)・2〜10=上位何校か。meisei_yokonarabi.dart)
-      data['k_yobiint3_86'] = yokonarabiSuu(kantoku);
+      // 校数(0=なし(初期値)・2〜29)+100×そろえ方(0=平均(初期値)・1=名声1位)。meisei_yokonarabi.dart)
+      data['k_yobiint3_86'] = yokonarabiAtai(kantoku);
       // 目標順位決め方設定(int)
       data['cg_spurtryokuseichousisuu2'] =
           currentGhensuu.spurtryokuseichousisuu2;
@@ -422,10 +422,10 @@ class SettingsQrProcessor {
         currentGhensuu.spurtryokuseichousisuu3 = 0;
       }
       // 名声上位の横並び(スカウトのとき)(int) kantoku.yobiint3[86] (2.0.2)
-      //   0=なし・2〜10=上位何校か(古いQRコードには含まれていないので、そのときは今の設定のまま)
+      //   校数+100×そろえ方(古いQRコードには含まれていないので、そのときは今の設定のまま)
       final dynamic yobiint3_86 = dataMap['k_yobiint3_86'];
       if (yobiint3_86 is int && yokonarabiTadashii(yobiint3_86)) {
-        yokonarabiIreru(kantoku, yobiint3_86);
+        yokonarabiAtaiIreru(kantoku, yobiint3_86);
       }
       // 目標順位決め方設定(int)
       // (2.0.1から、正しくない値は新しい初期値の対校戦順位追従にする。2.0.0までのQRコードの93

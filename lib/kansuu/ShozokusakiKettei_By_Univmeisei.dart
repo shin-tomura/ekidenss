@@ -98,12 +98,12 @@ List<int> shozokuChuusenOmomi({
       }
     }
   }
-  // 名声上位の横並びの設定なら、上位K校の重みを、その平均にそろえる(2.0.2。meisei_yokonarabi.dart。
+  // 名声上位の横並びの設定なら、上位K校の重みを、平均か名声1位の重みにそろえる(2.0.2。meisei_yokonarabi.dart。
   // 強化プロジェクトの「名声N位並み」は、そろえたあとの重みで見るので、その前に行う)
   yokonarabiOmomi(
     temp_meisei,
     sortedunivdata,
-    yokonarabiSuu(Hive.box<KantokuData>('kantokuBox').get('KantokuData')),
+    YokonarabiSettei.yomu(Hive.box<KantokuData>('kantokuBox').get('KantokuData')),
   );
   // 強化プロジェクト中の大学は、名声N位の大学の重みまで上げる(2.0.1。kyouka_project.dart)
   kyoukaOmomiHosei(temp_meisei, ghensuu);

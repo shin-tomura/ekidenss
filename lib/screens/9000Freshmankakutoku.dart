@@ -10,6 +10,7 @@ import 'dart:math';
 import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/kansuu/scout_com.dart';
 import 'package:ekiden/kansuu/kyouka_project.dart'; // 強化プロジェクト(2.0.1)
+import 'package:ekiden/screens/kyouka_oshirase.dart'; // 強化プロジェクトの始動のお知らせ(2.0.2)
 import 'package:ekiden/kansuu/bokou_pipe.dart'; // 監督の母校パイプ(2.0.1)
 import 'package:ekiden/kansuu/koukou.dart'; // 出身校と高校時代の実績(1.9.5)
 import 'package:ekiden/screens/Modal_koukouMeikan.dart'; // 高校名鑑(1.9.5)
@@ -303,8 +304,13 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
         hajimete = kantoku != null && !comScoutOshiraseZumi(kantoku);
         junban = hajimete || _ghensuu!.scoutChances >= _roundSuu;
       }
-      if (koukouGamen || junban) {
+      // 強化プロジェクトが今年始まったときの始動のお知らせ(2.0.2。kyouka_oshirase.dart。
+      // 今年のスカウトから効くので、スカウト解禁の記事や帯より先に出す)
+      final bool shidou = KyoukaShidouOshirase.dasu;
+      if (koukouGamen || junban || shidou) {
         WidgetsBinding.instance.addPostFrameCallback((_) async {
+          if (!mounted) return;
+          if (shidou) await kyoukaShidouOshiraseDasu(context, _ghensuu!);
           if (!mounted) return;
           if (koukouGamen) await _kotoshiKoukouTaikaiHiraku();
           if (mounted && junban) _showChikuJunbanDialog(hajimete: hajimete);
@@ -1554,7 +1560,10 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
   String? _kyoukaMoji() {
     final Ghensuu? gh = _ghensuu;
     if (gh == null) return null;
-    final KyoukaProject? p = kyoukaProjectIma(gh);
+    // 強化されるスカウトが残っている間だけ(このスカウトが最後なら、このスカウトの間だけ。2.0.2)
+    final KantokuData? k = Hive.box<KantokuData>('kantokuBox').get('KantokuData');
+    if (k == null) return null;
+    final KyoukaProject? p = kyoukaProjectHyouji(k, gh);
     if (p == null) return null;
     String mei = '';
     for (final UnivData u in Hive.box<UnivData>('univBox').values) {
@@ -1563,7 +1572,8 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
     if (mei.isEmpty) return null;
     // 自分の大学のときは「あなたの大学」(設定で自分の大学も選ばれるようにしたとき。2.0.1)
     final String dare = p.univid == gh.MYunivid ? 'あなたの大学' : '$mei大学';
-    return '$dareが強化プロジェクト中です(${p.owari}年度まで)。'
+    // 期間は「8年3月のスカウトまで」(最後のスカウトなら「今回のスカウトまで」。2.0.2。kyoukaKikanMoji)
+    return '$dareが強化プロジェクト中です(${kyoukaKikanMoji(p, gh)})。'
         '新入生のスカウトで、名声の高い大学と同じくらい選ばれやすくなっています。';
   }
 

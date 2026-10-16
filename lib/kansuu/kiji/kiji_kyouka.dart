@@ -92,7 +92,9 @@ List<Kiji> kyoukaProjectKiji(KijiKankyou k) {
   }
 
   final String lead =
-      '$meiが、${p.hajime}年度から${p.owari}年度までの$nensuu年間、陸上競技部の強化プロジェクトに取り組むと発表した。'
+      // 期間は、画面の表示と同じく「8年3月のスカウトまで」と書く(2.0.2。kyoukaKikanMoji。
+      // プレイヤーにはスカウトが3月の出来事に見えるため。「○年度まで」だと1年ずれて見える)
+      '$meiが、${p.owari}年3月のスカウトまでの$nensuu年間、陸上競技部の強化プロジェクトに取り組むと発表した。'
       '柱は新入生のスカウトで、有望な高校生の獲得に本腰を入れる。';
 
   final List<KijiBlock> honbun = [

@@ -40,10 +40,11 @@ import 'package:ekiden/kansuu/taikai_chouki.dart';
 //   創立の年度は大学の番号から計算で決める(kyoukaSouritsuNendo。保存しない。同じ大学ならいつも同じ)ので、
 //   同じ大学で2回目のプロジェクトが起きても、周年の数が合う。同じ大学で同じ型が続かないように、
 //   大学ごとに前回の型を覚えておく
-// ・画面: 大学画面に「強化プロジェクト中(○年度まで)」。始まった年の4月5日の最新画面で、始動のお知らせの
-//   ダイアログを一度だけ出す(2.0.2。スキップ中は出さない。kyouka_oshirase.dart)。スカウト画面では、
-//   新入生の一覧の上の帯(2.0.2から右端の×で消せる。そのスカウトが終わるまで消えたまま)と、
-//   最初に出るスカウト解禁の記事の上の「スカウト強化中」の表示(2.0.2)に出す(9000Freshmankakutoku.dart)
+// ・画面(2.0.2から、強化されるスカウトが残っている間だけ出す。kyoukaProjectHyouji。期間は「○年3月のスカウトまで」
+//   と書く。kyoukaKikanMoji): 大学画面に「強化プロジェクト中」。スカウト画面では、新入生の一覧の上の帯
+//   (右端の×で消せる。そのスカウトが終わるまで消えたまま)と、最初に出るスカウト解禁の記事の上の
+//   「スカウト強化中」の表示(9000Freshmankakutoku.dart)。始まった年は、スカウトの画面の最初(記事より前)に、
+//   始動のお知らせのダイアログを一度だけ出す(スキップ中はスカウトの画面が出ないので出ない。kyouka_oshirase.dart)
 // ・保存(KantokuData.yobiint3。新しいゲームでは0に戻る):
 //   [80] 設定(起こりやすさ + 10×重み + 100×期間のコード + 1000×自分の大学も選ばれるか(0=選ばれない・1=選ばれる)。
 //        どれも0が初期値)
@@ -222,7 +223,7 @@ class KyoukaProject {
 const int _keta8 = 100000000;
 
 /// 始動のお知らせのダイアログを、まだ出していないか(2.0.2。メモリだけ。抽選で始まったときに立て、
-/// 4月5日の最新画面で見たら下ろす。kyouka_oshirase.dart)
+/// そのすぐあとのスカウトの画面で見たら下ろす。kyouka_oshirase.dart)
 class KyoukaShidouOshirase {
   static bool dasu = false;
 }
@@ -247,6 +248,24 @@ KyoukaProject? kyoukaProjectChuu(KantokuData k, int nendo) {
   if (p == null || nendo < p.hajime || nendo > p.owari) return null;
   return p;
 }
+
+/// 画面に出す強化プロジェクト(2.0.2。強化されるスカウトが残っている間だけ。なければnull)
+/// 強化するのはスカウトだけなので、最後のスカウト(終わる年度の3月のスカウト。中の日付は4月5日)が
+/// 終わったら、画面からは消す。今の年度が終わる年度になったら、そのスカウトの画面(モード9000)の間だけ出す
+/// (年度替わりの処理のすぐあとにスカウトの画面が出るので、ほかの画面では、もう最後のスカウトが終わっている)
+KyoukaProject? kyoukaProjectHyouji(KantokuData k, Ghensuu gh) {
+  final int nendo = choukiNendo(gh);
+  final KyoukaProject? p = kyoukaProjectChuu(k, nendo);
+  if (p == null) return null;
+  if (nendo >= p.owari && gh.mode != 9000) return null;
+  return p;
+}
+
+/// 画面に出す期間の書き方(2.0.2。「8年3月のスカウトまで」。最後のスカウトの最中は「今回のスカウトまで」)
+/// プレイヤーには、スカウトは3月25日のあとの出来事に見えるので「3月」と書く(卒業の「8年3月」とそろえる。
+/// 年は1月に変わるので、終わる年度の数字がそのまま、その3月の年になる)
+String kyoukaKikanMoji(KyoukaProject p, Ghensuu gh) =>
+    choukiNendo(gh) >= p.owari ? '今回のスカウトまで' : '${p.owari}年3月のスカウトまで';
 
 /// 今の日付で実行中の強化プロジェクト(Hiveから読む。なければnull)
 KyoukaProject? kyoukaProjectIma(Ghensuu gh) {
@@ -382,7 +401,7 @@ Future<bool> kyoukaProjectChuusen({
   _projectKaku(k, KyoukaProject(u.id, k1, nendo, owari));
   _maeKataKaku(k, u.id, k1);
   await k.save();
-  // 4月5日の最新画面で、始動のお知らせのダイアログを一度だけ出す(2.0.2。kyouka_oshirase.dart)
+  // このあとのスカウトの画面の最初に、始動のお知らせのダイアログを一度だけ出す(2.0.2。kyouka_oshirase.dart)
   KyoukaShidouOshirase.dasu = true;
   return true;
 }

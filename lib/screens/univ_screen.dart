@@ -30,7 +30,7 @@ import 'package:ekiden/kansuu/kiji/kiji_kihon.dart'
 import 'package:ekiden/screens/kiji_hyou_view.dart'; // 表の部品(1.9.8)
 import 'package:ekiden/screens/kukan_haiti_button.dart'; // 今季タイム一覧表を開くボタン(1.9.9)
 import 'package:ekiden/kansuu/kyouka_project.dart'
-    show KyoukaProject, kyoukaProjectChuu; // 強化プロジェクト(2.0.1)
+    show KyoukaProject, kyoukaProjectHyouji, kyoukaKikanMoji; // 強化プロジェクト(2.0.1)
 import 'package:ekiden/kansuu/koukou.dart'
     show koukouIchiranMoji, koukouHyoujiJouhou, KoukouJouhou; // 監督の出身校(2.0.1。監督の母校パイプ)
 import 'package:ekiden/screens/Modal_koukouMeikan.dart'
@@ -3777,10 +3777,11 @@ class _UnivScreenState extends State<UnivScreen> {
                     fontSize: HENSUU.fontsize_honbun,
                   ),
                 ),
-                // 強化プロジェクト中の大学(2.0.1。kyouka_project.dart)
-                if (_kyoukaOwari(kantoku, ghensuu, currentUnivData.id) != null)
+                // 強化プロジェクト中の大学(2.0.1。kyouka_project.dart。2.0.2から、強化されるスカウトが
+                // 残っている間だけ出し、期間は「8年3月のスカウトまで」と書く)
+                if (_kyoukaKikan(kantoku, ghensuu, currentUnivData.id) != null)
                   Text(
-                    '強化プロジェクト中(${_kyoukaOwari(kantoku, ghensuu, currentUnivData.id)}年度まで)',
+                    '強化プロジェクト中(${_kyoukaKikan(kantoku, ghensuu, currentUnivData.id)})',
                     style: TextStyle(
                       color: Colors.orangeAccent,
                       fontSize: HENSUU.fontsize_honbun,
@@ -4784,9 +4785,10 @@ String _shushouMoji(KantokuData kantoku, Ghensuu gh, int univid) {
   return '';
 }
 
-/// 大学[univid]が強化プロジェクト中なら、終わる年度(でなければnull。2.0.1。kyouka_project.dart)
-int? _kyoukaOwari(KantokuData kantoku, Ghensuu gh, int univid) {
-  final KyoukaProject? p = kyoukaProjectChuu(kantoku, choukiNendo(gh));
+/// 大学[univid]が強化プロジェクト中なら、期間の文(「8年3月のスカウトまで」。でなければnull。2.0.1。
+/// kyouka_project.dart。2.0.2から、最後のスカウトが終わったら出さない)
+String? _kyoukaKikan(KantokuData kantoku, Ghensuu gh, int univid) {
+  final KyoukaProject? p = kyoukaProjectHyouji(kantoku, gh);
   if (p == null || p.univid != univid) return null;
-  return p.owari;
+  return kyoukaKikanMoji(p, gh);
 }

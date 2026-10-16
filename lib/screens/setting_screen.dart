@@ -26,6 +26,8 @@ import 'package:ekiden/screens/senryaku_entry_settei.dart'; // 戦略的エン�
 import 'package:ekiden/screens/yosen_com_siji_settei.dart'; // 正月駅伝予選の指示と集団走(1.9.9)
 import 'package:ekiden/screens/kyouka_project_settei.dart'; // 強化プロジェクト設定(2.0.1)
 import 'package:ekiden/screens/bokou_pipe_settei.dart'; // 監督の母校パイプ設定(2.0.1)
+import 'package:ekiden/screens/meisei_yokonarabi_settei.dart'
+    show meiseiYokonarabiSetteiHiraku; // 名声の横並び設定(2.0.3)
 import 'package:ekiden/screens/Modal_TrainingEffect.dart';
 import 'package:ekiden/screens/Modal_TimeChousei.dart';
 import 'package:ekiden/settings_qr_page.dart';
@@ -1601,6 +1603,20 @@ class _SettingScreenState extends State<SettingScreen>
             },
             child: Text(
               "入学時名声影響度設定",
+              style: TextStyle(
+                color: const Color.fromARGB(255, 0, 255, 0),
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          // 名声の横並び設定(2.0.3。2.0.2は入学時名声影響度設定の中の「名声上位の横並び」だった。
+          // ブロック・グループ・名声の編集まで広がったので独立させた。meisei_yokonarabi_settei.dart)
+          TextButton(
+            onPressed: () => meiseiYokonarabiSetteiHiraku(context),
+            child: Text(
+              "名声の横並び設定",
               style: TextStyle(
                 color: const Color.fromARGB(255, 0, 255, 0),
                 decoration: TextDecoration.underline,

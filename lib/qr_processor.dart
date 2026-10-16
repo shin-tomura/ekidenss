@@ -117,7 +117,7 @@ class SettingsQrProcessor {
       // 入学時名声影響度設定(int)
       data['cg_spurtryokuseichousisuu3'] =
           currentGhensuu.spurtryokuseichousisuu3;
-      // 名声の横並び(スカウトのとき)(int) yobiint3[86] (2.0.2で追加。入学時名声影響度設定の画面にある設定。
+      // 名声の横並び(スカウトのとき)(int) yobiint3[86] (2.0.2で追加。2.0.3から名声の横並び設定の画面にある設定。
       // 2.0.2の形は校数+100×そろえ方、2.0.3の形は1000+そろえ方+10×形+100×名声の順位のつなぎ。meisei_yokonarabi.dart)
       data['k_yobiint3_86'] = yokonarabiAtai(kantoku);
       // 名声の横並びの大学のグループ(int) yobiint3[87]・[88] (2.0.3で追加。1大学1桁(大学id%15の位)、

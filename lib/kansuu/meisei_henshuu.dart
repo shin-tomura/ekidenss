@@ -4,7 +4,7 @@ import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/kansuu/meisei_rireki.dart'; // 名声の履歴(1.8.8)
 
 // ------------------------------------------------------------
-// 名声を編集する(2.0.3。名声の横並びのグループの編集の画面で使う)
+// 名声を編集する(2.0.3。名声の横並び設定の画面のグループの編集で使う。meisei_yokonarabi_settei.dart)
 //
 // 名声設定の画面(univ_screen.dart の ModalMeiseiHenkou)と同じ変え方にする:
 // ・入力できるのは9〜(10万と、今の一番高い名声の大きいほう)

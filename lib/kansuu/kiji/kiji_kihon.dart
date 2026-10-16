@@ -2235,7 +2235,12 @@ class KijiKakite {
   // 直前の2つの段落の文末の種類(文のリズム。1.9.4)
   final List<int> _bunmatsu = [];
 
-  KijiKakite(this.k, int tane) : r = KijiRand(tane);
+  /// 選手を初めて出すときのかっこに、主将の「・主将」を付けるか(2.0.2。学連選抜通信では付けない。
+  /// 学連選抜の主将と読み違えないように)
+  final bool shushouShirushi;
+
+  KijiKakite(this.k, int tane, {this.shushouShirushi = true})
+    : r = KijiRand(tane);
 
   /// 文末の種類(0: 「〜た。」、1: 「〜だ。」「〜る。」など、2: 体言止めなど)
   static int bunmatsuShurui(String bun) {
@@ -2262,9 +2267,10 @@ class KijiKakite {
   int? get _tsuzuitaBunmatsu =>
       (_bunmatsu.length >= 2 && _bunmatsu[0] == _bunmatsu[1]) ? _bunmatsu[0] : null;
 
-  /// 選手を初めて出すときのかっこの中の学年(「3年」。主将なら、画面と同じく「4年・主将」。2.0.2)
+  /// 選手を初めて出すときのかっこの中の学年(「3年」。主将なら、画面と同じく「4年・主将」。2.0.2。
+  /// [shushouShirushi] がfalseの記事(学連選抜通信)では付けない)
   String gakunenKakko(SenshuData s) =>
-      '${s.gakunen}年${k.shushou(s) ? shushouShirushiMoji : ''}';
+      '${s.gakunen}年${shushouShirushi && k.shushou(s) ? shushouShirushiMoji : ''}';
 
   /// 選手の呼び方。初めては「山田太郎(3年)」(主将は「山田太郎(4年・主将)」。2.0.2)、2回目からは「山田」
   /// [daigaku] 初めて出すときに「東西大の」を前に付けるか

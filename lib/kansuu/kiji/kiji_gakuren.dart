@@ -413,7 +413,11 @@ List<Kiji> gakurenTenbouKiji(KijiKankyou k) {
 
 Kiji _tenbouTop(KijiKankyou k, List<_GSenshu> list) {
   const int no = 301;
-  final KijiKakite w = KijiKakite(k, kijiTane(k.gh, k.race, no));
+  final KijiKakite w = KijiKakite(
+    k,
+    kijiTane(k.gh, k.race, no),
+    shushouShirushi: false, // 主将の印は付けない(学連選抜の主将と読み違えないように。2.0.2)
+  );
   final int n = list.length;
   final int ks = k.kukansuu;
   final UnivData? my = k.jibunUniv;
@@ -604,7 +608,11 @@ Kiji _tenbouTop(KijiKankyou k, List<_GSenshu> list) {
 
 Kiji _tenbouMeikan(KijiKankyou k, List<_GSenshu> list) {
   const int no = 302;
-  final KijiKakite w = KijiKakite(k, kijiTane(k.gh, k.race, no));
+  final KijiKakite w = KijiKakite(
+    k,
+    kijiTane(k.gh, k.race, no),
+    shushouShirushi: false, // 主将の印は付けない(学連選抜の主将と読み違えないように。2.0.2)
+  );
   final int n = list.length;
   final int ks = k.kukansuu;
   final String midashi = w.erabu([
@@ -740,7 +748,11 @@ Kiji? _sokuhou(
   final _GSenshu? x = _kukanNoSenshu(list, kk);
   if (r == null || x == null) return null;
   final int no = 320 + kk;
-  final KijiKakite w = KijiKakite(k, kijiTane(k.gh, k.race, no));
+  final KijiKakite w = KijiKakite(
+    k,
+    kijiTane(k.gh, k.race, no),
+    shushouShirushi: false, // 主将の印は付けない(学連選抜の主将と読み違えないように。2.0.2)
+  );
   final int ks = k.kukansuu;
   final bool saigo = kk == ks - 1;
   final bool ouroOwari = ks >= 6 && kk == 4;
@@ -984,7 +996,11 @@ KijiHyou _kekkaHyou(List<GakurenKukanKekka?> kekka) {
 
 Kiji _kekkaTop(KijiKankyou k, List<_GSenshu> list, List<GakurenKukanKekka?> kekka) {
   const int no = 311;
-  final KijiKakite w = KijiKakite(k, kijiTane(k.gh, k.race, no));
+  final KijiKakite w = KijiKakite(
+    k,
+    kijiTane(k.gh, k.race, no),
+    shushouShirushi: false, // 主将の印は付けない(学連選抜の主将と読み違えないように。2.0.2)
+  );
   final int ks = k.kukansuu;
   final GakurenKukanKekka saigo = kekka.last!;
   final int sougou = saigo.tuukaJuni;
@@ -1156,7 +1172,11 @@ Kiji _kekkaZenin(
   List<GakurenKukanKekka?> kekka,
 ) {
   const int no = 312;
-  final KijiKakite w = KijiKakite(k, kijiTane(k.gh, k.race, no));
+  final KijiKakite w = KijiKakite(
+    k,
+    kijiTane(k.gh, k.race, no),
+    shushouShirushi: false, // 主将の印は付けない(学連選抜の主将と読み違えないように。2.0.2)
+  );
   final int ks = k.kukansuu;
   final int n = _daigakuJun(k, ks - 1).length;
   final int sougou = kekka.last!.tuukaJuni;

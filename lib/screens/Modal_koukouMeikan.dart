@@ -942,8 +942,10 @@ class _KoukouHenshuuState extends State<_KoukouHenshuu> {
 
 /// 高校のページ(1.9.5。名門校のカードと、都道府県別の高校から開く)
 /// ・上に校名・都道府県・名門度・タイプ・紹介文と回数、☆(お気に入り)と「編集」
-/// ・年度ごとの都道府県予選・地区大会・全国高校駅伝の成績(大会の記録の直近10回。全国は押すと走者と進学先)
 /// ・今、大学にいる卒業生(コンピュータスカウトONでスカウトの途中は、決まっていない新入生の大学を出さない)
+/// ・この高校出身の大学の監督(2.0.1。監督の母校パイプ)
+/// ・年度ごとの都道府県予選・地区大会・全国高校駅伝の成績(大会の記録の直近10回。全国は押すと走者と進学先)
+/// ・卒業生と監督は、2.0.3から年度ごとの成績より前に出す(下までスクロールしなくても見られるように)
 class _KoukouPage extends StatefulWidget {
   const _KoukouPage({required this.ban});
 
@@ -1314,20 +1316,7 @@ class _KoukouPageState extends State<_KoukouPage> {
             '「編集」では、校名・名門度・タイプ・留学生の有無・紹介文を変えられます(都道府県は変えられません)。',
             style: _hosoku,
           ),
-          // ---- 年度ごとの成績 ----
-          _midashi('■年度ごとの成績'),
-          const Text(
-            '新しい回から、大会の記録が残っている直近10回分です。'
-            '都道府県予選と地区大会はチームの順位とタイム、全国高校駅伝は押すと走った選手と進学先を見られます。',
-            style: _hosoku,
-          ),
-          if (_kiroku.isEmpty)
-            const Padding(
-              padding: EdgeInsets.only(top: 8),
-              child: Text('まだ記録がありません。', style: _honbun),
-            ),
-          for (final KoukouTaikaiKiroku r in _kiroku) ..._kaiSeiseki(r),
-          // ---- 今、大学にいる卒業生 ----
+          // ---- 今、大学にいる卒業生(2.0.3から年度ごとの成績より前に出す) ----
           _midashi('■今、大学にいる卒業生'),
           if (sotsugyousei.isEmpty) const Text('今、大学にいる卒業生はいません。', style: _honbun),
           for (final SenshuData s in sotsugyousei) _sotsugyouseiGyou(s),
@@ -1346,6 +1335,19 @@ class _KoukouPageState extends State<_KoukouPage> {
             alignment: Alignment.centerLeft,
             child: BokouPipeSetsumeiLink(),
           ),
+          // ---- 年度ごとの成績 ----
+          _midashi('■年度ごとの成績'),
+          const Text(
+            '新しい回から、大会の記録が残っている直近10回分です。'
+            '都道府県予選と地区大会はチームの順位とタイム、全国高校駅伝は押すと走った選手と進学先を見られます。',
+            style: _hosoku,
+          ),
+          if (_kiroku.isEmpty)
+            const Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: Text('まだ記録がありません。', style: _honbun),
+            ),
+          for (final KoukouTaikaiKiroku r in _kiroku) ..._kaiSeiseki(r),
           const SizedBox(height: 24),
           const Text('架空の高校です。実在の学校とは関係ありません。大学のレースや育成には影響しません。', style: _hosoku),
           const SizedBox(height: 24),

@@ -44,46 +44,11 @@ List<Kiji> kyoukaProjectKiji(KijiKankyou k) {
       : TEISUU.DEFAULTJUNI;
   final bool kotoshiShutsujou = juni < TEISUU.DEFAULTJUNI;
 
-  // 目標と、正月駅伝から遠ざかっていること(大学の状況で変える)
-  final int tsuusan = choukiTsuusan(u, 2, choukiYuushou);
-  final ChoukiKiroku? c = choukiYomu(u, 2, choukiYuushou);
-  final int saigo = c?.saigo ?? 0;
-  final int shutsujouTsuusan = choukiTsuusan(u, 2, choukiShutsujou);
-  final int saigoShutsujou = choukiYomu(u, 2, choukiShutsujou)?.saigo ?? 0;
-  final String mokuhyou; // 見出しとコメントに使う目標
-  final String buriBun;
-  if (shutsujouTsuusan <= 0 && !kotoshiShutsujou) {
-    // 一度も出場がない
-    mokuhyou = '正月駅伝初出場';
-    buriBun = '正月駅伝にはまだ出場したことがなく、まずは初出場を目指す。';
-  } else if (!kotoshiShutsujou) {
-    // 今年は出場していない(まずは本戦復帰)
-    final String yuushouMae = tsuusan <= 0
-        ? '正月駅伝では、'
-        : (tsuusan == 1 ? '正月駅伝で優勝したこともあるが、' : '正月駅伝では通算$tsuusan回の優勝を誇るが、');
-    if (saigoShutsujou > 0 && nendo > saigoShutsujou) {
-      final int buri = nendo - saigoShutsujou;
-      mokuhyou = '$buri年ぶりの正月駅伝出場';
-      buriBun = '$yuushouMae$saigoShutsujou年度を最後に本戦から遠ざかっていて、まずは本戦復帰を目指す。';
-    } else {
-      mokuhyou = '正月駅伝の本戦復帰';
-      buriBun = '$yuushouMae本戦から遠ざかっていて、まずは本戦復帰を目指す。';
-    }
-  } else if (tsuusan <= 0) {
-    mokuhyou = '悲願の初優勝';
-    buriBun = '正月駅伝ではまだ優勝がなく、悲願の初優勝を目指す。';
-  } else if (saigo > 0) {
-    final int buri = nendo - saigo;
-    mokuhyou = '$buri年ぶりの優勝';
-    buriBun = tsuusan == 1
-        ? '正月駅伝では$saigo年度に優勝しているが、それから$buri年、頂点から遠ざかっている。'
-        : '正月駅伝では通算$tsuusan回の優勝を誇るが、$saigo年度を最後に$buri年、頂点から遠ざかっている。';
-  } else {
-    mokuhyou = '久しぶりの優勝';
-    buriBun = tsuusan == 1
-        ? '正月駅伝では優勝の経験があるが、長く頂点から遠ざかっている。'
-        : '正月駅伝では通算$tsuusan回の優勝を誇るが、長く頂点から遠ざかっている。';
-  }
+  // 目標と、正月駅伝から遠ざかっていること(大学の状況で変える。2.0.2から kyoukaMokuhyou に分けた。
+  // 始動のお知らせのダイアログでも同じ目標を出すため)
+  final ({String mokuhyou, String buriBun}) mk = kyoukaMokuhyou(u, nendo);
+  final String mokuhyou = mk.mokuhyou; // 見出しとコメントに使う目標
+  final String buriBun = mk.buriBun;
   // 今年の正月駅伝の順位の文(出場していなければ、上の文で本戦から遠ざかっていることを書いたので空)
   final String kotoshiBun = kotoshiShutsujou ? '今年の正月駅伝は${juni + 1}位だった。' : '';
 
@@ -179,4 +144,55 @@ List<Kiji> kyoukaProjectKiji(KijiKankyou k) {
       kekka: false,
     ),
   ];
+}
+
+/// 強化プロジェクトの目標と、正月駅伝から遠ざかっていることの文(大学の状況で変える)
+/// (2.0.2に記事から分けた。記事と、4月5日の始動のお知らせのダイアログ(kyouka_oshirase.dart)で使う)
+/// [u] プロジェクトを始めた大学、[nendo] 始めた年度。目標は見出し・コメント・ダイアログに使う
+({String mokuhyou, String buriBun}) kyoukaMokuhyou(UnivData u, int nendo) {
+  // 今年の正月駅伝の順位
+  final int juni = u.juni_race.length > 2 && u.juni_race[2].isNotEmpty
+      ? u.juni_race[2][0]
+      : TEISUU.DEFAULTJUNI;
+  final bool kotoshiShutsujou = juni < TEISUU.DEFAULTJUNI;
+  final int tsuusan = choukiTsuusan(u, 2, choukiYuushou);
+  final ChoukiKiroku? c = choukiYomu(u, 2, choukiYuushou);
+  final int saigo = c?.saigo ?? 0;
+  final int shutsujouTsuusan = choukiTsuusan(u, 2, choukiShutsujou);
+  final int saigoShutsujou = choukiYomu(u, 2, choukiShutsujou)?.saigo ?? 0;
+  final String mokuhyou; // 見出しとコメントに使う目標
+  final String buriBun;
+  if (shutsujouTsuusan <= 0 && !kotoshiShutsujou) {
+    // 一度も出場がない
+    mokuhyou = '正月駅伝初出場';
+    buriBun = '正月駅伝にはまだ出場したことがなく、まずは初出場を目指す。';
+  } else if (!kotoshiShutsujou) {
+    // 今年は出場していない(まずは本戦復帰)
+    final String yuushouMae = tsuusan <= 0
+        ? '正月駅伝では、'
+        : (tsuusan == 1 ? '正月駅伝で優勝したこともあるが、' : '正月駅伝では通算$tsuusan回の優勝を誇るが、');
+    if (saigoShutsujou > 0 && nendo > saigoShutsujou) {
+      final int buri = nendo - saigoShutsujou;
+      mokuhyou = '$buri年ぶりの正月駅伝出場';
+      buriBun = '$yuushouMae$saigoShutsujou年度を最後に本戦から遠ざかっていて、まずは本戦復帰を目指す。';
+    } else {
+      mokuhyou = '正月駅伝の本戦復帰';
+      buriBun = '$yuushouMae本戦から遠ざかっていて、まずは本戦復帰を目指す。';
+    }
+  } else if (tsuusan <= 0) {
+    mokuhyou = '悲願の初優勝';
+    buriBun = '正月駅伝ではまだ優勝がなく、悲願の初優勝を目指す。';
+  } else if (saigo > 0) {
+    final int buri = nendo - saigo;
+    mokuhyou = '$buri年ぶりの優勝';
+    buriBun = tsuusan == 1
+        ? '正月駅伝では$saigo年度に優勝しているが、それから$buri年、頂点から遠ざかっている。'
+        : '正月駅伝では通算$tsuusan回の優勝を誇るが、$saigo年度を最後に$buri年、頂点から遠ざかっている。';
+  } else {
+    mokuhyou = '久しぶりの優勝';
+    buriBun = tsuusan == 1
+        ? '正月駅伝では優勝の経験があるが、長く頂点から遠ざかっている。'
+        : '正月駅伝では通算$tsuusan回の優勝を誇るが、長く頂点から遠ざかっている。';
+  }
+  return (mokuhyou: mokuhyou, buriBun: buriBun);
 }

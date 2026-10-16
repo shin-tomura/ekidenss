@@ -800,11 +800,16 @@ class KijiGamen extends StatelessWidget {
   /// 記事の表の下(生成AIの枠の上)に置くもの(なければnull。スカウト解禁の記事の「大会の結果を見る」ボタン。2.0.1)
   final Widget? shitaBotan;
 
+  /// 記事の一番上(見出しの札の上)に置くもの(なければnull。記事と一緒にスクロールする。
+  /// スカウト解禁の記事の上の「スカウト強化中」の表示。2.0.2)
+  final Widget? ueWaku;
+
   const KijiGamen({
     super.key,
     required this.list,
     required this.bangou,
     this.shitaBotan,
+    this.ueWaku,
   });
 
   @override
@@ -823,6 +828,7 @@ class KijiGamen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
         children: [
+          if (ueWaku != null) ...[ueWaku!, const SizedBox(height: 16)],
           _fudaNarabi(kiji),
           const SizedBox(height: 12),
           Text(

@@ -1045,6 +1045,8 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
         builder: (_) => KijiGamen(
           list: kiji,
           bangou: 0,
+          // 強化プロジェクト中なら、記事の上に「スカウト強化中」の表示(2.0.2)
+          ueWaku: _kyoukaWaku(),
           shitaBotan: Center(
             child: ElevatedButton.icon(
               onPressed: () => _kotoshiKekkaHiraku(modoruMoji: '記事に戻る'),
@@ -1544,7 +1546,8 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
         '(説明画面の設定タブの「新入生の進学先(全大学)」からも、翌年のスカウトまで見られます)。';
   }
 
-  /// 強化プロジェクト中の大学の案内(なければnull。2.0.1。kyouka_project.dart)
+  /// 強化プロジェクト中の大学の案内(なければnull。2.0.1。kyouka_project.dart。
+  /// 2.0.2から、一覧の上の帯ではなく、スカウト解禁の記事の上の表示(_kyoukaWaku)に出す)
   String? _kyoukaMoji() {
     final Ghensuu? gh = _ghensuu;
     if (gh == null) return null;
@@ -1557,8 +1560,54 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
     if (mei.isEmpty) return null;
     // 自分の大学のときは「あなたの大学」(設定で自分の大学も選ばれるようにしたとき。2.0.1)
     final String dare = p.univid == gh.MYunivid ? 'あなたの大学' : '$mei大学';
-    return '強化プロジェクト中: $dare(${p.owari}年度まで)。'
-        'スカウトに力を入れていて、名声の高い大学と同じくらい選ばれやすくなっています';
+    return '$dareが強化プロジェクト中です(${p.owari}年度まで)。'
+        '新入生のスカウトで、名声の高い大学と同じくらい選ばれやすくなっています。';
+  }
+
+  /// スカウト解禁の記事の上に出す「スカウト強化中」の表示(強化プロジェクト中でなければnull。2.0.2)
+  /// (記事と一緒にスクロールするので、新入生の一覧は狭くならない。文は折り返し、高さは決めない)
+  Widget? _kyoukaWaku() {
+    final String? bun = _kyoukaMoji();
+    if (bun == null) return null;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.orange.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.orangeAccent, width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.campaign, color: Colors.orangeAccent),
+              SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'スカウト強化中',
+                  style: TextStyle(
+                    color: Colors.orangeAccent,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            bun,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              height: 1.6,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   /// コンピュータスカウトONのときの説明
@@ -2035,17 +2084,8 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
           ),
           // 地区めぐりの地区の切り替え(1.9.6)
           if (_chikuMeguri) _buildChikuPanel(),
-          // 強化プロジェクト中の大学(2.0.1。kyouka_project.dart)
-          if (_kyoukaMoji() != null)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              color: Colors.orange.withOpacity(0.15),
-              child: Text(
-                _kyoukaMoji()!,
-                style: const TextStyle(color: Colors.orangeAccent, fontSize: 13),
-              ),
-            ),
+          // 強化プロジェクト中の大学の帯は、新入生の一覧が狭くなるのでやめ、2.0.2から
+          // スカウト解禁の記事の上に出す(_kyoukaWaku)
 
           // 選手リスト
           Expanded(

@@ -14,6 +14,7 @@ import 'package:ekiden/kansuu/koukou.dart'; // 新入生の出身校と高校時
 import 'package:ekiden/kansuu/kyouka_project.dart'; // 強化プロジェクト(2.0.1)
 import 'package:ekiden/kansuu/taikai_chouki.dart' show choukiNendo; // 年度(2.0.1)
 import 'package:ekiden/kansuu/shushou.dart' show shushouKetteiBun; // 決まった主将(2.0.1)
+import 'package:ekiden/screens/kyouka_oshirase.dart'; // 強化プロジェクトの始動のお知らせ(2.0.2)
 // KANSUUクラスをインポートするか、必要な関数をここに直接定義
 // 仮で必要な関数をここに定義します。もし kansuu.dart があるならそちらをインポートしてください。
 // import 'package:ekiden/utils/kansuu.dart';
@@ -131,6 +132,10 @@ class Mode0100Content extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 4月5日に強化プロジェクトが始まっていれば、画面を出したあとにお知らせのダイアログを一度だけ出す
+    // (2.0.2。スキップ中は出さない。kyouka_oshirase.dart)
+    kyoukaShidouOshiraseYoyaku(context, ghensuu);
+
     // Mode0100Content内でHiveデータを直接listenする場合
     // (LatestScreenからのghensuu引数は、ここでは主にonAdvanceModeのトリガーに使う)
 

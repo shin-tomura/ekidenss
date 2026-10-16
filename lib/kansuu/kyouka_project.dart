@@ -40,7 +40,10 @@ import 'package:ekiden/kansuu/taikai_chouki.dart';
 //   創立の年度は大学の番号から計算で決める(kyoukaSouritsuNendo。保存しない。同じ大学ならいつも同じ)ので、
 //   同じ大学で2回目のプロジェクトが起きても、周年の数が合う。同じ大学で同じ型が続かないように、
 //   大学ごとに前回の型を覚えておく
-// ・画面: 大学画面に「強化プロジェクト中(○年度まで)」、スカウト画面に実行中の大学
+// ・画面: 大学画面に「強化プロジェクト中(○年度まで)」。始まった年の4月5日の最新画面で、始動のお知らせの
+//   ダイアログを一度だけ出す(2.0.2。スキップ中は出さない。kyouka_oshirase.dart)。スカウト画面では、
+//   最初に出るスカウト解禁の記事の上に「スカウト強化中」の表示を出す(2.0.2。2.0.1では一覧の上の帯だったが、
+//   新入生の一覧が狭くなるのでやめた。9000Freshmankakutoku.dart)
 // ・保存(KantokuData.yobiint3。新しいゲームでは0に戻る):
 //   [80] 設定(起こりやすさ + 10×重み + 100×期間のコード + 1000×自分の大学も選ばれるか(0=選ばれない・1=選ばれる)。
 //        どれも0が初期値)
@@ -218,6 +221,12 @@ class KyoukaProject {
 
 const int _keta8 = 100000000;
 
+/// 始動のお知らせのダイアログを、まだ出していないか(2.0.2。メモリだけ。抽選で始まったときに立て、
+/// 4月5日の最新画面で見たら下ろす。kyouka_oshirase.dart)
+class KyoukaShidouOshirase {
+  static bool dasu = false;
+}
+
 /// 最後(実行中)の強化プロジェクト(一度もなければnull)
 KyoukaProject? kyoukaProjectSaigo(KantokuData k) {
   if (k.yobiint3.length <= kyoukaJoutaiIndex) return null;
@@ -373,6 +382,8 @@ Future<bool> kyoukaProjectChuusen({
   _projectKaku(k, KyoukaProject(u.id, k1, nendo, owari));
   _maeKataKaku(k, u.id, k1);
   await k.save();
+  // 4月5日の最新画面で、始動のお知らせのダイアログを一度だけ出す(2.0.2。kyouka_oshirase.dart)
+  KyoukaShidouOshirase.dasu = true;
   return true;
 }
 

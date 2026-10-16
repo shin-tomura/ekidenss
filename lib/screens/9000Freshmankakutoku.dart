@@ -12,6 +12,7 @@ import 'package:ekiden/kansuu/scout_com.dart';
 import 'package:ekiden/kansuu/kyouka_project.dart'; // 強化プロジェクト(2.0.1)
 import 'package:ekiden/screens/kyouka_oshirase.dart'; // 強化プロジェクトの始動のお知らせ(2.0.2)
 import 'package:ekiden/kansuu/bokou_pipe.dart'; // 監督の母校パイプ(2.0.1)
+import 'package:ekiden/kansuu/meisei_yokonarabi.dart'; // 名声上位の横並び(2.0.2)
 import 'package:ekiden/kansuu/koukou.dart'; // 出身校と高校時代の実績(1.9.5)
 import 'package:ekiden/screens/Modal_koukouMeikan.dart'; // 高校名鑑(1.9.5)
 import 'package:ekiden/kansuu/kiji/kiji.dart' show Kiji, koukouTaikaiKiji; // スカウト解禁の記事(2.0.1)
@@ -1334,11 +1335,17 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
     final targetUniv = _univBox.get(freshman.univid)!;
 
     // 1. 大学の名声値に基づく基本成功確率の計算
+    // (名声上位の横並びの設定なら、上位K校を平均にそろえた名声で計算する。2.0.2。meisei_yokonarabi.dart)
+    final Map<int, int> sm = scoutMeiseiMap(
+      _univBox.values.toList(),
+      yokonarabiSuu(Hive.box<KantokuData>('kantokuBox').get('KantokuData')),
+    );
+    final int myMeisei = sm[myUniv.id] ?? myUniv.meisei_total;
+    final int targetMeisei = sm[targetUniv.id] ?? targetUniv.meisei_total;
     double universityPrestigeRate;
     // 分母がゼロになるのを防ぐ
-    if (myUniv.meisei_total + targetUniv.meisei_total > 0) {
-      universityPrestigeRate =
-          myUniv.meisei_total / (myUniv.meisei_total + targetUniv.meisei_total);
+    if (myMeisei + targetMeisei > 0) {
+      universityPrestigeRate = myMeisei / (myMeisei + targetMeisei);
     } else {
       universityPrestigeRate = 0.5; // 分母がゼロの場合は基本値を設定
     }

@@ -4,6 +4,7 @@ import 'package:ekiden/ghensuu.dart';
 import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/kansuu/taikai_chouki.dart';
+import 'package:ekiden/kansuu/meisei_yokonarabi.dart'; // 名声上位の横並び(2.0.2)
 
 // ------------------------------------------------------------
 // 強化プロジェクト(2.0.1)
@@ -444,9 +445,10 @@ Map<int, int> kyoukaScoutMeiseiHoseiNendo(
     if (x.id == p.univid) u = x;
   }
   if (u == null) return const {};
-  final List<int> jun = univs.map((x) => x.meisei_total).toList()
-    ..sort((a, b) => b.compareTo(a));
+  // 名声上位の横並びの設定なら、そろえたあとの名声で見る(2.0.2。meisei_yokonarabi.dart)
+  final Map<int, int> sm = scoutMeiseiMap(univs, yokonarabiSuu(k));
+  final List<int> jun = sm.values.toList()..sort((a, b) => b.compareTo(a));
   final int n = min(kyoukaOmomiJuni(k), jun.length);
   if (n <= 0) return const {};
-  return {u.id: max(u.meisei_total, jun[n - 1])};
+  return {u.id: max(sm[u.id] ?? u.meisei_total, jun[n - 1])};
 }

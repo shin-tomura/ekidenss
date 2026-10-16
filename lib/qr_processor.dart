@@ -24,6 +24,7 @@ import 'kansuu/yosen_com_siji.dart'; // 正月駅伝予選のコンピュータ�
 import 'kansuu/mokuhyou_kimekata.dart'; // 目標順位決め方設定の確認(2.0.1)
 import 'kansuu/kyouka_project.dart'; // 強化プロジェクト設定の確認(2.0.1)
 import 'kansuu/bokou_pipe.dart'; // 監督の母校パイプ設定の確認(2.0.1)
+import 'kansuu/meisei_yokonarabi.dart'; // 名声上位の横並びの確認(2.0.2)
 import 'kansuu/shushou.dart'; // 主将の特典の設定の確認(2.0.1)
 
 // 読み込み時に複数枚のデータを一時的に保持する状態管理クラス
@@ -116,6 +117,9 @@ class SettingsQrProcessor {
       // 入学時名声影響度設定(int)
       data['cg_spurtryokuseichousisuu3'] =
           currentGhensuu.spurtryokuseichousisuu3;
+      // 名声上位の横並び(スカウトのとき)(int) yobiint3[86] (2.0.2で追加。入学時名声影響度設定の画面にある設定。
+      // 0=なし(初期値)・2〜10=上位何校か。meisei_yokonarabi.dart)
+      data['k_yobiint3_86'] = yokonarabiSuu(kantoku);
       // 目標順位決め方設定(int)
       data['cg_spurtryokuseichousisuu2'] =
           currentGhensuu.spurtryokuseichousisuu2;
@@ -416,6 +420,12 @@ class SettingsQrProcessor {
       if (currentGhensuu.spurtryokuseichousisuu3 < 0 ||
           currentGhensuu.spurtryokuseichousisuu3 > 9) {
         currentGhensuu.spurtryokuseichousisuu3 = 0;
+      }
+      // 名声上位の横並び(スカウトのとき)(int) kantoku.yobiint3[86] (2.0.2)
+      //   0=なし・2〜10=上位何校か(古いQRコードには含まれていないので、そのときは今の設定のまま)
+      final dynamic yobiint3_86 = dataMap['k_yobiint3_86'];
+      if (yobiint3_86 is int && yokonarabiTadashii(yobiint3_86)) {
+        yokonarabiIreru(kantoku, yobiint3_86);
       }
       // 目標順位決め方設定(int)
       // (2.0.1から、正しくない値は新しい初期値の対校戦順位追従にする。2.0.0までのQRコードの93

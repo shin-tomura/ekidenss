@@ -6,6 +6,7 @@ import 'package:ekiden/senshu_data.dart';
 import 'package:ekiden/senshu_r_data.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/kansuu/koukou.dart' show KoukouJouhou;
+import 'package:ekiden/kansuu/meisei_yokonarabi.dart'; // 名声上位の横並び(2.0.2)
 
 // ------------------------------------------------------------
 // 監督の母校パイプ(2.0.1)
@@ -190,7 +191,15 @@ class BokouPipe {
   /// コンピュータの声かけのコード(bokouPipeKoekake〜)
   final int koekake;
 
-  const BokouPipe(this.bokou, this.juni, {this.koekake = bokouPipeKoekakeFutsuu});
+  /// 名声上位の横並びの校数(0はなし。名声N位並みを、そろえたあとの名声で見るため。2.0.2。meisei_yokonarabi.dart)
+  final int yokonarabi;
+
+  const BokouPipe(
+    this.bokou,
+    this.juni, {
+    this.koekake = bokouPipeKoekakeFutsuu,
+    this.yokonarabi = 0,
+  });
 
   /// 効かないもの
   static const BokouPipe nashi = BokouPipe({}, 0);
@@ -202,7 +211,12 @@ class BokouPipe {
     final Map<int, int> m = bokouPipeBokou(k);
     if (!bokouPipeJibunKiku(k)) m.remove(myUnivid);
     if (m.isEmpty) return nashi;
-    return BokouPipe(m, bokouPipeJuni(k), koekake: bokouPipeKoekakeCode(k));
+    return BokouPipe(
+      m,
+      bokouPipeJuni(k),
+      koekake: bokouPipeKoekakeCode(k),
+      yokonarabi: yokonarabiSuu(k),
+    );
   }
 
   /// 効かないか
@@ -234,6 +248,7 @@ class BokouPipe {
   /// 新入生[s]が大学[univid]の監督の母校の後輩なら、名声N位の大学の名声まで上げる
   int meisei(int univid, SenshuData s, int moto, List<UnivData> univs) {
     if (!kouhai(univid, s)) return moto;
-    return max(moto, _nBanme([for (final UnivData u in univs) u.meisei_total]));
+    // 名声上位の横並びの設定なら、そろえたあとの名声で見る(2.0.2)
+    return max(moto, _nBanme(scoutMeiseiMap(univs, yokonarabi).values.toList()));
   }
 }

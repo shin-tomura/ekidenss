@@ -36,6 +36,7 @@ import 'package:ekiden/kansuu/koukou.dart'
 import 'package:ekiden/screens/Modal_koukouMeikan.dart'
     show koukouPageHirakuBan; // 監督の出身校から高校名鑑の高校のページを開く(2.0.1)
 import 'package:ekiden/kansuu/shushou.dart' show shushouIdUniv; // 主将(2.0.1)
+import 'package:ekiden/kansuu/meisei_yokonarabi.dart'; // 名声上位の横並び(2.0.2)
 import 'package:ekiden/screens/setsumei_mado.dart'; // 主将・母校パイプの説明のリンク(2.0.1)
 import 'package:ekiden/kansuu/mokuhyou_kimekata.dart'
     show
@@ -1487,6 +1488,11 @@ class _ModalSpurtryokuseichousisuu3State
                             ],
                           );
                         }),
+                        // 名声上位の横並び(スカウトのとき)(2.0.2。meisei_yokonarabi.dart)
+                        // (上のレベルと組み合わせて使う別の項目。押しても画面は閉じない)
+                        const SizedBox(height: 16),
+                        const _YokonarabiSettei(),
+                        const SizedBox(height: 16),
                       ],
                     ),
                   ),
@@ -1520,6 +1526,100 @@ class _ModalSpurtryokuseichousisuu3State
           ),
         );
       },
+    );
+  }
+}
+
+/// 入学時名声影響度設定の画面の「名声上位の横並び(スカウトのとき)」(2.0.2。meisei_yokonarabi.dart)
+class _YokonarabiSettei extends StatefulWidget {
+  const _YokonarabiSettei();
+
+  @override
+  State<_YokonarabiSettei> createState() => _YokonarabiSetteiState();
+}
+
+class _YokonarabiSetteiState extends State<_YokonarabiSettei> {
+  @override
+  Widget build(BuildContext context) {
+    final KantokuData? k = Hive.box<KantokuData>(
+      'kantokuBox',
+    ).get('KantokuData');
+    if (k == null) return const SizedBox.shrink();
+    final int ima = yokonarabiSuu(k);
+    String mei(int v) => v == 0 ? 'なし(初期値)' : yokonarabiMei(v);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Text(
+          '名声上位の横並び(スカウトのとき)',
+          style: TextStyle(
+            color: HENSUU.textcolor,
+            fontSize: HENSUU.fontsize_honbun,
+            fontWeight: FontWeight.bold,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 12),
+        Text(
+          '名声の上位の大学を、新入生のスカウトでは同じ名声として扱います(上位の大学の名声の平均にそろえます)。'
+          '名声1位の大学が、スカウトで抜け出しにくくなります。それより下の大学の選ばれやすさは変わりません。'
+          '名声の表示や、目標順位・獲得名声などには影響しません。\n'
+          '上のレベルと組み合わせて使えます。この設定は次の新入生スカウトから影響します。',
+          style: TextStyle(
+            color: HENSUU.textcolor,
+            fontSize: HENSUU.fontsize_honbun,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 12),
+        Text(
+          '現在: ${mei(ima)}',
+          style: TextStyle(
+            color: HENSUU.textcolor,
+            fontSize: HENSUU.fontsize_honbun,
+            fontWeight: FontWeight.bold,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 16),
+        Wrap(
+          alignment: WrapAlignment.center,
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final int v in [
+              0,
+              for (int n = yokonarabiSaishou; n <= yokonarabiSaidai; n++) n,
+            ])
+              ElevatedButton(
+                onPressed: () async {
+                  yokonarabiIreru(k, v);
+                  await k.save();
+                  if (mounted) setState(() {});
+                },
+                style: ElevatedButton.styleFrom(
+                  // 今の設定はオレンジ
+                  backgroundColor: v == ima ? Colors.orange : Colors.green,
+                  foregroundColor: Colors.black,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                ),
+                child: Text(
+                  mei(v),
+                  style: TextStyle(
+                    fontSize: HENSUU.fontsize_honbun,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ],
     );
   }
 }

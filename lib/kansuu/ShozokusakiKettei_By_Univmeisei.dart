@@ -7,6 +7,8 @@ import 'package:ekiden/constants.dart'; // TEISUUクラスをインポート
 import 'package:ekiden/kansuu/ikusei_ryuugakusei.dart';
 import 'package:ekiden/kansuu/joukai.dart';
 import 'package:ekiden/kansuu/kyouka_project.dart'; // 強化プロジェクト(2.0.1)
+import 'package:ekiden/kantoku_data.dart';
+import 'package:ekiden/kansuu/meisei_yokonarabi.dart'; // 名声上位の横並び(2.0.2)
 import 'package:flutter/services.dart';
 // 必要に応じて他のモデルや定数ファイルのインポートを追加してください
 
@@ -96,6 +98,13 @@ List<int> shozokuChuusenOmomi({
       }
     }
   }
+  // 名声上位の横並びの設定なら、上位K校の重みを、その平均にそろえる(2.0.2。meisei_yokonarabi.dart。
+  // 強化プロジェクトの「名声N位並み」は、そろえたあとの重みで見るので、その前に行う)
+  yokonarabiOmomi(
+    temp_meisei,
+    sortedunivdata,
+    yokonarabiSuu(Hive.box<KantokuData>('kantokuBox').get('KantokuData')),
+  );
   // 強化プロジェクト中の大学は、名声N位の大学の重みまで上げる(2.0.1。kyouka_project.dart)
   kyoukaOmomiHosei(temp_meisei, ghensuu);
   return temp_meisei;

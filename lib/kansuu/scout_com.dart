@@ -12,6 +12,7 @@ import 'package:ekiden/kansuu/koukou.dart'; // 地区めぐりの出身校(1.9.6
 import 'package:ekiden/kansuu/koukou_meibo.dart'; // 地区めぐりの地区(1.9.6)
 import 'package:ekiden/kansuu/kyouka_project.dart'; // 強化プロジェクト(2.0.1)
 import 'package:ekiden/kansuu/bokou_pipe.dart'; // 監督の母校パイプ(2.0.1)
+import 'package:ekiden/kansuu/meisei_yokonarabi.dart'; // 名声上位の横並び(2.0.2)
 
 // ------------------------------------------------------------
 // コンピュータ大学の新入生スカウト(1.7.9)
@@ -812,6 +813,8 @@ Map<int, double> comScoutSeikouritsuIchiran({
   )[univid];
   // 監督の母校の後輩は、名声N位並みの名声で計算する(2.0.1。bokou_pipe.dart)
   final BokouPipe pipe = BokouPipe.yomu(kantoku, univid);
+  // スカウトで使う名声(名声上位の横並びの設定なら、上位K校を平均にそろえたもの。2.0.2。meisei_yokonarabi.dart)
+  final Map<int, int> sm = scoutMeiseiMap(sortedUnivData, yokonarabiSuu(kantoku));
   return {
     for (final SenshuData s in shinnyuusei)
       if (s.hirou != 1 && !comScoutKettei(s) && !comScoutKotowarareta(s))
@@ -825,10 +828,10 @@ Map<int, double> comScoutSeikouritsuIchiran({
               ? pipe.meisei(
                   univid,
                   s,
-                  kyouka ?? sortedUnivData[univid].meisei_total,
+                  kyouka ?? sm[univid] ?? sortedUnivData[univid].meisei_total,
                   sortedUnivData,
                 )
-              : kyouka,
+              : (kyouka ?? sm[univid]),
         ),
   };
 }
@@ -1348,6 +1351,8 @@ Future<List<ComScoutKekka>> comScoutRound({
     kantoku,
     gh,
   );
+  // スカウトで使う名声(名声上位の横並びの設定なら、上位K校を平均にそろえたもの。2.0.2。meisei_yokonarabi.dart)
+  final Map<int, int> sm = scoutMeiseiMap(sortedUnivData, yokonarabiSuu(kantoku));
   // 監督の母校パイプ(2.0.1。bokou_pipe.dart): 監督の母校の後輩の争奪戦・交渉の成功率と、
   // 地区めぐり(声かけ)のコンピュータの大学の声のかけ方に使う
   final BokouPipe pipe = BokouPipe.yomu(kantoku, gh.MYunivid);
@@ -1458,10 +1463,10 @@ Future<List<ComScoutKekka>> comScoutRound({
                   ? pipe.meisei(
                       univ.id,
                       s,
-                      kyoukaMeisei[univ.id] ?? univ.meisei_total,
+                      kyoukaMeisei[univ.id] ?? sm[univ.id] ?? univ.meisei_total,
                       sortedUnivData,
                     )
-                  : kyoukaMeisei[univ.id],
+                  : (kyoukaMeisei[univ.id] ?? sm[univ.id]),
             ),
           ),
         );
@@ -1603,6 +1608,7 @@ Future<List<ComScoutKekka>> comScoutRound({
                             k.univid,
                             k.senshu,
                             kyoukaMeisei[k.univid] ??
+                                sm[k.univid] ??
                                 sortedUnivData[k.univid].meisei_total,
                             sortedUnivData,
                           ),

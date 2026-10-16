@@ -1597,6 +1597,8 @@ class _YokonarabiSetteiState extends State<_YokonarabiSettei> {
         ),
         const SizedBox(height: 16),
         // そろえ方(平均(初期値)・名声1位)
+        // (監督の母校パイプ設定と同じ選択チップ。選んでいるほうに✓を付け、色を変える。
+        //  表示の設定で✓が出なくならないように、✓は必ず出す)
         Text('そろえ方', style: honbun, textAlign: TextAlign.center),
         const SizedBox(height: 8),
         Wrap(
@@ -1605,35 +1607,39 @@ class _YokonarabiSetteiState extends State<_YokonarabiSettei> {
           runSpacing: 8,
           children: [
             for (final int h in const [yokonarabiHeikin, yokonarabiIchii])
-              ElevatedButton(
-                onPressed: () async {
-                  yokonarabiHouhouIreru(k, h);
-                  await _hozon(k);
-                },
-                style: ElevatedButton.styleFrom(
-                  // 今の設定はオレンジ
-                  backgroundColor: h == houhou ? Colors.orange : Colors.green,
-                  foregroundColor: Colors.black,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                ),
-                child: Text(
+              ChoiceChip(
+                label: Text(
                   h == yokonarabiHeikin
                       ? '${yokonarabiHouhouMei(h)}(初期値)'
                       : yokonarabiHouhouMei(h),
-                  style: TextStyle(
-                    fontSize: HENSUU.fontsize_honbun,
-                    fontWeight: FontWeight.bold,
-                  ),
+                ),
+                selected: h == houhou,
+                showCheckmark: true,
+                checkmarkColor: Colors.white,
+                onSelected: (bool selected) async {
+                  if (!selected || h == houhou) return;
+                  yokonarabiHouhouIreru(k, h);
+                  await _hozon(k);
+                },
+                selectedColor: Colors.teal.shade700,
+                backgroundColor: Colors.grey.shade800,
+                labelStyle: TextStyle(
+                  color: Colors.white,
+                  fontSize: HENSUU.fontsize_honbun,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
           ],
         ),
+        // 校数が「なし」のときは、そろえ方は効かない
+        if (ima == 0) ...[
+          const SizedBox(height: 8),
+          Text(
+            'そろえ方は、横並びにする校数を選ぶと効きます。',
+            style: honbun,
+            textAlign: TextAlign.center,
+          ),
+        ],
         const SizedBox(height: 8),
         Text(
           houhou == yokonarabiIchii

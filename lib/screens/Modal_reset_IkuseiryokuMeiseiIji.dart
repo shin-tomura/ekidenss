@@ -55,7 +55,8 @@ class _ModalReset_IkuseiryokuMeiseiIji
               crossAxisAlignment: CrossAxisAlignment.center, // 中央寄せ
               children: <Widget>[
                 Text(
-                  "本当に名声と育成力以外は全てリセットしてやり直しますか？\nアルバムも消去されます。",
+                  // 名声の横並びの設定も残る(2.0.3。main.dart の _runMode101010Processing)
+                  "本当に名声と育成力、名声の横並びの設定以外は全てリセットしてやり直しますか？\nアルバムも消去されます。",
                   style: TextStyle(
                     color: HENSUU.textcolor,
                     fontSize: HENSUU.fontsize_honbun,

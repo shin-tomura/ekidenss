@@ -74,6 +74,12 @@ import 'package:ekiden/kansuu/taikai_chouki.dart'; // 大会の長い記録の�
 import 'package:ekiden/kansuu/mokuhyou_kimekata.dart'; // 目標順位の決め方の移行処理(2.0.1)
 import 'package:ekiden/kansuu/kyouka_project.dart'; // 強化プロジェクト(2.0.1)
 import 'package:ekiden/kansuu/shushou.dart'; // 主将(2.0.1)
+import 'package:ekiden/kansuu/meisei_yokonarabi.dart'
+    show
+        yokonarabiAtai,
+        yokonarabiAtaiIreru,
+        yokonarabiGroupAtai,
+        yokonarabiGroupAtaiIreru; // 名声の横並びの設定を、名声と育成力を維持するリセットで残す(2.0.3)
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 // ★ここに buildAppTheme() 関数を記述する★
@@ -1579,6 +1585,11 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     // Boxからデータを読み込む
     final KantokuData? kantoku = _kantokuBox.get('KantokuData');
     if (kantoku != null) {
+      // 名声の横並びの設定([86]と大学のグループ[87][88])は、名声と一緒に残す
+      // (2.0.3。凝った世界観をリセットのたびに作り直さなくてよいように。meisei_yokonarabi.dart)
+      final int yokonarabi = yokonarabiAtai(kantoku);
+      final int yokonarabiGroup0 = yokonarabiGroupAtai(kantoku, 0);
+      final int yokonarabiGroup1 = yokonarabiGroupAtai(kantoku, 1);
       for (int i = 0; i < TEISUU.UNIVSUU * 3; i++) {
         kantoku.rid[i] = 0;
         kantoku.yobiint0[i] = 0;
@@ -1588,6 +1599,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         kantoku.yobiint4[i] = 0;
         kantoku.yobiint5[i] = 0;
       }
+      yokonarabiAtaiIreru(kantoku, yokonarabi);
+      yokonarabiGroupAtaiIreru(kantoku, 0, yokonarabiGroup0);
+      yokonarabiGroupAtaiIreru(kantoku, 1, yokonarabiGroup1);
       kantoku.yobiint2[2] = 25;
       kantoku.yobiint2[3] = 70;
       kantoku.yobiint2[4] = 50;

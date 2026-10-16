@@ -25,6 +25,7 @@ import 'package:ekiden/screens/ModalChartSenshu.dart';
 import 'package:ekiden/kansuu/ChartPanelUniv.dart';
 import 'package:ekiden/screens/Modal_ChartHyojiHijyojiKirikae.dart'; // レーダーチャートのパネルの表示・非表示(2.0.3)
 import 'package:ekiden/kansuu/meisei_rireki.dart'; // 名声の履歴(1.8.8)
+import 'package:ekiden/kansuu/meisei_henshuu.dart'; // 名声の横並びのグループの編集の画面で名声も変える(2.0.3)
 import 'package:ekiden/kansuu/shiyou_text.dart'; // 留学生の入学の決まり(1.8.9)
 import 'package:ekiden/kansuu/kiji/kiji_kihon.dart'
     show KijiHyou, univSandaiHyou, konkiKaisaiZumi; // 三大駅伝の成績の表(1.9.8)
@@ -1896,7 +1897,10 @@ class _YokonarabiBlockHenshuuState extends State<_YokonarabiBlockHenshuu> {
 
 /// 名声の横並びの大学のグループを編集する画面(2.0.3。meisei_yokonarabi.dart)
 /// ・大学を名声の高い順に並べ、行ごとにグループ(なし・1〜9)を選ぶ(どの大学も1つのグループにしか入らない)
-/// ・上に、グループごとの大学のまとめを出す(1校だけのグループは「効きません」と添える)
+/// ・上に、グループごとの大学のまとめと、スカウトでの名声(そろえたあとの値)を出す(1校だけのグループは「効きません」と添える)
+/// ・グループの強さは入れた大学の名声で決まるので、行ごとに名声も変えられる(名声設定の画面と同じ変え方。meisei_henshuu.dart)。
+///   開いている間は行の並びを変えず、名声と「名声○位」だけをすぐ変える(続けて変えるときに行が飛ばないように)。
+///   「名声の順に並べ直す」で並べ直せる
 /// ・グループは大学idで持つので、名声の順位が変わっても同じ顔ぶれのまま。あなたの大学も入れられる
 /// ・変えるたびに保存する
 class _YokonarabiGroupHenshuu extends StatefulWidget {
@@ -1919,6 +1923,90 @@ class _YokonarabiGroupHenshuuState extends State<_YokonarabiGroupHenshuu> {
     Color(0xFF01579B),
     Color(0xFF5D4037),
   ];
+
+  /// 行の並び(大学id。開いたときと「名声の順に並べ直す」を押したときの名声の順)
+  List<int> _narabi = [];
+
+  /// 名声の入力欄(大学idごと)
+  final Map<int, TextEditingController> _meiseiCtrl = {};
+  final Map<int, FocusNode> _meiseiFocus = {};
+
+  /// 名声を保存している途中か
+  bool _hozonChuu = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _narabiNaoshi();
+  }
+
+  @override
+  void dispose() {
+    for (final TextEditingController c in _meiseiCtrl.values) {
+      c.dispose();
+    }
+    for (final FocusNode f in _meiseiFocus.values) {
+      f.dispose();
+    }
+    super.dispose();
+  }
+
+  /// 大学(id 0〜29)
+  List<UnivData> _univs() => [
+    for (final UnivData u in Hive.box<UnivData>('univBox').values)
+      if (u.id >= 0 && u.id < yokonarabiJuniSuu) u,
+  ];
+
+  /// 名声の高い順(同じなら大学idの小さい順)
+  List<UnivData> _meiseiJun(List<UnivData> univs) => List<UnivData>.of(univs)
+    ..sort((a, b) {
+      final int c = b.meisei_total.compareTo(a.meisei_total);
+      return c != 0 ? c : a.id.compareTo(b.id);
+    });
+
+  /// 行の並びを今の名声の順にする
+  void _narabiNaoshi() {
+    _narabi = [for (final UnivData u in _meiseiJun(_univs())) u.id];
+  }
+
+  /// 大学[u]の名声の入力欄(なければ作る。入力欄から離れたら確定する)
+  TextEditingController _ctrl(UnivData u) {
+    return _meiseiCtrl.putIfAbsent(u.id, () {
+      final FocusNode f = FocusNode();
+      f.addListener(() {
+        if (!f.hasFocus) _meiseiKakutei(u.id);
+      });
+      _meiseiFocus[u.id] = f;
+      return TextEditingController(text: '${u.meisei_total}');
+    });
+  }
+
+  /// 入力した名声を確定する(範囲の外や数字でなければ、もとの名声に戻す)
+  /// (画面を閉じたあとに入力欄から離れたときは何もしない。入力欄は閉じるときに片付けるため)
+  Future<void> _meiseiKakutei(int univid) async {
+    if (!mounted) return;
+    final TextEditingController? c = _meiseiCtrl[univid];
+    final UnivData? u = Hive.box<UnivData>('univBox').get(univid);
+    if (c == null || u == null || _hozonChuu) return;
+    final int? atai = int.tryParse(c.text.trim());
+    final int saidai = meiseiHenshuuSaidai(_univs());
+    if (atai == null || atai < meiseiHenshuuSaishou || atai > saidai) {
+      c.text = '${u.meisei_total}';
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+          ..clearSnackBars()
+          ..showSnackBar(
+            SnackBar(content: Text('名声は${meiseiHenshuuSaishou}から${saidai}の間で入れてください。')),
+          );
+      }
+      return;
+    }
+    if (atai == u.meisei_total) return;
+    _hozonChuu = true;
+    await meiseiHenshuu(u, atai);
+    _hozonChuu = false;
+    if (mounted) setState(() {});
+  }
 
   Future<void> _hozon(KantokuData k) async {
     await k.save();
@@ -1950,101 +2038,146 @@ class _YokonarabiGroupHenshuuState extends State<_YokonarabiGroupHenshuu> {
         body: const SizedBox.shrink(),
       );
     }
-    final List<UnivData> univs = [
-      for (final UnivData u in Hive.box<UnivData>('univBox').values)
-        if (u.id >= 0 && u.id < yokonarabiJuniSuu) u,
-    ];
+    final List<UnivData> univs = _univs();
+    final Map<int, UnivData> univMap = {for (final UnivData u in univs) u.id: u};
     final List<int> group = yokonarabiGroupRetsu(k);
     final List<({int group, List<UnivData> univs})> ichiran = yokonarabiGroupIchiran(group, univs);
-    // 名声の高い順(同じなら大学idの小さい順)
-    final List<UnivData> jun = List<UnivData>.of(univs)
-      ..sort((a, b) {
-        final int c = b.meisei_total.compareTo(a.meisei_total);
-        return c != 0 ? c : a.id.compareTo(b.id);
-      });
+    // スカウトでの名声(そろえたあとの値。名声やグループを変えるとすぐ変わる)
+    final Map<int, int> scoutMeisei = scoutMeiseiMap(
+      univs,
+      YokonarabiSettei(0, yokonarabiHouhou(k) == yokonarabiIchii, group: group),
+    );
+    // 今の名声の順位(大学id → 1位から)
+    final List<UnivData> imaJun = _meiseiJun(univs);
+    final Map<int, int> juni = {
+      for (int i = 0; i < imaJun.length; i++) imaJun[i].id: i + 1,
+    };
     final Box<Ghensuu> gb = Hive.box<Ghensuu>('ghensuuBox');
     final int myUnivId = gb.isNotEmpty ? (gb.getAt(0)?.MYunivid ?? -1) : -1;
-    int groupBan(UnivData u) => (u.id >= 0 && u.id < group.length) ? group[u.id] : 0;
+    int groupBan(int id) => (id >= 0 && id < group.length) ? group[id] : 0;
     return Scaffold(
       backgroundColor: HENSUU.backgroundcolor,
       appBar: appBar,
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Text(
-            'グループに入れた大学は、名声の順位が変わっても同じ顔ぶれのままです。'
-            '同じグループの大学は、新入生のスカウトでは同じ名声として扱います。'
-            'グループは1〜9の9個まで作れ、1校だけのグループは効きません。あなたの大学も入れられます。',
-            style: honbun,
-          ),
-          const SizedBox(height: 12),
-          // 今のグループ
-          if (ichiran.isEmpty)
-            Text('今のグループ: なし', style: honbun.copyWith(fontWeight: FontWeight.bold))
-          else
-            for (final ({int group, List<UnivData> univs}) g in ichiran)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Text(
-                  'グループ${g.group}: ${g.univs.map((UnivData u) => '${u.name}大学').join('・')}'
-                  '${g.univs.length < 2 ? '(1校だけなので効きません)' : ''}',
-                  style: honbun.copyWith(fontWeight: FontWeight.bold),
-                ),
-              ),
-          const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: OutlinedButton(
-              onPressed: ichiran.isEmpty
-                  ? null
-                  : () async {
-                      yokonarabiGroupZenbuNashi(k);
-                      await _hozon(k);
-                    },
-              child: Text('すべてなしにする', style: honbun),
+      body: GestureDetector(
+        // 入力欄の外を押したら、キーボードを閉じて名声を確定する
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            Text(
+              'グループに入れた大学は、名声の順位が変わっても同じ顔ぶれのままです。'
+              '同じグループの大学は、新入生のスカウトでは同じ名声として扱います。'
+              'グループは1〜9の9個まで作れ、1校だけのグループは効きません。あなたの大学も入れられます。',
+              style: honbun,
             ),
-          ),
-          const SizedBox(height: 16),
-          Text('大学ごとに決める', style: honbun.copyWith(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 4),
-          Text('大学は、今の名声の高い順に並んでいます。同じグループの大学は、同じ色で並びます。', style: hosoku),
-          const SizedBox(height: 8),
-          for (int i = 0; i < jun.length; i++)
-            Container(
-              color: groupBan(jun[i]) >= 1 && groupBan(jun[i]) <= _iro.length ? _iro[groupBan(jun[i]) - 1] : null,
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              child: Wrap(
-                spacing: 12,
-                runSpacing: 0,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  Text('名声${i + 1}位', style: hosoku),
-                  Text(
-                    '${jun[i].name}大学${jun[i].id == myUnivId ? '(あなたの大学)' : ''}',
-                    style: honbun.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: jun[i].id == myUnivId ? Colors.amber : HENSUU.textcolor,
-                    ),
-                  ),
-                  DropdownButton<int>(
-                    value: groupBan(jun[i]),
-                    dropdownColor: Colors.grey[900],
+            const SizedBox(height: 8),
+            Text(
+              'グループの強さは、入れた大学の名声で決まります(平均か一番上にそろえます)。'
+              'この画面で名声も変えられます。ここで変えた名声は、名声設定で変えたのと同じく、名声の表示や目標順位などにも効きます。',
+              style: hosoku,
+            ),
+            const SizedBox(height: 12),
+            // 今のグループと、スカウトでの名声
+            if (ichiran.isEmpty)
+              Text('今のグループ: なし', style: honbun.copyWith(fontWeight: FontWeight.bold))
+            else
+              for (final ({int group, List<UnivData> univs}) g in ichiran)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text(
+                    'グループ${g.group}: ${g.univs.map((UnivData u) => '${u.name}大学').join('・')}'
+                    '${g.univs.length < 2 ? '(1校だけなので効きません)' : '(スカウトでの名声 ${scoutMeisei[g.univs.first.id] ?? g.univs.first.meisei_total})'}',
                     style: honbun.copyWith(fontWeight: FontWeight.bold),
-                    items: [
-                      for (int g = 0; g <= yokonarabiGroupSaidai; g++)
-                        DropdownMenuItem<int>(value: g, child: Text(g == 0 ? 'なし' : 'グループ$g')),
-                    ],
-                    onChanged: (int? g) async {
-                      if (g == null) return;
-                      yokonarabiGroupIreru(k, jun[i].id, g);
-                      await _hozon(k);
-                    },
                   ),
-                ],
-              ),
+                ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton(
+                  onPressed: ichiran.isEmpty
+                      ? null
+                      : () async {
+                          yokonarabiGroupZenbuNashi(k);
+                          await _hozon(k);
+                        },
+                  child: Text('すべてなしにする', style: honbun),
+                ),
+                OutlinedButton(
+                  onPressed: () {
+                    FocusScope.of(context).unfocus();
+                    setState(_narabiNaoshi);
+                  },
+                  child: Text('名声の順に並べ直す', style: honbun),
+                ),
+              ],
             ),
-          const SizedBox(height: 24),
-        ],
+            const SizedBox(height: 16),
+            Text('大学ごとに決める', style: honbun.copyWith(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 4),
+            Text(
+              '大学は、この画面を開いたときの名声の高い順に並んでいます(名声を変えても並びは変わりません)。'
+              '同じグループの大学は、同じ色で並びます。名声は、数字を入れて入力欄の外を押すと変わります。',
+              style: hosoku,
+            ),
+            const SizedBox(height: 8),
+            for (final int id in _narabi)
+              if (univMap[id] != null)
+                Container(
+                  color: groupBan(id) >= 1 && groupBan(id) <= _iro.length ? _iro[groupBan(id) - 1] : null,
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: Wrap(
+                    spacing: 12,
+                    runSpacing: 4,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text('名声${juni[id] ?? 0}位', style: hosoku),
+                      Text(
+                        '${univMap[id]!.name}大学${id == myUnivId ? '(あなたの大学)' : ''}',
+                        style: honbun.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: id == myUnivId ? Colors.amber : HENSUU.textcolor,
+                        ),
+                      ),
+                      // 名声(数字を入れて、完了か入力欄の外を押すと確定)
+                      SizedBox(
+                        width: 110,
+                        child: TextField(
+                          controller: _ctrl(univMap[id]!),
+                          focusNode: _meiseiFocus[id],
+                          keyboardType: TextInputType.number,
+                          style: honbun,
+                          decoration: InputDecoration(
+                            isDense: true,
+                            labelText: '名声',
+                            labelStyle: hosoku,
+                            border: const OutlineInputBorder(),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                          ),
+                          onSubmitted: (_) => FocusScope.of(context).unfocus(),
+                        ),
+                      ),
+                      DropdownButton<int>(
+                        value: groupBan(id),
+                        dropdownColor: Colors.grey[900],
+                        style: honbun.copyWith(fontWeight: FontWeight.bold),
+                        items: [
+                          for (int g = 0; g <= yokonarabiGroupSaidai; g++)
+                            DropdownMenuItem<int>(value: g, child: Text(g == 0 ? 'なし' : 'グループ$g')),
+                        ],
+                        onChanged: (int? g) async {
+                          if (g == null) return;
+                          yokonarabiGroupIreru(k, id, g);
+                          await _hozon(k);
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+            const SizedBox(height: 24),
+          ],
+        ),
       ),
     );
   }

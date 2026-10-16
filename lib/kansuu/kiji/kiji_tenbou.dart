@@ -1653,7 +1653,7 @@ String _henkouMochiMoji(KijiKankyou k, SenshuData s, int idx) {
 /// (初めては「山田太郎(3年・ハーフ1時間02分10秒)」、2回目からは「山田(ハーフ1時間02分10秒)」)
 String _senshuMochi(KijiKakite w, SenshuData s, String mochi) {
   if (w.deta('S${s.id}')) return '${w.senshu(s)}($mochi)';
-  return w.hito('S${s.id}', s.name, '${s.gakunen}年・$mochi', '');
+  return w.hito('S${s.id}', s.name, '${w.gakunenKakko(s)}・$mochi', '');
 }
 
 Kiji? _toujitsuKekkaTenbou(Tenbou t) {

@@ -10,6 +10,8 @@ import 'package:ekiden/screens/Modal_courseshoukai.dart'; // 大会の名前(cou
 import 'package:ekiden/kansuu/custom_seigen.dart'; // カスタム駅伝の出場制限(1年生だけか)
 import 'package:ekiden/kansuu/koukou.dart'; // 出身校と高校時代の実績(1.9.5)
 import 'package:ekiden/kansuu/taikai_chouki.dart'; // 大会の長い記録(2.0.0)
+import 'package:ekiden/kansuu/shushou.dart'
+    show shushouIchiran, shushouShirushiMoji; // 選手名の「・主将」の印(2.0.2)
 
 // ------------------------------------------------------------
 // ニュース記事(箱庭スポーツ)の共通の部品(1.9.2)
@@ -854,6 +856,13 @@ class KijiKankyou {
     this.race,
     this.kekka,
   );
+
+  /// 大学ごとの主将の選手id(大学id → 選手id。記事を作るときの主将。2.0.2。shushou.dart)
+  /// (初めて使うときに一度だけ求める)
+  late final Map<int, int> shushouId = shushouIchiran(kantoku, gh, senshu);
+
+  /// 選手[s]が今の主将か(2.0.2)
+  bool shushou(SenshuData s) => shushouId[s.univid] == s.id;
 
   /// 今の表示中の大会でデータを読む(データがなければnull)
   /// [kekka] 結果の記事(大会のあと)のとき
@@ -2253,13 +2262,17 @@ class KijiKakite {
   int? get _tsuzuitaBunmatsu =>
       (_bunmatsu.length >= 2 && _bunmatsu[0] == _bunmatsu[1]) ? _bunmatsu[0] : null;
 
-  /// 選手の呼び方。初めては「山田太郎(3年)」、2回目からは「山田」
+  /// 選手を初めて出すときのかっこの中の学年(「3年」。主将なら、画面と同じく「4年・主将」。2.0.2)
+  String gakunenKakko(SenshuData s) =>
+      '${s.gakunen}年${k.shushou(s) ? shushouShirushiMoji : ''}';
+
+  /// 選手の呼び方。初めては「山田太郎(3年)」(主将は「山田太郎(4年・主将)」。2.0.2)、2回目からは「山田」
   /// [daigaku] 初めて出すときに「東西大の」を前に付けるか
   String senshu(SenshuData s, {bool daigaku = false}) {
     return hito(
       'S${s.id}',
       s.name,
-      '${s.gakunen}年',
+      gakunenKakko(s),
       daigaku && s.univid >= 0 && s.univid < k.univ.length
           ? '${daigakuMei(k.univ[s.univid])}の'
           : '',
@@ -2273,7 +2286,7 @@ class KijiKakite {
     return hitoSoe(
       'S${s.id}',
       s.name,
-      '${s.gakunen}年',
+      gakunenKakko(s),
       daigaku && s.univid >= 0 && s.univid < k.univ.length
           ? '${daigakuMei(k.univ[s.univid])}の'
           : '',

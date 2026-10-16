@@ -6,6 +6,8 @@ import 'package:ekiden/kansuu/koukou.dart'; // 出身校と高校時代の実績
 import 'package:ekiden/kansuu/kiji/kiji_kihon.dart';
 import 'package:ekiden/kansuu/kiji/kiji_gakunai.dart' show gakunaiSiteMeiJibun, gakunaiKishaMei;
 import 'package:ekiden/kansuu/bokou_pipe.dart' show bokouPipeBokou; // 監督の母校から入った新入生(2.0.1)
+import 'package:ekiden/kansuu/shushou.dart' show shushouNendoRetsu; // 新入生紹介号の主将(2.0.2)
+import 'package:ekiden/kansuu/taikai_chouki.dart' show choukiNendo;
 
 // ------------------------------------------------------------
 // 新入生の記事(2.0.0。4月5日の最新画面のカードから。読めるのはその日だけ)
@@ -1984,6 +1986,33 @@ List<Kiji> shinnyuuseiGakunaiKiji(KijiKankyou k) {
   final ({String name, int nenrei})? kt = k.kantokuMei(u.id);
   if (kt != null) {
     w.comment('「${w.erabu(_jibunKantokuKotoba)}」と${w.hito('K${u.id}', kt.name, '', '')}監督(${kt.nenrei})は${w.erabu(_kantokuShime)}。');
+  }
+  // 新しい年度の主将(2.0.2。4月上旬の最新画面に出す主将と同じ。文で主将と書くので、かっこに「・主将」は付けない)
+  final int? shushouId = k.shushouId[u.id];
+  SenshuData? shushou;
+  if (shushouId != null) {
+    for (final SenshuData s in k.senshu) {
+      if (s.id == shushouId) shushou = s;
+    }
+  }
+  if (shushou != null) {
+    // (名前は先に作っておく。erabu は候補を全部作ってから選ぶので、候補の中で呼ぶと名前を出したことになるため)
+    final String mei = w.hito('S${shushou.id}', shushou.name, '${shushou.gakunen}年', '');
+    // 3年生のときから続けて主将なら「昨季に続き」(前の年度の主将の記録があるときだけ分かる)
+    final bool tsuzuke =
+        shushou.gakunen == 4 &&
+        shushouNendoRetsu(k.kantoku, shushou, choukiNendo(k.gh)).length >= 2;
+    w.danraku(
+      tsuzuke
+          ? w.erabu([
+              '昨季に続き、主将は$meiが務める。新しい仲間を加えたチームで、新しいシーズンに挑む。',
+              '主将は、昨季に続いて$meiが務める。新入生とともに、チームは新しいシーズンへ踏み出す。',
+            ])
+          : w.erabu([
+              '新チームの主将は$meiが務める。新しい仲間を加えたチームで、新しいシーズンに挑む。',
+              '新しいシーズン、チームを率いる主将は$meiだ。新入生とともに、チームは新たな一歩を踏み出す。',
+            ]),
+    );
   }
   // 編集部の目(学生記者の型で変える)
   final int nyuu10 = nihon.where((x) {

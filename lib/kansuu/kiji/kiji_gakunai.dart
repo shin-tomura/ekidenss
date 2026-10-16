@@ -2323,11 +2323,11 @@ String _nyuugakuHikakuBun(SenshuData s, double time) {
   return '入学時の記録(${jikanMoji(nyuugaku)})より${saMoji(d)}速いタイムだった。';
 }
 
-/// 小見出しに出す選手の名前(「山田太郎(2年)」)。本文では2回目からの呼び方(名字)で書けるように、
-/// 名前を出したことにしておく
+/// 小見出しに出す選手の名前(「山田太郎(2年)」。主将は「山田太郎(4年・主将)」。2.0.2)。
+/// 本文では2回目からの呼び方(名字)で書けるように、名前を出したことにしておく
 String _koMidashiMei(KijiKakite w, SenshuData s) {
   w.senshu(s);
-  return '${fullMei(s.name)}(${s.gakunen}年)';
+  return '${fullMei(s.name)}(${w.gakunenKakko(s)})';
 }
 
 /// 対校戦の種目の記事(入賞者全員と、チーム内3位までの選手と、伸び盛りの選手を紹介する)

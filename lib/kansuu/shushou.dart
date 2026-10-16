@@ -333,8 +333,8 @@ bool shushouHoseiNashiDatta(SenshuData s) =>
 bool shushouHenkouDekiru(Ghensuu gh) => gh.month >= 4 && gh.month <= 9;
 
 /// 4年生の選手[s]が主将を務めた年度(古い順。主将でなければ空。2.0.2)
-/// [yonenNendo] 選手が4年生の年度。卒業の処理(RetireNew)の前に呼ぶ
-/// (年度替わりの卒業の処理と、3月25日の学内メディアの卒業生特集で使う)。
+/// [yonenNendo] 選手が4年生の年度。その年度のうち(年度の終わりの卒業の処理(RetireNew)まで)に呼ぶ
+/// (年度替わりの卒業の処理と、学内メディアの卒業生特集(3月25日)・新入生紹介号(4月5日)で使う)。
 /// 4年生の年度の主将は今の主将の欄で、3年生の年度の主将は前の年度替わりに写しておいた欄で見る
 /// (どちらも、その年度の終わりの主将。前の年度の主将の欄は2.0.2から写すので、それより前の年度は分からない)
 List<int> shushouNendoRetsu(KantokuData k, SenshuData s, int yonenNendo) {

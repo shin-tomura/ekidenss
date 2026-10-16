@@ -2045,6 +2045,13 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
     final List<SenshuData> filteredMyFreshmen = _myFreshmen
         .where(_meetsFilterCriteria)
         .toList();
+    // コンピュータスカウトONでは、ほかの大学に進学が決まった選手(進路未定の選手の下に並んでいる)の前に
+    // 区切りを入れる(2.0.2。並べ替えが区切りの上と下で別々なのが分かるように)
+    final int miteiSuu = _comScoutOn
+        ? filteredTargetFreshmen.where((s) => !comScoutKettei(s)).length
+        : filteredTargetFreshmen.length;
+    final int ketteiSuu = filteredTargetFreshmen.length - miteiSuu;
+    final bool kugiriAri = _comScoutOn && ketteiSuu > 0;
 
     return Scaffold(
       backgroundColor: HENSUU.backgroundcolor,
@@ -2153,19 +2160,25 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
             child: ListView.builder(
               padding: const EdgeInsets.all(12),
               itemCount:
-                  filteredMyFreshmen.length + filteredTargetFreshmen.length,
+                  filteredMyFreshmen.length +
+                  filteredTargetFreshmen.length +
+                  (kugiriAri ? 1 : 0),
               itemBuilder: (context, index) {
                 if (index < filteredMyFreshmen.length) {
                   return _buildFreshmanCard(
                     filteredMyFreshmen[index],
                     isMyUniv: true,
                   );
-                } else {
-                  return _buildFreshmanCard(
-                    filteredTargetFreshmen[index - filteredMyFreshmen.length],
-                    isMyUniv: false,
-                  );
                 }
+                int i = index - filteredMyFreshmen.length;
+                if (kugiriAri) {
+                  if (i == miteiSuu) return _ketteiKugiri(ketteiSuu);
+                  if (i > miteiSuu) i--;
+                }
+                return _buildFreshmanCard(
+                  filteredTargetFreshmen[i],
+                  isMyUniv: false,
+                );
               },
             ),
           ),
@@ -2201,6 +2214,8 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
     if (kotowari) rateStr = _chikuMeguri ? '保留' : '断られた';
     // 地区めぐり(声かけ)には成功率がないので、進路未定の選手は「未定」(1.9.6)
     if (_koekake && !kettei) rateStr = '未定';
+    // ほかの大学に進学が決まった選手は、カード全体を沈んだ色にする(2.0.2。もう声をかけられない選手と分かるように)
+    final bool sumi = !isMyUniv && kettei;
     // 出身校と高校時代の実績(1.9.5)
     final String koukouMoji = _koukouMoji(freshman);
     // 監督の母校の後輩の印(2.0.1。bokou_pipe.dart)
@@ -2218,13 +2233,17 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
     }
 
     return Card(
-      // 自校なら濃い紺色、他校なら深いグレー
-      color: isMyUniv ? const Color(0xFF1A1F26) : const Color(0xFF2C2C2E),
+      // 自校なら濃い紺色、他校なら深いグレー(ほかの大学に決まった選手は、もっと暗いグレー。2.0.2)
+      color: isMyUniv
+          ? const Color(0xFF1A1F26)
+          : (sumi ? const Color(0xFF1C1C1E) : const Color(0xFF2C2C2E)),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(
-          // 自校ならゴールド、他校なら落ち着いた青の枠線
-          color: isMyUniv ? Colors.amber : Colors.blueAccent.withOpacity(0.3),
+          // 自校ならゴールド、他校なら落ち着いた青の枠線(ほかの大学に決まった選手は灰色。2.0.2)
+          color: isMyUniv
+              ? Colors.amber
+              : (sumi ? Colors.white24 : Colors.blueAccent.withOpacity(0.3)),
           width: isMyUniv ? 2.0 : 1.5,
         ),
       ),
@@ -2255,7 +2274,7 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
                         style: TextStyle(
                           color: isMyUniv
                               ? Colors.amberAccent
-                              : Colors.cyanAccent,
+                              : (sumi ? Colors.white54 : Colors.cyanAccent),
                           fontSize:
                               HENSUU.fontsize_honbun + 2, // 22 -> 18 にサイズダウン
                           fontWeight: FontWeight.bold,
@@ -2308,8 +2327,8 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
                         ),
                         Text(
                           rateStr,
-                          style: const TextStyle(
-                            color: Colors.white,
+                          style: TextStyle(
+                            color: sumi ? Colors.white60 : Colors.white,
                             fontSize: HENSUU.fontsize_honbun + 2,
                             fontWeight: FontWeight.bold,
                           ),
@@ -2331,7 +2350,11 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
             child: Wrap(
               spacing: 6,
               runSpacing: 6,
-              children: _buildAbilityBadges(freshman, isMyUniv: isMyUniv),
+              children: _buildAbilityBadges(
+                freshman,
+                isMyUniv: isMyUniv,
+                sumi: sumi,
+              ),
             ),
           ),
 
@@ -2348,7 +2371,9 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
                       Text(
                         freshman.name,
                         style: TextStyle(
-                          color: isMyUniv ? Colors.amber[100] : Colors.white70,
+                          color: isMyUniv
+                              ? Colors.amber[100]
+                              : (sumi ? Colors.white54 : Colors.white70),
                           fontSize: HENSUU.fontsize_honbun - 2,
                           fontWeight: isMyUniv
                               ? FontWeight.bold
@@ -2437,18 +2462,27 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
     );
   }
 
-  Widget _buildSingleBadge(String label, int value, bool isMyUniv) {
+  /// 能力値のバッジ1つ(自校ならゴールド系、他校ならブルー系。
+  /// [sumi] はほかの大学に進学が決まった選手で、灰色系。2.0.2)
+  Widget _buildSingleBadge(
+    String label,
+    int value,
+    bool isMyUniv, {
+    bool sumi = false,
+  }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: isMyUniv
             ? Colors.amber.withOpacity(0.15)
-            : Colors.blueAccent.withOpacity(0.15),
+            : (sumi
+                  ? Colors.white.withOpacity(0.06)
+                  : Colors.blueAccent.withOpacity(0.15)),
         borderRadius: BorderRadius.circular(4),
         border: Border.all(
           color: isMyUniv
               ? Colors.amber.withOpacity(0.5)
-              : Colors.blueAccent.withOpacity(0.4),
+              : (sumi ? Colors.white24 : Colors.blueAccent.withOpacity(0.4)),
         ),
       ),
       child: Row(
@@ -2457,7 +2491,9 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
           Text(
             label,
             style: TextStyle(
-              color: isMyUniv ? Colors.amber[50] : Colors.white,
+              color: isMyUniv
+                  ? Colors.amber[50]
+                  : (sumi ? Colors.white60 : Colors.white),
               fontSize: HENSUU.fontsize_honbun,
               fontWeight: FontWeight.bold,
             ),
@@ -2466,7 +2502,9 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
           Text(
             value.toString(),
             style: TextStyle(
-              color: isMyUniv ? Colors.amberAccent : Colors.cyanAccent,
+              color: isMyUniv
+                  ? Colors.amberAccent
+                  : (sumi ? Colors.white54 : Colors.cyanAccent),
               fontSize: HENSUU.fontsize_honbun,
               fontWeight: FontWeight.bold,
             ),
@@ -2476,10 +2514,35 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
     );
   }
 
-  /// 能力値を個別のバッジとして構築する（自校なら色をゴールドに）
+  /// ほかの大学に進学が決まった選手の前に入れる区切り(2.0.2。コンピュータスカウトONのとき、
+  /// 進路未定の選手の下。線の下に見出しを置き、文字が大きいときは折り返す)
+  Widget _ketteiKugiri(int ninzuu) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Divider(color: Colors.white24, height: 1),
+          const SizedBox(height: 8),
+          Text(
+            'ほかの大学に進学が決まった選手($ninzuu人)',
+            style: const TextStyle(
+              color: Colors.white60,
+              fontSize: HENSUU.fontsize_honbun - 2,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 能力値を個別のバッジとして構築する（自校なら色をゴールドに。
+  /// [sumi] はほかの大学に進学が決まった選手で、灰色系。2.0.2）
   List<Widget> _buildAbilityBadges(
     SenshuData freshman, {
     required bool isMyUniv,
+    bool sumi = false,
   }) {
     List<Widget> badges = [];
 
@@ -2501,51 +2564,16 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
       if (index != -1 && _ghensuu!.nouryokumieruflag[index] == 1) {
         int value = _getAbilityValue(freshman, criterion);
         if (value > 0) {
-          badges.add(
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                // 自校ならゴールド系、他校ならブルー系のバッジ
-                color: isMyUniv
-                    ? Colors.amber.withOpacity(0.15)
-                    : Colors.blueAccent.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(
-                  color: isMyUniv
-                      ? Colors.amber.withOpacity(0.5)
-                      : Colors.blueAccent.withOpacity(0.4),
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    label,
-                    style: TextStyle(
-                      color: isMyUniv ? Colors.amber[50] : Colors.white,
-                      fontSize: HENSUU.fontsize_honbun,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    value.toString(),
-                    style: TextStyle(
-                      color: isMyUniv ? Colors.amberAccent : Colors.cyanAccent,
-                      fontSize: HENSUU.fontsize_honbun,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
+          // 自校ならゴールド系、他校ならブルー系のバッジ(安定感と同じ形。2.0.2からまとめた)
+          badges.add(_buildSingleBadge(label, value, isMyUniv, sumi: sumi));
         }
       }
     });
 
     if (freshman.anteikan > 0) {
-      badges.add(_buildSingleBadge('安定感', freshman.anteikan, isMyUniv));
+      badges.add(
+        _buildSingleBadge('安定感', freshman.anteikan, isMyUniv, sumi: sumi),
+      );
     }
 
     if (badges.isEmpty) {

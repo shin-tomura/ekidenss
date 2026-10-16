@@ -8,6 +8,7 @@ import 'package:ekiden/kansuu/kiji/kiji_tokuchou.dart'; // 選手の特徴の文
 import 'package:ekiden/kansuu/kiji/kiji_kimochi.dart'; // 駅伝男・平常心の持ち味(1.9.7)
 import 'package:ekiden/kansuu/ikku_pace.dart'; // 1区の集団のペースの予想(駅伝男の持ち味。1.9.7)
 import 'package:ekiden/kansuu/shushou.dart' show shushouNendoRetsu; // 卒業生特集の主将(2.0.2)
+import 'package:ekiden/kansuu/kiji/kiji_shushou.dart'; // 主将のコメント(2.0.2)
 import 'package:ekiden/kansuu/taikai_chouki.dart' show choukiNendo;
 import 'package:ekiden/kansuu/kiji/kiji_kekka.dart' show EkidenKekka, EkidenUnivKekka;
 import 'package:ekiden/kansuu/kiji/kiji_yosen.dart'
@@ -621,6 +622,40 @@ Kiji _kekkaTop(EkidenKekka e, EkidenUnivKekka m, String site) {
     kuyashii = true;
   }
   w.comment(kantokuComment(w, kb, m.u.id, kuyashii: kuyashii));
+  // 主将のコメント(2.0.2。kiji_shushou.dart。監督のコメントに続けて、チームとしての言葉。
+  // 1年生だけのカスタム駅伝は、主将が走るチームではないので入れない)
+  final SenshuData? shushou = k.ichinenDake ? null : shushouSenshu(k, m.u.id);
+  if (shushou != null) {
+    final ShushouBamen shushouBamen;
+    if (r == 0) {
+      shushouBamen = ShushouBamen.yuushou;
+    } else if (seed != null && !seedNow && seedMae) {
+      shushouBamen = ShushouBamen.mitassei;
+    } else if ((seed != null && seedNow && !seedMae) || tassei) {
+      shushouBamen = ShushouBamen.tassei;
+    } else if (mokuhyou == null && r < e.n ~/ 2) {
+      // 目標がないときは、上半分ならうまくいった言葉にする
+      shushouBamen = ShushouBamen.tassei;
+    } else {
+      shushouBamen = ShushouBamen.mitassei;
+    }
+    w.comment(
+      shushouComment(
+        w,
+        shushou,
+        shushouBamen,
+        jijitsu: shushouKekkaJijitsu(
+          e,
+          m,
+          shushou,
+          mokuhyou: mokuhyou,
+          mae: maeAri ? mae : null,
+          seedNow: seed == null ? null : seedNow,
+          seedMae: seedMae,
+        ),
+      ),
+    );
+  }
   w.danraku('走った$ks人の一人ひとりの走りは、別の記事「全員の走り」で振り返る。');
   final String tsugi = race == 0
       ? '次は11月駅伝。チームはさらに強くなって戻ってくる。'
@@ -1033,6 +1068,32 @@ Kiji _meikan(
       u.id,
     ),
   );
+  // 主将のコメント(2.0.2。kiji_shushou.dart。監督のコメントに続けて、チームとしての意気込み。
+  // 名鑑の本人のコメントは自分の走りの言葉なので、こちらはチームの言葉にする。
+  // 1年生だけのカスタム駅伝は、主将が走るチームではないので入れない)
+  final SenshuData? shushou = k.ichinenDake ? null : shushouSenshu(k, u.id);
+  if (shushou != null) {
+    // 前回の順位(展望は大会の前なので、いちばん新しい記録が前回)
+    final int zenkai = juniRace(u, k.race, 0);
+    w.comment(
+      shushouComment(
+        w,
+        shushou,
+        zenkai == 0 ? ShushouBamen.tenbouHonmei : ShushouBamen.tenbouChousen,
+        jijitsu: shushouTenbouJijitsu(
+          k,
+          shushou,
+          hashiru,
+          [
+            for (final SenshuData? s in hashiru)
+              if (s != null && _hatsuShussou(k, s)) s,
+          ],
+          mokuhyou: _mokuhyou(k, u, k.univ.where(k.shutsujou).length),
+          mae: shutsujouJuni(zenkai) ? zenkai : null,
+        ),
+      ),
+    );
+  }
 
   final List<List<String>> gyou = [];
   for (int kk = 0; kk < ks; kk++) {

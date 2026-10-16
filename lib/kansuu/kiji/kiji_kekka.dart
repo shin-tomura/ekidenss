@@ -9,6 +9,8 @@ import 'package:ekiden/kansuu/taikai_chouki.dart'; // 大会の長い記録の�
 import 'package:ekiden/kansuu/kiji/kiji_ouro.dart'; // 正月駅伝の往路の記事(2.0.0)
 import 'package:ekiden/kansuu/kiji/kiji_comment.dart';
 import 'package:ekiden/kansuu/kiji/kiji_kimochi.dart' show kimochiTokuhitsu; // 「駅伝男」たちの走り(1.9.7)
+import 'package:ekiden/kansuu/kiji/kiji_shushou.dart'
+    show ShushouBamen, shushouSenshu, shushouComment, shushouKekkaJijitsu; // 優勝校の主将のコメント(2.0.2)
 
 // ------------------------------------------------------------
 // 駅伝(10月・11月・正月・カスタム)の結果の記事(1.9.2。結果画面の「ニュース記事」)
@@ -789,6 +791,28 @@ Kiji _topKiji(EkidenKekka e) {
       ],
     ),
   );
+  // 優勝校の主将のコメント(2.0.2。kiji_shushou.dart。監督のコメントに続けて。
+  // 主将が勝負所やアンカーとして話したあとは、同じ人が2度話すので入れない。
+  // 1年生だけのカスタム駅伝は、主将が走るチームではないので入れない)
+  final SenshuData? winShushou = k.ichinenDake ? null : shushouSenshu(k, win.u.id);
+  if (winShushou != null) {
+    final bool hanashita =
+        (!kanzen && win.senshu[k0]?.id == winShushou.id) ||
+        (ks >= 2 &&
+            (kanzen || k0 != ks - 1) &&
+            win.senshu[ks - 1]?.id == winShushou.id);
+    if (!hanashita) {
+      w.comment(
+        shushouComment(
+          w,
+          winShushou,
+          ShushouBamen.yuushou,
+          jijitsu: shushouKekkaJijitsu(e, win, winShushou),
+          daigaku: win.mei,
+        ),
+      );
+    }
+  }
 
   // 本文: 1位と2位の差(僅差なら攻防、大差なら独走。1.9.2)
   if (kinsa) {

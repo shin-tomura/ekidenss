@@ -12,6 +12,8 @@ import 'package:ekiden/kansuu/bokou_pipe.dart'; // この高校出身の監督(2
 import 'package:ekiden/screens/setsumei_mado.dart'
     show BokouPipeSetsumeiLink; // 「母校パイプとは」のリンク(2.0.1)
 import 'package:ekiden/kansuu/time_date.dart';
+import 'package:ekiden/screens/Modal_senshu.dart'
+    show ModalSenshuDetailView; // 高校のページの卒業生を押すと選手の詳細の小窓(2.0.3)
 
 // ------------------------------------------------------------
 // 高校名鑑(1.9.5。説明画面の設定タブの「高校名鑑」から開く)
@@ -943,7 +945,8 @@ class _KoukouHenshuuState extends State<_KoukouHenshuu> {
 /// 高校のページ(1.9.5。名門校のカードと、都道府県別の高校から開く)
 /// ・上に校名・都道府県・名門度・タイプ・紹介文と回数、☆(お気に入り)と「編集」
 /// ・この高校出身の大学の監督(2.0.1。監督の母校パイプ)
-/// ・今、大学にいる卒業生(コンピュータスカウトONでスカウトの途中は、決まっていない新入生の大学を出さない)
+/// ・今、大学にいる卒業生(コンピュータスカウトONでスカウトの途中は、決まっていない新入生の大学を出さない)。
+///   2.0.3から、押すと選手の詳細の小窓を開く(進路未定の新入生は押せない)
 /// ・年度ごとの都道府県予選・地区大会・全国高校駅伝の成績(大会の記録の直近10回。全国は押すと走者と進学先)
 /// ・監督と卒業生は、2.0.3から年度ごとの成績より前に出す(下までスクロールしなくても見られるように)。
 ///   監督を一番上にするのは、スカウトのときに、母校パイプで競い合う大学があるかを確かめやすくするため
@@ -1358,34 +1361,65 @@ class _KoukouPageState extends State<_KoukouPage> {
   }
 
   /// 卒業生の行(「3年　山田太郎　→ ○○大学」。自分の大学の選手は色を変える。スカウトの途中で決まっていない新入生は「進路未定」)
+  /// 2.0.3から、行を押すと選手の詳細の小窓を開く(押せる行は名前に下線。新入生の進学先の画面と同じ)。
+  /// 進路未定の新入生は、小窓の上に仮の振り分けの大学が出てしまうので押せない
   Widget _sotsugyouseiGyou(SenshuData s) {
     final bool mitei = _miteiKa(s);
     final bool jibun = !mitei && s.univid == _myUnivId;
     final String um = mitei ? '進路未定' : (_univMei[s.univid] == null ? '' : '${_univMei[s.univid]}大学');
-    return Padding(
-      padding: const EdgeInsets.only(left: 12, top: 4),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 2,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          Text('${s.gakunen}年', style: _hosoku),
-          Text(
-            s.name,
-            style: TextStyle(
-              color: jibun ? Colors.amber : HENSUU.textcolor,
-              fontSize: HENSUU.fontsize_honbun,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          if (um.isNotEmpty)
+    final Color namaeIro = jibun ? Colors.amber : HENSUU.textcolor;
+    return InkWell(
+      onTap: mitei ? null : () => _senshuShousai(s),
+      child: Padding(
+        padding: const EdgeInsets.only(left: 12, top: 4, bottom: 2),
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 2,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Text('${s.gakunen}年', style: _hosoku),
             Text(
-              mitei ? um : '→ $um',
-              style: TextStyle(color: jibun ? Colors.amber : _usui, fontSize: HENSUU.fontsize_honbun - 2),
+              s.name,
+              style: TextStyle(
+                color: namaeIro,
+                fontSize: HENSUU.fontsize_honbun,
+                fontWeight: FontWeight.bold,
+                decoration: mitei ? null : TextDecoration.underline,
+                decorationColor: namaeIro,
+              ),
             ),
-        ],
+            if (um.isNotEmpty)
+              Text(
+                mitei ? um : '→ $um',
+                style: TextStyle(color: jibun ? Colors.amber : _usui, fontSize: HENSUU.fontsize_honbun - 2),
+              ),
+          ],
+        ),
       ),
     );
+  }
+
+  /// 選手の詳細の小窓を開く(2.0.3。ほかの画面と同じ開き方。閉じたら名前の変更などを反映するために描き直す)
+  /// 小窓の出身校を押すと、新しく開かずにこのページに戻る(このページと小窓が何重にも重ならないように)
+  void _senshuShousai(SenshuData s) {
+    showGeneralDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.8),
+      barrierDismissible: true,
+      barrierLabel: '詳細',
+      transitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (context, animation, secondaryAnimation) {
+        return ModalSenshuDetailView(senshuId: s.id, modoruKoukouBan: widget.ban);
+      },
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        return FadeTransition(
+          opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+          child: child,
+        );
+      },
+    ).then((_) {
+      if (mounted) setState(() {});
+    });
   }
 }
 

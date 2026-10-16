@@ -11,6 +11,8 @@ import 'package:ekiden/screens/Modal_koukouMeikan.dart'
 //   ページを開くようにした(大学画面の監督の出身校と同じ)
 // ・行の間はあけず、今までと同じ見た目で並べる(場所を増やさない)
 // ・表示しない設定のときと、出身校が分からない選手は、今まで通り出身地・趣味の文だけ
+// ・2.0.3から、高校のページの卒業生から開いた小窓では [modoruBan] にその高校の番号を渡し、
+//   出身校がその高校なら、新しく開かずに小窓を閉じて高校のページに戻る(何重にも重ならないように)
 // ------------------------------------------------------------
 
 class ShusshinKoukouBun extends StatelessWidget {
@@ -20,6 +22,7 @@ class ShusshinKoukouBun extends StatelessWidget {
     required this.samusataisei,
     required this.hirou,
     required this.kantoku,
+    this.modoruBan,
     this.style = const TextStyle(
       color: Colors.white,
       fontSize: HENSUU.fontsize_honbun,
@@ -36,6 +39,11 @@ class ShusshinKoukouBun extends StatelessWidget {
   final int hirou;
 
   final KantokuData kantoku;
+
+  /// この高校のページから開いた小窓なら、その高校の名簿の番号(2.0.3。なければnull)。
+  /// 出身校がこの番号なら、押すと小窓を閉じてそのページに戻る
+  final int? modoruBan;
+
   final TextStyle style;
 
   @override
@@ -51,10 +59,17 @@ class ShusshinKoukouBun extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         if (shumi.isNotEmpty) Text(shumi, style: style),
-        // 押すと高校名鑑のその高校のページを開く(名門校でなくても開ける)
+        // 押すと高校名鑑のその高校のページを開く(名門校でなくても開ける)。
+        // その高校のページから開いた小窓なら、小窓を閉じてそのページに戻る(2.0.3)
         GestureDetector(
           behavior: HitTestBehavior.opaque,
-          onTap: () => koukouPageHirakuBan(context, b.ban),
+          onTap: () {
+            if (b.ban == modoruBan) {
+              Navigator.of(context).pop();
+            } else {
+              koukouPageHirakuBan(context, b.ban);
+            }
+          },
           child: Text(
             b.koukou,
             style: style.copyWith(color: HENSUU.LinkColor),

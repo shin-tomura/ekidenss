@@ -40,7 +40,11 @@ class ModalSenshuDetailView extends StatefulWidget {
   // 外部から表示したい選手のIDを受け取る
   final int senshuId;
 
-  const ModalSenshuDetailView({super.key, required this.senshuId});
+  /// 高校名鑑の高校のページの卒業生から開いたときの、その高校の名簿の番号(2.0.3。ほかの画面からはnull)。
+  /// 出身校を押したときに、新しく開かずに小窓を閉じてそのページに戻るために使う
+  final int? modoruKoukouBan;
+
+  const ModalSenshuDetailView({super.key, required this.senshuId, this.modoruKoukouBan});
 
   @override
   State<ModalSenshuDetailView> createState() => _ModalSenshuDetailViewState();
@@ -637,6 +641,7 @@ class _ModalSenshuDetailViewState extends State<ModalSenshuDetailView> {
                             samusataisei: currentSenshu.samusataisei,
                             hirou: currentSenshu.hirou,
                             kantoku: kantoku,
+                            modoruBan: widget.modoruKoukouBan, // 高校のページから開いたとき(2.0.3)
                           ),
                           const SizedBox(height: 8),
                           // 入学時5000m記録

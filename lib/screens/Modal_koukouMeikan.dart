@@ -942,10 +942,11 @@ class _KoukouHenshuuState extends State<_KoukouHenshuu> {
 
 /// 高校のページ(1.9.5。名門校のカードと、都道府県別の高校から開く)
 /// ・上に校名・都道府県・名門度・タイプ・紹介文と回数、☆(お気に入り)と「編集」
-/// ・今、大学にいる卒業生(コンピュータスカウトONでスカウトの途中は、決まっていない新入生の大学を出さない)
 /// ・この高校出身の大学の監督(2.0.1。監督の母校パイプ)
+/// ・今、大学にいる卒業生(コンピュータスカウトONでスカウトの途中は、決まっていない新入生の大学を出さない)
 /// ・年度ごとの都道府県予選・地区大会・全国高校駅伝の成績(大会の記録の直近10回。全国は押すと走者と進学先)
-/// ・卒業生と監督は、2.0.3から年度ごとの成績より前に出す(下までスクロールしなくても見られるように)
+/// ・監督と卒業生は、2.0.3から年度ごとの成績より前に出す(下までスクロールしなくても見られるように)。
+///   監督を一番上にするのは、スカウトのときに、母校パイプで競い合う大学があるかを確かめやすくするため
 class _KoukouPage extends StatefulWidget {
   const _KoukouPage({required this.ban});
 
@@ -1316,11 +1317,7 @@ class _KoukouPageState extends State<_KoukouPage> {
             '「編集」では、校名・名門度・タイプ・留学生の有無・紹介文を変えられます(都道府県は変えられません)。',
             style: _hosoku,
           ),
-          // ---- 今、大学にいる卒業生(2.0.3から年度ごとの成績より前に出す) ----
-          _midashi('■今、大学にいる卒業生'),
-          if (sotsugyousei.isEmpty) const Text('今、大学にいる卒業生はいません。', style: _honbun),
-          for (final SenshuData s in sotsugyousei) _sotsugyouseiGyou(s),
-          // ---- この高校出身の監督(2.0.1。監督の母校パイプ) ----
+          // ---- この高校出身の監督(2.0.1。監督の母校パイプ。2.0.3から一番上に出す) ----
           _midashi('■この高校出身の大学の監督'),
           if (_kantoku.isEmpty) const Text('今、この高校出身の大学の監督はいません。', style: _honbun),
           for (final BokouKantoku b in _kantoku)
@@ -1335,6 +1332,10 @@ class _KoukouPageState extends State<_KoukouPage> {
             alignment: Alignment.centerLeft,
             child: BokouPipeSetsumeiLink(),
           ),
+          // ---- 今、大学にいる卒業生(2.0.3から年度ごとの成績より前に出す) ----
+          _midashi('■今、大学にいる卒業生'),
+          if (sotsugyousei.isEmpty) const Text('今、大学にいる卒業生はいません。', style: _honbun),
+          for (final SenshuData s in sotsugyousei) _sotsugyouseiGyou(s),
           // ---- 年度ごとの成績 ----
           _midashi('■年度ごとの成績'),
           const Text(

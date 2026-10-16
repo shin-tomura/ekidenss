@@ -23,6 +23,7 @@ import 'package:ekiden/screens/Modal_matrix3.dart';
 import 'package:ekiden/screens/ModalAverageTop10TimeRankingView.dart';
 import 'package:ekiden/screens/ModalChartSenshu.dart';
 import 'package:ekiden/kansuu/ChartPanelUniv.dart';
+import 'package:ekiden/screens/Modal_ChartHyojiHijyojiKirikae.dart'; // レーダーチャートのパネルの表示・非表示(2.0.3)
 import 'package:ekiden/kansuu/meisei_rireki.dart'; // 名声の履歴(1.8.8)
 import 'package:ekiden/kansuu/shiyou_text.dart'; // 留学生の入学の決まり(1.8.9)
 import 'package:ekiden/kansuu/kiji/kiji_kihon.dart'
@@ -3924,7 +3925,55 @@ class _UnivScreenState extends State<UnivScreen> {
                     child: Column(
                       children: [
                         // パネルを呼び出す（IDを渡すだけ）
-                        buildUnivAnalysisPanel(ghensuu.hyojiunivnum),
+                        // 2.0.3から、選手画面と同じく表示・非表示を切り替えられる(yobiint2[20]の2の位)
+                        if (chartPanelHyouji(kantoku, daigaku: true))
+                          buildUnivAnalysisPanel(ghensuu.hyojiunivnum),
+                        TextButton(
+                          onPressed: () async {
+                            await showGeneralDialog(
+                              context: context,
+                              barrierColor: Colors.black.withOpacity(
+                                0.8,
+                              ), // モーダルの背景色
+                              barrierDismissible: true, // 背景タップで閉じられるようにする
+                              barrierLabel: 'パネル表示非表示切替', // アクセシビリティ用ラベル
+                              transitionDuration: const Duration(
+                                milliseconds: 300,
+                              ), // アニメーション時間
+                              pageBuilder:
+                                  (context, animation, secondaryAnimation) {
+                                    return const AnalysisPanelConfigScreen(
+                                      daigaku: true,
+                                    );
+                                  },
+                              transitionBuilder:
+                                  (
+                                    context,
+                                    animation,
+                                    secondaryAnimation,
+                                    child,
+                                  ) {
+                                    // モーダル表示時のアニメーション (例: フェードイン)
+                                    return FadeTransition(
+                                      opacity: CurvedAnimation(
+                                        parent: animation,
+                                        curve: Curves.easeOut,
+                                      ),
+                                      child: child,
+                                    );
+                                  },
+                            );
+                            if (mounted) setState(() {});
+                          },
+                          child: Text(
+                            "パネル表示非表示切替",
+                            style: TextStyle(
+                              color: const Color.fromARGB(255, 0, 255, 0),
+                              decoration: TextDecoration.underline,
+                              decorationColor: HENSUU.textcolor,
+                            ),
+                          ),
+                        ),
 
                         if (ghensuu.hyojiunivnum == ghensuu.MYunivid)
                           Text(

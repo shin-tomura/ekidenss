@@ -3,8 +3,19 @@ import 'package:hive_flutter/hive_flutter.dart';
 //import 'package:ekiden/constants.dart';
 import 'package:ekiden/kantoku_data.dart';
 
+/// レーダーチャートのパネル(分析パネル)を出すか(kantoku.yobiint2[20])
+/// ・一の位(奇数か)が選手画面(他大学の選手の詳細の小窓も)、2の位が大学画面(2.0.3)。どちらも0なら表示(初期値)
+/// ・2.0.2までは選手画面だけで、0=表示・1=非表示だったので、今までのデータもそのまま読める
+bool chartPanelHyouji(KantokuData kantoku, {bool daigaku = false}) {
+  final int v = kantoku.yobiint2[20];
+  return daigaku ? (v ~/ 2) % 2 == 0 : v % 2 == 0;
+}
+
 class AnalysisPanelConfigScreen extends StatefulWidget {
-  const AnalysisPanelConfigScreen({super.key});
+  const AnalysisPanelConfigScreen({super.key, this.daigaku = false});
+
+  /// 大学画面のパネルの切り替えか(false なら選手画面。2.0.3)
+  final bool daigaku;
 
   @override
   State<AnalysisPanelConfigScreen> createState() =>
@@ -32,20 +43,21 @@ class _AnalysisPanelConfigScreenState extends State<AnalysisPanelConfigScreen> {
     setState(() => _isProcessing = true);
 
     try {
-      // yobiint2[20] を反転 (0なら1、1なら0)
-      // 0: 表示, 1: 非表示
-      final int currentMode = k.yobiint2[20];
-      final int newMode = currentMode == 0 ? 1 : 0;
-
-      k.yobiint2[20] = newMode;
+      // yobiint2[20] のその画面の位だけを反転する(一の位が選手画面、2の位が大学画面。2.0.3)
+      // その位が 0: 表示, 1: 非表示
+      final int kurai = widget.daigaku ? 2 : 1;
+      final bool imaHyouji = chartPanelHyouji(k, daigaku: widget.daigaku);
+      k.yobiint2[20] = imaHyouji ? k.yobiint2[20] + kurai : k.yobiint2[20] - kurai;
+      final bool newHyouji = !imaHyouji;
 
       // Hiveのデータ保存
       await k.save();
 
       if (mounted) {
-        final message = newMode == 0
-            ? '選手画面の分析パネルを表示に設定しました'
-            : '選手画面の分析パネルを非表示に設定しました';
+        final String gamen = widget.daigaku ? '大学画面' : '選手画面';
+        final message = newHyouji
+            ? '$gamenの分析パネルを表示に設定しました'
+            : '$gamenの分析パネルを非表示に設定しました';
 
         ScaffoldMessenger.of(context).clearSnackBars();
         ScaffoldMessenger.of(context).showSnackBar(
@@ -74,7 +86,8 @@ class _AnalysisPanelConfigScreenState extends State<AnalysisPanelConfigScreen> {
   @override
   Widget build(BuildContext context) {
     // 現在のモード判定（0:表示, 1:非表示）
-    final bool isPanelVisible = (_kantoku?.yobiint2[20] ?? 0) == 0;
+    final KantokuData? kd = _kantoku;
+    final bool isPanelVisible = kd == null || chartPanelHyouji(kd, daigaku: widget.daigaku);
 
     return Scaffold(
       backgroundColor: const Color(0xFF1A1F26),
@@ -98,9 +111,9 @@ class _AnalysisPanelConfigScreenState extends State<AnalysisPanelConfigScreen> {
               ),
               child: Column(
                 children: [
-                  const Text(
-                    '選手詳細画面：分析パネル設定',
-                    style: TextStyle(color: Colors.white, fontSize: 14),
+                  Text(
+                    widget.daigaku ? '大学画面：分析パネル設定' : '選手詳細画面：分析パネル設定',
+                    style: const TextStyle(color: Colors.white, fontSize: 14),
                   ),
                   const SizedBox(height: 8),
                   Text(
@@ -170,14 +183,27 @@ class _AnalysisPanelConfigScreenState extends State<AnalysisPanelConfigScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildSectionTitle('分析パネルとは'),
-                    _buildDescriptionText(
-                      '各選手の能力を「スピード」「スタミナ」「ロード」「山適性」「起伏耐性」の5つの指標でレーダーチャート化し、総合評価を算出したパネルです。',
-                    ),
+                    if (widget.daigaku)
+                      _buildDescriptionText(
+                        '各種目の上位10人の平均タイムから、大学の力を「スピード」「スタミナ」「山適性」「ロード」「起伏耐性」の5つの指標でレーダーチャート化し、総合評価と二つ名・分析文を添えたパネルです。',
+                      )
+                    else
+                      _buildDescriptionText(
+                        '各選手の能力を「スピード」「スタミナ」「ロード」「山適性」「起伏耐性」の5つの指標でレーダーチャート化し、総合評価を算出したパネルです。',
+                      ),
                     const SizedBox(height: 20),
                     _buildSectionTitle('非表示にするメリット'),
-                    _buildDescriptionText(
-                      '● 画面のスクロール量を減らし、基本データ（タイムや学年）の確認を優先できます。',
-                    ),
+                    if (widget.daigaku) ...[
+                      _buildDescriptionText(
+                        '● 画面のスクロール量を減らし、監督や大会の成績などの確認を優先できます。',
+                      ),
+                      _buildDescriptionText(
+                        '● パネルの中の「自己ベスト/今季ベスト」の切り替えも一緒に隠れます(ほかの画面の切り替えと同じ設定です)。',
+                      ),
+                    ] else
+                      _buildDescriptionText(
+                        '● 画面のスクロール量を減らし、基本データ（タイムや学年）の確認を優先できます。',
+                      ),
                     /*const SizedBox(height: 20),
                     const Card(
                       color: Colors.white10,

@@ -474,7 +474,7 @@ class _ModalSenshuDetailViewState extends State<ModalSenshuDetailView> {
                       child: ListView(
                         padding: const EdgeInsets.symmetric(horizontal: 16.0),
                         children: [
-                          if (kantoku.yobiint2[20] == 0)
+                          if (chartPanelHyouji(kantoku)) // 一の位が選手画面(2.0.3から大学画面と詰める)
                             // 共通パネルを呼び出すだけ！
                             buildSenshuAnalysisPanel(
                               currentSenshu,

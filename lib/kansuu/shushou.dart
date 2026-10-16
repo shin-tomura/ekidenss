@@ -332,29 +332,38 @@ bool shushouHoseiNashiDatta(SenshuData s) =>
 /// 主将を代えられる時期か(4月〜9月。10月からは年度の終わりまで代えられない)
 bool shushouHenkouDekiru(Ghensuu gh) => gh.month >= 4 && gh.month <= 9;
 
+/// 4年生の選手[s]が主将を務めた年度(古い順。主将でなければ空。2.0.2)
+/// [yonenNendo] 選手が4年生の年度。卒業の処理(RetireNew)の前に呼ぶ
+/// (年度替わりの卒業の処理と、3月25日の学内メディアの卒業生特集で使う)。
+/// 4年生の年度の主将は今の主将の欄で、3年生の年度の主将は前の年度替わりに写しておいた欄で見る
+/// (どちらも、その年度の終わりの主将。前の年度の主将の欄は2.0.2から写すので、それより前の年度は分からない)
+List<int> shushouNendoRetsu(KantokuData k, SenshuData s, int yonenNendo) {
+  if (k.yobiint4.length <= shushouMaeNendoIndex) return const [];
+  final List<int> nendo = [];
+  // 3年生の年度(前の年度の主将の欄は、選手のidがそのときと同じ選手を指す。
+  // 4年生は3年生のときから同じidで在籍しているため)
+  if (k.yobiint4[shushouMaeNendoIndex] == yonenNendo - 1 &&
+      _hozonId(k, s.univid, base: shushouMaeIdIndex0) == s.id) {
+    nendo.add(yonenNendo - 1);
+  }
+  // 4年生の年度
+  if (k.yobiint4[shushouNendoIndex] == yonenNendo &&
+      _hozonId(k, s.univid) == s.id) {
+    nendo.add(yonenNendo);
+  }
+  return nendo;
+}
+
 /// 卒業の処理(RetireNew)で、卒業する選手[s]が主将を務めた年度の、OBの経歴の行(2.0.2。主将でなければ空)
 /// [owattaNendo] 終わった年度(卒業する選手が4年生だった年度)、[univMei] 大学名(「大学」は付けない)。
-/// 4年生の年度の主将は今の主将の欄で、3年生の年度の主将は前の年度替わりに写しておいた欄で見る
-/// (どちらも、その年度の終わりの主将)。両方なら「5年度・6年度 東西大学 主将」のように1行にまとめる
+/// 年度の見方は shushouNendoRetsu。両方なら「5年度・6年度 東西大学 主将」のように1行にまとめる
 String shushouSotsugyouGyou(
   KantokuData k,
   SenshuData s,
   int owattaNendo,
   String univMei,
 ) {
-  if (k.yobiint4.length <= shushouMaeNendoIndex) return '';
-  final List<int> nendo = [];
-  // 3年生の年度(前の年度の主将の欄は、選手のidがそのときと同じ選手を指す。
-  // 4年生は3年生のときから同じidで在籍しているため)
-  if (k.yobiint4[shushouMaeNendoIndex] == owattaNendo - 1 &&
-      _hozonId(k, s.univid, base: shushouMaeIdIndex0) == s.id) {
-    nendo.add(owattaNendo - 1);
-  }
-  // 4年生の年度
-  if (k.yobiint4[shushouNendoIndex] == owattaNendo &&
-      _hozonId(k, s.univid) == s.id) {
-    nendo.add(owattaNendo);
-  }
+  final List<int> nendo = shushouNendoRetsu(k, s, owattaNendo);
   if (nendo.isEmpty) return '';
   return '${nendo.map((int n) => '$n年度').join('・')} $univMei大学 主将\n';
 }

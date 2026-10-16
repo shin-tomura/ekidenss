@@ -7,6 +7,8 @@ import 'package:ekiden/kansuu/kiji/kiji_comment.dart';
 import 'package:ekiden/kansuu/kiji/kiji_tokuchou.dart'; // 選手の特徴の文(1.9.7)
 import 'package:ekiden/kansuu/kiji/kiji_kimochi.dart'; // 駅伝男・平常心の持ち味(1.9.7)
 import 'package:ekiden/kansuu/ikku_pace.dart'; // 1区の集団のペースの予想(駅伝男の持ち味。1.9.7)
+import 'package:ekiden/kansuu/shushou.dart' show shushouNendoRetsu; // 卒業生特集の主将(2.0.2)
+import 'package:ekiden/kansuu/taikai_chouki.dart' show choukiNendo;
 import 'package:ekiden/kansuu/kiji/kiji_kekka.dart' show EkidenKekka, EkidenUnivKekka;
 import 'package:ekiden/kansuu/kiji/kiji_yosen.dart'
     show YosenKekka, YosenUnivKekka, YosenSenshuKekka;
@@ -33,6 +35,7 @@ import 'package:ekiden/kansuu/kiji/kiji_taikousen.dart'
 //  4. 復路スタート直前号(正月駅伝の6区のスタート前): 往路の振り返りと、復路を走る選手
 //  5. 卒業生特集(3月25日の最新画面): 自分の大学の4年生全員の4年間の歩み
 //     (卒業の処理のあとは卒業選手のデータが大学ごとに10人くらいしか残らないので、この日だけ)
+//     (主将を務めた選手は、そのことと、主将らしいコメントも書く。2.0.2)
 //  6. 駅伝予選(11月駅伝予選・正月駅伝予選)の結果号と展望号: 弱い大学は予選にしか出られない年も
 //     あるので、予選でも全員を紹介する。予選の出走歴も数える(選手名鑑・卒業生特集)が、
 //     「初めての駅伝」「駅伝デビュー」は今まで通り本戦(駅伝)だけで決める
@@ -1444,10 +1447,41 @@ List<Kiji> gakunaiSotsugyouKiji(KijiKankyou k) {
 
   final Set<int> tsukattaKouhai = {};
   final List<List<String>> gyou = [];
+  // 今の年度(3月25日なので、4年生の年度。主将を務めた年度を見るのに使う。2.0.2)
+  final int nendo = choukiNendo(k.gh);
   for (final SenshuData s in yonen) {
     final String yobi = myouji(s.name);
     final String? ken = k.shusshin(s);
     w.koMidashi(w.senshu(s));
+    // 主将を務めた選手は、最初にそのことを書く(2.0.2。卒業アルバムの経歴と同じ見方。shushou.dart)
+    // (3年生の年度の主将は2.0.2から記録するので、分からないこともある。4年生だけのときの文は、
+    //  3年生のときに主将でなかったとは言い切らない)
+    final List<int> shushouNendo = shushouNendoRetsu(k.kantoku, s, nendo);
+    final bool shushou = shushouNendo.isNotEmpty;
+    if (shushouNendo.length >= 2) {
+      w.danraku(
+        w.erabu(const [
+          '3年生から2年続けて主将を務め、チームをまとめた。',
+          '3年生から2年続けて、主将としてチームを引っ張った。',
+          '3年生から2年間、主将としてチームの先頭に立った。',
+        ]),
+      );
+    } else if (shushou && shushouNendo.first == nendo) {
+      w.danraku(
+        w.erabu(const [
+          '4年生では主将としてチームをまとめた。',
+          '4年生では主将を務め、チームを引っ張った。',
+          '4年生では主将として、チームの先頭に立った。',
+        ]),
+      );
+    } else if (shushou) {
+      w.danraku(
+        w.erabu(const [
+          '3年生のときは主将としてチームをまとめた。',
+          '3年生のときは主将を務め、チームを引っ張った。',
+        ]),
+      );
+    }
     // 入学から今までの持ちタイム
     final StringBuffer sb = StringBuffer();
     final double nyuugaku = s.kiroku_nyuugakuji_5000;
@@ -1543,7 +1577,14 @@ List<Kiji> gakunaiSotsugyouKiji(KijiKankyou k) {
     final KijiHyou? rh = sandaiSeisekiHyou(s);
     if (rh != null) w.hyou(rh);
     w.danraku(shusshinShumiBun(k, s, w.r, yobi));
-    w.comment(senshuComment(w, CommentBamen.sotsugyou, yobi));
+    // (主将を務めた選手は、主将らしい言葉。2.0.2)
+    w.comment(
+      senshuComment(
+        w,
+        shushou ? CommentBamen.sotsugyouShushou : CommentBamen.sotsugyou,
+        yobi,
+      ),
+    );
     // 後輩のひと言(同じ区間を走った後輩、いなければ同じ出身地の後輩)
     SenshuData? kh;
     String? kukanMoji;

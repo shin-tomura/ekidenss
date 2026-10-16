@@ -119,6 +119,9 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
   // 表示する地区(-2=今の地区(初期値。地区が進むと次の地区になる)・-1=全地区・0〜10=その地区)
   int _hyoujiSentaku = -2;
   bool _junbanDialogZumi = false; // 地区の順番のダイアログを、この画面で出したか
+  // 強化プロジェクトの帯を×で消したか(2.0.2。この画面のあいだだけ覚える。スカウトはラウンドをまたいでも
+  // この画面のまま進むので、そのスカウトが終わるまで消えたまま。アプリを開き直すとまた出る)
+  bool _kyoukaObiKeshita = false;
   // 今年の高校の大会の画面を出した年(1.9.9。アプリを開いている間だけ覚える。ほかの画面に移って戻っても、
   // もう一度は出さない。アプリを開き直したときは、1ラウンド目の前ならもう一度出す)
   static int _kotoshiKoukouTaikaiNen = -1;
@@ -1547,7 +1550,7 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
   }
 
   /// 強化プロジェクト中の大学の案内(なければnull。2.0.1。kyouka_project.dart。
-  /// 2.0.2から、一覧の上の帯ではなく、スカウト解禁の記事の上の表示(_kyoukaWaku)に出す)
+  /// 一覧の上の帯(×で消せる。2.0.2)と、スカウト解禁の記事の上の表示(_kyoukaWaku。2.0.2)に出す)
   String? _kyoukaMoji() {
     final Ghensuu? gh = _ghensuu;
     if (gh == null) return null;
@@ -2084,8 +2087,47 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
           ),
           // 地区めぐりの地区の切り替え(1.9.6)
           if (_chikuMeguri) _buildChikuPanel(),
-          // 強化プロジェクト中の大学の帯は、新入生の一覧が狭くなるのでやめ、2.0.2から
-          // スカウト解禁の記事の上に出す(_kyoukaWaku)
+          // 強化プロジェクト中の大学(2.0.1。kyouka_project.dart)
+          // 新入生の一覧を広く使えるように、右端の×で消せる(2.0.2。そのスカウトが終わるまで消えたまま。
+          // 消しても、新聞のアイコンで読み返すスカウト解禁の記事の上に出る)
+          if (!_kyoukaObiKeshita && _kyoukaMoji() != null)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.only(left: 12),
+              color: Colors.orange.withOpacity(0.15),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Text(
+                        _kyoukaMoji()!,
+                        style: const TextStyle(
+                          color: Colors.orangeAccent,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(
+                      Icons.close,
+                      color: Colors.orangeAccent,
+                      size: 18,
+                    ),
+                    tooltip: '閉じる',
+                    // 帯が高くならないように小さめにする(押せる大きさは残す)
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(
+                      minWidth: 40,
+                      minHeight: 36,
+                    ),
+                    onPressed: () => setState(() => _kyoukaObiKeshita = true),
+                  ),
+                ],
+              ),
+            ),
 
           // 選手リスト
           Expanded(

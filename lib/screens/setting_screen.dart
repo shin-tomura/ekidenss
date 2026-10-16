@@ -1617,7 +1617,7 @@ class _SettingScreenState extends State<SettingScreen>
             ),
           ),
           const SizedBox(height: 24),
-          // ---- 名声(名声の値・増え方・新入生のスカウトへの効き方の順。最後に新入生の留学生) ----
+          // ---- 名声(名声の値・増え方・新入生のスカウトへの効き方の順) ----
           TextButton(
             onPressed: () {
               showGeneralDialog(
@@ -1741,7 +1741,8 @@ class _SettingScreenState extends State<SettingScreen>
               ),
             ),
           ),
-          const SizedBox(height: 8),
+          // 留学生受け入れ設定は1つだけだが、探しやすいように見出しを分けた(2.0.3)
+          _setteiMidashi('留学生'),
           TextButton(
             onPressed: () {
               showGeneralDialog(

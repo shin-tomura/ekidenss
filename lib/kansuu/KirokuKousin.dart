@@ -19,6 +19,8 @@ import 'package:ekiden/kansuu/goldsilver_com.dart';
 import 'package:ekiden/kansuu/gakuren_kantoku.dart'; // 学連選抜の監督・目標順位(1.8.4)
 import 'package:ekiden/kansuu/gakuren_text.dart'; // 学連選抜の結果(順位相当。1.8.4)
 import 'package:ekiden/kansuu/meisei_rireki.dart'; // 名声の履歴(1.8.8)
+import 'package:ekiden/kansuu/meisei_kotei.dart'
+    show meiseiGoukeiNokosu; // コンピュータの大学の名声の固定(2.0.3)
 import 'package:ekiden/kansuu/rekidai_kiroku.dart'; // 歴代10位までの記録(1.8.8)
 import 'package:ekiden/kansuu/kingin_wariai.dart'; // 難易度ごとの金銀支給量の割合(1.9.1)
 import 'package:ekiden/kansuu/taikai_chouki.dart'; // 大会の長い記録(2.0.0)
@@ -1441,6 +1443,9 @@ Future<void> kirokuKousin({
   if ((racebangou >= 0 && racebangou <= 2) || racebangou == 5) {
     // meisei_total更新
     for (var i = 0; i < sortedunivdata.length; i++) {
+      // コンピュータの大学の名声を固定しているときは、その大学の合計は計算し直さない
+      // (2.0.3。得た名声は年ごとの名声には入っている。meisei_kotei.dart)
+      if (meiseiGoukeiNokosu(kantoku, sortedunivdata[i].id, gh[0].MYunivid)) continue;
       sortedunivdata[i].meisei_total = 0;
       for (var ii = 0; ii < TEISUU.MEISEIHOZONNENSUU; ii++) {
         sortedunivdata[i].meisei_total += sortedunivdata[i].meisei_yeargoto[ii];
@@ -2190,6 +2195,9 @@ Future<void> kirokuKousin({
 
       // meisei_total更新
       for (int i = 0; i < sortedunivdata.length; i++) {
+        // コンピュータの大学の名声を固定しているときは、その大学の合計は計算し直さない
+        // (2.0.3。得た名声は年ごとの名声には入っている。meisei_kotei.dart)
+        if (meiseiGoukeiNokosu(kantoku, sortedunivdata[i].id, gh[0].MYunivid)) continue;
         sortedunivdata[i].meisei_total = 0;
         for (int ii = 0; ii < TEISUU.MEISEIHOZONNENSUU; ii++) {
           if (ii < sortedunivdata[i].meisei_yeargoto.length) {

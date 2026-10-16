@@ -12,6 +12,8 @@ import 'package:ekiden/kansuu/GakunenZurasi.dart';
 import 'package:ekiden/kansuu/ShozokusakiKettei_By_Univmeisei.dart';
 import 'package:ekiden/kansuu/SenshuShokiti.dart';
 import 'package:ekiden/kansuu/meisei_rireki.dart'; // 名声の履歴(1.8.8)
+import 'package:ekiden/kansuu/meisei_kotei.dart'
+    show meiseiGoukeiNokosu; // コンピュータの大学の名声の固定(2.0.3)
 import 'package:ekiden/kansuu/koukou.dart'; // 出身校と高校時代の実績(1.9.5)
 import 'package:ekiden/kansuu/wakate_shuunin.dart'; // 若いOBの監督・コーチ(2.0.1)
 import 'package:ekiden/kansuu/shushou.dart'
@@ -766,6 +768,12 @@ Future<void> RetireNew({
           sortedUnivData[i].meisei_yeargoto[ii - 1];
     }
     sortedUnivData[i].meisei_yeargoto[0] = 1; // 最新の年度の名声は1に初期化？（要確認）
+    // コンピュータの大学の名声を固定しているときは、年ごとの名声はずらすが、合計は計算し直さない
+    // (2.0.3。meisei_kotei.dart)
+    if (meiseiGoukeiNokosu(kantoku, sortedUnivData[i].id, ghensuu.MYunivid)) {
+      await sortedUnivData[i].save();
+      continue;
+    }
     sortedUnivData[i].meisei_total = 0; // 合計名声をリセット
 
     // 新しい合計名声を計算

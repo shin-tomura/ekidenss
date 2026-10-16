@@ -6,6 +6,7 @@ import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/kansuu/meisei_yokonarabi.dart';
 import 'package:ekiden/kansuu/meisei_henshuu.dart'; // グループの編集で名声も変える(2.0.3)
+import 'package:ekiden/kansuu/meisei_kotei.dart'; // コンピュータの大学の名声の固定(2.0.3)
 
 // ------------------------------------------------------------
 // 説明画面の設定タブの「名声の横並び設定」(2.0.3)
@@ -21,6 +22,8 @@ import 'package:ekiden/kansuu/meisei_henshuu.dart'; // グループの編集で�
 //     決まるので、名声も変えられる(名声設定の画面と同じ変え方。meisei_henshuu.dart)。開いている間は行の並びを
 //     変えず、名声と「名声○位」だけをすぐ変える(続けて変えるときに行が飛ばないように)。「名声の順に並べ直す」で
 //     並べ直せる。今のグループには、スカウトでの名声(そろえたあとの値)を添える
+// ・そろえ方の下に、コンピュータの大学の名声を固定するか(成績で動く(初期値)・固定する)を置く。
+//   固定をやめたら、すぐに本当の名声に計算し直す(meisei_kotei.dart)
 // ・変えるたびに保存する
 // ------------------------------------------------------------
 
@@ -112,6 +115,21 @@ class _ModalMeiseiYokonarabiSetteiState extends State<ModalMeiseiYokonarabiSette
 
   Future<void> _hozon(KantokuData k) async {
     await k.save();
+    if (mounted) setState(() {});
+  }
+
+  /// コンピュータの大学の名声を固定するかを変える。固定をやめたら、すぐに本当の名声(年ごとの名声の合計)に
+  /// 計算し直し、名声の入力欄の数字も今の名声にする
+  Future<void> _koteiIreru(KantokuData k, bool kotei) async {
+    meiseiKoteiAtaiIreru(k, kotei ? 1 : 0);
+    await k.save();
+    if (!kotei) {
+      await meiseiGoukeiKeisanNaoshi();
+      for (final MapEntry<int, TextEditingController> e in _meiseiCtrl.entries) {
+        final UnivData? u = Hive.box<UnivData>('univBox').get(e.key);
+        if (u != null) e.value.text = '${u.meisei_total}';
+      }
+    }
     if (mounted) setState(() {});
   }
 
@@ -217,6 +235,7 @@ class _ModalMeiseiYokonarabiSetteiState extends State<ModalMeiseiYokonarabiSette
     final int houhou = yokonarabiHouhou(k);
     final bool daigaku = yokonarabiKata(k) == yokonarabiKataDaigaku;
     final bool kiku = YokonarabiSettei.yomu(k).kiku;
+    final bool kotei = meiseiKotei(k);
     final List<UnivData> univs = _univs();
     final List<int> group = yokonarabiGroupRetsu(k);
     final List<({int group, List<UnivData> univs})> ichiran =
@@ -240,7 +259,8 @@ class _ModalMeiseiYokonarabiSetteiState extends State<ModalMeiseiYokonarabiSette
                 '名声の順位のブロック(例えば1〜3位・4〜8位)や、決めた大学のグループごとに、新入生のスカウトでは同じ名声として扱います。'
                 '名声1位の大学をスカウトで抜け出しにくくしたり、名門のグループを長く強いままにしたりできます。'
                 '名声の表示や、目標順位・獲得名声などには影響しません。\n'
-                '入学時名声影響度設定のレベルと組み合わせて効きます。この設定は次の新入生スカウトから影響します。',
+                '入学時名声影響度設定のレベルと組み合わせて効きます。この設定は次の新入生スカウトから影響します。\n'
+                'コンピュータの大学の名声を固定して、作った勢力図をそのまま残すこともできます。',
                 style: _honbun,
               ),
               const SizedBox(height: 16),
@@ -318,6 +338,27 @@ class _ModalMeiseiYokonarabiSetteiState extends State<ModalMeiseiYokonarabiSette
                 houhou == yokonarabiIchii
                     ? '一番上にそろえる: $matomariの大学がみな、その中で名声が一番高い大学と同じくらい選ばれやすくなり、その分、ほかの大学は選ばれにくくなります。'
                     : '平均にそろえる: $matomariの大学の名声の平均にそろえます。まとめた選ばれやすさは今のままで、ほかの大学の選ばれやすさは変わりません。',
+                style: _hosoku,
+              ),
+              const SizedBox(height: 16),
+              // コンピュータの大学の名声を固定するか(2.0.3。meisei_kotei.dart)
+              Text('コンピュータの大学の名声', style: _honbun.copyWith(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _chip('成績で動く(初期値)', !kotei, () => _koteiIreru(k, false)),
+                  _chip('固定する', kotei, () => _koteiIreru(k, true)),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                kotei
+                    ? '固定する: コンピュータの大学は、駅伝などで名声を得ても名声が変わらず、作った勢力図がそのまま残ります。'
+                        '名声は、この画面や名声設定で変えると、その値で固定されます。あなたの大学の名声は今まで通り動きます。'
+                        '固定をやめると、すぐに本当の名声(過去10年に得た名声の合計)に戻ります。'
+                    : '成績で動く: コンピュータの大学の名声も、駅伝などの成績で今まで通り動きます。',
                 style: _hosoku,
               ),
               const SizedBox(height: 16),
@@ -478,7 +519,8 @@ class _ModalMeiseiYokonarabiSetteiState extends State<ModalMeiseiYokonarabiSette
       Text(
         'グループは1〜9の9個まで作れ、1校だけのグループは効きません。あなたの大学も入れられます。'
         'グループの強さは、入れた大学の名声で決まります(平均か一番上にそろえます)。'
-        'ここで変えた名声は、名声設定で変えたのと同じく、名声の表示や目標順位などにも効きます。',
+        'ここで変えた名声は、名声設定で変えたのと同じく、名声の表示や目標順位などにも効きます'
+        '(コンピュータの大学の名声を固定しているときは、その値で固定されます)。',
         style: _hosoku,
       ),
       const SizedBox(height: 12),

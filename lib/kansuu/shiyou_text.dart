@@ -38,6 +38,7 @@ import 'package:ekiden/kansuu/meisei_yokonarabi.dart'
         yokonarabiKataDaigaku,
         yokonarabiGroupRetsu,
         yokonarabiGroupIchiran; // 名声の横並び(2.0.2。2.0.3から名声の順位のブロックを複数と、大学のグループ)
+import 'package:ekiden/kansuu/meisei_kotei.dart' show meiseiKotei; // コンピュータの大学の名声の固定(2.0.3)
 
 // ------------------------------------------------------------
 // ゲームの仕様の文(1.8.3で生成AI向けに作り、1.8.4から説明書と共通にした)
@@ -800,6 +801,16 @@ List<String> _yokonarabiGroupGyou(KantokuData? k, bool setsumeisho) {
   ];
 }
 
+/// コンピュータの大学の名声の固定の行(2.0.3。meisei_kotei.dart。固定していないときは空)
+/// このデータでの仕組みなので、生成AI向けにも書く(設定の名前は説明書だけ)
+List<String> _meiseiKoteiGyou(bool setsumeisho) {
+  if (!meiseiKotei(_kantoku())) return const [];
+  return [
+    '・${_konoData(setsumeisho)}、コンピュータの大学の名声は固定されていて、駅伝などで名声を得ても変わりません。',
+    '　・${_anata(setsumeisho)}の大学の名声は、今まで通り成績で変わります。',
+  ];
+}
+
 /// 名声
 ShiyouSetsu shiyouMeisei({bool setsumeisho = false}) {
   final List<String> gyou = [
@@ -807,6 +818,8 @@ ShiyouSetsu shiyouMeisei({bool setsumeisho = false}) {
     '・名声が高いほど、有力な新入生が入学しやすくなります。',
     // 名声の横並び(2.0.2。meisei_yokonarabi.dart。設定しているときだけ書く)
     ..._yokonarabiGyou(setsumeisho),
+    // コンピュータの大学の名声の固定(2.0.3。meisei_kotei.dart。固定しているときだけ書く)
+    ..._meiseiKoteiGyou(setsumeisho),
     '・コンピュータスカウトがONのときは、名声は新入生スカウトの次のことにも影響します。',
     '　・交渉の成功率',
     '　・争奪戦(同じ選手に複数の大学が交渉に成功したとき)での選ばれやすさ',
@@ -835,6 +848,10 @@ ShiyouSetsu shiyouMeisei({bool setsumeisho = false}) {
       '　・大学のグループには、あなたの大学も入れられます。',
       // 名声と育成力を維持するリセットでは残す(2.0.3。main.dart の _runMode101010Processing)
       '　・設定タブの「名声と育成力は維持しつつリセットしてやり直す」では、名声の横並びの設定も残ります。',
+      // コンピュータの大学の名声の固定(2.0.3。meisei_kotei.dart)
+      '・コンピュータの大学の名声を固定するかも、設定タブの「名声の横並び設定」で変えられます(初期値は固定しない)。',
+      '　・固定中は、名声設定などで変えた名声がそのまま続きます。固定をやめると、本当の名声に戻ります。',
+      '　・あなたの大学を別の大学に変えると、前の大学はその時点の名声で固定されます。',
       // 強化プロジェクト(2.0.1。kyouka_project.dart)
       '・強化プロジェクトの起こりやすさ・選ばれやすさ・期間と、あなたの大学も選ばれるかは、設定タブの「強化プロジェクト設定」で変えられます。',
       // 監督の母校パイプ(2.0.1。bokou_pipe.dart。「母校パイプとは」の窓と同じ行)

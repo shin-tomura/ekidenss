@@ -3,6 +3,9 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ekiden/constants.dart'; // TEISUU, HENSUUクラスをインポート
 import 'package:ekiden/univ_data.dart'; // UnivDataクラスをインポート
 import 'package:ekiden/kansuu/meisei_rireki.dart';
+import 'package:ekiden/ghensuu.dart';
+import 'package:ekiden/kantoku_data.dart';
+import 'package:ekiden/kansuu/meisei_kotei.dart' show meiseiGoukeiNokosu; // コンピュータの大学の名声の固定(2.0.3)
 
 // ------------------------------------------------------------
 // 名声の履歴(1.8.8)
@@ -73,8 +76,21 @@ class ModalMeiseiRireki extends StatelessWidget {
   List<Widget> _naiyou(UnivData univ) {
     const TextStyle futsuu = TextStyle(color: HENSUU.textcolor);
     const TextStyle chuui = TextStyle(color: Colors.grey, fontSize: 13);
+    // コンピュータの大学の名声を固定しているときは、合計は固定した値で、内訳(年ごとの名声)と合わない(2.0.3)
+    final Box<Ghensuu> gb = Hive.box<Ghensuu>('ghensuuBox');
+    final int myUnivId = gb.isNotEmpty ? (gb.getAt(0)?.MYunivid ?? -1) : -1;
+    final bool kotei = meiseiGoukeiNokosu(
+      Hive.box<KantokuData>('kantokuBox').get('KantokuData'),
+      univ.id,
+      myUnivId,
+    );
     final List<Widget> list = [
       Text('名声(過去10年の合計): ${univ.meisei_total}', style: futsuu),
+      if (kotei)
+        const Text(
+          '・コンピュータの大学の名声を固定しているので、合計は固定した値です。下の年ごとの名声には、実際に得た名声が入ります。',
+          style: chuui,
+        ),
       const SizedBox(height: 8),
       const Text(
         '・駅伝の総合順位と区間賞、学連選抜の区間1位相当、対校戦で得た名声を記録しています。',

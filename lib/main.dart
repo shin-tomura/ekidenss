@@ -80,6 +80,8 @@ import 'package:ekiden/kansuu/meisei_yokonarabi.dart'
         yokonarabiAtaiIreru,
         yokonarabiGroupAtai,
         yokonarabiGroupAtaiIreru; // 名声の横並びの設定を、名声と育成力を維持するリセットで残す(2.0.3)
+import 'package:ekiden/kansuu/meisei_kotei.dart'
+    show meiseiKoteiAtai, meiseiKoteiAtaiIreru; // コンピュータの大学の名声の固定も残す(2.0.3)
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 // ★ここに buildAppTheme() 関数を記述する★
@@ -1585,11 +1587,13 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     // Boxからデータを読み込む
     final KantokuData? kantoku = _kantokuBox.get('KantokuData');
     if (kantoku != null) {
-      // 名声の横並びの設定([86]と大学のグループ[87][88])は、名声と一緒に残す
-      // (2.0.3。凝った世界観をリセットのたびに作り直さなくてよいように。meisei_yokonarabi.dart)
+      // 名声の横並びの設定([86]と大学のグループ[87][88])と、コンピュータの大学の名声の固定([89])は、
+      // 名声と一緒に残す(2.0.3。凝った世界観をリセットのたびに作り直さなくてよいように。
+      // meisei_yokonarabi.dart・meisei_kotei.dart)
       final int yokonarabi = yokonarabiAtai(kantoku);
       final int yokonarabiGroup0 = yokonarabiGroupAtai(kantoku, 0);
       final int yokonarabiGroup1 = yokonarabiGroupAtai(kantoku, 1);
+      final int meiseiKoteiMae = meiseiKoteiAtai(kantoku);
       for (int i = 0; i < TEISUU.UNIVSUU * 3; i++) {
         kantoku.rid[i] = 0;
         kantoku.yobiint0[i] = 0;
@@ -1602,6 +1606,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       yokonarabiAtaiIreru(kantoku, yokonarabi);
       yokonarabiGroupAtaiIreru(kantoku, 0, yokonarabiGroup0);
       yokonarabiGroupAtaiIreru(kantoku, 1, yokonarabiGroup1);
+      meiseiKoteiAtaiIreru(kantoku, meiseiKoteiMae);
       kantoku.yobiint2[2] = 25;
       kantoku.yobiint2[3] = 70;
       kantoku.yobiint2[4] = 50;

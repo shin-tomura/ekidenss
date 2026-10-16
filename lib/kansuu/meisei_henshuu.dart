@@ -10,7 +10,7 @@ import 'package:ekiden/kansuu/meisei_rireki.dart'; // 名声の履歴(1.8.8)
 // ・入力できるのは9〜(10万と、今の一番高い名声の大きいほう)
 // ・10年分の合計をその値にし、年ごとの名声は10年に均等に分ける(端数は新しい年から1ずつ)
 // ・名声の履歴に「名声を編集」と書く(年ごとの名声を作り直すので、内訳と合わなくなるため)
-// ・名声の順位(meiseijuni)を付け直す(名声の高い順。同じなら大学idの小さい順)
+// ・名声の順位(meiseijuni)を付け直す(駅伝のあとや年度替わりと同じ並べ方。名声の高い順で、同じなら大学idの大きい順)
 // (名声設定の画面は今のまま。この関数は使っていない)
 // ------------------------------------------------------------
 
@@ -44,14 +44,12 @@ Future<void> meiseiHenshuu(UnivData univ, int atai) async {
   await meiseiJuniTsukeNaoshi();
 }
 
-/// 名声の順位(meiseijuni。0が1位)を付け直す(名声の高い順。同じなら大学idの小さい順)
+/// 名声の順位(meiseijuni。0が1位)を付け直す
+/// (駅伝のあとや年度替わりと同じ並べ方。名声の高い順で、同じなら大学idの大きい順)
 Future<void> meiseiJuniTsukeNaoshi() async {
   final Box<UnivData> box = Hive.box<UnivData>('univBox');
   final List<UnivData> jun = box.values.toList()
-    ..sort((a, b) {
-      final int c = b.meisei_total.compareTo(a.meisei_total);
-      return c != 0 ? c : a.id.compareTo(b.id);
-    });
+    ..sort((a, b) => (b.meisei_total * 100 + b.id).compareTo(a.meisei_total * 100 + a.id));
   for (int i = 0; i < jun.length; i++) {
     if (jun[i].meiseijuni != i) {
       jun[i].meiseijuni = i;

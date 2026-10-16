@@ -25,6 +25,7 @@ import 'kansuu/mokuhyou_kimekata.dart'; // 目標順位決め方設定の確認(
 import 'kansuu/kyouka_project.dart'; // 強化プロジェクト設定の確認(2.0.1)
 import 'kansuu/bokou_pipe.dart'; // 監督の母校パイプ設定の確認(2.0.1)
 import 'kansuu/meisei_yokonarabi.dart'; // 名声上位の横並びの確認(2.0.2)
+import 'kansuu/meisei_kotei.dart'; // コンピュータの大学の名声の固定(2.0.3)
 import 'kansuu/shushou.dart'; // 主将の特典の設定の確認(2.0.1)
 
 // 読み込み時に複数枚のデータを一時的に保持する状態管理クラス
@@ -126,6 +127,9 @@ class SettingsQrProcessor {
         yokonarabiGroupAtai(kantoku, 0),
         yokonarabiGroupAtai(kantoku, 1),
       ];
+      // コンピュータの大学の名声を固定するか(int) yobiint3[89] (2.0.3で追加。0=固定しない(初期値)・1=固定する。
+      // 名声の横並び設定の画面にある設定。meisei_kotei.dart)
+      data['k_yobiint3_89'] = meiseiKoteiAtai(kantoku);
       // 目標順位決め方設定(int)
       data['cg_spurtryokuseichousisuu2'] =
           currentGhensuu.spurtryokuseichousisuu2;
@@ -436,6 +440,14 @@ class SettingsQrProcessor {
       // 名声の横並びの大学のグループ(int) kantoku.yobiint3[87]・[88] (2.0.3)
       //   1大学1桁(大学id%15の位)、0=なし(初期値)・1〜9=グループ
       //   (古いQRコードには含まれていないので、そのときは今の設定のまま)
+      // コンピュータの大学の名声を固定するか(int) kantoku.yobiint3[89] (2.0.3)
+      //   0=固定しない(初期値)・1=固定する(古いQRコードには含まれていないので、そのときは今の設定のまま)
+      //   (読み込んだ名声は、そのまま固定の値になる。固定しないに変わったときは、次に合計を計算し直すときに
+      //    年ごとの名声の合計に戻る。QRコードの名声は年ごとの名声も作り直すので、合計と同じ値になる)
+      final dynamic yobiint3_89 = dataMap['k_yobiint3_89'];
+      if (yobiint3_89 is int && meiseiKoteiTadashii(yobiint3_89)) {
+        meiseiKoteiAtaiIreru(kantoku, yobiint3_89);
+      }
       final dynamic yobiint3_87_88 = dataMap['k_yobiint3_87_88'];
       if (yobiint3_87_88 is List && yobiint3_87_88.length == 2) {
         for (int i = 0; i < 2; i++) {

@@ -1532,7 +1532,8 @@ class _ModalSpurtryokuseichousisuu3State
 }
 
 /// 入学時名声影響度設定の画面の「名声の横並び(スカウトのとき)」(2.0.2。meisei_yokonarabi.dart)
-/// 2.0.3から、名声の順位のブロックを複数決められる(ブロックは「ブロックを編集」の画面で決める)
+/// 2.0.3から、名声の順位のブロックを複数決められる(ブロックは「ブロックを編集」の画面で決める)。
+/// また、名声の順位で区切るかわりに、大学を決めてグループにまとめる形も選べる(「グループを編集」の画面で決める)
 class _YokonarabiSettei extends StatefulWidget {
   const _YokonarabiSettei();
 
@@ -1546,10 +1547,12 @@ class _YokonarabiSetteiState extends State<_YokonarabiSettei> {
     if (mounted) setState(() {});
   }
 
-  /// ブロックの編集の画面を開き、戻ったら描き直す
-  Future<void> _blockHenshuu() async {
+  /// ブロック(大学の形ならグループ)の編集の画面を開き、戻ったら描き直す
+  Future<void> _henshuu(bool daigaku) async {
     await Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(builder: (_) => const _YokonarabiBlockHenshuu()),
+      MaterialPageRoute<void>(
+        builder: (_) => daigaku ? const _YokonarabiGroupHenshuu() : const _YokonarabiBlockHenshuu(),
+      ),
     );
     if (mounted) setState(() {});
   }
@@ -1562,10 +1565,19 @@ class _YokonarabiSetteiState extends State<_YokonarabiSettei> {
     if (k == null) return const SizedBox.shrink();
     final int tsunagi = yokonarabiTsunagi(k);
     final int houhou = yokonarabiHouhou(k);
+    final bool daigaku = yokonarabiKata(k) == yokonarabiKataDaigaku;
+    final bool kiku = YokonarabiSettei.yomu(k).kiku;
     final TextStyle honbun = TextStyle(
       color: HENSUU.textcolor,
       fontSize: HENSUU.fontsize_honbun,
     );
+    // 大学のグループのまとめ(大学の形のとき。2.0.3)
+    final List<({int group, List<UnivData> univs})> group = daigaku
+        ? yokonarabiGroupIchiran(
+            yokonarabiGroupRetsu(k),
+            Hive.box<UnivData>('univBox').values.toList(),
+          )
+        : const [];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
@@ -1576,30 +1588,90 @@ class _YokonarabiSetteiState extends State<_YokonarabiSettei> {
         ),
         const SizedBox(height: 12),
         Text(
-          '名声の順位のブロック(例えば1〜3位・4〜8位)ごとに、新入生のスカウトでは同じ名声として扱います。'
-          '名声1位の大学が、スカウトで抜け出しにくくなります。'
+          '名声の順位のブロック(例えば1〜3位・4〜8位)や、決めた大学のグループごとに、新入生のスカウトでは同じ名声として扱います。'
+          '名声1位の大学をスカウトで抜け出しにくくしたり、名門のグループを長く強いままにしたりできます。'
           '名声の表示や、目標順位・獲得名声などには影響しません。\n'
           '上のレベルと組み合わせて使えます。この設定は次の新入生スカウトから影響します。',
           style: honbun,
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 16),
-        // 今のブロック(2.0.3。編集は別の画面)
-        Text(
-          'ブロック: ${tsunagi == 0 ? 'なし(初期値)' : yokonarabiBlockMoji(tsunagi)}',
-          style: honbun.copyWith(fontWeight: FontWeight.bold),
-          textAlign: TextAlign.center,
+        // 決め方(名声の順位で区切る(初期値)・大学を決めてまとめる。2.0.3。どちらか一方だけが効く。
+        // そろえ方と同じ選択チップ。✓は必ず出す)
+        Text('決め方', style: honbun, textAlign: TextAlign.center),
+        const SizedBox(height: 8),
+        Wrap(
+          alignment: WrapAlignment.center,
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final int ka in const [yokonarabiKataJuni, yokonarabiKataDaigaku])
+              ChoiceChip(
+                label: Text(
+                  ka == yokonarabiKataJuni ? '名声の順位で区切る(初期値)' : '大学を決めてまとめる',
+                ),
+                selected: (ka == yokonarabiKataDaigaku) == daigaku,
+                showCheckmark: true,
+                checkmarkColor: Colors.white,
+                onSelected: (bool selected) async {
+                  if (!selected || (ka == yokonarabiKataDaigaku) == daigaku) return;
+                  yokonarabiKataIreru(k, ka);
+                  await _hozon(k);
+                },
+                selectedColor: Colors.teal.shade700,
+                backgroundColor: Colors.grey.shade800,
+                labelStyle: TextStyle(
+                  color: Colors.white,
+                  fontSize: HENSUU.fontsize_honbun,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+          ],
         ),
         const SizedBox(height: 8),
-        ElevatedButton(
-          onPressed: _blockHenshuu,
-          child: const Text('ブロックを編集'),
+        Text(
+          daigaku
+              ? '大学を決めてまとめる: グループに入れた大学は、名声の順位が変わっても同じ顔ぶれのままです。'
+              : '名声の順位で区切る: 名声の順が入れ替わると、ブロックに入る大学も入れ替わります。',
+          style: honbun,
+          textAlign: TextAlign.center,
         ),
         const SizedBox(height: 16),
-        // そろえ方(平均(初期値)・一番上。全部のブロックで共通)
+        // 今のブロックかグループ(2.0.3。編集は別の画面)
+        if (!daigaku)
+          Text(
+            'ブロック: ${tsunagi == 0 ? 'なし(初期値)' : yokonarabiBlockMoji(tsunagi)}',
+            style: honbun.copyWith(fontWeight: FontWeight.bold),
+            textAlign: TextAlign.center,
+          )
+        else if (group.isEmpty)
+          Text(
+            'グループ: なし',
+            style: honbun.copyWith(fontWeight: FontWeight.bold),
+            textAlign: TextAlign.center,
+          )
+        else
+          for (final ({int group, List<UnivData> univs}) g in group)
+            Text(
+              'グループ${g.group}: ${g.univs.map((UnivData u) => '${u.name}大学').join('・')}'
+              '${g.univs.length < 2 ? '(1校だけなので効きません)' : ''}',
+              style: honbun.copyWith(fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+        const SizedBox(height: 8),
+        ElevatedButton(
+          onPressed: () => _henshuu(daigaku),
+          child: Text(daigaku ? 'グループを編集' : 'ブロックを編集'),
+        ),
+        const SizedBox(height: 16),
+        // そろえ方(平均(初期値)・一番上。全部のブロック・グループで共通)
         // (監督の母校パイプ設定と同じ選択チップ。選んでいるほうに✓を付け、色を変える。
         //  表示の設定で✓が出なくならないように、✓は必ず出す)
-        Text('そろえ方(全部のブロックで共通)', style: honbun, textAlign: TextAlign.center),
+        Text(
+          daigaku ? 'そろえ方(全部のグループで共通)' : 'そろえ方(全部のブロックで共通)',
+          style: honbun,
+          textAlign: TextAlign.center,
+        ),
         const SizedBox(height: 8),
         Wrap(
           alignment: WrapAlignment.center,
@@ -1631,11 +1703,11 @@ class _YokonarabiSetteiState extends State<_YokonarabiSettei> {
               ),
           ],
         ),
-        // ブロックが「なし」のときは、そろえ方は効かない
-        if (tsunagi == 0) ...[
+        // ブロック(グループ)が効かないときは、そろえ方も効かない
+        if (!kiku) ...[
           const SizedBox(height: 8),
           Text(
-            'そろえ方は、ブロックを決めると効きます。',
+            daigaku ? 'そろえ方は、2校以上のグループを作ると効きます。' : 'そろえ方は、ブロックを決めると効きます。',
             style: honbun,
             textAlign: TextAlign.center,
           ),
@@ -1643,8 +1715,8 @@ class _YokonarabiSetteiState extends State<_YokonarabiSettei> {
         const SizedBox(height: 8),
         Text(
           houhou == yokonarabiIchii
-              ? '一番上にそろえる: ブロックの大学がみな、ブロックの中で名声が一番高い大学と同じくらい選ばれやすくなり、その分、ほかの大学は選ばれにくくなります。'
-              : '平均にそろえる: ブロックの大学の名声の平均にそろえます。ブロックをまとめた選ばれやすさは今のままで、ほかの大学の選ばれやすさは変わりません。',
+              ? '一番上にそろえる: ${daigaku ? 'グループ' : 'ブロック'}の大学がみな、その中で名声が一番高い大学と同じくらい選ばれやすくなり、その分、ほかの大学は選ばれにくくなります。'
+              : '平均にそろえる: ${daigaku ? 'グループ' : 'ブロック'}の大学の名声の平均にそろえます。まとめた選ばれやすさは今のままで、ほかの大学の選ばれやすさは変わりません。',
           style: honbun,
           textAlign: TextAlign.center,
         ),
@@ -1737,7 +1809,8 @@ class _YokonarabiBlockHenshuuState extends State<_YokonarabiBlockHenshuu> {
         children: [
           Text(
             'ブロックは名声の順位で決まります。名声の順が入れ替わると、ブロックに入る大学も入れ替わります。'
-            '同じブロックの大学は、新入生のスカウトでは同じ名声として扱います。',
+            '同じブロックの大学は、新入生のスカウトでは同じ名声として扱います。'
+            '大学を決めてまとめたいときは、前の画面の決め方で「大学を決めてまとめる」を選んでください。',
             style: honbun,
           ),
           const SizedBox(height: 12),
@@ -1814,6 +1887,162 @@ class _YokonarabiBlockHenshuuState extends State<_YokonarabiBlockHenshuu> {
                 checkColor: Colors.white,
                 side: const BorderSide(color: Colors.white70, width: 2),
               ),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+}
+
+/// 名声の横並びの大学のグループを編集する画面(2.0.3。meisei_yokonarabi.dart)
+/// ・大学を名声の高い順に並べ、行ごとにグループ(なし・1〜9)を選ぶ(どの大学も1つのグループにしか入らない)
+/// ・上に、グループごとの大学のまとめを出す(1校だけのグループは「効きません」と添える)
+/// ・グループは大学idで持つので、名声の順位が変わっても同じ顔ぶれのまま。あなたの大学も入れられる
+/// ・変えるたびに保存する
+class _YokonarabiGroupHenshuu extends StatefulWidget {
+  const _YokonarabiGroupHenshuu();
+
+  @override
+  State<_YokonarabiGroupHenshuu> createState() => _YokonarabiGroupHenshuuState();
+}
+
+class _YokonarabiGroupHenshuuState extends State<_YokonarabiGroupHenshuu> {
+  /// グループごとの行の色(グループ1〜9。なしは色なし)
+  static const List<Color> _iro = [
+    Color(0xFF004D40),
+    Color(0xFF1A237E),
+    Color(0xFF4A148C),
+    Color(0xFF3E2723),
+    Color(0xFF263238),
+    Color(0xFF33691E),
+    Color(0xFF880E4F),
+    Color(0xFF01579B),
+    Color(0xFF5D4037),
+  ];
+
+  Future<void> _hozon(KantokuData k) async {
+    await k.save();
+    if (mounted) setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final KantokuData? k = Hive.box<KantokuData>(
+      'kantokuBox',
+    ).get('KantokuData');
+    final TextStyle honbun = TextStyle(
+      color: HENSUU.textcolor,
+      fontSize: HENSUU.fontsize_honbun,
+    );
+    final TextStyle hosoku = TextStyle(
+      color: HENSUU.textcolor.withOpacity(0.7),
+      fontSize: HENSUU.fontsize_honbun - 2,
+    );
+    final AppBar appBar = AppBar(
+      title: const Text('グループの編集', style: TextStyle(color: Colors.white)),
+      backgroundColor: Colors.grey[900],
+      foregroundColor: Colors.white,
+    );
+    if (k == null) {
+      return Scaffold(
+        backgroundColor: HENSUU.backgroundcolor,
+        appBar: appBar,
+        body: const SizedBox.shrink(),
+      );
+    }
+    final List<UnivData> univs = [
+      for (final UnivData u in Hive.box<UnivData>('univBox').values)
+        if (u.id >= 0 && u.id < yokonarabiJuniSuu) u,
+    ];
+    final List<int> group = yokonarabiGroupRetsu(k);
+    final List<({int group, List<UnivData> univs})> ichiran = yokonarabiGroupIchiran(group, univs);
+    // 名声の高い順(同じなら大学idの小さい順)
+    final List<UnivData> jun = List<UnivData>.of(univs)
+      ..sort((a, b) {
+        final int c = b.meisei_total.compareTo(a.meisei_total);
+        return c != 0 ? c : a.id.compareTo(b.id);
+      });
+    final Box<Ghensuu> gb = Hive.box<Ghensuu>('ghensuuBox');
+    final int myUnivId = gb.isNotEmpty ? (gb.getAt(0)?.MYunivid ?? -1) : -1;
+    int groupBan(UnivData u) => (u.id >= 0 && u.id < group.length) ? group[u.id] : 0;
+    return Scaffold(
+      backgroundColor: HENSUU.backgroundcolor,
+      appBar: appBar,
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Text(
+            'グループに入れた大学は、名声の順位が変わっても同じ顔ぶれのままです。'
+            '同じグループの大学は、新入生のスカウトでは同じ名声として扱います。'
+            'グループは1〜9の9個まで作れ、1校だけのグループは効きません。あなたの大学も入れられます。',
+            style: honbun,
+          ),
+          const SizedBox(height: 12),
+          // 今のグループ
+          if (ichiran.isEmpty)
+            Text('今のグループ: なし', style: honbun.copyWith(fontWeight: FontWeight.bold))
+          else
+            for (final ({int group, List<UnivData> univs}) g in ichiran)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(
+                  'グループ${g.group}: ${g.univs.map((UnivData u) => '${u.name}大学').join('・')}'
+                  '${g.univs.length < 2 ? '(1校だけなので効きません)' : ''}',
+                  style: honbun.copyWith(fontWeight: FontWeight.bold),
+                ),
+              ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton(
+              onPressed: ichiran.isEmpty
+                  ? null
+                  : () async {
+                      yokonarabiGroupZenbuNashi(k);
+                      await _hozon(k);
+                    },
+              child: Text('すべてなしにする', style: honbun),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text('大学ごとに決める', style: honbun.copyWith(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 4),
+          Text('大学は、今の名声の高い順に並んでいます。同じグループの大学は、同じ色で並びます。', style: hosoku),
+          const SizedBox(height: 8),
+          for (int i = 0; i < jun.length; i++)
+            Container(
+              color: groupBan(jun[i]) >= 1 && groupBan(jun[i]) <= _iro.length ? _iro[groupBan(jun[i]) - 1] : null,
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: Wrap(
+                spacing: 12,
+                runSpacing: 0,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text('名声${i + 1}位', style: hosoku),
+                  Text(
+                    '${jun[i].name}大学${jun[i].id == myUnivId ? '(あなたの大学)' : ''}',
+                    style: honbun.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: jun[i].id == myUnivId ? Colors.amber : HENSUU.textcolor,
+                    ),
+                  ),
+                  DropdownButton<int>(
+                    value: groupBan(jun[i]),
+                    dropdownColor: Colors.grey[900],
+                    style: honbun.copyWith(fontWeight: FontWeight.bold),
+                    items: [
+                      for (int g = 0; g <= yokonarabiGroupSaidai; g++)
+                        DropdownMenuItem<int>(value: g, child: Text(g == 0 ? 'なし' : 'グループ$g')),
+                    ],
+                    onChanged: (int? g) async {
+                      if (g == null) return;
+                      yokonarabiGroupIreru(k, jun[i].id, g);
+                      await _hozon(k);
+                    },
+                  ),
+                ],
+              ),
+            ),
           const SizedBox(height: 24),
         ],
       ),

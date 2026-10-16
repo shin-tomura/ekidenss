@@ -33,7 +33,11 @@ import 'package:ekiden/kansuu/meisei_yokonarabi.dart'
         yokonarabiBlock,
         yokonarabiBlockMoji,
         yokonarabiHouhou,
-        yokonarabiIchii; // 名声の横並び(2.0.2。2.0.3から名声の順位のブロックを複数)
+        yokonarabiIchii,
+        yokonarabiKata,
+        yokonarabiKataDaigaku,
+        yokonarabiGroupRetsu,
+        yokonarabiGroupIchiran; // 名声の横並び(2.0.2。2.0.3から名声の順位のブロックを複数と、大学のグループ)
 
 // ------------------------------------------------------------
 // ゲームの仕様の文(1.8.3で生成AI向けに作り、1.8.4から説明書と共通にした)
@@ -753,6 +757,8 @@ List<String> bokouPipeSetsumeiGyou() => [
 /// (2.0.3から、名声の順位のブロックを複数決められる。「1〜3位・4〜8位」のように書く)
 List<String> _yokonarabiGyou(bool setsumeisho) {
   final KantokuData? k = _kantoku();
+  // 大学を決めてまとめる形(2.0.3)は、グループごとに大学の名前を書く
+  if (yokonarabiKata(k) == yokonarabiKataDaigaku) return _yokonarabiGroupGyou(k, setsumeisho);
   final int tsunagi = yokonarabiTsunagi(k);
   final int blockSuu = yokonarabiBlock(tsunagi).length;
   if (blockSuu == 0) return const [];
@@ -765,6 +771,31 @@ List<String> _yokonarabiGyou(bool setsumeisho) {
     else
       '　・${sorezoreTen}その中の平均の名声にそろえます。ほかの大学の選ばれやすさは変わりません。',
     '　・名声の順位で決まるので、名声の順が入れ替わると、まとめられる大学も入れ替わります。',
+    '　・名声の表示や目標順位などは、もとの名声のままです。',
+  ];
+}
+
+/// 名声の横並びで、大学を決めてまとめる形の行(2.0.3。2校以上のグループがないときは空)
+List<String> _yokonarabiGroupGyou(KantokuData? k, bool setsumeisho) {
+  final List<({int group, List<UnivData> univs})> group = [
+    for (final ({int group, List<UnivData> univs}) g in yokonarabiGroupIchiran(
+      yokonarabiGroupRetsu(k),
+      Hive.box<UnivData>('univBox').values.toList(),
+    ))
+      if (g.univs.length >= 2) g,
+  ];
+  if (group.isEmpty) return const [];
+  final bool fukusuu = group.length >= 2;
+  final String sorezoreTen = fukusuu ? 'それぞれ、' : '';
+  return [
+    '・${_konoData(setsumeisho)}、新入生のスカウトでは、次の大学を${fukusuu ? 'グループごとに' : ''}同じ名声として扱います。',
+    for (final ({int group, List<UnivData> univs}) g in group)
+      '　・${g.univs.map((UnivData u) => '${u.name}大学').join('・')}',
+    if (yokonarabiHouhou(k) == yokonarabiIchii)
+      '　・${sorezoreTen}その中で名声が一番高い大学と同じくらい選ばれやすくなり、その分、ほかの大学は選ばれにくくなります。'
+    else
+      '　・${sorezoreTen}その中の平均の名声にそろえます。ほかの大学の選ばれやすさは変わりません。',
+    '　・決めた大学のまとまりなので、名声の順位が変わっても同じ顔ぶれです。',
     '　・名声の表示や目標順位などは、もとの名声のままです。',
   ];
 }
@@ -799,8 +830,9 @@ ShiyouSetsu shiyouMeisei({bool setsumeisho = false}) {
       '・コンピュータスカウトの詳しいことは、説明画面の設定タブの「コンピュータスカウト」の説明をご覧ください。',
       // 地区めぐり(声かけ)の争奪戦は、最後の志望と同じ重み(1.9.6。scout_com.dart)
       '・地区めぐり(声かけ)の争奪戦での名声の効き方は、設定タブの「入学時名声影響度設定」で変わります。',
-      // 名声の横並び(2.0.2。2.0.3から名声の順位のブロックを複数。meisei_yokonarabi.dart)
-      '・スカウトで同じ名声として扱う順位のブロックと、そろえ方(平均・一番上)は、設定タブの「入学時名声影響度設定」の「名声の横並び」で変えられます(初期値はなし・平均)。',
+      // 名声の横並び(2.0.2。2.0.3から名声の順位のブロックを複数と、大学のグループ。meisei_yokonarabi.dart)
+      '・スカウトで同じ名声として扱う順位のブロックか大学のグループと、そろえ方(平均・一番上)は、設定タブの「入学時名声影響度設定」の「名声の横並び」で変えられます(初期値はなし・平均)。',
+      '　・大学のグループには、あなたの大学も入れられます。',
       // 強化プロジェクト(2.0.1。kyouka_project.dart)
       '・強化プロジェクトの起こりやすさ・選ばれやすさ・期間と、あなたの大学も選ばれるかは、設定タブの「強化プロジェクト設定」で変えられます。',
       // 監督の母校パイプ(2.0.1。bokou_pipe.dart。「母校パイプとは」の窓と同じ行)

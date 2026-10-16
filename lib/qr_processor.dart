@@ -120,6 +120,12 @@ class SettingsQrProcessor {
       // 名声の横並び(スカウトのとき)(int) yobiint3[86] (2.0.2で追加。入学時名声影響度設定の画面にある設定。
       // 2.0.2の形は校数+100×そろえ方、2.0.3の形は1000+そろえ方+10×形+100×名声の順位のつなぎ。meisei_yokonarabi.dart)
       data['k_yobiint3_86'] = yokonarabiAtai(kantoku);
+      // 名声の横並びの大学のグループ(int) yobiint3[87]・[88] (2.0.3で追加。1大学1桁(大学id%15の位)、
+      // [87]に大学0〜14・[88]に大学15〜29、0=なし(初期値)・1〜9=グループ。meisei_yokonarabi.dart)
+      data['k_yobiint3_87_88'] = [
+        yokonarabiGroupAtai(kantoku, 0),
+        yokonarabiGroupAtai(kantoku, 1),
+      ];
       // 目標順位決め方設定(int)
       data['cg_spurtryokuseichousisuu2'] =
           currentGhensuu.spurtryokuseichousisuu2;
@@ -426,6 +432,18 @@ class SettingsQrProcessor {
       final dynamic yobiint3_86 = dataMap['k_yobiint3_86'];
       if (yobiint3_86 is int && yokonarabiTadashii(yobiint3_86)) {
         yokonarabiAtaiIreru(kantoku, yobiint3_86);
+      }
+      // 名声の横並びの大学のグループ(int) kantoku.yobiint3[87]・[88] (2.0.3)
+      //   1大学1桁(大学id%15の位)、0=なし(初期値)・1〜9=グループ
+      //   (古いQRコードには含まれていないので、そのときは今の設定のまま)
+      final dynamic yobiint3_87_88 = dataMap['k_yobiint3_87_88'];
+      if (yobiint3_87_88 is List && yobiint3_87_88.length == 2) {
+        for (int i = 0; i < 2; i++) {
+          final dynamic v = yobiint3_87_88[i];
+          if (v is int && yokonarabiGroupAtaiTadashii(v)) {
+            yokonarabiGroupAtaiIreru(kantoku, i, v);
+          }
+        }
       }
       // 目標順位決め方設定(int)
       // (2.0.1から、正しくない値は新しい初期値の対校戦順位追従にする。2.0.0までのQRコードの93

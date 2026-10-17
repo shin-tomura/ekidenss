@@ -38,7 +38,7 @@ import 'package:ekiden/screens/Modal_koukouMeikan.dart'
     show koukouPageHirakuBan; // 監督の出身校から高校名鑑の高校のページを開く(2.0.1)
 import 'package:ekiden/kansuu/shushou.dart' show shushouIdUniv; // 主将(2.0.1)
 import 'package:ekiden/screens/reset_ichiran_gamen.dart'
-    show resetIchiranGamenHiraku; // リセット・ロード・QRで残るもの・変わるもの(2.0.3。全てリセットの確認の画面から)
+    show resetIchiranGamenHiraku, resetSaiKakunin; // リセット・ロード・QRで残るもの・変わるもの(2.0.3。全てリセットの確認の画面から)。もう一度確かめるダイアログ(2.0.4)
 import 'package:ekiden/screens/Modal_reset_IkuseiryokuMeiseiIji.dart'
     show ModalReset_IkuseiryokuMeiseiIji; // 設定を残してやり直す方に切り替える(2.0.3)
 import 'package:ekiden/screens/meisei_yokonarabi_settei.dart'
@@ -2208,6 +2208,7 @@ class _ModalMieruNouryokuResetState extends State<ModalMieruNouryokuReset> {
 /// ・2.0.3から、名声・育成力と設定も初期値に戻す(何を戻すかは lib/kansuu/reset_ichiran.dart の一覧で決める)。
 ///   基本的には「名声・育成力と設定を残してやり直す」をおすすめし、本当に初期値に戻したいときだけ選んでもらう。
 ///   「設定を残してやり直す方にする」で、そちらの確認の画面に切り替えられる
+/// ・2.0.4から、はいを押したあとに、もう一度確かめるダイアログを出す(reset_ichiran_gamen.dart の resetSaiKakunin)
 class ModalAllReset extends StatefulWidget {
   const ModalAllReset({super.key});
 
@@ -2331,6 +2332,9 @@ class _ModalAllResetState extends State<ModalAllReset> {
                   const SizedBox(height: 16),
                   ElevatedButton(
                     onPressed: () async {
+                      // もう一度確かめる(2.0.4。やめたら、この画面に戻る)
+                      if (!await resetSaiKakunin(context, zenbu: true)) return;
+                      if (!context.mounted) return;
                       setState(() {
                         currentGhensuu.mode = 10;
                       });

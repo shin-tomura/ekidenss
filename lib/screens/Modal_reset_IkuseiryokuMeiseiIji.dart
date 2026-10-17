@@ -3,7 +3,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ekiden/ghensuu.dart'; // Ghensuuクラスをインポート
 import 'package:ekiden/constants.dart'; // TEISUU, HENSUUクラスをインポート
 import 'package:ekiden/screens/reset_ichiran_gamen.dart'
-    show resetIchiranGamenHiraku; // リセット・ロード・QRで残るもの・変わるもの(2.0.3)
+    show resetIchiranGamenHiraku, resetSaiKakunin; // リセット・ロード・QRで残るもの・変わるもの(2.0.3)。もう一度確かめるダイアログ(2.0.4)
 
 // ------------------------------------------------------------
 // 「名声・育成力と設定を残してやり直す」の確認の画面(2.0.2までは「名声と育成力は維持しつつリセットしてやり直す」)
@@ -11,6 +11,7 @@ import 'package:ekiden/screens/reset_ichiran_gamen.dart'
 // ・2.0.3から、何を残すかは lib/kansuu/reset_ichiran.dart の一覧で決める(ゲームの進み具合だけを消し、
 //   名声・育成力・名声の横並びと、レースや育成などの設定、表示の好みは残す)。基本的にはこちらをおすすめする
 // ・「残るもの・戻るものの一覧」から、一覧表の画面を開ける
+// ・2.0.4から、はいを押したあとに、もう一度確かめるダイアログを出す(reset_ichiran_gamen.dart の resetSaiKakunin)
 // ------------------------------------------------------------
 
 class ModalReset_IkuseiryokuMeiseiIji extends StatefulWidget {
@@ -104,6 +105,9 @@ class _ModalReset_IkuseiryokuMeiseiIji
                   // 「はい」ボタン
                   ElevatedButton(
                     onPressed: () async {
+                      // もう一度確かめる(2.0.4。やめたら、この画面に戻る)
+                      if (!await resetSaiKakunin(context, zenbu: false)) return;
+                      if (!context.mounted) return;
                       setState(() {
                         // UIを更新するためsetStateで囲む
                         currentGhensuu.mode = 101010;

@@ -8,6 +8,7 @@ import 'package:ekiden/qr_processor.dart' show qrKakidashiYobiBangou; // QRコ�
 // 「リセット・ロード・QRで残るもの・変わるもの」の一覧表の画面(2.0.3。最初は「リセットで残るもの・戻るもの」、
 // 次に「リセットとロードで残るもの・戻るもの」)
 // 説明画面の設定タブの一番上と、2つのリセットの確認の画面と、QRコードの画面から開く。
+// 2.0.4から、2つのリセットの確認の画面で進むボタンを押したあとの、もう一度確かめるダイアログ(resetSaiKakunin)もここに置く。
 // 中身は lib/kansuu/reset_ichiran.dart の一覧から作る(設定を足して一覧に1行書けば、ここにも出る)。
 // ・見出しは設定タブの見出しの順(resetMidashiJun)。行ごとに、2つのリセットで残るか戻るかと、
 //   セーブデータを読み込んだときにセーブの値になるか今のままか(yomikomiNokosu)と、
@@ -17,6 +18,45 @@ import 'package:ekiden/qr_processor.dart' show qrKakidashiYobiBangou; // QRコ�
 //   ・一覧に載っていない予備の番号(resetMitourokuBangou)
 //   ・QRコードの印と、QRコードに実際に書き出している予備の番号の食い違い(resetQrZure)
 // ------------------------------------------------------------
+
+/// リセットを、もう一度確かめるダイアログ(2.0.4。2つのリセットの確認の画面で、進むボタンを押したあと)
+/// [zenbu] が true なら「全てリセットしてやり直す」、false なら「名声・育成力と設定を残してやり直す」。
+/// 進むボタンを押したときだけ true(「やめる」とダイアログの外を押したときは false で、確認の画面に戻る)
+Future<bool> resetSaiKakunin(BuildContext context, {required bool zenbu}) async {
+  const TextStyle honbun = TextStyle(color: HENSUU.textcolor, fontSize: HENSUU.fontsize_honbun);
+  final bool? ok = await showDialog<bool>(
+    context: context,
+    builder: (c) => AlertDialog(
+      backgroundColor: Colors.grey[900],
+      // 文字を大きくしても、本文をスクロールで読めるようにする
+      scrollable: true,
+      title: Text(
+        zenbu ? '本当に全て初期値に戻しますか？' : '本当にやり直しますか？',
+        style: const TextStyle(color: Colors.white),
+      ),
+      content: Text(
+        zenbu
+            ? 'ゲームの進み具合に加えて、名声・育成力と、すべての設定が初期値に戻ります。アルバムも消去されます。'
+                '元には戻せません。'
+            : '選手・記録・年月日などのゲームの進み具合が消え、1年目からやり直します。アルバムも消去されます。'
+                '名声・育成力と設定は残ります。元には戻せません。',
+        style: honbun,
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.of(c).pop(false), child: const Text('やめる')),
+        // 元に戻せない操作なので、オレンジ色の文字にする
+        TextButton(
+          onPressed: () => Navigator.of(c).pop(true),
+          child: Text(
+            zenbu ? '全て初期値に戻す' : 'やり直す',
+            style: TextStyle(color: Colors.orange.shade300, fontWeight: FontWeight.bold),
+          ),
+        ),
+      ],
+    ),
+  );
+  return ok == true;
+}
 
 /// 一覧表の画面を開く
 Future<void> resetIchiranGamenHiraku(BuildContext context) {

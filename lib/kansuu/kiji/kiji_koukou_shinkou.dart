@@ -759,10 +759,15 @@ List<Kiji> _yosenKiji(KijiKankyou k, KoukouTaikaiKiroku rec, KoukouTaikaiKiroku?
                 maeJuni[e.code] == null ? '' : '${maeJuni[e.code]}位',
               ],
         ]),
-        KijiHyou('地区代表($chikuSuu校)', const ['地区', '高校', '出場'], [
+        KijiHyou('地区代表($chikuSuu校)', const ['地区', '高校', '出場', '前回'], [
           for (final e in deru)
             if (e.chiku >= 0 && e.chiku < koukouChikuMei.length)
-              [koukouChikuMei[e.chiku], r.kou(e.code), _shutsujouMojiKaime(kaime[e.code])],
+              [
+                koukouChikuMei[e.chiku],
+                r.kou(e.code),
+                _shutsujouMojiKaime(kaime[e.code]),
+                maeJuni[e.code] == null ? '' : '${maeJuni[e.code]}位',
+              ],
         ]),
       ],
       haishin: _haishin(nen, koukouYosenMonth, koukouYosenDay, tane),

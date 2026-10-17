@@ -1963,6 +1963,36 @@ Future<void> koukouOkiniiriHozon(int i, bool tsukeru) async {
   await _kaisuuJsonKaku(d);
 }
 
+/// 優勝回数・名簿の編集・お気に入りを入れている大学のid(2.0.3。reset_ichiran.dart で使う)
+const int koukouKaisuuUnivId = _kaisuuUnivId;
+
+/// 大学id 29 の文字の欄[t]から、お気に入りの高校を読む(2.0.3。セーブデータを読み込んでも、
+/// 今のお気に入りを残すため。reset_ichiran.dart)
+List<int> koukouOkiniiriMojiKaraYomu(String t) {
+  final dynamic f = _kaisuuJsonKaidoku(t)['f'];
+  final List<int> l = [];
+  if (f is List) {
+    for (final dynamic v in f) {
+      if (v is! num) continue;
+      final int i = v.toInt();
+      if (i >= 0 && i < koukouMeiboShoki.length && !l.contains(i)) l.add(i);
+    }
+  }
+  return l;
+}
+
+/// 大学id 29 の文字の欄[t]の、お気に入りの高校だけを[l]にした文字(優勝回数と名簿の編集はそのまま。
+/// 保存は呼び出し側で行う。2.0.3。reset_ichiran.dart)
+String koukouOkiniiriMojiNiIreru(String t, List<int> l) {
+  final Map<String, dynamic> d = _kaisuuJsonKaidoku(t);
+  if (l.isEmpty) {
+    d.remove('f');
+  } else {
+    d['f'] = l;
+  }
+  return d.isEmpty ? '' : '$_kaisuuMidashi\n${jsonEncode(d)}';
+}
+
 /// 大学id 29 のJSON(優勝回数と名簿の編集)を読む(読めなければ空)
 Map<String, dynamic> _kaisuuJsonYomu() {
   final UnivData? u = _kirokuUniv(_kaisuuUnivId);

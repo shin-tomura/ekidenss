@@ -6,6 +6,8 @@ import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/kansuu/seichou_type.dart' show seichouTypeWariai, seichouTypeWariaiIreru;
 import 'package:ekiden/kansuu/mokuhyou_kimekata.dart' show mokuhyouKimekataTaikousen;
+import 'package:ekiden/kansuu/koukou.dart'
+    show koukouKaisuuUnivId, koukouOkiniiriMojiKaraYomu, koukouOkiniiriMojiNiIreru; // 高校のお気に入り(2.0.3)
 
 // ------------------------------------------------------------
 // リセットで残すもの・戻すものの一覧(2.0.3)
@@ -27,7 +29,11 @@ import 'package:ekiden/kansuu/mokuhyou_kimekata.dart' show mokuhyouKimekataTaiko
 //   2. 今まで通りのリセット(予備の配列を0にする・初期化する)を行う
 //   3. 戻すことになっている設定を、ここに書いた初期値にする(shokika。nullなら2.で初期値になる)
 //   4. 取っておいた値を書き戻して保存する(3.と4.は resetAtoDeModosu。新しい選手を作る前に行う)
-// ・説明画面の設定タブの一番上の「リセットで残るもの・戻るもの」(reset_ichiran_gamen.dart)は、この一覧から作る
+// ・セーブデータを読み込んだとき(save_load_screen.dart の _importFromSlot)は、ゲームのデータを丸ごとセーブの値で
+//   置き換える(世界とそのルールはセーブしたときに戻る)。ただし、この一覧で yomikomiNokosu の行(表示の好み・
+//   フリーメモ・高校名鑑のお気に入り)は、読み込む前の今の値を取っておき、読み込んだあとに書き戻す
+//   (yomikomiMaeniToru・yomikomiAtoDeModosu。2.0.3。データ共有で受け取った世界を読み込んだときも同じ)
+// ・説明画面の設定タブの一番上の「リセットとロードで残るもの・戻るもの」(reset_ichiran_gamen.dart)は、この一覧から作る
 // ・設定を追加したら、この一覧に1行足し、分類を決める(CLAUDE.md)。監督データの予備の配列を使ったら、
 //   その番号を一覧の hozon か、下の resetSusumiBangou に書く。書き忘れると、開発中のビルドで、
 //   一覧表の画面とリセットのときに警告が出る(resetMitourokuBangou)
@@ -147,7 +153,7 @@ class ResetHozon {
 
 /// 一覧の1行
 class ResetKoumoku {
-  ResetKoumoku(this.mei, this.midashi, this.bunrui, this.hozon, {this.hosoku = ''});
+  ResetKoumoku(this.mei, this.midashi, this.bunrui, this.hozon, {this.hosoku = '', this.yomikomiNokosu = false});
 
   /// 名前(一覧表の画面に出す)
   final String mei;
@@ -161,6 +167,10 @@ class ResetKoumoku {
 
   /// 一覧表の画面に添える補足(空なら出さない)
   final String hosoku;
+
+  /// セーブデータを読み込んだときに、セーブの値ではなく今の値を残すか(2.0.3。表示の好み・フリーメモ・
+  /// 高校名鑑のお気に入り。trueにするときは、hozon に保存場所を書く)
+  final bool yomikomiNokosu;
 }
 
 /// 一覧表の画面の見出しの並び(設定タブの見出しの順)
@@ -425,18 +435,35 @@ List<ResetKoumoku> resetIchiran() {
     ResetKoumoku('大学ごとの金銀支給レベル・銀の使い道', '大学画面などの設定', ResetBunrui.rule, [_kantoku(2, 38, 41)]),
     ResetKoumoku('学連選抜の監督をするか', '大学画面などの設定', ResetBunrui.rule, [_kantoku(2, 75, 75)]),
     // ---- 表示 ----
-    ResetKoumoku('持ちタイムの表示(自己ベスト/今季ベスト)', '表示', ResetBunrui.tsukutta, [_kantoku(2, 77, 77)]),
+    ResetKoumoku('持ちタイムの表示(自己ベスト/今季ベスト)', '表示', ResetBunrui.tsukutta, [_kantoku(2, 77, 77)], yomikomiNokosu: true),
     ResetKoumoku('趣味・高校時代の表示', '表示', ResetBunrui.tsukutta, [
       _kantoku(2, 15, 15),
       _kantoku(2, 86, 86),
-    ]),
-    ResetKoumoku('レーダーチャートのパネル(選手画面・大学画面)', '表示', ResetBunrui.tsukutta, [_kantoku(2, 20, 20)]),
-    ResetKoumoku('今季タイム一覧表で隠す列', '表示', ResetBunrui.tsukutta, [_kantoku(3, 74, 74)]),
-    ResetKoumoku('レース分析の選択・フリーメモの最初に開くメモ', '表示', ResetBunrui.tsukutta, [_kantoku(2, 23, 32)]),
+    ], yomikomiNokosu: true),
+    ResetKoumoku('レーダーチャートのパネル(選手画面・大学画面)', '表示', ResetBunrui.tsukutta, [_kantoku(2, 20, 20)], yomikomiNokosu: true),
+    ResetKoumoku('今季タイム一覧表で隠す列', '表示', ResetBunrui.tsukutta, [_kantoku(3, 74, 74)], yomikomiNokosu: true),
+    ResetKoumoku('レース分析の選択・フリーメモの最初に開くメモ', '表示', ResetBunrui.tsukutta, [_kantoku(2, 23, 32)], yomikomiNokosu: true),
     // ---- 作ったもの(どのリセットでも触らない) ----
     ResetKoumoku('大学名', '作ったもの', ResetBunrui.tsukutta, []),
-    ResetKoumoku('フリーメモの中身', '作ったもの', ResetBunrui.tsukutta, []),
-    ResetKoumoku('高校名鑑の編集・お気に入り', '作ったもの', ResetBunrui.tsukutta, []),
+    // フリーメモ(大学id 13〜17 の文字の欄)はアプリ全体で1つ。読み込んでも今のまま(2.0.3)。
+    // データ共有で書き出すときも空にする(share_exporter.dart)
+    ResetKoumoku('フリーメモの中身', '作ったもの', ResetBunrui.tsukutta, [
+      for (int id = 13; id <= 17; id++) _tanshuku(id),
+    ], yomikomiNokosu: true),
+    ResetKoumoku('高校名鑑の編集', '作ったもの', ResetBunrui.tsukutta, []),
+    // お気に入りは、優勝回数・名簿の編集と同じ大学id 29 の文字の欄のJSONの f。f だけを書き戻す(koukou.dart)
+    ResetKoumoku('高校名鑑のお気に入り', '作ったもの', ResetBunrui.tsukutta, [
+      ResetHozon(
+        toru: (ResetDougu d) =>
+            koukouOkiniiriMojiKaraYomu(d.daigaku(koukouKaisuuUnivId)?.name_tanshuku ?? ''),
+        modosu: (ResetDougu d, Object? atai) {
+          final UnivData? u = d.daigaku(koukouKaisuuUnivId);
+          if (u != null && atai is List<int>) {
+            u.name_tanshuku = koukouOkiniiriMojiNiIreru(u.name_tanshuku, atai);
+          }
+        },
+      ),
+    ], yomikomiNokosu: true),
     // ---- ゲームの進み具合 ----
     ResetKoumoku('選手・OB(アルバム)・理事・監督とコーチ・主将', 'ゲームの進み具合', ResetBunrui.susumi, []),
     ResetKoumoku('大会・大学・学内の記録、年月日、金銀', 'ゲームの進み具合', ResetBunrui.susumi, []),
@@ -496,6 +523,31 @@ List<String> resetMitourokuBangou() {
       for (int i = 0; i < _hairetsu(moto, h).length; i++)
         if (!notteru.contains('$h:$i')) 'yobiint$h[$i]',
   ];
+}
+
+/// セーブデータを読み込む前に、今の値を残すもの(yomikomiNokosu の行)の値を取っておく(2.0.3)
+Map<int, List<Object?>> yomikomiMaeniToru(ResetDougu d) {
+  final List<ResetKoumoku> l = resetIchiran();
+  final Map<int, List<Object?>> m = {};
+  for (int i = 0; i < l.length; i++) {
+    if (!l[i].yomikomiNokosu) continue;
+    m[i] = [for (final ResetHozon h in l[i].hozon) h.toru(d)];
+  }
+  return m;
+}
+
+/// セーブデータを読み込んだあとに、取っておいた値を書き戻して保存する(2.0.3)
+/// ([d] は、読み込んだあとのデータで ResetDougu.yomu() し直したもの。読み込みでデータが入れ替わるため)
+Future<void> yomikomiAtoDeModosu(ResetDougu d, Map<int, List<Object?>> nokoshi) async {
+  final List<ResetKoumoku> l = resetIchiran();
+  for (final MapEntry<int, List<Object?>> e in nokoshi.entries) {
+    if (e.key < 0 || e.key >= l.length) continue;
+    final List<ResetHozon> hozon = l[e.key].hozon;
+    for (int j = 0; j < hozon.length && j < e.value.length; j++) {
+      hozon[j].modosu(d, e.value[j]);
+    }
+  }
+  await d.hozon();
 }
 
 /// リセットの前に、残す設定の値を取っておく(一覧の何行目か → 保存場所ごとの値)

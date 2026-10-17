@@ -28,6 +28,8 @@ import 'package:ekiden/kansuu/koukou.dart'; // 出身校と高校時代の実績
 import 'package:ekiden/kansuu/shushou.dart'; // 主将(2.0.1)
 import 'package:ekiden/kansuu/taikai_chouki.dart'; // 大会の長い記録の移行処理(2.0.0)
 import 'package:ekiden/kansuu/mokuhyou_kimekata.dart'; // 目標順位の決め方の移行処理(2.0.1)
+import 'package:ekiden/kansuu/reset_ichiran.dart'
+    show ResetDougu, yomikomiMaeniToru, yomikomiAtoDeModosu; // 読み込んでも今の値を残すもの(2.0.3)
 //import 'dart:io';
 //import 'package:path_provider/path_provider.dart';
 
@@ -422,6 +424,12 @@ class _SaveLoadScreenState extends State<SaveLoadScreen> {
 
       // 処理前スナップショット(途中で終了しても読み込み前の状態に戻せるように)
       await ShoriGuard.begin('保存ゲームの読み込み');
+
+      // 表示の好み・フリーメモ・高校名鑑のお気に入りは、セーブの値ではなく今の値を残す(2.0.3。
+      // 一覧の yomikomiNokosu の行。読み込む前に取っておき、読み込みと移行処理のあとで書き戻す。reset_ichiran.dart)
+      final ResetDougu? yomikomiMaeDougu = ResetDougu.yomu();
+      final Map<int, List<Object?>> yomikomiNokoshi =
+          yomikomiMaeDougu == null ? {} : yomikomiMaeniToru(yomikomiMaeDougu);
 
       print('---- [START] データ読み込み＆上書きフェーズ (Boxは閉じない) ----');
       for (var boxName in kActiveBoxNames) {
@@ -890,6 +898,15 @@ class _SaveLoadScreenState extends State<SaveLoadScreen> {
         final Ghensuu? gh = Hive.box<Ghensuu>('ghensuuBox').getAt(0);
         if (gh != null) {
           await mokuhyouKimekata201Ikou(gh);
+        }
+      }
+
+      // 読み込む前に取っておいた、表示の好み・フリーメモ・高校名鑑のお気に入りを書き戻す(2.0.3。reset_ichiran.dart)
+      // (読み込みでデータが入れ替わったので、読み込んだあとのデータで読み直してから書き戻す)
+      {
+        final ResetDougu? yomikomiAtoDougu = ResetDougu.yomu();
+        if (yomikomiAtoDougu != null) {
+          await yomikomiAtoDeModosu(yomikomiAtoDougu, yomikomiNokoshi);
         }
       }
 

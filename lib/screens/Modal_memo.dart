@@ -311,7 +311,8 @@ class _MemoScreenState extends State<MemoScreen> {
                 const SizedBox(
                   width: double.infinity,
                   child: Text(
-                    '※このメモもセーブデータに含まれますので、共有される場合には、個人情報の漏洩や権利侵害にご注意ください',
+                    // 2.0.3から、メモはアプリ全体で1つ(セーブデータを読み込んでも変わらず、データ共有でも相手に渡らない。reset_ichiran.dart)
+                    '※このメモはアプリ全体で1つです。セーブデータを読み込んでも変わらず、データ共有(世界を共有)でも相手には渡りません。',
                     style: TextStyle(color: Colors.yellowAccent, fontSize: 10),
                     textAlign: TextAlign.center,
                   ),

@@ -4,11 +4,12 @@ import 'package:ekiden/constants.dart';
 import 'package:ekiden/kansuu/reset_ichiran.dart';
 
 // ------------------------------------------------------------
-// 「リセットで残るもの・戻るもの」の一覧表の画面(2.0.3)
+// 「リセットとロードで残るもの・戻るもの」の一覧表の画面(2.0.3。最初は「リセットで残るもの・戻るもの」)
 // 説明画面の設定タブの一番上と、2つのリセットの確認の画面から開く。
 // 中身は lib/kansuu/reset_ichiran.dart の一覧から作る(設定を足して一覧に1行書けば、ここにも出る)。
-// ・見出しは設定タブの見出しの順(resetMidashiJun)。行ごとに、2つのリセットで残るか戻るかを出す
-// ・スマホで文字を大きくしても横にはみ出さないように、表ではなく、名前の下に2つの札を並べる
+// ・見出しは設定タブの見出しの順(resetMidashiJun)。行ごとに、2つのリセットで残るか戻るかと、
+//   セーブデータを読み込んだときにセーブの値になるか今のままか(yomikomiNokosu)を出す
+// ・スマホで文字を大きくしても横にはみ出さないように、表ではなく、名前の下に3つの札を並べる
 // ・開発中のビルドだけ、一覧に載っていない予備の番号があれば、一番上に赤字で出す(書き忘れの見張り)
 // ------------------------------------------------------------
 
@@ -24,7 +25,7 @@ class ResetIchiranGamen extends StatelessWidget {
 
   static const TextStyle _honbun = TextStyle(color: HENSUU.textcolor, fontSize: HENSUU.fontsize_honbun);
 
-  /// 札の文字と色(残る・戻る・選び直す)
+  /// リセットの札の文字と色(残る・戻る・選び直す)
   static (String, Color) _fuda(ResetBunrui b, {required bool zenbu}) {
     if (b == ResetBunrui.erabinaoshi) return ('選び直す', Colors.lightBlueAccent);
     return resetNokosu(b, zenbu: zenbu)
@@ -32,8 +33,12 @@ class ResetIchiranGamen extends StatelessWidget {
         : ('戻る', Colors.orangeAccent);
   }
 
-  Widget _fudaWidget(String reset, ResetBunrui b, {required bool zenbu}) {
-    final (String moji, Color iro) = _fuda(b, zenbu: zenbu);
+  /// セーブデータを読み込んだときの札の文字と色(今のまま・セーブの値)
+  static (String, Color) _yomikomiFuda(ResetKoumoku k) =>
+      k.yomikomiNokosu ? ('今のまま', Colors.lightGreenAccent) : ('セーブの値', Colors.white70);
+
+  Widget _fudaWidget(String toki, (String, Color) fuda) {
+    final (String moji, Color iro) = fuda;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
@@ -41,7 +46,7 @@ class ResetIchiranGamen extends StatelessWidget {
         borderRadius: BorderRadius.circular(6),
       ),
       child: Text(
-        '$reset: $moji',
+        '$toki: $moji',
         style: TextStyle(color: iro, fontSize: HENSUU.fontsize_honbun - 2),
       ),
     );
@@ -58,7 +63,11 @@ class ResetIchiranGamen extends StatelessWidget {
     return Scaffold(
       backgroundColor: HENSUU.backgroundcolor,
       appBar: AppBar(
-        title: const Text('リセットで残るもの・戻るもの', style: TextStyle(color: Colors.white)),
+        // 名前が長いので、狭い画面では縮めて1行に収める
+        title: const FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text('リセットとロードで残るもの・戻るもの', style: TextStyle(color: Colors.white)),
+        ),
         backgroundColor: HENSUU.backgroundcolor,
         foregroundColor: Colors.white,
       ),
@@ -75,7 +84,7 @@ class ResetIchiranGamen extends StatelessWidget {
                 ),
               ),
             const Text(
-              '設定タブの2つのリセットで、何が残り、何が初期値に戻るかの一覧です。',
+              '設定タブの2つのリセットと、セーブデータの読み込みで、何が残り、何が戻るかの一覧です。',
               style: _honbun,
             ),
             const SizedBox(height: 8),
@@ -93,6 +102,17 @@ class ResetIchiranGamen extends StatelessWidget {
             const Text(
               '・どちらのリセットでも、表示の好み・大学名・メモなどは残り、アルバム(卒業したOB)は消えます。'
               '難易度と総監督をする大学は、リセットのあとに選び直します。',
+              style: _honbun,
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              '・セーブデータを読み込むと、ゲームの進み具合・名声・設定・大学名などは、セーブしたときの値になります。'
+              '表示の好み・フリーメモ・高校名鑑のお気に入りは、今のままです。',
+              style: _honbun,
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              '・データ共有(世界を共有)で書き出すときは、フリーメモは入りません。',
               style: _honbun,
             ),
             for (final String midashi in resetMidashiJun) ...[
@@ -122,8 +142,9 @@ class ResetIchiranGamen extends StatelessWidget {
                           spacing: 8,
                           runSpacing: 4,
                           children: [
-                            _fudaWidget('設定を残すリセット', k.bunrui, zenbu: false),
-                            _fudaWidget('全てリセット', k.bunrui, zenbu: true),
+                            _fudaWidget('設定を残すリセット', _fuda(k.bunrui, zenbu: false)),
+                            _fudaWidget('全てリセット', _fuda(k.bunrui, zenbu: true)),
+                            _fudaWidget('セーブを読み込んだとき', _yomikomiFuda(k)),
                           ],
                         ),
                       ],

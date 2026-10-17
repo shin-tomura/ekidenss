@@ -45,7 +45,19 @@ class ShareExporter {
 
         if (box.isNotEmpty) {
           // 保存時はMap<dynamic, dynamic>をMap<String, dynamic>に変換してJSON化
-          final jsonString = jsonEncode(_convertMap(box.toMap()));
+          final dynamic naiyou = _convertMap(box.toMap());
+          // フリーメモ(大学id 13〜17 の文字の欄)は、相手に渡さないように空にして書き出す(2.0.3。
+          // メモはアプリ全体で1つで、読み込んだ側も自分のメモのまま。reset_ichiran.dart)
+          // (スロットには大学ごとのJSON(Map)が入っている。_convertMap で作り直した写しなので、
+          //  スロットの中身は変わらない。キーではなく中の id で見分ける)
+          if (baseName == 'univBox' && naiyou is Map) {
+            for (final dynamic univ in naiyou.values) {
+              if (univ is! Map) continue;
+              final dynamic id = univ['id'];
+              if (id is num && id >= 13 && id <= 17) univ['name_tanshuku'] = '';
+            }
+          }
+          final jsonString = jsonEncode(naiyou);
           final bytes = utf8.encode(jsonString);
           archive.addFile(ArchiveFile('$baseName.json', bytes.length, bytes));
         }

@@ -731,12 +731,15 @@ String _yuushouMoji(KoukouKirokuTeam t) {
 /// 全国高校駅伝の出場の回数目(「初出場」「3年連続5回目」「5年ぶり3回目」「5回目」。1.9.5)
 /// 記録を残し始めてからの回数(回数を0に戻した高校は、次に出たときが「初出場」)。
 /// 何年ぶりを残す前の記録では、あいだがあいた出場も「5回目」。回数を残す前の記録は空
-String _shutsujouMoji(KoukouKirokuTeam t) {
-  if (t.kaime < 1) return '';
-  if (t.kaime == 1) return '初出場';
-  if (t.renzoku >= 2) return '${t.renzoku}年連続${t.kaime}回目';
-  if (t.shutsujouBuri >= 2) return '${t.shutsujouBuri}年ぶり${t.kaime}回目';
-  return '${t.kaime}回目';
+String _shutsujouMoji(KoukouKirokuTeam t) => _shutsujouMojiSuu(t.kaime, t.renzoku, t.shutsujouBuri);
+
+/// 出場の回数目の文を、回数目・連続出場の年数・何年ぶりから作る(2.0.4。全国高校駅伝の結果を出す前の出場校の見込みにも使う)
+String _shutsujouMojiSuu(int kaime, int renzoku, int buri) {
+  if (kaime < 1) return '';
+  if (kaime == 1) return '初出場';
+  if (renzoku >= 2) return '$renzoku年連続$kaime回目';
+  if (buri >= 2) return '$buri年ぶり$kaime回目';
+  return '$kaime回目';
 }
 
 /// 出場の回数目と、[yuushou](1位)なら優勝の回数目をつないだ文(1.9.5)
@@ -2232,14 +2235,47 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
         Text('まだ行われていません。12月下旬に結果が出ます。出場校は、11月中旬の都道府県予選と地区大会で決まります。', style: _hosoku),
       ];
     }
-    final List<({int kouCode, String daihyou})> l = _shutsujouKou(k);
+    final List<({int kouCode, String daihyou, bool ken})> l = _shutsujouKou(k);
+    // 出場の回数目(12月下旬に回数を足す前の見込み。記事と同じ決め方)と、前回の全国の順位(2.0.4)
+    final Map<int, ({int kaime, int renzoku, int buri})> mikomi =
+        koukouShutsujouMikomi([for (final e in l) e.kouCode], k.nyuugakuNendo);
+    final Map<int, int> maeJuni = {};
+    for (final KoukouTaikaiKiroku r in _kiroku) {
+      if (r.nyuugakuNendo != k.nyuugakuNendo - 1) continue;
+      for (int j = 0; j < r.zenkoku.length; j++) {
+        maeJuni.putIfAbsent(r.zenkoku[j].kouCode, () => j + 1);
+      }
+      break;
+    }
+    // 1校の行(「天馬学園高(栃木)　県代表　3年連続5回目　前回2位」)
+    Widget gyou(({int kouCode, String daihyou, bool ken}) e) {
+      final ({int kaime, int renzoku, int buri})? m = mikomi[e.kouCode];
+      final String kaime = m == null ? '' : _shutsujouMojiSuu(m.kaime, m.renzoku, m.buri);
+      final int? mj = maeJuni[e.kouCode];
+      return Padding(
+        padding: const EdgeInsets.only(left: 12, top: 4),
+        child: Text(
+          [k.kouMei(e.kouCode), e.daihyou, if (kaime.isNotEmpty) kaime, if (mj != null) '前回$mj位'].join('　'),
+          style: _honbun,
+        ),
+      );
+    }
+
+    final List<({int kouCode, String daihyou, bool ken})> kenDai = [for (final e in l) if (e.ken) e];
+    final List<({int kouCode, String daihyou, bool ken})> chikuDai = [for (final e in l) if (!e.ken) e];
     return [
       Text('まだ行われていません。12月下旬に結果が出ます。都道府県予選と地区大会で決まった出場校(${l.length}校)です。', style: _hosoku),
-      for (final ({int kouCode, String daihyou}) e in l)
-        Padding(
-          padding: const EdgeInsets.only(left: 12, top: 4),
-          child: Text('${k.kouMei(e.kouCode)}　${e.daihyou}', style: _honbun),
-        ),
+      const Text('出場の回数目と前回の順位は、記録を残し始めてからのものです。', style: _hosoku),
+      Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: Text('都道府県代表(${kenDai.length}校)', style: _honbun),
+      ),
+      for (final e in kenDai) gyou(e),
+      Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: Text('地区代表(${chikuDai.length}校)', style: _honbun),
+      ),
+      for (final e in chikuDai) gyou(e),
       // 全国高校駅伝のコース(区間の距離と特徴。2.0.4)
       const Padding(
         padding: EdgeInsets.only(top: 12),
@@ -2255,13 +2291,14 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
 
   /// 都道府県予選と地区大会で決まった、全国高校駅伝の出場校(2.0.4。県代表は都道府県の順、地区代表は地区の順)
   /// 県代表は予選の1位、地区代表は地区大会の地区代表で、地区大会がない地区(北海道)は予選の2位
-  List<({int kouCode, String daihyou})> _shutsujouKou(KoukouTaikaiKiroku k) {
-    final List<({int kouCode, String daihyou})> l = [];
+  /// [ken] は県代表か(2.0.4。一覧を県代表と地区代表に分けるため)
+  List<({int kouCode, String daihyou, bool ken})> _shutsujouKou(KoukouTaikaiKiroku k) {
+    final List<({int kouCode, String daihyou, bool ken})> l = [];
     final List<KoukouYosenKen>? yo = k.yosen;
     if (yo == null) return l;
     for (int ken = 0; ken < yo.length; ken++) {
       for (final KoukouYosenTeam t in yo[ken].teams) {
-        if (t.juni == 1) l.add((kouCode: t.kouCode, daihyou: '県代表'));
+        if (t.juni == 1) l.add((kouCode: t.kouCode, daihyou: '県代表', ken: true));
       }
     }
     final List<List<KoukouChikuTeam>>? ch = k.chiku;
@@ -2274,12 +2311,12 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
       if (kens.length <= 1) {
         if (kens.length == 1 && kens.first < yo.length) {
           for (final KoukouYosenTeam t in yo[kens.first].teams) {
-            if (t.juni == 2) l.add((kouCode: t.kouCode, daihyou: daihyou));
+            if (t.juni == 2) l.add((kouCode: t.kouCode, daihyou: daihyou, ken: false));
           }
         }
       } else if (ch != null && c < ch.length) {
         for (final KoukouChikuTeam t in ch[c]) {
-          if (t.daihyou == 2) l.add((kouCode: t.kouCode, daihyou: daihyou));
+          if (t.daihyou == 2) l.add((kouCode: t.kouCode, daihyou: daihyou, ken: false));
         }
       }
     }

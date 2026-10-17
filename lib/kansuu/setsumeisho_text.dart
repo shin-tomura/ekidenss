@@ -83,6 +83,7 @@ List<SetsumeishoGroup> setsumeishoGroupList() {
       SetsumeishoKoumoku(_gakunaiKiroku),
       SetsumeishoKoumoku(_kantokuCoach),
       SetsumeishoKoumoku(_koukouJidai),
+      SetsumeishoKoumoku(_reset),
       SetsumeishoKoumoku(_pcBan),
       SetsumeishoKoumoku(_saigoni),
       SetsumeishoKoumoku(_privacy),
@@ -298,6 +299,20 @@ const ShiyouSetsu _koukouJidai = ShiyouSetsu('出身校と高校時代', [
   '　・過去の大会の記録は、そのときの校名で出ます。回数は改名後も残ります。',
   '　・編集の画面で、その高校の出場回数と優勝回数を0に戻せます。',
   '・設定タブの「趣味・高校時代の表示設定」で、表示しないようにできます。',
+]);
+
+// リセットしてやり直す(2.0.3。何を残すかは lib/kansuu/reset_ichiran.dart の一覧で決める)
+const ShiyouSetsu _reset = ShiyouSetsu('リセットしてやり直す', [
+  '・設定タブの「名声・育成力と設定を残してやり直す」と「全てリセットしてやり直す」で、1年目からやり直せます。',
+  '・基本的には「名声・育成力と設定を残してやり直す」がおすすめです。',
+  '　・選手・記録・年月日などのゲームの進み具合だけを消します。',
+  '　・名声・育成力・名声の横並びと、レースや育成などの設定は残ります。',
+  '・「全てリセットしてやり直す」は、名声・育成力と設定も初期値に戻します。',
+  '　・本当に初期値に戻したいときだけ選んでください。',
+  '・どちらのリセットでも、表示の好み・大学名・メモ・カスタム駅伝の名前とコースは残ります。',
+  '　・高校名鑑の編集とお気に入りも残ります。アルバム(卒業したOB)は消えます。',
+  '・難易度と総監督をする大学は、リセットのあとに選び直します。',
+  '・何が残り、何が戻るかは、設定タブの一番上の「リセットで残るもの・戻るもの」で見られます。',
 ]);
 
 const ShiyouSetsu _pcBan = ShiyouSetsu('PC版(箱庭小駅伝・箱庭小駅伝2)のプレイ経験のある方へ', [

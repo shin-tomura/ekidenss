@@ -74,14 +74,13 @@ import 'package:ekiden/kansuu/taikai_chouki.dart'; // 大会の長い記録の�
 import 'package:ekiden/kansuu/mokuhyou_kimekata.dart'; // 目標順位の決め方の移行処理(2.0.1)
 import 'package:ekiden/kansuu/kyouka_project.dart'; // 強化プロジェクト(2.0.1)
 import 'package:ekiden/kansuu/shushou.dart'; // 主将(2.0.1)
-import 'package:ekiden/kansuu/meisei_yokonarabi.dart'
+import 'package:ekiden/kansuu/reset_ichiran.dart'
     show
-        yokonarabiAtai,
-        yokonarabiAtaiIreru,
-        yokonarabiGroupAtai,
-        yokonarabiGroupAtaiIreru; // 名声の横並びの設定を、名声と育成力を維持するリセットで残す(2.0.3)
-import 'package:ekiden/kansuu/meisei_kotei.dart'
-    show meiseiKoteiAtai, meiseiKoteiAtaiIreru; // コンピュータの大学の名声の固定も残す(2.0.3)
+        ResetDougu,
+        ResetBunrui,
+        resetNokosu,
+        resetMaeniToru,
+        resetAtoDeModosu; // リセットで残すもの・戻すものの一覧(2.0.3)
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 // ★ここに buildAppTheme() 関数を記述する★
@@ -1375,6 +1374,11 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     // ★★★ フラグを設定 END ★★★
 
     print('現在モード10: 初期処理を実行中...');
+    // リセットで残すものと戻すものは、一覧(reset_ichiran.dart)で決める(2.0.3)。
+    // 残すことになっている設定の値を先に取っておき、今まで通りのリセットのあとで書き戻す
+    final ResetDougu? resetDougu = ResetDougu.yomu();
+    final Map<int, List<Object?>> resetNokoshi =
+        resetDougu == null ? {} : resetMaeniToru(resetDougu, zenbu: true);
     // ここでmode10で実行したい実際の処理を書く
 
     // Boxからデータを読み込む
@@ -1445,8 +1449,16 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     //final Box<Ghensuu> _ghensuuBox = Hive.box<Ghensuu>('ghensuuBox');
     await GhensuuShokika(_ghensuuBox);
     print('GhensuuShokika完了');
-    await ShokitiUnivdata(false, _univBox);
+    // 名声と育成力(勢力図)は、ShokitiUnivdata の維持の印で残すか決める(一覧の分類どおり。2.0.3)
+    await ShokitiUnivdata(
+      resetNokosu(ResetBunrui.seiryoku, zenbu: true),
+      _univBox,
+    );
     print('ShokitiUnivdata完了');
+    // 戻す設定を一覧の初期値にし、残す設定を書き戻す(新しい選手を作る前に。reset_ichiran.dart。2.0.3)
+    if (resetDougu != null) {
+      await resetAtoDeModosu(resetDougu, resetNokoshi, zenbu: true);
+    }
     await SenshuShokitiSetteiByGakunen(0); //
     print('SenshuShokitiSetteiByGakunen完了');
 
@@ -1573,6 +1585,11 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     // ★★★ フラグを設定 END ★★★
 
     print('現在モード101010: 初期処理を実行中...');
+    // リセットで残すものと戻すものは、一覧(reset_ichiran.dart)で決める(2.0.3)。
+    // 残すことになっている設定の値を先に取っておき、今まで通りのリセットのあとで書き戻す
+    final ResetDougu? resetDougu = ResetDougu.yomu();
+    final Map<int, List<Object?>> resetNokoshi =
+        resetDougu == null ? {} : resetMaeniToru(resetDougu, zenbu: false);
     // ここでmode10で実行したい実際の処理を書く
 
     // Boxからデータを読み込む
@@ -1587,13 +1604,6 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     // Boxからデータを読み込む
     final KantokuData? kantoku = _kantokuBox.get('KantokuData');
     if (kantoku != null) {
-      // 名声の横並びの設定([86]と大学のグループ[87][88])と、コンピュータの大学の名声の固定([89])は、
-      // 名声と一緒に残す(2.0.3。凝った世界観をリセットのたびに作り直さなくてよいように。
-      // meisei_yokonarabi.dart・meisei_kotei.dart)
-      final int yokonarabi = yokonarabiAtai(kantoku);
-      final int yokonarabiGroup0 = yokonarabiGroupAtai(kantoku, 0);
-      final int yokonarabiGroup1 = yokonarabiGroupAtai(kantoku, 1);
-      final int meiseiKoteiMae = meiseiKoteiAtai(kantoku);
       for (int i = 0; i < TEISUU.UNIVSUU * 3; i++) {
         kantoku.rid[i] = 0;
         kantoku.yobiint0[i] = 0;
@@ -1603,10 +1613,6 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         kantoku.yobiint4[i] = 0;
         kantoku.yobiint5[i] = 0;
       }
-      yokonarabiAtaiIreru(kantoku, yokonarabi);
-      yokonarabiGroupAtaiIreru(kantoku, 0, yokonarabiGroup0);
-      yokonarabiGroupAtaiIreru(kantoku, 1, yokonarabiGroup1);
-      meiseiKoteiAtaiIreru(kantoku, meiseiKoteiMae);
       kantoku.yobiint2[2] = 25;
       kantoku.yobiint2[3] = 70;
       kantoku.yobiint2[4] = 50;
@@ -1654,8 +1660,16 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     //final Box<Ghensuu> _ghensuuBox = Hive.box<Ghensuu>('ghensuuBox');
     await GhensuuShokika(_ghensuuBox);
     print('GhensuuShokika完了');
-    await ShokitiUnivdata(true, _univBox);
+    // 名声と育成力(勢力図)は、ShokitiUnivdata の維持の印で残すか決める(一覧の分類どおり。2.0.3)
+    await ShokitiUnivdata(
+      resetNokosu(ResetBunrui.seiryoku, zenbu: false),
+      _univBox,
+    );
     print('ShokitiUnivdata完了');
+    // 戻す設定を一覧の初期値にし、残す設定を書き戻す(新しい選手を作る前に。reset_ichiran.dart。2.0.3)
+    if (resetDougu != null) {
+      await resetAtoDeModosu(resetDougu, resetNokoshi, zenbu: false);
+    }
     await SenshuShokitiSetteiByGakunen(0); //
     print('SenshuShokitiSetteiByGakunen完了');
 

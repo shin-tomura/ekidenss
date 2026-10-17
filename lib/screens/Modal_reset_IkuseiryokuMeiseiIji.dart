@@ -3,7 +3,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ekiden/ghensuu.dart'; // Ghensuuクラスをインポート
 import 'package:ekiden/constants.dart'; // TEISUU, HENSUUクラスをインポート
 import 'package:ekiden/screens/reset_ichiran_gamen.dart'
-    show resetIchiranGamenHiraku; // リセットとロードで残るもの・戻るもの(2.0.3)
+    show resetIchiranGamenHiraku; // リセット・ロード・QRで残るもの・変わるもの(2.0.3)
 
 // ------------------------------------------------------------
 // 「名声・育成力と設定を残してやり直す」の確認の画面(2.0.2までは「名声と育成力は維持しつつリセットしてやり直す」)

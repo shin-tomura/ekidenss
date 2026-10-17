@@ -85,6 +85,10 @@ class SettingsQrProcessor {
   // --- 1. データ抽出/シリアライズ (エクスポート用) ---
 
   // 指定された部門のデータをJSON Mapとして抽出
+  // ・ここに項目を足したり減らしたりしたら、lib/kansuu/reset_ichiran.dart の一覧の QR の印(qr・qrHosoku)も
+  //   合わせる(2.0.3)。印は一覧表の画面とQRコードの画面の内容一覧に出す説明用で、QRコードの中身はここで決まる
+  // ・監督データの予備の配列は「k_yobiint2_58_62」(yobiint2 の[58]〜[62])の形の名前で書き出す。
+  //   開発中のビルドでは、この名前から番号を読み取って一覧の印と比べる(qrKakidashiYobiBangou・resetQrZure)
   Map<String, dynamic> _extractDepartmentData(SettingsDepartment department) {
     final kantoku = Hive.box<KantokuData>('kantokuBox').get('KantokuData')!;
     final album = Hive.box<Album>('albumBox').get('AlbumData')!;
@@ -160,6 +164,9 @@ class SettingsQrProcessor {
       data['ud_name_tanshuku_9'] = sortedUnivData[9].name_tanshuku;
       // 調子関連設定(int)
       data['k_yobiint2_2_11'] = kantoku.yobiint2.sublist(2, 12);
+      // コンピュータチームの体調不良発生スイッチ(int) [21] (2.0.3で追加。調子関連設定の画面にある設定。
+      // 1=発生する(初期値)・0=発生しない。2.0.2までは入れていなかった)
+      data['k_yobiint2_21'] = kantoku.yobiint2[21];
       // 金銀支給量設定(int)
       data['k_yobiint2_12'] = kantoku.yobiint2[12];
       // 金銀支給量設定の難易度ごとの割合(int) yobiint3[70]〜[73] (1.9.1で追加)
@@ -564,6 +571,12 @@ class SettingsQrProcessor {
         if (kantoku.yobiint2[11] < 0 || kantoku.yobiint2[11] > 10) {
           kantoku.yobiint2[11] = 10;
         }
+      }
+      // コンピュータチームの体調不良発生スイッチ(int) kantoku.yobiint2[21] (2.0.3)
+      //   1=発生する(初期値)・0=発生しない(古いQRコードには含まれていないので、そのときは今の設定のまま)
+      final dynamic yobiint2_21 = dataMap['k_yobiint2_21'];
+      if (yobiint2_21 is int && (yobiint2_21 == 0 || yobiint2_21 == 1)) {
+        kantoku.yobiint2[21] = yobiint2_21;
       }
 
       // 金銀支給量設定(int)
@@ -1067,4 +1080,28 @@ class SettingsQrProcessor {
         ) ??
         false;
   }
+}
+
+/// (開発用)QRコードに書き出している、監督データの予備の配列の番号(「配列:番号」の形。「2:58」など。2.0.3)
+/// 全部の部門の書き出す項目の名前(「k_yobiint2_58_62」なら yobiint2 の[58]〜[62])から読み取る。
+/// lib/kansuu/reset_ichiran.dart の一覧の QR の印との食い違いの見張り(resetQrZure)で使う。
+/// データが読めないときは例外になるので、呼び出し側で受け止める
+Set<String> qrKakidashiYobiBangou(BuildContext context) {
+  final SettingsQrProcessor p = SettingsQrProcessor(context);
+  final RegExp kata = RegExp(r'^k_yobiint([2-5])_(\d+)(?:_(\d+))?');
+  final Set<String> bangou = {};
+  for (final SettingsDepartment d in SettingsDepartment.values) {
+    for (final String kagi in p._extractDepartmentData(d).keys) {
+      final RegExpMatch? m = kata.firstMatch(kagi);
+      if (m == null) continue;
+      final int h = int.parse(m.group(1)!);
+      final int kara = int.parse(m.group(2)!);
+      final String? madeMoji = m.group(3);
+      final int made = madeMoji == null ? kara : int.parse(madeMoji);
+      for (int i = kara; i <= made; i++) {
+        bangou.add('$h:$i');
+      }
+    }
+  }
+  return bangou;
 }

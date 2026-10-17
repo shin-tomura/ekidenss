@@ -6,6 +6,10 @@ import 'qr_processor.dart';
 import 'qr_display_modal.dart';
 //import 'qr_camera_scanner_modal.dart';
 import 'qr_gallery_scanner_modal.dart';
+import 'package:ekiden/kansuu/reset_ichiran.dart'
+    show ResetKoumoku, ResetQr, resetIchiran, resetMidashiJun; // 内容の一覧(2.0.3)
+import 'package:ekiden/screens/reset_ichiran_gamen.dart'
+    show resetIchiranGamenHiraku; // リセット・ロード・QRで残るもの・変わるもの(2.0.3)
 
 class SettingsQrPage extends StatefulWidget {
   const SettingsQrPage({super.key});
@@ -186,6 +190,21 @@ class _SettingsQrPageState extends State<SettingsQrPage> {
 
   // --- 既存ウィジェット (色の設定は元のコードのまま維持) ---
 
+  /// QRコードで入出力する設定の一覧の文(2.0.3)
+  /// reset_ichiran.dart の一覧の、QRの値・一部QRの値の行を、見出しの順に並べる(補足があれば次の行に添える)
+  String _qrNaiyouIchiran() {
+    final List<ResetKoumoku> ichiran = resetIchiran();
+    final StringBuffer b = StringBuffer();
+    for (final String midashi in resetMidashiJun) {
+      for (final ResetKoumoku k in ichiran) {
+        if (k.midashi != midashi || k.qr == ResetQr.imanomama) continue;
+        b.write('・${k.mei}\n');
+        if (k.qrHosoku.isNotEmpty) b.write('　${k.qrHosoku}\n');
+      }
+    }
+    return b.toString().trimRight();
+  }
+
   Widget _buildUserDescriptionArea() {
     return Container(
       padding: const EdgeInsets.all(12.0),
@@ -211,43 +230,28 @@ class _SettingsQrPageState extends State<SettingsQrPage> {
             '複数枚のQRコードを読み込む際は、途中で中断しないようにご注意ください。\n\n'
             '駅伝コースのQRコードは、その駅伝の区間数・区間距離・登り具合・下り具合・アップダウン回数の情報を扱います。\n\n'
             '駅伝タイムのQRコードは、全体・区間ごとタイム調整のうち、その駅伝の各区間のタイム調整の情報を格納しています。\n\n'
-            '各種設定のQRコードは、以下の内容を含みます。ただし、意図せず個人情報が含まれてしまう可能性を考慮し、大学名とカスタム駅伝名称については入出力されません。\n'
-            '・実力発揮度設定\n'
-            '・難易度「極」「天」設定\n'
-            '・難易度(鬼、難しいなど)\n'
-            '・難易度変更2(レベル0から9)\n'
-            '・育成力\n'
-            '・名声\n'
-            '・入学時名声影響度設定\n'
-            '・名声の横並び設定(大学のグループと、コンピュータの大学の名声の固定も含む)\n'
-            '・目標順位決め方設定\n'
-            '・カスタム駅伝開催するしない\n'
-            '・カスタム駅伝獲得名声倍率\n'
-            '・カスタム駅伝の出場制限(出場できる学年と留学生の出場)\n'
-            '・駅伝名声設定\n'
-            '・留学生受け入れ設定\n'
-            '・学連選抜モチベーション設定\n'
-            '・最適解区間配置確率設定\n'
-            '・戦略的エントリー確率設定\n'
-            '・全体・区間ごとタイム調整のうちの全体のタイム調整\n'
-            '・長距離タイム抑制設定\n'
-            '・調子関連設定(コンピュータチームの体調不良発生スイッチは除く)\n'
-            '・金銀支給量設定(難易度ごとの割合を含む)\n'
-            '・記録会時期設定\n'
-            '・年間強化練習効果設定\n'
-            '・コンピュータ金銀使用設定(ON/OFF・大学ごとの支給レベルと銀の使い道)\n'
-            '・コンピュータスカウト設定(ON/OFF・スカウトの形・周回数・積極性・ラウンド回数・評価の割合・大学ごとのスカウト方針と性格と評価の割合と積極性)\n'
-            '・目標順位・指示の補正設定(主将の特典を含む)\n'
-            '・能力のタイムへの影響度設定\n'
-            '・学連選抜の監督をするかどうか\n'
-            '・区間配置の方針(大学ごと。最適解区間配置の使い方を含む)\n'
-            '・正月駅伝予選の指示と集団走(コンピュータの大学)\n'
-            '・強化プロジェクト設定\n'
-            '・監督の母校パイプ設定\n'
-            '・集団走設定\n'
-            '・成長タイプ設定(限界突破の起こり方・13分台の新入生の限界突破を含む)\n',
-
+            'QRコードで入出力するのは、以下の設定です。駅伝コースと区間ごとのタイム調整は駅伝ごとのQRコードで、そのほかは各種設定のQRコードで入出力します。'
+            'ただし、意図せず個人情報が含まれてしまう可能性を考慮し、大学名とカスタム駅伝名称については入出力されません。',
             style: TextStyle(color: Colors.white70, fontSize: 14),
+          ),
+          const SizedBox(height: 4),
+          // 内容の一覧は、lib/kansuu/reset_ichiran.dart の一覧の QR の印から作る(2.0.3。2.0.2までは手書きのリスト)。
+          // 印は説明用で、QRコードの中身は qr_processor.dart で決まる。QRコードに項目を足したら、印も合わせる
+          Text(
+            _qrNaiyouIchiran(),
+            style: const TextStyle(color: Colors.white70, fontSize: 14),
+          ),
+          // リセット・ロード・QRで残るもの・変わるものの一覧表(reset_ichiran_gamen.dart)
+          TextButton(
+            onPressed: () => resetIchiranGamenHiraku(context),
+            child: const Text(
+              'リセット・ロード・QRで残るもの・変わるもの',
+              style: TextStyle(
+                color: Color.fromARGB(255, 0, 255, 0),
+                decoration: TextDecoration.underline,
+                decorationColor: Color.fromARGB(255, 0, 255, 0),
+              ),
+            ),
           ),
           // 必要に応じて、ここでTextFieldを配置して編集可能にすることも可能です
         ],

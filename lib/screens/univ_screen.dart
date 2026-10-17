@@ -38,7 +38,7 @@ import 'package:ekiden/screens/Modal_koukouMeikan.dart'
     show koukouPageHirakuBan; // 監督の出身校から高校名鑑の高校のページを開く(2.0.1)
 import 'package:ekiden/kansuu/shushou.dart' show shushouIdUniv; // 主将(2.0.1)
 import 'package:ekiden/screens/reset_ichiran_gamen.dart'
-    show resetIchiranGamenHiraku; // リセットとロードで残るもの・戻るもの(2.0.3。全てリセットの確認の画面から)
+    show resetIchiranGamenHiraku; // リセット・ロード・QRで残るもの・変わるもの(2.0.3。全てリセットの確認の画面から)
 import 'package:ekiden/screens/Modal_reset_IkuseiryokuMeiseiIji.dart'
     show ModalReset_IkuseiryokuMeiseiIji; // 設定を残してやり直す方に切り替える(2.0.3)
 import 'package:ekiden/screens/meisei_yokonarabi_settei.dart'

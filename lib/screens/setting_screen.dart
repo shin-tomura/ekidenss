@@ -27,7 +27,7 @@ import 'package:ekiden/screens/yosen_com_siji_settei.dart'; // 正月駅伝予�
 import 'package:ekiden/screens/kyouka_project_settei.dart'; // 強化プロジェクト設定(2.0.1)
 import 'package:ekiden/screens/bokou_pipe_settei.dart'; // 監督の母校パイプ設定(2.0.1)
 import 'package:ekiden/screens/reset_ichiran_gamen.dart'
-    show resetIchiranGamenHiraku; // リセットとロードで残るもの・戻るもの(2.0.3)
+    show resetIchiranGamenHiraku; // リセット・ロード・QRで残るもの・変わるもの(2.0.3)
 import 'package:ekiden/screens/meisei_yokonarabi_settei.dart'
     show meiseiYokonarabiSetteiHiraku; // 名声の横並び設定(2.0.3)
 import 'package:ekiden/screens/Modal_TrainingEffect.dart';
@@ -191,11 +191,11 @@ class _SettingScreenState extends State<SettingScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start, // テキストを左寄せにする
         children: [
-          // リセットとロード(セーブデータの読み込み)で残るもの・戻るものの一覧(2.0.3。reset_ichiran_gamen.dart)
+          // リセット・ロード(セーブデータの読み込み)・QRコードの読み込みで残るもの・変わるものの一覧(2.0.3。reset_ichiran_gamen.dart)
           TextButton(
             onPressed: () => resetIchiranGamenHiraku(context),
             child: Text(
-              "リセットとロードで残るもの・戻るもの",
+              "リセット・ロード・QRで残るもの・変わるもの",
               style: TextStyle(
                 color: const Color.fromARGB(255, 0, 255, 0),
                 decoration: TextDecoration.underline,

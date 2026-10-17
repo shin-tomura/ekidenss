@@ -1101,9 +1101,9 @@ Future<void> main() async {
     //save_load_screenの中の _importFromSlot の中にもあるので、そちらも変更すること！
     final versionValue = int.tryParse(sortedUnivData[7].name_tanshuku);
     if (versionValue == null ||
-        versionValue < 22030 ||
+        versionValue < 22040 ||
         versionValue > 999999999) {
-      sortedUnivData[7].name_tanshuku = "22030"; //バージョン番号
+      sortedUnivData[7].name_tanshuku = "22040"; //バージョン番号
       await sortedUnivData[7].save();
     }
 
@@ -3175,6 +3175,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
       ghensuu.month = 1;
       ghensuu.year += 1;
     }
+
+    // 高校の大会(2.0.4。7月下旬に来年の新入生の世代の高校総体・都道府県予選・地区大会・全国高校駅伝を
+    // まとめて計算し、11月中旬に予選と地区大会、12月下旬に全国高校駅伝の結果を出す。koukou.dart)
+    await koukouTaikaiHinichi(ghensuu);
 
     //調子設定
     final Random random = Random();

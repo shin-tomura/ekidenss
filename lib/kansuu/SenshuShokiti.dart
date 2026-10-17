@@ -8,6 +8,8 @@ import 'package:ekiden/kansuu/RironTime_Nyuugakuji.dart';
 import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/kansuu/joukai.dart';
 import 'package:ekiden/kansuu/kingin_kiroku.dart'; // 金銀の記録(1.9.9)
+import 'package:ekiden/kansuu/shinnyuusei_dodai.dart'; // 新入生の土台(2.0.4)
+import 'package:ekiden/kansuu/koukou.dart' show koukouRainenDodaiYomu; // 7月下旬に先に決めた新入生の土台(2.0.4)
 
 /// SenshuData Box 内の選手をループし、指定した学年の選手に特定の処理を適用する関数。
 ///
@@ -55,6 +57,11 @@ Future<void> SenshuShokitiSetteiByGakunen(
       for (final s in allSenshu)
         if (s.gakunen != targetGakunen) s.name,
   };
+  // 4月の新入生(1年生)に使う、7月下旬に高校の大会のために先に決めた来年の新入生の土台
+  // (2.0.4。koukou.dart。なければ空で、ここで引く)
+  final List<ShinnyuuseiDodai> dodaiList =
+      targetGakunen == 1 ? koukouRainenDodaiYomu() : const <ShinnyuuseiDodai>[];
+  int dodaiI = 0;
   // 取得した全ての選手データをループ処理します
   for (var senshu in allSenshu) {
     /*for (final entry in senshuBox.toMap().entries) {
@@ -73,46 +80,19 @@ Future<void> SenshuShokitiSetteiByGakunen(
     if (targetGakunen == 0 || senshu.gakunen == targetGakunen) {
       // 卒業した選手の枠を新しい選手に作り直すので、金銀の記録を消す(1.9.9。kingin_kiroku.dart)
       senshu.name_tanshuku = kinginKirokuNashi;
-      int r_mae = 0;
-      int r_ato = 0;
-      // 在籍中の選手と名字・名前の両方が同じになったら選び直す(最大50回)
-      for (int tries = 0; tries < 50; tries++) {
-        r_mae = random.nextInt(TEISUU.SUU_NAMEMAE);
-        r_ato = random.nextInt(TEISUU.SUU_NAMEATO);
-        // 名字が3文字以上の場合は、3文字以上の下の名前にならないよう選び直す(長くなりすぎないように)
-        if (r_mae < ghensuu.name_mae.length &&
-            ghensuu.name_mae[r_mae].runes.length >= 3) {
-          for (
-            int i = 0;
-            i < 20 &&
-                r_ato < ghensuu.name_ato.length &&
-                ghensuu.name_ato[r_ato].runes.length >= 3;
-            i++
-          ) {
-            r_ato = random.nextInt(TEISUU.SUU_NAMEATO);
-          }
-        }
-        if (r_mae >= ghensuu.name_mae.length ||
-            r_ato >= ghensuu.name_ato.length) {
-          break; // 範囲外は下のエラー処理に任せる
-        }
-        if (!zaisekiNames.contains(
-          '${ghensuu.name_mae[r_mae]} ${ghensuu.name_ato[r_ato]}',
-        )) {
-          break;
-        }
-      }
-
-      // name_maeとname_atoリストから名前を選び、結合して設定
-      // Swiftコードは `gh[0].name_mae[r_mae]` だったので、Dartでは `ghensuu.name_mae[r_mae]`
-      // ただし、リストのインデックス範囲外アクセスを防ぐためにチェックを加えるのが安全です
-      if (r_mae < ghensuu.name_mae.length && r_ato < ghensuu.name_ato.length) {
-        senshu.name = '${ghensuu.name_mae[r_mae]} ${ghensuu.name_ato[r_ato]}';
+      // 新入生の土台(名前・素質の引き方・入学時5000m・能力値の一部・出身地と趣味。2.0.4。shinnyuusei_dodai.dart)
+      // 7月下旬に先に決めた土台があれば順に使い(高校の情報も入っている。koukou.dart)、なければここで引く
+      // (引き方は2.0.3までと同じ。在籍中の選手と名字・名前の両方が同じにならないように選ぶ)
+      final ShinnyuuseiDodai dodai = dodaiI < dodaiList.length
+          ? dodaiList[dodaiI++]
+          : shinnyuuseiDodaiHiku(random, ghensuu, zaisekiNames);
+      final String? dodaiName = dodai.name;
+      if (dodaiName != null) {
+        senshu.name = dodaiName;
         zaisekiNames.add(senshu.name); // 同じ回に作る他の選手とも重ならないように
-        //print(' -count=${count} ID ${senshu.id}: 名前を ${senshu.name} に設定しました。');
       } else {
         print(' - ID ${senshu.id}: 名前生成エラー: インデックスが範囲外です。');
-        // エラー時のフォールバックとして、デフォルト名を維持するか、別の処理を検討
+        // エラー時のフォールバックとして、デフォルト名を維持する
       }
 
       // 各能力値の初期値
@@ -143,84 +123,22 @@ Future<void> SenshuShokitiSetteiByGakunen(
         }
       }
 
-      bool tokubetuflag = false;
-      int tokubetusisuu = 0;
-      bool juusanpundaiflag = false; // 13分台の新入生(1.8.5)
+      // 素質の引き方と素質は土台で決めてある(2.0.4)
+      final bool tokubetuflag = dodai.kuji == dodaiKujiTokubetu;
+      final int tokubetusisuu = tokubetuflag ? dodai.sositu : 0;
       bool itsuzaiflag = false; // 隠れた逸材(1.8.8。joukai.dart)
       senshu.hirou = 0;
       {
         //選手ごとの成長力とか成長のスタート地点とか
+        // (a・b・素質・素質ボーナスの計算は2.0.3までと同じ。shinnyuusei_dodai.dart の shinnyuuseiSosituSettei)
         final Random random = Random();
-        int aInt = 0;
-        int tempRand = 0;
-        int aMinInt = 0;
-
-        if (random.nextInt(1500) < 10) {
-          tokubetuflag = true;
-          tokubetusisuu = random.nextInt(51);
-          senshu.hirou = 2;
-          // 13分20・30台大学入学の条件
-          senshu.sositu_bonus = TEISUU.SOSITU_BONUS; //-100
-          tempRand = tokubetusisuu + 1500; // 1550から1600までの乱数
-
-          // a_min_intの計算 (temprand=1550の場合のa_min_int)
-          aMinInt =
-              (1550.0 * 1550.0 * 0.0333 - 1550.0 * 114.25 + senshu.magicnumber)
-                  .toInt();
-
-          final double tani = 1000.0 / (1680.0 - 1550.0);
-
-          // a_intの計算
-          aInt = aMinInt + ((tempRand - 1550) * tani).toInt();
-
-          senshu.a = aInt * 0.000000001;
-          senshu.b = 1645.0 * 0.0001; // 固定値
-          senshu.sositu = tempRand;
-        } else if (random.nextInt(100) < TEISUU.KAKURITU13PUNDAINYUUGAKU) {
-          // 13分台大学入学の条件分岐
-          juusanpundaiflag = true;
-          senshu.sositu_bonus = TEISUU.SOSITU_BONUS; //-100
-          tempRand = random.nextInt(51) + 1550; // 1550から1600までの乱数
-
-          // a_min_intの計算 (temprand=1550の場合のa_min_int)
-          aMinInt =
-              (1550.0 * 1550.0 * 0.0333 - 1550.0 * 114.25 + senshu.magicnumber)
-                  .toInt();
-
-          final double tani = 1000.0 / (1680.0 - 1550.0);
-
-          // a_intの計算
-          aInt = aMinInt + ((tempRand - 1550) * tani).toInt();
-
-          senshu.a = aInt * 0.000000001;
-          senshu.b = 1645.0 * 0.0001; // 固定値
-          senshu.sositu = tempRand;
-        } else {
-          senshu.sositu_bonus = 0;
-          tempRand = random.nextInt(80) + 1601; // 1601から1680までの乱数
-
-          // a_min_intの計算 (temprand=1550の場合のa_min_int)
-          aMinInt =
-              (1550.0 * 1550.0 * 0.0333 - 1550.0 * 114.25 + senshu.magicnumber)
-                  .toInt();
-
-          final double tani1 = 1000.0 / (1680.0 - 1550.0); // 最初の区間の単位
-          final double tani2 = 3000.0 / (1680.0 - 1600.0); // 次の区間の単位
-
-          // a_intの計算
-          aInt =
-              aMinInt +
-              ((1600.0 - 1550.0) * tani1).toInt() +
-              ((tempRand - 1600.0) * tani2).toInt();
-
-          senshu.a = aInt * 0.000000001;
-          senshu.b = 1645.0 * 0.0001; // 固定値
-          senshu.sositu = tempRand;
-          // 13分台でない新入生のうちitsuzaiWariai%を、隠れた逸材にする(1.8.8。joukai.dart)
-          // (入学時5000mの記録・能力値は、ここで決めた素質のまま決め、上限を決めたあとで基本走力と上限を置き換える)
-          if (random.nextInt(100) < itsuzaiWariai) {
-            itsuzaiflag = true;
-          }
+        final ({int aInt, int aMinInt}) ai = shinnyuuseiSosituSettei(senshu, dodai.kuji, dodai.sositu);
+        final int aInt = ai.aInt;
+        final int aMinInt = ai.aMinInt;
+        // 13分台でない新入生のうちitsuzaiWariai%を、隠れた逸材にする(1.8.8。joukai.dart)
+        // (入学時5000mの記録・能力値は、ここで決めた素質のまま決め、上限を決めたあとで基本走力と上限を置き換える)
+        if (dodai.kuji == dodaiKujiFutsuu && random.nextInt(100) < itsuzaiWariai) {
+          itsuzaiflag = true;
         }
 
         // 素質が1600を超える場合の追加処理
@@ -262,14 +180,9 @@ Future<void> SenshuShokitiSetteiByGakunen(
         5000.0,
         senshu,
       );
-      // 13分台の新入生の入学時5000mは、13分35秒〜13分59秒に広げる(遅いほど多い。1.8.5)
+      // 入学時5000mは土台の値にする(土台と同じ計算。13分台の新入生は13分35秒〜13分59秒に広げた値。1.8.5・2.0.4)
       // (RironTime_Nyuugakuji は a・b を書き換えるので、今まで通り呼んでから記録だけ置き換える)
-      if (juusanpundaiflag) {
-        senshu.kiroku_nyuugakuji_5000 = nyuugakuji5000Juusanpundai(
-          senshu.sositu,
-          random,
-        );
-      }
+      senshu.kiroku_nyuugakuji_5000 = dodai.t5;
       // 基本走力の上限を、入学時5000mの記録で決める(1.8.5。詳しくは joukai.dart)
       // (入学時の基本走力はどの選手も上限より遅いので、今まで通り育成で上限に向かって伸びる)
       senshu.magicnumber = joukaiMagicnumberFromNyuugakuji5000(
@@ -292,36 +205,11 @@ Future<void> SenshuShokitiSetteiByGakunen(
         senshu.gakunaijuni_bestkiroku[i] = TEISUU.DEFAULTJUNI;
       }
       senshu.time_bestkiroku[0] = senshu.kiroku_nyuugakuji_5000;
-      senshu.choukyorinebari = random.nextInt(99) + 1; // 1から99までの乱数を生成
+      senshu.choukyorinebari = dodai.nebari; // 1から99まで(土台で引いてある。2.0.4)
 
-      {
-        const int bunbo = 1680 - 1550; // 分母
-        final int bunsi = 1680 - senshu.sositu; // 分子
-
-        final double ritu = bunsi.toDouble() / bunbo.toDouble(); // 比率を計算
-
-        int kotae = (100 * ritu).toInt(); // 整数に変換して100を掛ける
-
-        // 最小値を1に制限
-        if (kotae < 1) {
-          kotae = 1;
-        }
-
-        // 最大値を99に制限
-        if (kotae > 99) {
-          kotae = 99;
-        }
-
-        senshu.spurtryoku = kotae; // 結果を選手のspurtryokuに設定
-
-        senshu.paceagesagetaiouryoku = kotae - 10 + (random.nextInt(21) - 10);
-        if (senshu.paceagesagetaiouryoku > 89) {
-          senshu.paceagesagetaiouryoku = 89;
-        }
-        if (senshu.paceagesagetaiouryoku < 1) {
-          senshu.paceagesagetaiouryoku = 1;
-        }
-      }
+      // スパート力(素質から)とペース変動対応力(スパート力の近く)は、土台で決めてある(2.0.4)
+      senshu.spurtryoku = dodai.spurt;
+      senshu.paceagesagetaiouryoku = dodai.pace;
 
       senshu.kegaflag = 0;
 
@@ -358,20 +246,12 @@ Future<void> SenshuShokitiSetteiByGakunen(
       senshu.kazetaisei = random.nextInt(99) + 1;
       //senshu.atusataisei = random.nextInt(99) + 1;
       //senshu.samusataisei = random.nextInt(99) + 1;
-      senshu.noboritekisei = random.nextInt(99) + 1;
-      senshu.kudaritekisei = random.nextInt(99) + 1;
-      senshu.noborikudarikirikaenouryoku = random.nextInt(99) + 1;
-      senshu.tandokusou = random.nextInt(99) + 1;
-      //senshu.paceagesagetaiouryoku = random.nextInt(99) + 1;
-      if (random.nextInt(100) < 33) {
-        int temp_paceagesagetaiouryoku = random.nextInt(99) + 1;
-        if (temp_paceagesagetaiouryoku > senshu.paceagesagetaiouryoku) {
-          senshu.paceagesagetaiouryoku = temp_paceagesagetaiouryoku;
-        }
-      }
-      if (senshu.hirou == 2) {
-        senshu.paceagesagetaiouryoku = 90 + tokubetusisuu ~/ 5;
-      }
+      // 登り・下り・アップダウン・ロードは土台で引いてある(ペース変動対応力の引き直しと、
+      // 特別な選手のペース変動対応力も土台に入っている。2.0.4)
+      senshu.noboritekisei = dodai.nobori;
+      senshu.kudaritekisei = dodai.kudari;
+      senshu.noborikudarikirikaenouryoku = dodai.updown;
+      senshu.tandokusou = dodai.road;
 
       if (random.nextInt(100) < 80) {
         senshu.konjou = random.nextInt(50) + 1;
@@ -392,18 +272,8 @@ Future<void> SenshuShokitiSetteiByGakunen(
       }
       senshu.time_taikai_total = TEISUU.DEFAULTTIME;
 
-      ////出身地+趣味
-      int targetHobbyIndex = random.nextInt(HobbyDatabase.allHobbies.length);
-      // 都道府県: 27番目の要素 ("大阪府"と想定) -> インデックス 26
-      int targetPrefectureIndex = random.nextInt(
-        LocationDatabase.allPrefectures.length,
-      );
-      // ⭐ パック（格納）
-      final int combinedIndex = PackedIndexHelper.packIndices(
-        hobbyIndex: targetHobbyIndex,
-        prefectureIndex: targetPrefectureIndex,
-      );
-      senshu.samusataisei = combinedIndex;
+      ////出身地+趣味(土台で引いてある。7月下旬に先に決めた土台は、出身校と高校時代の実績も入っている。2.0.4)
+      senshu.samusataisei = dodai.samusataisei;
     }
     if (targetGakunen == 0) {
       //初期の2年生以上の選手は後の初期選手用育成処理の関係で成長タイプ上書き

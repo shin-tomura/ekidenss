@@ -38,6 +38,7 @@ import 'package:ekiden/screens/kiji_hyou_view.dart'; // 金特訓・銀特訓の
 import 'package:ekiden/kansuu/kingin_kiroku.dart'; // 金銀の記録(1.9.9)
 import 'package:ekiden/screens/koukou_taikai_oshirase.dart'; // 高校の大会の結果が出た日のお知らせ(2.0.4)
 import 'package:ekiden/screens/Modal_yosenTimeBunpu.dart'; // 正月駅伝予選のチーム内のタイム分布(2.0.5)
+import 'package:ekiden/screens/Modal_kukanTimeBunpu.dart'; // 駅伝の区間ごとのタイム分布(2.0.5)
 
 // モーダルビューのプレースホルダー
 // 実際にはこれらのファイルを別途作成する必要があります
@@ -1480,6 +1481,21 @@ class _Mode0700ContentState extends State<Mode0700Content> {
                                               _buildGakurenSaishuuKukan(
                                                 currentGhensuu,
                                                 idJunUnivData,
+                                              ),
+                                            // 駅伝の区間ごとのタイム分布(2.0.5。Modal_kukanTimeBunpu.dart)
+                                            // 正月駅伝予選のカードと同じ形で、差が一番ついた区間を抜き出して出す
+                                            if (currentGhensuu
+                                                        .hyojiracebangou <=
+                                                    2 ||
+                                                currentGhensuu
+                                                        .hyojiracebangou ==
+                                                    5)
+                                              KukanBunpuCard(
+                                                key: ValueKey(
+                                                  'kukanBunpu_${currentGhensuu.year}_${currentGhensuu.hyojiracebangou}',
+                                                ),
+                                                race: currentGhensuu
+                                                    .hyojiracebangou,
                                               ),
                                             if (currentGhensuu
                                                     .hyojiracebangou <=

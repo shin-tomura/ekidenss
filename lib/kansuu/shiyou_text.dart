@@ -161,6 +161,9 @@ ShiyouSetsu shiyouTaikai({bool setsumeisho = false}) {
     }
   }
   gyou.addAll([
+    // 結果画面のグラフ(説明書だけ。2.0.5。Modal_kukanTimeBunpu.dart)
+    if (setsumeisho)
+      '・駅伝の結果画面の「区間ごとのタイム分布」で、区間ごとの区間1位からの差の広がりをグラフで見られます。',
     ..._yosen11Gyou,
     ..._yosenShougatsuGyou,
     // 結果画面のグラフ(説明書だけ。2.0.5。Modal_yosenTimeBunpu.dart)

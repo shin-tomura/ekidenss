@@ -107,7 +107,17 @@ class _Bunpu {
   _Bunpu._(this.e, this.kou, this.senHeikin, this.hayai, this.osoi);
 
   /// 正月駅伝予選の結果から作る(結果がなければnull)
+  /// (思わぬデータで画面が止まらないよう、作れなければnull。記事と同じ)
   static _Bunpu? yomu() {
+    try {
+      return _yomuHontai();
+    } catch (e, st) {
+      debugPrint('[チーム内のタイム分布] 作れませんでした: $e\n$st');
+      return null;
+    }
+  }
+
+  static _Bunpu? _yomuHontai() {
     final KijiKankyou? k = KijiKankyou.yomuRace(_yosenRace, kekka: true);
     final YosenKekka? e = k == null ? null : YosenKekka.tsukuru(k);
     if (e == null) return null;

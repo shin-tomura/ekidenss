@@ -27,6 +27,9 @@ import 'package:ekiden/screens/Modal_senshu.dart'
 //   この高校出身の大学の監督も出す(2.0.1。監督の母校パイプ。bokou_pipe.dart)
 // ・新入生のスカウトの画面の「高校名鑑」からも開く(1.9.5。「大会の記録」のタブから。進学先はスカウトの画面と
 //   同じ出し方で、一番新しい回(今年の新入生の世代)の全国高校駅伝を開いておく)
+// ・2.0.4から、今の高校3年生の世代の回(7月下旬から次の4月まで)も出す。まだ行われていない大会は
+//   「11月中旬に結果が出ます」などと出し、名前の出ている3年生(来年の新入生)には進学先を出さない。
+//   大会の日のお知らせからは、その回だけの画面(KoukouTaikaiShinkouGamen)を開く
 // ・名簿は koukouMeibo(初期値に、この画面で変えた分を重ねたもの)から作る
 // ・高校の情報を表示しない設定のときも開ける(自分で開く画面なので)
 // ・文字を大きくしている人がいるので、横並びは Wrap にし、高さは固定しない
@@ -236,8 +239,34 @@ class _ModalKoukouMeikanState extends State<ModalKoukouMeikan> {
 
 /// 今年の新入生(スカウトの候補)の世代の、高校の大会の記録があるか(1.9.9。今年の高校の大会の画面を出すか)
 bool kotoshiKoukouTaikaiKirokuAri() {
-  final List<KoukouTaikaiKiroku> l = koukouTaikaiKirokuYomu();
-  return l.isNotEmpty && l.first.nyuugakuNendo == koukouImaNoNendo();
+  final int? nendo = koukouImaNoNendo();
+  return koukouTaikaiKirokuYomu().any((KoukouTaikaiKiroku k) => k.nyuugakuNendo == nendo);
+}
+
+/// 今の高校3年生の世代(次の4月に大学に入る世代)の回か(2.0.4。7月下旬から次の4月まで)
+bool _rainenNoKai(KoukouTaikaiKiroku k) {
+  final int? nendo = koukouImaNoNendo();
+  return nendo != null && k.nyuugakuNendo > nendo;
+}
+
+/// 今の高校3年生の世代の高校の大会(2.0.4。大会の結果が出た日のお知らせの「結果を見る」から開く)
+/// その回の、出した大会の結果を開いて出し、まだの大会は結果が出る時期を出す
+class KoukouTaikaiShinkouGamen extends StatelessWidget {
+  const KoukouTaikaiShinkouGamen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: HENSUU.backgroundcolor,
+      appBar: AppBar(
+        title: const Text('今年度の高校の大会', style: TextStyle(color: Colors.white)),
+        backgroundColor: Colors.grey[900],
+        foregroundColor: Colors.white,
+        centerTitle: true,
+      ),
+      body: const _TaikaiKiroku(rainenNomi: true, modoruMoji: '閉じる'),
+    );
+  }
 }
 
 /// 今年の高校の大会(1.9.9。新入生のスカウトの画面を開いたとき、1ラウンド目の前に出す)
@@ -408,7 +437,12 @@ class _KenBetsu extends StatelessWidget {
         if (i < meibo.length) i,
     ];
     final List<KoukouTaikaiKiroku> kiroku = koukouTaikaiKirokuYomu();
-    final KoukouTaikaiKiroku? saishin = kiroku.isEmpty ? null : kiroku.first;
+    // 直近の回(都道府県予選の結果をまだ出していない今の高校3年生の世代の回は、とばす。2.0.4)
+    final List<KoukouTaikaiKiroku> yosenAri = [
+      for (final KoukouTaikaiKiroku k in kiroku)
+        if (!k.yosenMada) k,
+    ];
+    final KoukouTaikaiKiroku? saishin = yosenAri.isEmpty ? null : yosenAri.first;
     String chokkin(int i) => saishin == null ? '' : _chokkinMoji(koukouKaiSeisekiYomu(saishin, i));
     Widget gyou(int i, {bool kenAri = false}) => _gyou(
           context,
@@ -424,7 +458,7 @@ class _KenBetsu extends StatelessWidget {
     final List<Widget> l = [
       const Text(
         '名門度は名門・強豪・中堅・一般の4段階で、名門度が高い高校ほど、名前のない部員も強くなります。'
-        '出場回数と優勝回数は、記録を残し始めてからの回数で、毎年4月上旬に新入生が入るときに増えます。',
+        '出場回数と優勝回数は、記録を残し始めてからの回数で、毎年12月下旬に全国高校駅伝の結果が出るときに増えます。',
         style: _honbun,
       ),
       const SizedBox(height: 6),
@@ -624,10 +658,13 @@ Future<void> _koukouPageHiraku(BuildContext context, int ban, VoidCallback onHen
 /// ゲーム開始前の大会(0年12月より前。開始時の在学生4学年分)は「プレ大会」にして、開始時の学年で見分ける
 /// (「プレ大会(ゲーム開始時の4年生の世代)」)。
 /// [imaGakunen] が1以上なら、かっこの中を今の学年にする(「(今の1年生の世代)」。在学生の世代の欄のとき)
+/// 今の高校3年生の世代の回は「(今の高校3年生の世代)」(2.0.4)
 String _kaiMei(KoukouTaikaiKiroku k, {int imaGakunen = 0}) {
   final int taikaiNen = k.nyuugakuNendo - 1;
   if (taikaiNen >= 1) {
-    final String sedai = imaGakunen >= 1 ? '今の$imaGakunen年生の世代' : '${k.nyuugakuNendo}年入学の世代';
+    final String sedai = _rainenNoKai(k)
+        ? '今の高校3年生の世代'
+        : (imaGakunen >= 1 ? '今の$imaGakunen年生の世代' : '${k.nyuugakuNendo}年入学の世代');
     return '第$taikaiNen回 $taikaiNen年12月($sedai)';
   }
   // 1年入学の世代が開始時の1年生、0年入学が2年生…
@@ -909,7 +946,8 @@ class _KoukouHenshuuState extends State<_KoukouHenshuu> {
           ),
           const SizedBox(height: 8),
           const Text(
-            '名門度・タイプ・留学生の変更は、次の新入生の計算から効きます。今の選手の高校時代の実績は変わりません。'
+            '名門度・タイプ・留学生の変更は、次の高校の大会(7月下旬にまとめて計算します)から効きます。'
+            '今の選手の高校時代の実績と、今の高校3年生の世代の大会の結果は変わりません。'
             '校名の変更は、今の選手の出身校にもそのまま出ます。過去の大会の記録は、そのときの校名で出ます。'
             '全国高校駅伝の出場回数と優勝回数は、校名を変えてもこの高校に残ります(0に戻すこともできます)。',
             style: _hosoku,
@@ -1093,9 +1131,15 @@ class _KoukouPageState extends State<_KoukouPage> {
     if (m == null) return const [Text('この回は走者の記録がありません。', style: _hosoku)];
     final List<KoukouKirokuSousha> jun = List<KoukouKirokuSousha>.of(m)
       ..sort((a, b) => (a.kukan == 0 ? 99 : a.kukan).compareTo(b.kukan == 0 ? 99 : b.kukan));
+    // 今の高校3年生の世代の回は、名前の出ている3年生(来年の新入生)を残している(2.0.4)
+    final bool rainen = _rainenNoKai(r);
     return [
-      if (juni >= 9) const Text('9位以下の高校は、大学に入った選手だけを残しています。', style: _hosoku),
-      if (jun.isEmpty) const Text('大学に入った選手はいません。', style: _hosoku),
+      if (juni >= 9)
+        Text(
+          rainen ? '9位以下の高校は、名前の出ている3年生(来年の新入生)だけを残しています。' : '9位以下の高校は、大学に入った選手だけを残しています。',
+          style: _hosoku,
+        ),
+      if (jun.isEmpty) Text(rainen ? '名前の出ている3年生はいません。' : '大学に入った選手はいません。', style: _hosoku),
       for (final KoukouKirokuSousha s in jun) _soushaGyou(r, t, s),
     ];
   }
@@ -1110,6 +1154,10 @@ class _KoukouPageState extends State<_KoukouPage> {
       final String touji = (s.gakunen >= 1 && s.gakunen <= 2) ? '(当時${s.gakunen}年)' : '';
       mei = '${s.name}$touji';
       univ = _univMoji(s, jibun);
+    } else if (s.rainen) {
+      // 今の高校3年生の世代の、名前の出ている3年生(来年の新入生。まだ進学先はない。2.0.4)
+      final String touji = (s.gakunen >= 1 && s.gakunen <= 2) ? '(当時${s.gakunen}年)' : '';
+      mei = '${s.name}$touji';
     } else {
       mei = s.shurui == 3 ? '留学生' : '${s.gakunen}年生';
     }
@@ -1127,7 +1175,7 @@ class _KoukouPageState extends State<_KoukouPage> {
             style: TextStyle(
               color: iro,
               fontSize: HENSUU.fontsize_honbun,
-              fontWeight: s.namaeAri ? FontWeight.bold : FontWeight.normal,
+              fontWeight: s.namaeDeru ? FontWeight.bold : FontWeight.normal,
             ),
           ),
           if (univ.isNotEmpty)
@@ -1157,6 +1205,11 @@ class _KoukouPageState extends State<_KoukouPage> {
     // あとで校名か都道府県を変えた高校は、当時の名前を添える
     final String? touji = r.kyuumei[ban];
     if (touji != null) l.add(_gyouHosoku('当時の校名: $touji'));
+    // 今の高校3年生の世代の回で、都道府県予選をまだ出していない(2.0.4)
+    if (r.yosenMada) {
+      l.add(_gyouHosoku('都道府県予選と地区大会は11月中旬、全国高校駅伝は12月下旬に結果が出ます。'));
+      return l;
+    }
     // 都道府県予選と地区大会
     final KoukouYosenTeam? yo = s.yosen;
     if (!s.yosenKirokuAri) {
@@ -1194,7 +1247,10 @@ class _KoukouPageState extends State<_KoukouPage> {
     }
     // 全国高校駅伝
     final KoukouKirokuTeam? z = s.zenkoku;
-    if (z == null) {
+    if (r.zenkokuMada) {
+      // 今の高校3年生の世代の回で、全国高校駅伝の結果をまだ出していない(2.0.4)
+      l.add(_gyouHosoku(_zenkokuShutsujou(s) ? '全国高校駅伝(12月下旬)に出場します。' : '全国高校駅伝には進めませんでした。'));
+    } else if (z == null) {
       l.add(_gyouHosoku('全国高校駅伝には出ていません。'));
     } else {
       final int c = z.daihyou - 1;
@@ -1217,6 +1273,19 @@ class _KoukouPageState extends State<_KoukouPage> {
       );
     }
     return l;
+  }
+
+  /// 都道府県予選と地区大会の結果で、全国高校駅伝に出ることが決まったか(2.0.4。全国の結果をまだ出していない回)
+  /// 予選の1位(県代表)、地区大会の地区代表、地区大会がない地区(北海道)は予選の2位(地区代表)
+  bool _zenkokuShutsujou(KoukouKaiSeiseki s) {
+    final KoukouYosenTeam? yo = s.yosen;
+    if (yo == null) return false;
+    if (yo.juni == 1) return true;
+    final KoukouChikuTeam? ch = s.chiku;
+    if (ch != null) return ch.daihyou == 2;
+    final int c = (s.ken >= 0 && s.ken < koukouKenChiku.length) ? koukouKenChiku[s.ken] : -1;
+    final bool chikuNashi = c >= 0 && koukouKenChiku.where((int x) => x == c).length <= 1;
+    return chikuNashi && yo.juni == 2;
   }
 
   @override
@@ -1295,7 +1364,8 @@ class _KoukouPageState extends State<_KoukouPage> {
             style: _honbun,
           ),
           const Text(
-            '回数は記録を残し始めてからの回数で、毎年4月上旬に新入生が入るときに増えます。',
+            '回数は記録を残し始めてからの回数で、毎年、結果が出るとき(都道府県予選と地区大会は11月中旬、'
+            '全国高校駅伝は12月下旬)に増えます。',
             style: _hosoku,
           ),
           const SizedBox(height: 12),
@@ -1430,18 +1500,22 @@ class _TaikaiKiroku extends StatefulWidget {
   const _TaikaiKiroku({
     this.scoutKara = false,
     this.kotoshiNomi = false,
+    this.rainenNomi = false,
     this.shingakuMoji,
     this.jibunHantei,
     this.modoruMoji = 'スカウトへ進む',
   });
 
-  /// 今年の高校の大会の画面の、一番下の戻るボタンの文字(2.0.1)
+  /// 今年の高校の大会の画面と、今年度の高校の大会の画面の、一番下の戻るボタンの文字(2.0.1)
   final String modoruMoji;
 
   final bool scoutKara;
 
-  /// 今年の高校の大会の画面(KotoshiKoukouTaikaiGamen)か(1.9.9。一番新しい回だけを出す)
+  /// 今年の高校の大会の画面(KotoshiKoukouTaikaiGamen)か(1.9.9。今年の新入生の世代の回だけを出す)
   final bool kotoshiNomi;
+
+  /// 今年度の高校の大会の画面(KoukouTaikaiShinkouGamen)か(2.0.4。今の高校3年生の世代の回だけを出す)
+  final bool rainenNomi;
   final String? Function(KoukouKirokuSousha s)? shingakuMoji;
   final bool Function(KoukouKirokuSousha s)? jibunHantei;
 
@@ -1511,8 +1585,7 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
       '名前のない3年生は、ゲームの大学には進まない選手です(ほかの大学や実業団に進む選手、高校で陸上をやめる選手など)。'
       '名前のない留学生も、ゲームの大学には進まない留学生です。';
 
-  /// 記録がいつ増えるかの注釈(実在の大会は秋に予選、12月に全国なので、その時期に増えると
-  /// 思われないように、増える時期を「4月上旬だけ」と言い切って、目立つ枠で出す。1.9.5)
+  /// 記録がいつ増えるかの注釈(目立つ枠で出す。1.9.5。2.0.4から、実在と同じ時期に大会の結果が出る)
   static Widget _jikiChuuki() {
     return Container(
       width: double.infinity,
@@ -1522,10 +1595,10 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
         borderRadius: BorderRadius.circular(6),
       ),
       child: const Text(
-        '高校の大会の記録は、毎年4月上旬に新入生が大学に入るときに、1回分がまとめて増えます。'
-        'ほかの時期には増えません。'
-        '増えるのは、その新入生たちが高校3年だった年度の、夏の高校総体と、秋の都道府県予選・地区大会と、'
-        '12月の全国高校駅伝の結果です。',
+        '高校の大会は、実在と同じ時期に行われます。'
+        '高校総体は7月下旬、都道府県予選と地区大会は11月中旬、全国高校駅伝は12月下旬に結果が出て、'
+        'そのときに記録が増えます。'
+        '今の高校3年生(次の4月に大学に入る世代)の回は、終わった大会から見られます。',
         style: TextStyle(color: Colors.orangeAccent, fontSize: HENSUU.fontsize_honbun - 1),
       ),
     );
@@ -1580,6 +1653,11 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
         sub = um.isEmpty ? '' : '→ $um大学';
       }
       jibun = u == _myUnivId;
+    } else if (s.rainen) {
+      // 今の高校3年生の世代の、名前の出ている3年生(来年の新入生。まだ進学先はない。2.0.4)
+      final String toujiR = (s.gakunen >= 1 && s.gakunen <= 2) ? '(当時${s.gakunen}年)' : '';
+      mei = '${s.name}$toujiR';
+      sub = kouAri ? kou : '';
     } else {
       final String gaku = s.shurui == 3 ? '留学生' : '${s.gakunen}年生';
       mei = kouAri ? '$kouの$gaku' : gaku;
@@ -1597,7 +1675,7 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
             style: TextStyle(
               color: jibun ? Colors.amber : HENSUU.textcolor,
               fontSize: chiisai ? HENSUU.fontsize_honbun - 2 : HENSUU.fontsize_honbun,
-              fontWeight: s.namaeAri ? FontWeight.bold : FontWeight.normal,
+              fontWeight: s.namaeDeru ? FontWeight.bold : FontWeight.normal,
             ),
           ),
           if (sub.isNotEmpty)
@@ -1656,13 +1734,21 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
       ..sort((a, b) => (a.kukan == 0 ? 99 : a.kukan).compareTo(b.kukan == 0 ? 99 : b.kukan));
     // 今年の新入生の世代をスカウトの途中に見ているときは「今年の新入生」と書く(1.9.9)
     final bool kotoshi = _kotoshiNoKai(kiroku);
+    // 今の高校3年生の世代の回は、名前の出ている3年生(来年の新入生)を残している(2.0.4)
+    final bool rainen = _rainenNoKai(kiroku);
     return [
       if (j >= 8)
         Text(
-          kotoshi ? '9位以下の高校は、今年の新入生だけを残しています。' : '9位以下の高校は、大学に入った選手だけを残しています。',
+          rainen
+              ? '9位以下の高校は、名前の出ている3年生(来年の新入生)だけを残しています。'
+              : (kotoshi ? '9位以下の高校は、今年の新入生だけを残しています。' : '9位以下の高校は、大学に入った選手だけを残しています。'),
           style: _hosoku,
         ),
-      if (jun.isEmpty) Text(kotoshi ? '今年の新入生はいません。' : '大学に入った選手はいません。', style: _hosoku),
+      if (jun.isEmpty)
+        Text(
+          rainen ? '名前の出ている3年生はいません。' : (kotoshi ? '今年の新入生はいません。' : '大学に入った選手はいません。'),
+          style: _hosoku,
+        ),
       for (final KoukouKirokuSousha s in jun)
         _soushaGyou(
           kiroku,
@@ -1717,14 +1803,15 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
       );
     }
     if (widget.kotoshiNomi) return _kotoshiNoKekka(context);
+    if (widget.rainenNomi) return _rainenNoKekka(context);
     final int erabu = _erabu.clamp(0, _kiroku.length - 1).toInt();
     final KoukouTaikaiKiroku k = _kiroku[erabu];
 
     // ---- 在学生の世代の優勝校と優勝者(1.9.5) ----
-    // 一番新しい記録を今の1年生の世代として、そこから4回分(記録は新入生が入るときに増え、
-    // 同じときに4年生が卒業するので、今の日付を見なくても在学生とずれない。途中の年の記録が
-    // 欠けていても、卒業した世代は出さない)
-    final int saishinNendo = _kiroku.first.nyuugakuNendo;
+    // 今年度に大学に入った世代を今の1年生の世代として、そこから4回分(途中の年の記録が
+    // 欠けていても、卒業した世代は出さない)。2.0.4から、7月下旬から次の4月までは今の高校3年生の世代の回も
+    // あるので、一番新しい記録ではなく今の年度から数える(今の高校3年生の世代は出さない)
+    final int saishinNendo = koukouImaNoNendo() ?? _kiroku.first.nyuugakuNendo;
     final List<Widget> chokkin = [
       const Text(
         '優勝校の下に、大学に入った選手と進学先を出しています。'
@@ -1805,6 +1892,7 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
       const SizedBox(height: 4),
       const Text(
         '名前の出ている選手は、ゲームの大学に入った選手です。$_namaeNashiSetsumei'
+        '今の高校3年生の世代の回では、名前の出ている3年生が、次の4月に大学に入る予定の選手です。'
         '大会の回は、大学の駅伝と同じく1年目の大会を第1回とし、ゲーム開始前の大会はプレ大会として出します。',
         style: _hosoku,
       ),
@@ -1920,11 +2008,15 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
   /// (名鑑の「大会の結果」と、スカウト画面から開いたときに使う。1.9.5)
   /// [kotoshi] なら(今年の高校の大会の画面。1.9.9)、区間の上位3人と高校総体の決勝も開いておき、
   /// 高校総体を地区大会・都道府県予選より前に出す
+  /// [yosenHiraku] なら地区大会と都道府県予選も開いておく(2.0.4。11月中旬のお知らせから開いたとき)
+  /// 今の高校3年生の世代の回で、まだ結果を出していない大会は、結果が出る時期を出し、後ろに回す(2.0.4)。
+  /// 全国高校駅伝の結果の前は、都道府県予選と地区大会で決まった出場校を出す
   List<Widget> _kekka(
     KoukouTaikaiKiroku k,
     int erabu, {
     bool zenkokuHiraku = false,
     bool kotoshi = false,
+    bool yosenHiraku = false,
   }) {
     final List<List<KoukouChikuTeam>>? ch = k.chiku;
     final List<KoukouYosenKen>? yo = k.yosen;
@@ -1941,109 +2033,202 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
           ],
         ),
     ];
-    return [
-      // 全国高校駅伝(高校を開くと走者と進学先)
-      _Oritatami(
-        key: ValueKey<String>('zenkoku$erabu'),
-        midashi: '全国高校駅伝(${k.zenkoku.length}校)',
-        hajimeHiraku: zenkokuHiraku,
-        naka: [
-          Text(
-            _kotoshiNoKai(k)
-                ? '高校を押すと、走った選手を見られます。名前の出ている3年生が、この春に大学に入る今年の新入生(スカウトの候補)です。'
-                : '高校を押すと、走った選手と進学先を見られます。',
-            style: _hosoku,
-          ),
-          for (int j = 0; j < k.zenkoku.length; j++)
+    // 全国高校駅伝と区間の上位3人(まだ結果を出していない回は、出場校と結果が出る時期。2.0.4)
+    final List<Widget> zenkoku = k.zenkokuMada
+        ? [
             _Oritatami(
-              key: ValueKey<String>('team$erabu-$j'),
-              midashi: _teamMidashi(k, j, k.zenkoku[j]),
-              naka: _teamMember(k, j, k.zenkoku[j]),
-              futoi: j == 0,
+              key: ValueKey<String>('zenkoku$erabu'),
+              midashi: '全国高校駅伝(12月下旬)',
+              hajimeHiraku: zenkokuHiraku,
+              naka: _zenkokuMadaNaka(k),
             ),
-        ],
-      ),
-      // 区間の上位3人
-      _Oritatami(
-        key: ValueKey<String>('kukan$erabu'),
-        midashi: '全国高校駅伝 区間の上位3人',
-        hajimeHiraku: kotoshi,
-        naka: [
-          for (int kk = 0; kk < k.kukan.length; kk++) ...[
-            Padding(
-              padding: const EdgeInsets.only(left: 4, top: 8),
-              child: Text(
-                _kukanKyori(kk),
-                style: const TextStyle(color: HENSUU.textcolor, fontWeight: FontWeight.bold),
-              ),
-            ),
-            for (int j = 0; j < k.kukan[kk].length; j++)
-              _soushaGyou(
-                k,
-                j == 0 ? '区間賞' : '${j + 1}位',
-                k.kukan[kk][j],
-                TimeDate.timeToFunByouString(k.kukan[kk][j].time),
-              ),
-          ],
-        ],
-      ),
-      if (kotoshi) ...soutai,
-      // 地区大会(チームの順位とタイム。1.9.5)
-      _Oritatami(
-        key: ValueKey<String>('chiku$erabu'),
-        midashi: '地区大会',
-        naka: ch == null
-            ? const [Text('この回は、地区大会の記録がありません。', style: _hosoku)]
-            : [
-                const Text(
-                  '各都道府県の予選の上位3校が走り、県代表を除いた最上位の高校が、地区代表として全国高校駅伝に進みます。'
-                  '北海道は地区大会がなく、予選の2位が地区代表です。',
+          ]
+        : [
+            // 全国高校駅伝(高校を開くと走者と進学先)
+            _Oritatami(
+              key: ValueKey<String>('zenkoku$erabu'),
+              midashi: '全国高校駅伝(${k.zenkoku.length}校)',
+              hajimeHiraku: zenkokuHiraku,
+              naka: [
+                Text(
+                  _rainenNoKai(k)
+                      ? '高校を押すと、走った選手を見られます。名前の出ている3年生は、次の4月に大学に入る予定の選手です。'
+                      : (_kotoshiNoKai(k)
+                          ? '高校を押すと、走った選手を見られます。名前の出ている3年生が、この春に大学に入る今年の新入生(スカウトの候補)です。'
+                          : '高校を押すと、走った選手と進学先を見られます。'),
                   style: _hosoku,
                 ),
-                for (int c = 0; c < ch.length && c < koukouChikuMei.length; c++)
-                  if (ch[c].isNotEmpty)
-                    _Oritatami(
-                      key: ValueKey<String>('chiku$erabu-$c'),
-                      midashi: '${koukouChikuMei[c]}大会(${ch[c].length}校)',
-                      futoi: false,
-                      naka: [
-                        for (int j = 0; j < ch[c].length; j++) _chikuGyou(k, j, ch[c][j]),
-                      ],
-                    ),
-              ],
-      ),
-      // 都道府県予選(チームの順位とタイム。地区ごとに折りたたみ。1.9.5)
-      _Oritatami(
-        key: ValueKey<String>('yosen$erabu'),
-        midashi: '都道府県予選',
-        naka: yo == null
-            ? const [Text('この回は、都道府県予選の記録がありません。', style: _hosoku)]
-            : [
-                const Text(
-                  '各都道府県の名簿の5校が走り、1位の高校が県代表として全国高校駅伝に、上位3校が地区大会に進みます。'
-                  '予選のコースは全国と同じ距離の平らなコースですが、その日の気温や風で、県ごとにタイムの出やすさが違います。',
-                  style: _hosoku,
-                ),
-                for (int c = 0; c < koukouChikuMei.length; c++)
+                for (int j = 0; j < k.zenkoku.length; j++)
                   _Oritatami(
-                    key: ValueKey<String>('yosen$erabu-$c'),
-                    midashi: koukouChikuMei[c],
-                    futoi: false,
-                    naka: [
-                      for (int ken = 0; ken < yo.length && ken < koukouKenChiku.length; ken++)
-                        if (koukouKenChiku[ken] == c) ..._yosenKen(k, ken, yo[ken]),
-                    ],
+                    key: ValueKey<String>('team$erabu-$j'),
+                    midashi: _teamMidashi(k, j, k.zenkoku[j]),
+                    naka: _teamMember(k, j, k.zenkoku[j]),
+                    futoi: j == 0,
                   ),
               ],
-      ),
+            ),
+            // 区間の上位3人
+            _Oritatami(
+              key: ValueKey<String>('kukan$erabu'),
+              midashi: '全国高校駅伝 区間の上位3人',
+              hajimeHiraku: kotoshi,
+              naka: [
+                for (int kk = 0; kk < k.kukan.length; kk++) ...[
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4, top: 8),
+                    child: Text(
+                      _kukanKyori(kk),
+                      style: const TextStyle(color: HENSUU.textcolor, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  for (int j = 0; j < k.kukan[kk].length; j++)
+                    _soushaGyou(
+                      k,
+                      j == 0 ? '区間賞' : '${j + 1}位',
+                      k.kukan[kk][j],
+                      TimeDate.timeToFunByouString(k.kukan[kk][j].time),
+                    ),
+                ],
+              ],
+            ),
+          ];
+    // 地区大会と都道府県予選(まだ結果を出していない回は、結果が出る時期。2.0.4)
+    final List<Widget> yosen = k.yosenMada
+        ? [
+            _Oritatami(
+              key: ValueKey<String>('chiku$erabu'),
+              midashi: '都道府県予選と地区大会(11月中旬)',
+              naka: const [Text('まだ行われていません。11月中旬に結果が出ます。', style: _hosoku)],
+            ),
+          ]
+        : [
+            // 地区大会(チームの順位とタイム。1.9.5)
+            _Oritatami(
+              key: ValueKey<String>('chiku$erabu'),
+              midashi: '地区大会',
+              hajimeHiraku: yosenHiraku,
+              naka: ch == null
+                  ? const [Text('この回は、地区大会の記録がありません。', style: _hosoku)]
+                  : [
+                      const Text(
+                        '各都道府県の予選の上位3校が走り、県代表を除いた最上位の高校が、地区代表として全国高校駅伝に進みます。'
+                        '北海道は地区大会がなく、予選の2位が地区代表です。',
+                        style: _hosoku,
+                      ),
+                      for (int c = 0; c < ch.length && c < koukouChikuMei.length; c++)
+                        if (ch[c].isNotEmpty)
+                          _Oritatami(
+                            key: ValueKey<String>('chiku$erabu-$c'),
+                            midashi: '${koukouChikuMei[c]}大会(${ch[c].length}校)',
+                            futoi: false,
+                            naka: [
+                              for (int j = 0; j < ch[c].length; j++) _chikuGyou(k, j, ch[c][j]),
+                            ],
+                          ),
+                    ],
+            ),
+            // 都道府県予選(チームの順位とタイム。地区ごとに折りたたみ。1.9.5)
+            _Oritatami(
+              key: ValueKey<String>('yosen$erabu'),
+              midashi: '都道府県予選',
+              hajimeHiraku: yosenHiraku,
+              naka: yo == null
+                  ? const [Text('この回は、都道府県予選の記録がありません。', style: _hosoku)]
+                  : [
+                      const Text(
+                        '各都道府県の名簿の5校が走り、1位の高校が県代表として全国高校駅伝に、上位3校が地区大会に進みます。'
+                        '予選のコースは全国と同じ距離の平らなコースですが、その日の気温や風で、県ごとにタイムの出やすさが違います。',
+                        style: _hosoku,
+                      ),
+                      for (int c = 0; c < koukouChikuMei.length; c++)
+                        _Oritatami(
+                          key: ValueKey<String>('yosen$erabu-$c'),
+                          midashi: koukouChikuMei[c],
+                          futoi: false,
+                          naka: [
+                            for (int ken = 0; ken < yo.length && ken < koukouKenChiku.length; ken++)
+                              if (koukouKenChiku[ken] == c) ..._yosenKen(k, ken, yo[ken]),
+                          ],
+                        ),
+                    ],
+            ),
+          ];
+    // 今の高校3年生の世代の回で、まだ結果を出していない大会があるとき(2.0.4)
+    if (k.zenkokuMada) {
+      // 7月下旬から: 高校総体 → 予選と地区大会(まだ) → 全国(まだ)
+      if (k.yosenMada) return [...soutai, ...yosen, ...zenkoku];
+      // 11月中旬から: 全国(出場校) → 地区大会 → 都道府県予選 → 高校総体
+      return [...zenkoku, ...yosen, ...soutai];
+    }
+    return [
+      ...zenkoku,
+      if (kotoshi) ...soutai,
+      ...yosen,
       // 高校総体の決勝
       if (!kotoshi) ...soutai,
     ];
   }
 
-  /// 今年の高校の大会の画面の中身(1.9.9。一番新しい回だけ。下に「スカウトへ進む」ボタン)
+  /// 全国高校駅伝の結果をまだ出していない回の、全国高校駅伝の欄(2.0.4)。
+  /// 都道府県予選と地区大会の結果を出したあとは、そこで決まった出場校(県代表・地区代表)を出す
+  List<Widget> _zenkokuMadaNaka(KoukouTaikaiKiroku k) {
+    if (k.yosenMada) {
+      return const [
+        Text('まだ行われていません。12月下旬に結果が出ます。出場校は、11月中旬の都道府県予選と地区大会で決まります。', style: _hosoku),
+      ];
+    }
+    final List<({int kouCode, String daihyou})> l = _shutsujouKou(k);
+    return [
+      Text('まだ行われていません。12月下旬に結果が出ます。都道府県予選と地区大会で決まった出場校(${l.length}校)です。', style: _hosoku),
+      for (final ({int kouCode, String daihyou}) e in l)
+        Padding(
+          padding: const EdgeInsets.only(left: 12, top: 4),
+          child: Text('${k.kouMei(e.kouCode)}　${e.daihyou}', style: _honbun),
+        ),
+    ];
+  }
+
+  /// 都道府県予選と地区大会で決まった、全国高校駅伝の出場校(2.0.4。県代表は都道府県の順、地区代表は地区の順)
+  /// 県代表は予選の1位、地区代表は地区大会の地区代表で、地区大会がない地区(北海道)は予選の2位
+  List<({int kouCode, String daihyou})> _shutsujouKou(KoukouTaikaiKiroku k) {
+    final List<({int kouCode, String daihyou})> l = [];
+    final List<KoukouYosenKen>? yo = k.yosen;
+    if (yo == null) return l;
+    for (int ken = 0; ken < yo.length; ken++) {
+      for (final KoukouYosenTeam t in yo[ken].teams) {
+        if (t.juni == 1) l.add((kouCode: t.kouCode, daihyou: '県代表'));
+      }
+    }
+    final List<List<KoukouChikuTeam>>? ch = k.chiku;
+    for (int c = 0; c < koukouChikuMei.length; c++) {
+      final List<int> kens = [
+        for (int ken = 0; ken < koukouKenChiku.length; ken++)
+          if (koukouKenChiku[ken] == c) ken,
+      ];
+      final String daihyou = '地区代表(${koukouChikuMei[c]})';
+      if (kens.length <= 1) {
+        if (kens.length == 1 && kens.first < yo.length) {
+          for (final KoukouYosenTeam t in yo[kens.first].teams) {
+            if (t.juni == 2) l.add((kouCode: t.kouCode, daihyou: daihyou));
+          }
+        }
+      } else if (ch != null && c < ch.length) {
+        for (final KoukouChikuTeam t in ch[c]) {
+          if (t.daihyou == 2) l.add((kouCode: t.kouCode, daihyou: daihyou));
+        }
+      }
+    }
+    return l;
+  }
+
+  /// 今年の高校の大会の画面の中身(1.9.9。今年の新入生の世代の回だけ。下に「スカウトへ進む」ボタン)
+  /// (2.0.4から、今の高校3年生の世代の回もあるので、一番新しい回ではなく今年度の回を探す)
   Widget _kotoshiNoKekka(BuildContext context) {
-    final KoukouTaikaiKiroku k = _kiroku.first;
+    final int? nendo = koukouImaNoNendo();
+    final KoukouTaikaiKiroku k = _kiroku.firstWhere(
+      (KoukouTaikaiKiroku r) => r.nyuugakuNendo == nendo,
+      orElse: () => _kiroku.first,
+    );
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -2086,9 +2271,72 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
     );
   }
 
+  /// 今年度の高校の大会の画面の中身(2.0.4。今の高校3年生の世代の回だけ。下に「閉じる」ボタン)
+  /// 出した大会の結果を開いておく(11月中旬からは全国高校駅伝の出場校と地区大会・都道府県予選、
+  /// 12月下旬からは全国高校駅伝)
+  Widget _rainenNoKekka(BuildContext context) {
+    KoukouTaikaiKiroku? k;
+    for (final KoukouTaikaiKiroku r in _kiroku) {
+      if (_rainenNoKai(r)) {
+        k = r;
+        break;
+      }
+    }
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        if (k == null)
+          const Text('今の高校3年生の世代の大会の記録は、まだありません。高校総体は7月下旬に行われます。', style: _honbun)
+        else ...[
+          Text(
+            '今の高校3年生(次の4月に大学に入る世代)の、${_kaiMei(k)}の結果です。'
+            '高校総体は7月下旬、都道府県予選と地区大会は11月中旬、全国高校駅伝は12月下旬に結果が出ます。',
+            style: _honbun,
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            '名前の出ている3年生は、次の4月に大学に入る予定の選手です。$_namaeNashiSetsumei',
+            style: _hosoku,
+          ),
+          const SizedBox(height: 8),
+          ..._kekka(
+            k,
+            0,
+            zenkokuHiraku: !k.yosenMada,
+            kotoshi: !k.zenkokuMada || k.yosenMada,
+            yosenHiraku: !k.yosenMada && k.zenkokuMada,
+          ),
+        ],
+        const SizedBox(height: 16),
+        const Text(
+          '前の回の結果や高校のことは、説明画面の設定タブの「高校名鑑」で見られます。'
+          '架空の高校の大会です。大学のレースや育成には影響しません。',
+          style: _hosoku,
+        ),
+        const SizedBox(height: 16),
+        Center(
+          child: ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: HENSUU.buttonColor,
+              foregroundColor: HENSUU.buttonTextColor,
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+            ),
+            child: Text(
+              widget.modoruMoji,
+              style: const TextStyle(fontSize: HENSUU.fontsize_honbun, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ),
+        const SizedBox(height: 24),
+      ],
+    );
+  }
+
   /// スカウトの画面から開いたときの説明(1.9.5)。一番新しい回が今年の新入生の世代か(記録がなければ、そう書く)
   Widget _scoutSetsumei() {
-    final bool kotoshi = _kiroku.isNotEmpty && _kiroku.first.nyuugakuNendo == koukouImaNoNendo();
+    final int? nendo = koukouImaNoNendo();
+    final bool kotoshi = _kiroku.any((KoukouTaikaiKiroku r) => r.nyuugakuNendo == nendo);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),

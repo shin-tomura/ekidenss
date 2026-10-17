@@ -36,6 +36,7 @@ import 'package:ekiden/screens/Modal_senshu_race_bunseki.dart'
     show ModalSenshuAnalysisView; // 最終区の選手の結果分析(1.9.9)
 import 'package:ekiden/screens/kiji_hyou_view.dart'; // 金特訓・銀特訓の記録の一覧表(1.9.9)
 import 'package:ekiden/kansuu/kingin_kiroku.dart'; // 金銀の記録(1.9.9)
+import 'package:ekiden/screens/koukou_taikai_oshirase.dart'; // 高校の大会の結果が出た日のお知らせ(2.0.4)
 
 // モーダルビューのプレースホルダー
 // 実際にはこれらのファイルを別途作成する必要があります
@@ -1169,6 +1170,9 @@ class _Mode0700ContentState extends State<Mode0700Content> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
+                                    // 高校の大会の結果が出た日のお知らせ(2.0.4。7月下旬の高校総体と、記録会を11月に
+                                    // している設定の11月中旬の都道府県予選と地区大会。ほかの日は何も出さない)
+                                    KoukouTaikaiOshirase(gh: currentGhensuu),
                                     // 春の成長 / 夏合宿 の結果表示
                                     if (currentGhensuu.month == 4 &&
                                         currentGhensuu.day == 25)

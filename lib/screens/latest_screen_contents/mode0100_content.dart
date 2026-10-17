@@ -14,6 +14,7 @@ import 'package:ekiden/kansuu/koukou.dart'; // 新入生の出身校と高校時
 import 'package:ekiden/kansuu/kyouka_project.dart'; // 強化プロジェクト(2.0.1)
 import 'package:ekiden/kansuu/taikai_chouki.dart' show choukiNendo; // 年度(2.0.1)
 import 'package:ekiden/kansuu/shushou.dart' show shushouKetteiBun; // 決まった主将(2.0.1)
+import 'package:ekiden/screens/koukou_taikai_oshirase.dart'; // 高校の大会の結果が出た日のお知らせ(2.0.4)
 // KANSUUクラスをインポートするか、必要な関数をここに直接定義
 // 仮で必要な関数をここに定義します。もし kansuu.dart があるならそちらをインポートしてください。
 // import 'package:ekiden/utils/kansuu.dart';
@@ -752,6 +753,12 @@ class Mode0100Content extends StatelessWidget {
                                     "\nまずは一次エントリーに登録する選手を決定し、その後、一次エントリーに登録した選手で区間エントリーを行い、最後に当日変更を行えます。(現実世界だとそれぞれ期間を空けますが、この世界ではタップ一つで時間が進むものとご想像いただければ幸いです)",
                                     style: TextStyle(color: HENSUU.textcolor),
                                   ),
+                                ] else if (koukouTaikaiOshiraseBun(
+                                  currentGhensuu,
+                                ).isNotEmpty) ...[
+                                  // 高校の大会の結果が出た日(2.0.4。12月下旬の全国高校駅伝と、記録会を9月にしている
+                                  // 設定の11月中旬の都道府県予選と地区大会。koukou_taikai_oshirase.dart)
+                                  KoukouTaikaiOshirase(gh: currentGhensuu),
                                 ] else ...[
                                   const Text(
                                     "今日は特に何もありませんでした",

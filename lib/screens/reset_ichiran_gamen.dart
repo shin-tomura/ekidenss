@@ -43,7 +43,11 @@ Future<bool> resetSaiKakunin(BuildContext context, {required bool zenbu}) async 
         style: honbun,
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.of(c).pop(false), child: const Text('やめる')),
+        // やめるは、暗い背景で読みやすいように白い文字にする
+        TextButton(
+          onPressed: () => Navigator.of(c).pop(false),
+          child: const Text('やめる', style: TextStyle(color: Colors.white)),
+        ),
         // 元に戻せない操作なので、オレンジ色の文字にする
         TextButton(
           onPressed: () => Navigator.of(c).pop(true),

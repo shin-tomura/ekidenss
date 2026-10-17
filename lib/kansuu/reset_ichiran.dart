@@ -446,7 +446,7 @@ List<ResetKoumoku> resetIchiran() {
     // ---- 作ったもの(どのリセットでも触らない) ----
     ResetKoumoku('大学名', '作ったもの', ResetBunrui.tsukutta, []),
     // フリーメモ(大学id 13〜17 の文字の欄)はアプリ全体で1つ。読み込んでも今のまま(2.0.3)。
-    // データ共有で書き出すときも空にする(share_exporter.dart)
+    // データ共有で書き出すときと取り込むときも空にする(share_exporter.dart の _memoKesu)
     ResetKoumoku('フリーメモの中身', '作ったもの', ResetBunrui.tsukutta, [
       for (int id = 13; id <= 17; id++) _tanshuku(id),
     ], yomikomiNokosu: true),

@@ -48,15 +48,8 @@ class ShareExporter {
           final dynamic naiyou = _convertMap(box.toMap());
           // フリーメモ(大学id 13〜17 の文字の欄)は、相手に渡さないように空にして書き出す(2.0.3。
           // メモはアプリ全体で1つで、読み込んだ側も自分のメモのまま。reset_ichiran.dart)
-          // (スロットには大学ごとのJSON(Map)が入っている。_convertMap で作り直した写しなので、
-          //  スロットの中身は変わらない。キーではなく中の id で見分ける)
-          if (baseName == 'univBox' && naiyou is Map) {
-            for (final dynamic univ in naiyou.values) {
-              if (univ is! Map) continue;
-              final dynamic id = univ['id'];
-              if (id is num && id >= 13 && id <= 17) univ['name_tanshuku'] = '';
-            }
-          }
+          // (_convertMap で作り直した写しを空にするので、スロットの中身は変わらない)
+          if (baseName == 'univBox' && naiyou is Map) _memoKesu(naiyou);
           final jsonString = jsonEncode(naiyou);
           final bytes = utf8.encode(jsonString);
           archive.addFile(ArchiveFile('$baseName.json', bytes.length, bytes));
@@ -128,6 +121,9 @@ class ShareExporter {
           // ★修正ポイント: 型キャストエラーを防ぐため、安全にMap<String, dynamic>へ変換
           final Map<String, dynamic> dataMap =
               _fixJsonTypes(rawJson) as Map<String, dynamic>;
+          // 2.0.2までのアプリで書き出したファイルにはフリーメモが入っているので、取り込むときも空にする
+          // (送った人のメモをセーブ枠に残さない。2.0.3)
+          if (baseName == 'univBox') _memoKesu(dataMap);
 
           final bool wasOpen = Hive.isBoxOpen(slotBoxName);
           final Box box = wasOpen
@@ -223,6 +219,16 @@ class ShareExporter {
   }
 
   static dynamic _restoreKey(String key) => int.tryParse(key) ?? key;
+
+  /// 大学データのJSON(大学ごとのMap)の、フリーメモ(大学id 13〜17 の文字の欄)を空にする(2.0.3)
+  /// (キーではなく、中の id で見分ける。書き出すときと取り込むときに使う)
+  static void _memoKesu(Map<dynamic, dynamic> univJson) {
+    for (final dynamic univ in univJson.values) {
+      if (univ is! Map) continue;
+      final dynamic id = univ['id'];
+      if (id is num && id >= 13 && id <= 17) univ['name_tanshuku'] = '';
+    }
+  }
 
   static Map<dynamic, dynamic>? getSlotMeta(int slotNumber) {
     if (!Hive.isBoxOpen(_metaBoxName)) return null;

@@ -1,5 +1,6 @@
 // 正月駅伝予選のチーム内のタイム分布(2.0.5)
-// 結果画面の「チーム内のタイム分布」から開く。
+// 結果画面の「チーム内のタイム分布」のカード(YosenBunpuCard。ニュース記事のカードの下)から開く。
+// カードには、自分の大学(出ていなければ11位の大学)の帯を、グラフの画面と同じ横軸で抜き出して出す。
 // ・大学ごとに、合計に入った1〜10番手のタイムの範囲を横向きの帯で描き、
 //   10人の点・平均(合計÷10)・中央値・合計に入らなかった11・12番手(白抜き)を重ねる。
 // ・右ほど速いタイム。合計は上位10人の合計なので、平均の並びがそのまま順位の並びになる。
@@ -88,6 +89,263 @@ class _Kou {
   }
 }
 
+/// グラフのもとになる結果(グラフの画面と、結果画面のカードで使う)
+class _Bunpu {
+  final YosenKekka e;
+
+  /// 順位の順
+  final List<_Kou> kou;
+
+  /// 10位の大学の平均(通過ラインの争いがなければnull)
+  final double? senHeikin;
+
+  /// 横軸の右端(速い側)と左端(遅い側)のタイム
+  final double hayai;
+  final double osoi;
+
+  _Bunpu._(this.e, this.kou, this.senHeikin, this.hayai, this.osoi);
+
+  /// 正月駅伝予選の結果から作る(結果がなければnull)
+  static _Bunpu? yomu() {
+    final KijiKankyou? k = KijiKankyou.yomuRace(_yosenRace, kekka: true);
+    final YosenKekka? e = k == null ? null : YosenKekka.tsukuru(k);
+    if (e == null) return null;
+    final YosenUnivKekka? jibun = e.jibun;
+    final List<_Kou> kou = [];
+    for (final YosenUnivKekka x in e.jun) {
+      final int keisan = math.min(e.keisanNinzuu, x.senshu.length);
+      if (keisan <= 0) continue;
+      final List<double> t = [for (final YosenSenshuKekka y in x.senshu) y.time];
+      double goukei = 0;
+      for (int i = 0; i < keisan; i++) {
+        goukei += t[i];
+      }
+      final int naka = keisan ~/ 2;
+      final double chuuouchi = keisan.isOdd
+          ? t[naka]
+          : (t[naka - 1] + t[naka]) / 2;
+      kou.add(
+        _Kou(
+          x,
+          t,
+          keisan,
+          goukei / keisan,
+          chuuouchi,
+          e.tsuuka(x),
+          identical(x, jibun),
+        ),
+      );
+    }
+    if (kou.isEmpty) return null;
+    double? senHeikin;
+    if (e.borderAri) {
+      final YosenUnivKekka sen = e.jun[e.tsuukaSuu - 1];
+      for (final _Kou kk in kou) {
+        if (identical(kk.x, sen)) senHeikin = kk.heikin;
+      }
+    }
+    // 横軸の範囲。合計に入った選手は必ず入れる。
+    // 合計に入らなかった選手は、10番手の一番遅いタイムから _sotoHaba 秒までにする
+    final double hayai = kou.map((kk) => kk.ichiban).reduce(math.min);
+    final double osoi10 = kou.map((kk) => kk.saigo).reduce(math.max);
+    final double osoiZen = kou.map((kk) => kk.t.last).reduce(math.max);
+    final double osoi = math.min(osoiZen, osoi10 + _sotoHaba);
+    final double haba = math.max(osoi - hayai, 60.0);
+    final double yoyuu = haba * 0.04;
+    return _Bunpu._(
+      e,
+      kou,
+      senHeikin,
+      hayai - yoyuu,
+      hayai + haba + yoyuu,
+    );
+  }
+
+  /// 結果画面のカードに出し、グラフの画面で最初に開いておく大学
+  /// (自分の大学が出ていれば自分の大学。出ていなければ次点の11位の大学。
+  ///  全校が出場できて11位がないときは最下位の大学)
+  _Kou get daihyou {
+    for (final _Kou kk in kou) {
+      if (kk.jibun) return kk;
+    }
+    if (e.borderAri) {
+      for (final _Kou kk in kou) {
+        if (kk.juni >= e.tsuukaSuu) return kk;
+      }
+    }
+    return kou.last;
+  }
+}
+
+/// 目盛りの縦線の間隔(秒。文字を出さないカード用。線が詰まりすぎないようにする)
+double _senKankaku(double w, double hayai, double osoi) {
+  final double byouAtari = (w - _haji * 2) / (osoi - hayai);
+  for (final double s in const [60.0, 120.0, 300.0]) {
+    if (byouAtari * s >= 12) return s;
+  }
+  return 600;
+}
+
+/// 目盛りのタイムの一覧
+List<double> _memoriIchiran(double kankaku, double hayai, double osoi) {
+  final List<double> memori = [];
+  for (double m = kankaku * (hayai / kankaku).ceil(); m <= osoi; m += kankaku) {
+    memori.add(m);
+  }
+  return memori;
+}
+
+/// グラフの画面を開く
+void _bunpuGamenHiraku(BuildContext context) {
+  showGeneralDialog(
+    context: context,
+    barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+    barrierDismissible: true, // 背景タップで閉じられるようにする
+    barrierLabel: 'チーム内のタイム分布', // アクセシビリティ用ラベル
+    transitionDuration: const Duration(milliseconds: 300),
+    pageBuilder: (context, animation, secondaryAnimation) =>
+        const ModalYosenTimeBunpuView(),
+    transitionBuilder: (context, animation, secondaryAnimation, child) {
+      return FadeTransition(
+        opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+        child: child,
+      );
+    },
+  );
+}
+
+// 結果画面のカードの色(ニュース記事のカード(kiji_screen.dart の KijiLinkCard)とそろえる)
+const Color _cardWaku = Color(0xFF161616);
+const Color _cardSen = Color(0xFF333333);
+const Color _cardUsui = Color(0xFF9E9E9E);
+
+/// 結果画面に置くカード(2.0.5)
+/// ・ほかのリンクに紛れないよう、ニュース記事のカードと同じ形にして、
+///   自分の大学(出ていなければ11位の大学)の帯を、グラフの画面と同じ横軸で抜き出して出す
+/// ・結果は画面を出したあとで1回だけ作る(画面が出るのを遅らせない)。
+///   大会が変わったら作り直すよう、置く側で key を付ける
+/// ・結果がなければ出さない
+class YosenBunpuCard extends StatefulWidget {
+  const YosenBunpuCard({super.key});
+
+  @override
+  State<YosenBunpuCard> createState() => _YosenBunpuCardState();
+}
+
+class _YosenBunpuCardState extends State<YosenBunpuCard> {
+  _Bunpu? _b;
+
+  /// 結果を作ったか
+  bool _tsukutta = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final _Bunpu? b = _Bunpu.yomu();
+      if (!mounted) return;
+      setState(() {
+        _b = b;
+        _tsukutta = true;
+      });
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final _Bunpu? b = _b;
+    if (_tsukutta && b == null) return const SizedBox.shrink();
+    final _Kou? kk = b?.daihyou;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: SizedBox(
+        width: double.infinity,
+        child: Material(
+          color: _cardWaku,
+          child: InkWell(
+            onTap: () => _bunpuGamenHiraku(context),
+            child: Container(
+              decoration: const BoxDecoration(
+                border: Border(
+                  left: BorderSide(color: Colors.tealAccent, width: 5),
+                  top: BorderSide(color: _cardSen),
+                  right: BorderSide(color: _cardSen),
+                  bottom: BorderSide(color: _cardSen),
+                ),
+              ),
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text.rich(
+                    TextSpan(
+                      children: [
+                        WidgetSpan(
+                          alignment: PlaceholderAlignment.middle,
+                          child: Icon(
+                            Icons.candlestick_chart,
+                            color: Colors.tealAccent,
+                            size: 16,
+                          ),
+                        ),
+                        TextSpan(text: ' チーム内のタイム分布'),
+                      ],
+                    ),
+                    style: TextStyle(
+                      color: Colors.tealAccent,
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  if (b != null && kk != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      '${kk.juni + 1}位 ${kk.x.mei}　${TimeDate.timeToJikanFunByouString(kk.x.time)}',
+                      style: TextStyle(
+                        color: kk.jibun ? Colors.orangeAccent : Colors.white,
+                        fontSize: 13,
+                      ),
+                    ),
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final double w = constraints.maxWidth;
+                        final List<double> memori = _memoriIchiran(
+                          _senKankaku(w, b.hayai, b.osoi),
+                          b.hayai,
+                          b.osoi,
+                        );
+                        return SizedBox(
+                          width: w,
+                          height: _gyouTakasa,
+                          child: CustomPaint(
+                            painter: _GyouPainter(
+                              kk,
+                              b.hayai,
+                              b.osoi,
+                              memori,
+                              b.senHeikin,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                  const SizedBox(height: 4),
+                  const Text(
+                    'グラフを見る ›',
+                    style: TextStyle(color: _cardUsui, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// 並べ方(0=順位・1=幅が小さい順・2=1番手が速い順・3=10番手が速い順)
 const List<String> _narabiMei = ['順位', '幅が小さい順', '1番手が速い順', '10番手が速い順'];
 
@@ -125,53 +383,15 @@ class _ModalYosenTimeBunpuViewState extends State<ModalYosenTimeBunpuView> {
   }
 
   void _yomu() {
-    final KijiKankyou? k = KijiKankyou.yomuRace(_yosenRace, kekka: true);
-    final YosenKekka? e = k == null ? null : YosenKekka.tsukuru(k);
-    _e = e;
-    if (e == null) return;
-    final YosenUnivKekka? jibun = e.jibun;
-    for (final YosenUnivKekka x in e.jun) {
-      final int keisan = math.min(e.keisanNinzuu, x.senshu.length);
-      if (keisan <= 0) continue;
-      final List<double> t = [for (final YosenSenshuKekka y in x.senshu) y.time];
-      double goukei = 0;
-      for (int i = 0; i < keisan; i++) {
-        goukei += t[i];
-      }
-      final int naka = keisan ~/ 2;
-      final double chuuouchi = keisan.isOdd
-          ? t[naka]
-          : (t[naka - 1] + t[naka]) / 2;
-      _kou.add(
-        _Kou(
-          x,
-          t,
-          keisan,
-          goukei / keisan,
-          chuuouchi,
-          e.tsuuka(x),
-          identical(x, jibun),
-        ),
-      );
-    }
-    if (_kou.isEmpty) return;
-    if (e.borderAri) {
-      final YosenUnivKekka sen = e.jun[e.tsuukaSuu - 1];
-      for (final _Kou kk in _kou) {
-        if (identical(kk.x, sen)) _senHeikin = kk.heikin;
-      }
-    }
-    // 横軸の範囲。合計に入った選手は必ず入れる。
-    // 合計に入らなかった選手は、10番手の一番遅いタイムから _sotoHaba 秒までにする
-    final double hayai = _kou.map((kk) => kk.ichiban).reduce(math.min);
-    final double osoi10 = _kou.map((kk) => kk.saigo).reduce(math.max);
-    final double osoiZen = _kou.map((kk) => kk.t.last).reduce(math.max);
-    final double osoi = math.min(osoiZen, osoi10 + _sotoHaba);
-    final double haba = math.max(osoi - hayai, 60.0);
-    final double yoyuu = haba * 0.04;
-    _hayai = hayai - yoyuu;
-    _osoi = hayai + haba + yoyuu;
-    if (jibun != null) _hiraku = jibun.u.id;
+    final _Bunpu? b = _Bunpu.yomu();
+    if (b == null) return;
+    _e = b.e;
+    _kou.addAll(b.kou);
+    _senHeikin = b.senHeikin;
+    _hayai = b.hayai;
+    _osoi = b.osoi;
+    // 結果画面のカードと同じ大学を開いておく
+    _hiraku = b.daihyou.x.u.id;
   }
 
   /// 並べ替えた大学

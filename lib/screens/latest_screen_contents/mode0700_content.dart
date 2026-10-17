@@ -1447,6 +1447,17 @@ class _Mode0700ContentState extends State<Mode0700Content> {
                                                 // 正月駅伝は学連選抜通信の結果号と速報も(1.9.7)
                                                 annai: kijiGakunaiAnnai(gakuren: true),
                                               ),
+                                            // 正月駅伝予選のチーム内のタイム分布(2.0.5。Modal_yosenTimeBunpu.dart)
+                                            // 目立つように、ニュース記事のカードと同じ形のカードにして、
+                                            // 自分の大学(出ていなければ11位の大学)の帯を抜き出して出す
+                                            if (currentGhensuu
+                                                    .hyojiracebangou ==
+                                                4)
+                                              YosenBunpuCard(
+                                                key: ValueKey(
+                                                  'yosenBunpu_${currentGhensuu.year}',
+                                                ),
+                                              ),
                                             // 最終区(11月駅伝予選は最終組)を走った自分の大学の選手の成績(1.9.9)
                                             // 指示画面の「==直近区間==」と同じ形。一番下の「選手の成績」まで
                                             // スクロールしなくても見られるように、ニュース記事のカードのすぐ下に置く
@@ -1521,68 +1532,6 @@ class _Mode0700ContentState extends State<Mode0700Content> {
                                                 },
                                                 child: Text(
                                                   "全大学結果概要",
-                                                  style: TextStyle(
-                                                    color: const Color.fromARGB(
-                                                      255,
-                                                      0,
-                                                      255,
-                                                      0,
-                                                    ),
-                                                    decoration: TextDecoration
-                                                        .underline,
-                                                    decorationColor:
-                                                        HENSUU.textcolor,
-                                                  ),
-                                                ),
-                                              ),
-
-                                            // 正月駅伝予選のチーム内のタイム分布(2.0.5。Modal_yosenTimeBunpu.dart)
-                                            if (currentGhensuu
-                                                    .hyojiracebangou ==
-                                                4)
-                                              TextButton(
-                                                onPressed: () {
-                                                  showGeneralDialog(
-                                                    context: context,
-                                                    barrierColor: Colors.black
-                                                        .withOpacity(0.8),
-                                                    barrierDismissible: true,
-                                                    barrierLabel:
-                                                        'チーム内のタイム分布',
-                                                    transitionDuration:
-                                                        const Duration(
-                                                          milliseconds: 300,
-                                                        ),
-                                                    pageBuilder:
-                                                        (
-                                                          context,
-                                                          animation,
-                                                          secondaryAnimation,
-                                                        ) {
-                                                          return const ModalYosenTimeBunpuView();
-                                                        },
-                                                    transitionBuilder:
-                                                        (
-                                                          context,
-                                                          animation,
-                                                          secondaryAnimation,
-                                                          child,
-                                                        ) {
-                                                          return FadeTransition(
-                                                            opacity:
-                                                                CurvedAnimation(
-                                                                  parent:
-                                                                      animation,
-                                                                  curve: Curves
-                                                                      .easeOut,
-                                                                ),
-                                                            child: child,
-                                                          );
-                                                        },
-                                                  );
-                                                },
-                                                child: Text(
-                                                  "チーム内のタイム分布",
                                                   style: TextStyle(
                                                     color: const Color.fromARGB(
                                                       255,

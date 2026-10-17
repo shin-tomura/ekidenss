@@ -747,20 +747,20 @@ class _ModalKukanTimeBunpuViewState extends State<ModalKukanTimeBunpuView> {
       '・区間1位 ${ichi.mei} ${_senshuMei(ichi.senshu[r.kk])} ${jikanMoji(r.ichii)}${r.kukanShin ? '(区間新)' : ''}',
     );
     l.add(
-      '・2位(${r.jun[1].mei})との差 ${saMoji(saByou(r.t[1], r.ichii))}(${km1Moji(r.t[1] - r.ichii)})',
+      '・区間2位(${r.jun[1].mei})との差 ${saMoji(saByou(r.t[1], r.ichii))}(${km1Moji(r.t[1] - r.ichii)})',
     );
     l.add(
-      '・区間の中央値 ${jikanMoji(r.chuuouchi)}(1位から+${saMoji(saByou(r.chuuouchi, r.ichii))})',
+      '・区間の中央値 ${jikanMoji(r.chuuouchi)}(区間1位から+${saMoji(saByou(r.chuuouchi, r.ichii))})',
     );
     l.add(
-      '・1位〜最下位の幅 ${saMoji(saByou(r.t.last, r.ichii))}(${km1Moji(r.t.last - r.ichii)})',
+      '・区間1位〜区間最下位の幅 ${saMoji(saByou(r.t.last, r.ichii))}(${km1Moji(r.t.last - r.ichii)})',
     );
     final int? jj = r.jibunJuni;
     if (jj != null) {
       final EkidenUnivKekka x = r.jun[jj];
       final String sa = jj == 0
           ? ''
-          : '(1位から+${saMoji(saByou(r.t[jj], r.ichii))})';
+          : '(区間1位から+${saMoji(saByou(r.t[jj], r.ichii))})';
       l.add(
         '・${x.mei} ${_senshuMei(x.senshu[r.kk])} 区間${jj + 1}位 ${jikanMoji(r.t[jj])}$sa',
       );
@@ -769,7 +769,7 @@ class _ModalKukanTimeBunpuViewState extends State<ModalKukanTimeBunpuView> {
     if (g != null) {
       final int gs = saByou(g.kukanTime, r.ichii);
       l.add(
-        '・学連選抜(OP) ${g.senshu.name}(${daigakuMeiMoji(g.shozoku)}・${g.senshu.gakunen}年) 区間${g.kukanJuni + 1}位相当 ${jikanMoji(g.kukanTime)}(1位から${gs < 0 ? '-' : '+'}${saMoji(gs)})',
+        '・学連選抜(OP) ${g.senshu.name}(${daigakuMeiMoji(g.shozoku)}・${g.senshu.gakunen}年) 区間${g.kukanJuni + 1}位相当 ${jikanMoji(g.kukanTime)}(区間1位から${gs < 0 ? '-' : '+'}${saMoji(gs)})',
       );
     }
     return Padding(

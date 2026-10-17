@@ -5,6 +5,7 @@
 //   10人の点・平均(合計÷10)・中央値・合計に入らなかった11・12番手(白抜き)を重ねる。
 // ・右ほど速いタイム。合計は上位10人の合計なので、平均の並びがそのまま順位の並びになる。
 // ・10位の大学の平均に縦の点線を引き、順位の並びでは10位と11位の間に区切りを入れる。
+// ・大学名の行の合計タイムの右に、通過ラインとの差を出す(11位以下は10位との差を+、10位以内は11位との差を-)。
 // ・大学を押すと、その下に選手ごとのタイムと、10番手が中央値で走っていたときの順位相当を出す。
 // ・結果は記事と同じ YosenKekka(kiji_yosen.dart)から作る。
 // ・並びの切り替えは覚えない(開くたびに順位の並び。予備の配列は使わない)。
@@ -195,6 +196,33 @@ List<double> _memoriIchiran(double kankaku, double hayai, double osoi) {
   return memori;
 }
 
+/// 大学名の行に出す通過ラインとのタイム差
+/// (11位以下は10位との差「(+1分05秒)」、10位以内は11位との差「(-12秒)」。
+///  画面に出ている合計タイム(秒未満は切り捨て)どうしの差。通過ラインの争いがなければnull)
+String? _tsuukaSaMoji(_Kou kk, YosenKekka e) {
+  if (!e.borderAri) return null;
+  final int sa = kk.tsuuka
+      ? saByou(e.jun[e.tsuukaSuu].time, kk.x.time)
+      : saByou(kk.x.time, e.jun[e.tsuukaSuu - 1].time);
+  return '(${kk.tsuuka ? '-' : '+'}${saMoji(sa)})';
+}
+
+/// 大学名の行(グラフの画面の各行と、結果画面のカードで使う)
+/// 「11位 港南大」「10時間35分12秒」「(+1分05秒)」の3つのかたまりに分け、
+/// 入りきらないときは、かたまりの間で折り返す(タイムや差の途中では切らない)
+Widget _midashiGyou(_Kou kk, YosenKekka e, Color iro) {
+  final TextStyle s = TextStyle(color: iro, fontSize: 13);
+  final String? sa = _tsuukaSaMoji(kk, e);
+  return Wrap(
+    crossAxisAlignment: WrapCrossAlignment.center,
+    children: [
+      Text('${kk.juni + 1}位 ${kk.x.mei}　', style: s),
+      Text(TimeDate.timeToJikanFunByouString(kk.x.time), style: s),
+      if (sa != null) Text(sa, style: s),
+    ],
+  );
+}
+
 /// グラフの画面を開く
 void _bunpuGamenHiraku(BuildContext context) {
   showGeneralDialog(
@@ -300,12 +328,10 @@ class _YosenBunpuCardState extends State<YosenBunpuCard> {
                   ),
                   if (b != null && kk != null) ...[
                     const SizedBox(height: 4),
-                    Text(
-                      '${kk.juni + 1}位 ${kk.x.mei}　${TimeDate.timeToJikanFunByouString(kk.x.time)}',
-                      style: TextStyle(
-                        color: kk.jibun ? Colors.orangeAccent : Colors.white,
-                        fontSize: 13,
-                      ),
+                    _midashiGyou(
+                      kk,
+                      b.e,
+                      kk.jibun ? Colors.orangeAccent : Colors.white,
                     ),
                     LayoutBuilder(
                       builder: (context, constraints) {
@@ -656,12 +682,10 @@ class _ModalYosenTimeBunpuViewState extends State<ModalYosenTimeBunpuView> {
           children: [
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Text(
-                '${kk.juni + 1}位 ${kk.x.mei}　${TimeDate.timeToJikanFunByouString(kk.x.time)}',
-                style: TextStyle(
-                  color: kk.jibun ? Colors.orangeAccent : HENSUU.textcolor,
-                  fontSize: 13,
-                ),
+              child: _midashiGyou(
+                kk,
+                e,
+                kk.jibun ? Colors.orangeAccent : HENSUU.textcolor,
               ),
             ),
             SizedBox(
@@ -671,7 +695,7 @@ class _ModalYosenTimeBunpuViewState extends State<ModalYosenTimeBunpuView> {
                 painter: _GyouPainter(kk, _hayai, _osoi, memori, _senHeikin),
               ),
             ),
-            if (hiraita) _buildNakami(kk, e),
+            if (hiraita) _buildNakami(kk),
           ],
         ),
       ),
@@ -679,7 +703,8 @@ class _ModalYosenTimeBunpuViewState extends State<ModalYosenTimeBunpuView> {
   }
 
   /// 押した大学の中身
-  Widget _buildNakami(_Kou kk, YosenKekka e) {
+  /// (通過ラインとのタイム差は、大学名の行に出す)
+  Widget _buildNakami(_Kou kk) {
     const TextStyle moji = TextStyle(
       color: Colors.white70,
       fontSize: 13,
@@ -697,15 +722,6 @@ class _ModalYosenTimeBunpuViewState extends State<ModalYosenTimeBunpuView> {
       l.add('　・平均が中央値より${saMoji(sa.round())}速く、速い選手が引き上げた形です。');
     }
     l.add('・1〜${kk.keisan}番手の幅 ${saMoji(kk.haba.round())}');
-    if (e.borderAri) {
-      if (kk.tsuuka) {
-        final int sa2 = saByou(e.jun[e.tsuukaSuu].time, kk.x.time);
-        l.add('・次点の${e.tsuukaSuu + 1}位とは${kinsaMoji(sa2)}');
-      } else {
-        final int sa2 = saByou(kk.x.time, e.jun[e.tsuukaSuu - 1].time);
-        l.add('・${e.tsuukaSuu}位とは${kinsaMoji(sa2)}');
-      }
-    }
     // 最後の1人が中央値で走っていたら(置き換えた見積もり。11番手は10番手より遅いので、合計に入る顔ぶれは変わらない)
     if (kk.keisan >= 2 && kk.saigo > kk.chuuouchi) {
       final double moshi = kk.x.time - (kk.saigo - kk.chuuouchi);

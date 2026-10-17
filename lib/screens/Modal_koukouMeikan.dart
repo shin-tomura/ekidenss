@@ -1645,7 +1645,7 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
         borderRadius: BorderRadius.circular(6),
       ),
       child: const Text(
-        '高校の大会は、実在と同じ時期に行われます。'
+        '高校の大会は、毎年決まった時期に行われます。'
         '高校総体は7月下旬、都道府県予選と地区大会は11月中旬、全国高校駅伝は12月下旬に結果が出て、'
         'そのときに記録が増えます。'
         '今の高校3年生(次の4月に大学に入る世代)の回は、終わった大会から見られます。',

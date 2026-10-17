@@ -12,6 +12,7 @@ import 'package:ekiden/kansuu/bokou_pipe.dart'; // この高校出身の監督(2
 import 'package:ekiden/screens/setsumei_mado.dart'
     show BokouPipeSetsumeiLink; // 「母校パイプとは」のリンク(2.0.1)
 import 'package:ekiden/kansuu/time_date.dart';
+import 'package:ekiden/screens/kiji_screen.dart' show kijiKoukouHiraku; // 高校の大会の記事(2.0.4)
 import 'package:ekiden/screens/Modal_senshu.dart'
     show ModalSenshuDetailView; // 高校のページの卒業生を押すと選手の詳細の小窓(2.0.3)
 
@@ -1534,6 +1535,9 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
   /// コンピュータスカウトONでスカウトの途中か(決まっていない新入生の大学を出さない。1.9.5)
   bool _scoutChuu = false;
 
+  /// 高校の大会の記事を読めるか(2.0.4。高校の情報を表示しない設定でなく、記事を書く回があるとき)
+  bool _kijiAri = false;
+
   static const List<String> _shumokuMei = ['1500m', '5000m', '3000m障害'];
 
   @override
@@ -1561,6 +1565,35 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
         _scoutChuu = kantoku != null && isComScoutOn(kantoku);
       }
     }
+    // 高校の大会の記事(2.0.4)
+    if (Hive.isBoxOpen('kantokuBox')) {
+      final KantokuData? kantoku = Hive.box<KantokuData>('kantokuBox').get('KantokuData');
+      _kijiAri = kantoku != null && !koukouHyoujiNashi(kantoku) && koukouKijiNoKai() != null;
+    }
+  }
+
+  /// 高校の大会の記事を開くボタン(2.0.4。記事を読めるときだけ)
+  List<Widget> _kijiBotan(BuildContext context) {
+    if (!_kijiAri) return const [];
+    return [
+      Wrap(
+        spacing: 12,
+        runSpacing: 8,
+        children: [
+          OutlinedButton.icon(
+            onPressed: () => kijiKoukouHiraku(context),
+            icon: const Icon(Icons.article, color: Colors.redAccent),
+            label: const Text('高校の大会のニュース記事', style: _honbun),
+          ),
+        ],
+      ),
+      const SizedBox(height: 4),
+      const Text(
+        '今年度の高校総体・全国高校駅伝の予選と本大会の、箱庭スポーツの記事です(結果が出た大会の分)。',
+        style: _hosoku,
+      ),
+      const SizedBox(height: 12),
+    ];
   }
 
   /// 今年の新入生(スカウトの候補)の世代の回を、スカウトの途中に見ているか(1.9.9)
@@ -1883,6 +1916,7 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
       ],
       _jikiChuuki(),
       const SizedBox(height: 12),
+      ..._kijiBotan(context),
       const Text(
         '新入生の世代ごとに、高校3年のときの全国高校駅伝と高校総体の結果を、直近10回分残しています。'
         '大学に入った選手には進学先を、自分の大学に来た選手は色を変えて出します。'
@@ -2299,6 +2333,7 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
             style: _hosoku,
           ),
           const SizedBox(height: 8),
+          ..._kijiBotan(context),
           ..._kekka(
             k,
             0,

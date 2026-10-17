@@ -15,6 +15,7 @@ import 'package:ekiden/kansuu/kiji/kiji_ouro.dart'; // 正月駅伝の往路の�
 import 'package:ekiden/kansuu/kiji/kiji_shinnyuusei.dart'; // 新入生の記事(4月5日。2.0.0)
 import 'package:ekiden/kansuu/kiji/kiji_kyouka.dart'; // 強化プロジェクトの記事(4月5日。2.0.1)
 import 'package:ekiden/kansuu/kiji/kiji_tt.dart'; // 夏のTT特集(8月25日。2.0.0)
+import 'package:ekiden/kansuu/kiji/kiji_koukou_shinkou.dart'; // 高校の大会の記事(7月下旬・11月中旬・12月下旬。2.0.4)
 import 'package:ekiden/kansuu/gakuren_text.dart' show gakurenKonnenAri;
 
 export 'package:ekiden/kansuu/kiji/kiji_kihon.dart'
@@ -26,6 +27,8 @@ export 'package:ekiden/kansuu/kiji/kiji_shinnyuusei.dart' show kijiShinnyuuseiKa
 export 'package:ekiden/kansuu/kiji/kiji_tt.dart' show kijiTtKa, ttSaishuuRace;
 // スカウト前の高校の大会の記事(2.0.1。新入生のスカウトの画面で出す)
 export 'package:ekiden/kansuu/kiji/kiji_koukou_taikai.dart' show kijiKoukouTaikaiKa, koukouTaikaiKiji;
+// 高校の大会の記事(2.0.4。高校の大会の結果が出る日のお知らせと、高校名鑑から読む)
+export 'package:ekiden/kansuu/kiji/kiji_koukou_shinkou.dart' show kijiKoukouShinkouKa;
 
 // ------------------------------------------------------------
 // ニュース記事(箱庭スポーツ)の入口(1.9.2)
@@ -50,6 +53,8 @@ export 'package:ekiden/kansuu/kiji/kiji_koukou_taikai.dart' show kijiKoukouTaika
 // (kiji_shinnyuusei.dart。新入生の世代全体と、自分の大学の新入生の記事)
 // 2.0.0から、8月25日(夏のTTの最終日のロード10km)の結果画面で、箱庭スポーツの「夏のTT特集」と
 // 学内メディアの「学内TT特集」も読める(kiji_tt.dart)
+// 2.0.4から、高校の大会の結果が出る日(7月下旬の高校総体・11月中旬の都道府県予選と地区大会・12月下旬の
+// 全国高校駅伝)のお知らせと、高校名鑑から、箱庭スポーツの高校の大会の記事も読める(kiji_koukou_shinkou.dart)
 // ------------------------------------------------------------
 
 /// 表示中の大会の結果の記事
@@ -343,6 +348,18 @@ List<Kiji> kijiTtIchiran() {
   }
 }
 
+/// 箱庭スポーツの高校の大会の記事(2.0.4。今年度の高校の大会の、出した大会の分だけ。新しい順)
+List<Kiji> kijiKoukouShinkouIchiran() {
+  try {
+    final List<Kiji> list = koukouShinkouKiji();
+    _log(list);
+    return list;
+  } catch (e, st) {
+    debugPrint('[ニュース記事] 高校の大会の記事を作れませんでした: $e\n$st');
+    return [];
+  }
+}
+
 /// 学内メディアの「学内TT特集」(8月25日。2.0.0)
 List<Kiji> kijiGakunaiTtIchiran() {
   try {
@@ -427,6 +444,7 @@ void _log(List<Kiji> list) {
 /// [shinnyuusei] 新入生の記事のとき(箱庭スポーツの期待のルーキーと、学内メディアの新入生紹介号。2.0.0)
 /// [tt] 夏のTT特集のとき(箱庭スポーツの夏のTT特集と、学内メディアの学内TT特集。2.0.0)
 /// [scoutMae] スカウト前の高校の大会の記事のとき(箱庭スポーツの「スカウト解禁」。2.0.1)
+/// [koukou] 高校の大会の記事のとき(高校総体・全国高校駅伝の予選と本大会と、地方版。2.0.4)
 String kijiIraibun(
   bool kekka, {
   bool gakunai = false,
@@ -435,7 +453,18 @@ String kijiIraibun(
   bool shinnyuusei = false,
   bool tt = false,
   bool scoutMae = false,
+  bool koukou = false,
 }) {
+  // 高校の大会の記事(2.0.4)。高校3年生の進学先はまだ決まっていないので、決めつけないように頼む
+  if (koukou) {
+    return '以下は、駅伝ゲーム「箱庭小駅伝SS」の高校の大会の結果をもとにした、架空のスポーツニュースサイト'
+        '「$site」の、高校の陸上の記事です。あなたはスポーツ紙の高校陸上担当のベテラン記者として、'
+        '読みごたえのある記事に書き直してください。'
+        '記事の時点では、高校3年生の進学先はまだ決まっていません。進学先や、どの大学に入るかは書き足さないでください。'
+        '順位・タイム・選手名・高校名などの事実は変えないでください。'
+        '選手の性格や勝負強さなど、記事に書かれていない特徴は付け足さないでください。'
+        'コメントは記事の中のものだけを使い、新しい発言は作らないでください。\n\n';
+  }
   // スカウト前の高校の大会の記事(2.0.1)。進学先はまだ決まっていないので、決めつけないように頼む
   if (scoutMae) {
     return '以下は、駅伝ゲーム「箱庭小駅伝SS」の高校の大会の結果をもとにした、架空のスポーツニュースサイト'

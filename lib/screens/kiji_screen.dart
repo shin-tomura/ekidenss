@@ -327,6 +327,20 @@ void kijiTtHiraku(BuildContext context) {
   ]);
 }
 
+/// 高校の大会の記事を開く(2.0.4。高校の大会の結果が出た日のお知らせのカードと、高校名鑑・今年度の高校の大会の画面から。
+/// 今年度の高校の大会の、出した大会の分だけ。新しい順)
+void kijiKoukouHiraku(BuildContext context) {
+  _hiraku(context, [
+    KijiBan(
+      site: kijiSiteMei,
+      sub: '陸上ニュース・高校の大会',
+      list: kijiKoukouShinkouIchiran(),
+      kekka: true,
+      nashiMoji: '今年度の高校の大会の記事はまだありません',
+    ),
+  ]);
+}
+
 void _hiraku(BuildContext context, List<KijiBan> bans) {
   showGeneralDialog(
     context: context,
@@ -773,6 +787,7 @@ class _KijiIchiranGamenState extends State<KijiIchiranGamen> {
               shinnyuusei: list.isNotEmpty && kijiShinnyuuseiKa(list.first), // 新入生の記事(2.0.0)
               scoutMae: list.isNotEmpty && kijiKoukouTaikaiKa(list.first), // スカウト解禁の記事(2.0.1)
               tt: list.isNotEmpty && kijiTtKa(list.first), // 夏のTT特集(2.0.0)
+              koukou: list.isNotEmpty && kijiKoukouShinkouKa(list.first), // 高校の大会の記事(2.0.4)
             ) +
             list.map((k) => k.zenbun()).join('\n\n'),
         'すべての記事(依頼文つき)',
@@ -969,8 +984,8 @@ class KijiGamen extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            kijiKoukouTaikaiKa(kiji)
-                // スカウト解禁の記事(2.0.1)
+            kijiKoukouTaikaiKa(kiji) || kijiKoukouShinkouKa(kiji)
+                // スカウト解禁の記事(2.0.1)と高校の大会の記事(2.0.4)
                 ? 'この記事を依頼文つきでコピーして生成AIに貼り付けると、記者になりきって書き直してくれます。'
                 : kiji.category.endsWith('速報')
                 ? 'この速報を依頼文つきでコピーして生成AIに貼り付けると、記者になりきって書き直してくれます。'
@@ -1003,6 +1018,7 @@ class KijiGamen extends StatelessWidget {
                         shinnyuusei: kijiShinnyuuseiKa(kiji), // 新入生の記事(2.0.0)
                         scoutMae: kijiKoukouTaikaiKa(kiji), // スカウト解禁の記事(2.0.1)
                         tt: kijiTtKa(kiji), // 夏のTT特集(2.0.0)
+                        koukou: kijiKoukouShinkouKa(kiji), // 高校の大会の記事(2.0.4)
                       ) +
                       kiji.zenbun(),
                   'この記事(依頼文つき)',

@@ -262,22 +262,28 @@ KishaKata kishaKataKara(String kishaMei) {
 // 見出しの型を前の年と重ねないための記録(2.0.0。年に1度の記事で使う。新入生の記事・夏のTT特集)
 // KantokuData.yobiint3[index] に、年度×10000 + 前の年の型×100 + 今年の型 を残す(型は1〜98。前の年がなければ99)。
 // 同じ年度に何度記事を作っても同じ見出しになるように、同じ年度ではもう書き換えない
+// 2.0.4から、[yobiint4] が true なら KantokuData.yobiint4[index] に残す(高校の大会の記事。yobiint3 は全部使ったため)
 // ------------------------------------------------------------
 
 class KijiMidashiKiroku {
   const KijiMidashiKiroku._();
 
+  /// 残す予備の配列(2.0.4。yobiint3 か yobiint4)
+  static List<int> _hairetsu(KijiKankyou k, bool yobiint4) =>
+      yobiint4 ? k.kantoku.yobiint4 : k.kantoku.yobiint3;
+
   /// 残っている値(年度・前の年の型・今年の型。なければnull)
-  static ({int nendo, int mae, int kon})? _yomu(KijiKankyou k, int index) {
-    if (k.kantoku.yobiint3.length <= index) return null;
-    final int v = k.kantoku.yobiint3[index];
+  static ({int nendo, int mae, int kon})? _yomu(KijiKankyou k, int index, bool yobiint4) {
+    final List<int> h = _hairetsu(k, yobiint4);
+    if (h.length <= index) return null;
+    final int v = h[index];
     if (v <= 0) return null;
     return (nendo: v ~/ 10000, mae: (v ~/ 100) % 100, kon: v % 100);
   }
 
   /// 今年度[nendo]の記事を作るときの、前の年の見出しの型(分からなければnull)
-  static int? maeNoKata(KijiKankyou k, int index, int nendo) {
-    final ({int nendo, int mae, int kon})? m = _yomu(k, index);
+  static int? maeNoKata(KijiKankyou k, int index, int nendo, {bool yobiint4 = false}) {
+    final ({int nendo, int mae, int kon})? m = _yomu(k, index, yobiint4);
     if (m == null) return null;
     if (m.nendo == nendo) return m.mae >= 1 && m.mae <= 98 ? m.mae : null;
     if (m.nendo == nendo - 1) return m.kon >= 1 && m.kon <= 98 ? m.kon : null;
@@ -285,11 +291,12 @@ class KijiMidashiKiroku {
   }
 
   /// 今年度の見出しの型[kon]を残す(同じ年度でもう残していれば何もしない。保存は待たない)
-  static void nokosu(KijiKankyou k, int index, int nendo, int? mae, int kon) {
-    if (k.kantoku.yobiint3.length <= index) return;
-    final ({int nendo, int mae, int kon})? m = _yomu(k, index);
+  static void nokosu(KijiKankyou k, int index, int nendo, int? mae, int kon, {bool yobiint4 = false}) {
+    final List<int> h = _hairetsu(k, yobiint4);
+    if (h.length <= index) return;
+    final ({int nendo, int mae, int kon})? m = _yomu(k, index, yobiint4);
     if (m != null && m.nendo == nendo) return;
-    k.kantoku.yobiint3[index] = nendo * 10000 + (mae ?? 99) * 100 + kon;
+    h[index] = nendo * 10000 + (mae ?? 99) * 100 + kon;
     k.kantoku.save();
   }
 }

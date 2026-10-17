@@ -18,6 +18,8 @@ import 'package:ekiden/kansuu/kiji/kiji_kihon.dart';
 //   「スカウトの見どころ」(地区めぐりの最初の地区・監督の母校・強化プロジェクト)を中心にする。
 //   個人の話(1区の区間賞・高校総体・世代トップ)は短く触れ、表に出す
 // ・見出しの型は、前の年と同じ型を避ける(KantokuData.yobiint3[85]。kiji_kihon.dart の KijiMidashiKiroku)
+// ・2.0.4から、高校の大会の結果は大会の日に箱庭スポーツの記事でも伝える(kiji_koukou_shinkou.dart)ので、
+//   この記事の見出しは「世代の層」と「名門校のそろい踏み」から選ぶ(全国高校駅伝の優勝校・接戦の型は使わない)
 // ・守る決まり(期待のルーキーと同じ):
 //   ・大学名は書かない(進学先はまだ決まっていない。仮の振り分けの大学を見せないため)。
 //     ただし、見どころの監督の母校・強化プロジェクトの大学は書く(どちらも画面に出ている事実)
@@ -155,23 +157,7 @@ class _Kakite {
 
   // ---- 点 ----
 
-  int get yuushouTen {
-    final KoukouKirokuTeam? t = yuushou;
-    if (t == null) return 0;
-    int ten = 60;
-    if (t.yuushouRenzoku >= 2) ten += 15;
-    if (t.yuushouKaime == 1) ten += 15;
-    if (t.yuushouBuri >= 5) ten += 10;
-    return ten;
-  }
-
-  int get sessenTen {
-    final int? sa = sessenSa;
-    if (sa == null) return 0;
-    if (sa <= 3) return 85;
-    if (sa <= 10) return 70;
-    return 0;
-  }
+  // 全国高校駅伝の優勝校と接戦の点(yuushouTen・sessenTen)は、2.0.4から見出しに使わないので除いた
 
   int get kazuTen {
     if (san.isEmpty) return 0;
@@ -489,8 +475,8 @@ List<Kiji> koukouTaikaiKiji() {
       if (ten > 0) kouho.add((g: g, ten: ten + w.r.ikutsu(10)));
     }
 
-    ire(_gYuushou, r.yuushouTen);
-    ire(_gSessen, r.sessenTen);
+    // 2.0.4から、全国高校駅伝の優勝校と接戦は12月下旬の記事(kiji_koukou_shinkou.dart)で伝えるので、
+    // 見出しは世代の層と名門校のそろい踏みから選ぶ(全国高校駅伝の段落は振り返りとして残す)
     ire(_gKazu, r.kazuTen);
     if (r.meimonTen >= 60) ire(_gMeimon, r.meimonTen);
     if (kouho.isEmpty) return [];

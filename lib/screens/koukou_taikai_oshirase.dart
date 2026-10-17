@@ -6,12 +6,15 @@ import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/skip.dart';
 import 'package:ekiden/kansuu/koukou.dart';
 import 'package:ekiden/screens/Modal_koukouMeikan.dart' show KoukouTaikaiShinkouGamen;
+import 'package:ekiden/screens/kiji_screen.dart' show KijiLinkCard, kijiKoukouHiraku; // 高校の大会の記事(2.0.4)
+import 'package:ekiden/kansuu/kiji/kiji.dart' show kijiKoukouShinkouIchiran;
 
 // ------------------------------------------------------------
 // 高校の大会の結果が出た日のお知らせ(2.0.4)
 // ・7月下旬(高校総体)・11月中旬(都道府県予選と地区大会)・12月下旬(全国高校駅伝)に、その日の画面に出す
 //   (7月下旬と、記録会を11月にしている設定の11月中旬はレースの結果の画面、ほかはその日の画面)
 // ・「結果を見る」で、今の高校3年生の世代の回の画面(Modal_koukouMeikan.dart の KoukouTaikaiShinkouGamen)を開く
+// ・その日の箱庭スポーツの記事のカードも置く(2.0.4。見出しを予告し、今年度の高校の大会の記事の一覧を開く)
 // ・スキップ中・高校の情報を表示しない設定のとき・その世代の回がないとき(7月下旬に計算していない年度)は出さない
 // ------------------------------------------------------------
 
@@ -96,6 +99,15 @@ class KoukouTaikaiOshirase extends StatelessWidget {
               foregroundColor: HENSUU.buttonTextColor,
             ),
             child: const Text('結果を見る'),
+          ),
+          // 箱庭スポーツの記事(その日の大会の記事が一番上。2.0.4)
+          const SizedBox(height: 12),
+          KijiLinkCard(
+            key: ValueKey('kijiKoukou_${gh.year}_${gh.month}_${gh.day}'),
+            namae: 'ニュース記事(箱庭スポーツ)',
+            tsukuru: kijiKoukouShinkouIchiran,
+            hiraku: kijiKoukouHiraku,
+            annai: '高校の大会の記事です。高校名鑑の「大会の記録」からも、次の7月下旬まで読み返せます',
           ),
         ],
       ),

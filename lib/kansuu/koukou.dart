@@ -2019,6 +2019,40 @@ Future<void> _happyou(int sedai, int dankai) async {
   await _kaisuuJsonKaku(kaisuuJson);
 }
 
+/// 高校の大会の記事を書く回(2.0.4): 今の高校3年生の世代の回(7月下旬から次の4月まで)があればそれ、
+/// なければ今年度に大学に入った世代の回(4月から次の7月下旬まで読み返せるように)。なければnull
+KoukouTaikaiKiroku? koukouKijiNoKai() {
+  final int? nendo = _imaNoNendo();
+  if (nendo == null) return null;
+  KoukouTaikaiKiroku? kotoshi;
+  for (final KoukouTaikaiKiroku r in koukouTaikaiKirokuYomu()) {
+    if (r.nyuugakuNendo == nendo + 1) return r;
+    if (r.nyuugakuNendo == nendo) kotoshi = r;
+  }
+  return kotoshi;
+}
+
+/// 全国高校駅伝の結果を出す前の、高校ごとの出場の見込み(2.0.4。都道府県予選と地区大会の記事)
+/// [codes] の高校が[sedai]の世代の回に出場したときの、出場の回数目・連続出場の年数・何年ぶり
+/// (連続でない2回目以上の出場のとき。ほかは0)。12月下旬に足す数(_shutsujouSusumeru)と同じ決め方
+Map<int, ({int kaime, int renzoku, int buri})> koukouShutsujouMikomi(List<int> codes, int sedai) {
+  final Map<String, dynamic> j = _kaisuuJsonYomu();
+  final List<int> d = _kaisuuList(j, 'd', 0);
+  final List<int> rn = _kaisuuList(j, 'rn', 0);
+  final List<int> ln = _kaisuuList(j, 'ln', _mishutsujou);
+  final Map<int, ({int kaime, int renzoku, int buri})> m = {};
+  for (final int code in codes) {
+    if (code < 0 || code >= d.length) continue;
+    final int kaime = d[code] + 1;
+    final int maeSaigo = ln[code];
+    final int renzoku = (maeSaigo == sedai - 1 && rn[code] > 0) ? rn[code] + 1 : 1;
+    final int buri =
+        (renzoku == 1 && kaime >= 2 && maeSaigo != _mishutsujou && sedai - maeSaigo >= 2) ? sedai - maeSaigo : 0;
+    m[code] = (kaime: kaime, renzoku: renzoku, buri: buri);
+  }
+  return m;
+}
+
 /// 4月5日の新入生の世代の回に、7月下旬に先に決めた土台があれば返す(SenshuShokiti.dart で新入生を作るときに
 /// 順に使う。なければ空。2.0.4)
 List<ShinnyuuseiDodai> koukouRainenDodaiYomu() {

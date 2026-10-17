@@ -2172,6 +2172,22 @@ Map<int, ({int kaime, int renzoku, int buri})> koukouShutsujouMikomi(List<int> c
   return m;
 }
 
+/// 全国高校駅伝の連続出場が、[sedai]の世代の回で途切れた名簿の高校と、途切れるまでの連続出場の年数
+/// (2.0.4。都道府県予選と地区大会の記事)。前の世代の回([sedai]-1)まで連続して出場し、この回の出場校[deru]に
+/// 入っていない高校。12月下旬に回数を足したあとも、出場しなかった高校の最後に出た年度と連続出場の年数は
+/// 変わらないので、同じ結果になる(記録を残し始めてからの年数)
+Map<int, int> koukouRenzokuTogire(Set<int> deru, int sedai) {
+  final Map<String, dynamic> j = _kaisuuJsonYomu();
+  final List<int> rn = _kaisuuList(j, 'rn', 0);
+  final List<int> ln = _kaisuuList(j, 'ln', _mishutsujou);
+  final Map<int, int> m = {};
+  for (int code = 0; code < rn.length && code < ln.length; code++) {
+    if (deru.contains(code)) continue;
+    if (ln[code] == sedai - 1 && rn[code] > 0) m[code] = rn[code];
+  }
+  return m;
+}
+
 /// 4月5日の新入生の世代の回に、7月下旬に先に決めた土台があれば返す(SenshuShokiti.dart で新入生を作るときに
 /// 順に使う。なければ空。2.0.4)
 List<ShinnyuuseiDodai> koukouRainenDodaiYomu() {

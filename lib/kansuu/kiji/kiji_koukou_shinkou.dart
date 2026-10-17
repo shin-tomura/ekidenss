@@ -13,7 +13,8 @@ import 'package:ekiden/kansuu/kiji/kiji_kihon.dart';
 //   いつ読み返しても同じ記事になる
 // ・見出しの型は、前の年と同じ型を避ける(KantokuData.yobiint4[76]〜[78]。kiji_kihon.dart の KijiMidashiKiroku)
 // ・地方版(都道府県を選んで読む「箱庭スポーツ ○○版」): 7月下旬の高校総体(県大会・地区大会)と、
-//   11月中旬の全国高校駅伝の都道府県予選(地区大会も)。下の「地方版」を参照
+//   11月中旬の全国高校駅伝の都道府県予選(地区大会も)。下の「地方版」を参照。
+//   名前のない選手ばかりの記事になるので、2.0.4の開発中に出さないことにした(koukou.dart の koukouChihoubanAri)
 // ・守る決まり(スカウト解禁の記事と同じ):
 //   ・能力値・選手の性質・成長タイプ・隠れた逸材には触れない。持ちタイムも書かない(大学に入るときの記録なので、
 //     4月の記事に任せる)。書くのは大会の順位とタイムだけ
@@ -1512,6 +1513,7 @@ List<Kiji> _chihouYosenKiji(KijiKankyou k, KoukouTaikaiKiroku rec, KoukouChihouK
 /// 地方版の記事(2.0.4。都道府県[ken]の、出した大会の分だけ。新しい順: 全国高校駅伝の予選・高校総体)
 /// 高校の情報を表示しない設定のときと、地方版の記録がないとき(7月下旬に計算した回でないときなど)は空
 List<Kiji> koukouChihouKiji(int ken) {
+  if (!koukouChihoubanAri) return []; // 地方版を出さないあいだ(2.0.4)
   final KijiKankyou? k = KijiKankyou.yomuRace(2);
   if (k == null || koukouHyoujiNashi(k.kantoku)) return [];
   final KoukouTaikaiKiroku? rec = koukouKijiNoKai();
@@ -1534,6 +1536,7 @@ List<Kiji> koukouChihouKiji(int ken) {
 
 /// 地方版の記事を読めるか(今年度の高校の大会の記事を書く回に、地方版の記録があるか。2.0.4)
 bool koukouChihouAri() {
+  if (!koukouChihoubanAri) return false; // 地方版を出さないあいだ(2.0.4。入口のカードとボタンも出ない)
   final KoukouTaikaiKiroku? rec = koukouKijiNoKai();
   if (rec == null) return false;
   return koukouChihouKirokuYomu(rec.nyuugakuNendo) != null;

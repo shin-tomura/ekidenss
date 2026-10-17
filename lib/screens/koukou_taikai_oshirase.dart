@@ -15,7 +15,7 @@ import 'package:ekiden/kansuu/kiji/kiji.dart' show kijiKoukouShinkouIchiran;
 //   (7月下旬と、記録会を11月にしている設定の11月中旬はレースの結果の画面、ほかはその日の画面)
 // ・「結果を見る」で、今の高校3年生の世代の回の画面(Modal_koukouMeikan.dart の KoukouTaikaiShinkouGamen)を開く
 // ・その日の箱庭スポーツの記事のカードも置く(2.0.4。見出しを予告し、今年度の高校の大会の記事の一覧を開く。
-//   一覧の下から地方版(都道府県ごとの記事)も開ける)
+//   地方版(都道府県ごとの記事)を出すときは、一覧の下から地方版も開ける。koukou.dart の koukouChihoubanAri)
 // ・スキップ中・高校の情報を表示しない設定のとき・その世代の回がないとき(7月下旬に計算していない年度)は出さない
 // ------------------------------------------------------------
 
@@ -108,8 +108,8 @@ class KoukouTaikaiOshirase extends StatelessWidget {
             namae: 'ニュース記事(箱庭スポーツ)',
             tsukuru: kijiKoukouShinkouIchiran,
             hiraku: kijiKoukouHiraku,
-            // 7月下旬と11月中旬は、地方版(都道府県ごとの記事)にも記事が出る(2.0.4)
-            annai: gh.month == koukouZenkokuMonth
+            // 7月下旬と11月中旬は、地方版(都道府県ごとの記事)にも記事が出る(2.0.4。地方版を出さないあいだは案内しない)
+            annai: (gh.month == koukouZenkokuMonth || !koukouChihoubanAri)
                 ? '高校の大会の記事です。高校名鑑の「大会の記録」からも、次の7月下旬まで読み返せます'
                 : '高校の大会の記事です。一覧の下の地方版では、都道府県ごとの記事も読めます。'
                     '高校名鑑の「大会の記録」からも、次の7月下旬まで読み返せます',

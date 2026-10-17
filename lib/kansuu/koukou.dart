@@ -920,7 +920,9 @@ int _bukatsuKimeru(SenshuData s, Random r) {
 /// 引き継いだ組などを [hikitsugiOut] に入れて返す(記録のその選手に名前を付けるため。1.9.5)
 /// [ryuuOut] を渡すと、名簿の高校の名前のない留学生の結果を
 /// [記録の中だけの番号, 高校の番号, 内部の持ちタイム(0.1秒), 高校の情報(経歴3)を詰めた値] で入れて返す
-/// (2.0.4。7月下旬の計算で、4月に大学に来た留学生に当てはめるため)
+/// (2.0.4。7月下旬の計算で、4月に大学に来た留学生に当てはめるため)。
+/// 全国高校駅伝で9位以下の高校の走者だった留学生は、その後ろに[チームの並び(z と同じ), 走者の行(m の形)]も付ける
+/// (9位以下の高校の走者は大学に入った選手だけを残すので、4月に当てはめたときに、m のそのチームに足す)
 Map<int, KoukouJouhou> _nendoKeisan(
   List<SenshuData> shinnyuusei,
   Random r, [
@@ -1008,6 +1010,8 @@ Map<int, KoukouJouhou> _nendoKeisan(
   // 大会の記録の中だけの番号を、-2から下へ付ける(1.9.5)
   int nanashiBan = -2;
   final List<_Kousei> ryuuNanashi = []; // 結果を残す名前のない留学生(2.0.4)
+  // 結果を残す名前のない留学生のうち、全国高校駅伝で9位以下の高校の走者だった選手の[チームの並び, 走者の行](2.0.4)
+  final Map<_Kousei, List<dynamic>> ryuuKyuuiIka = {};
   for (int i = 0; i < koukouMeibo.length; i++) {
     for (final int g in const [3, 3, 3, 2, 2, 2, 1, 1, 1]) {
       final _Kousei n = _nanashi(koukouMeibo[i].meimon, g, r);
@@ -1195,6 +1199,18 @@ Map<int, KoukouJouhou> _nendoKeisan(
     for (int j = 0; j < zenkokuTeams.length && j < 8; j++) {
       medatsu.addAll(zenkokuTeams[j].ku);
     }
+    // 9位以下の高校の走者だった、結果を残す名前のない留学生(2.0.4。m には残さず、4月に大学の留学生に
+    // 当てはめたときに足す。留学生は1校に1人で必ず走るので、補欠にはならない)
+    for (int j = 8; j < zenkokuTeams.length; j++) {
+      for (int kk = 0; kk < zenkokuTeams[j].ku.length; kk++) {
+        final _Kousei k = zenkokuTeams[j].ku[kk];
+        if (!k.tsuiseki || k.s != null) continue;
+        ryuuKyuuiIka[k] = <dynamic>[
+          j,
+          [..._soushaKiroku(k, zenkokuTeams[j].times[kk]), kk + 1, kk < zkj.length ? zkj[kk][j] + 1 : 0],
+        ];
+      }
+    }
   }
 
   // ---- 高校総体(県大会 → 地区大会 → 全国大会) ----
@@ -1366,6 +1382,7 @@ Map<int, KoukouJouhou> _nendoKeisan(
         k.koukou,
         (k.t5 * 10).round(),
         _kekkaMatome(k, k.koukou + 1, koukouKeirekiRyuugakusei).kakikomi(0),
+        ...?ryuuKyuuiIka[k], // 9位以下の高校の走者だったときは、チームの並びと走者の行
       ]);
     }
   }
@@ -1825,10 +1842,13 @@ bool _hikitsugiNaosu(List<dynamic> kiroku, List<_HikitsugiKekka> l, Map<int, Sen
 // ・都道府県予選・地区大会の優勝回数は11月中旬に、全国高校駅伝の出場回数・優勝回数などは12月下旬に足す
 // ・土台の選手は、記録では種類4(koukouShuruiRainen。大学id -1、選手のidは _dodaiId(土台の番号))で、名前を出す
 // ・回には、土台(dt。高校の情報も入れた形)と、名前のない留学生の結果(ry)も入れておく
+//   (ry には、全国高校駅伝で9位以下の高校の走者だった留学生の、チームの並びと走者の行も入れる。
+//   9位以下の高校の走者は大学に入った選手だけを残すので、4月に当てはめたときに、そのチームの走者に足す)
 // ・4月5日の新入生は、土台を順に使って作る(SenshuShokiti.dart。高校の情報も土台のまま)。大学の振り分けのあと
 //   (koukouShinnyuuseiNiUtsusu)、記録の種類4の選手を、名前の合う日本人の新入生(種類0・選手のid・大学)に
 //   付け替える。留学生の枠に回って大学に入らなかった選手は、名前のない3年生(種類2)に戻す
-//   (「名前が出ている選手は、ゲームの大学に入った選手」の決まりを、4月からは今まで通りにするため)
+//   (「名前が出ている選手は、ゲームの大学に入った選手」の決まりを、4月からは今まで通りにするため)。
+//   名前のない3年生に戻した選手は、9位以下の高校の走者(m)からは除く(大学に入った選手だけを残す決まりのため)
 // ・大学に来た留学生は、約半分(_ryuugakuseiKoukouWariai)を、その回の名前のない留学生のうち、力の近い選手
 //   (名門の高校ほど選ばれやすい)に当てはめ、記録のその選手を種類1に付け替える。残りは日本の高校に通っていない
 // ・土台・名前のない留学生の結果・mi・ph は、4月5日に付け替えたあとに消す
@@ -2254,11 +2274,16 @@ Future<void> _utsusuHontai() async {
   // 大学に来た留学生: 約半分を、この回の名前のない留学生のうち、力の近い選手に当てはめる
   // (名門の高校ほど選ばれやすい。1校の留学生は1人なので、1校から大学に来る留学生は1人まで)
   final List<List<num>> ry = [];
+  // 全国高校駅伝で9位以下の高校の走者だった留学生の、チームの並びと走者の行(ry と同じ並び。ほかはnull)
+  final List<({int j, List<dynamic> gyou})?> ryKyuuiIka = [];
   final dynamic ryMoto = kai['ry'];
   if (ryMoto is List) {
     for (final dynamic e in ryMoto) {
       if (e is List && e.length >= 4 && e[0] is num && e[1] is num && e[2] is num && e[3] is num) {
         ry.add([e[0] as num, e[1] as num, e[2] as num, e[3] as num]);
+        ryKyuuiIka.add(
+          (e.length >= 6 && e[4] is num && _soushaKa(e[5])) ? (j: (e[4] as num).toInt(), gyou: e[5] as List<dynamic>) : null,
+        );
       }
     }
   }
@@ -2297,6 +2322,12 @@ Future<void> _utsusuHontai() async {
       s.samusataisei = KoukouJouhou.yomu(ry[erabu][3].toInt()).kakikomi(s.samusataisei);
       // 記録のその留学生を、大学に入った留学生にする
       final int kirokuId = ry[erabu][0].toInt();
+      // 9位以下の高校の走者だったときは、その高校の走者の欄(m)に行を足す(下で一緒に付け替える。2.0.4)
+      final ({int j, List<dynamic> gyou})? kyuuiIka = ryKyuuiIka[erabu];
+      final dynamic mMoto = kai['m'];
+      if (kyuuiIka != null && mMoto is List && kyuuiIka.j >= 0 && kyuuiIka.j < mMoto.length && mMoto[kyuuiIka.j] is List) {
+        (mMoto[kyuuiIka.j] as List).add(List<dynamic>.of(kyuuiIka.gyou));
+      }
       _kaiNoSousha(kai, (dynamic a) {
         if (a is! List || a.length < 7 || a[0] is! num || a[6] is! num) return;
         if ((a[0] as num).toInt() != 3 || (a[6] as num).toInt() != kirokuId) return;
@@ -2313,6 +2344,19 @@ Future<void> _utsusuHontai() async {
     }
     await s.save();
   }
+  // 9位以下の高校の走者の欄(m)は大学に入った選手だけを残すので、名前のない3年生に戻した選手を除く(2.0.4。
+  // 留学生の枠に回って大学に入らなかった、名前の出ていた3年生)
+  int kyuuiIkaKeshita = 0;
+  final dynamic mKai = kai['m'];
+  if (mKai is List) {
+    for (int j = 8; j < mKai.length; j++) {
+      final dynamic g = mKai[j];
+      if (g is! List) continue;
+      final int mae = g.length;
+      g.removeWhere((dynamic a) => _soushaKa(a) && ((a as List)[0] as num).toInt() >= 2);
+      kyuuiIkaKeshita += mae - g.length;
+    }
+  }
   // 土台・名前のない留学生の結果・発表の段階は、もう使わないので消す
   kai.remove('dt');
   kai.remove('ry');
@@ -2322,7 +2366,7 @@ Future<void> _utsusuHontai() async {
   await u.save();
   print(
     '高校の大会の記録の付け替え: 新入生$tsukekae件・名前のない3年生に戻した$modoshi件'
-    '・留学生${ryuuShin.length}人(高校の出身$ryuuKimeta人)',
+    '(9位以下の高校の走者の欄から除いた$kyuuiIkaKeshita件)・留学生${ryuuShin.length}人(高校の出身$ryuuKimeta人)',
   ); // 確認用(2.0.4)
 }
 

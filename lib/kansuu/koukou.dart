@@ -622,6 +622,17 @@ const List<_Kukan> _zenkokuKukan = [
   _Kukan(5000, 1.003, 0.0010, 0.0010, 1), // 7区
 ];
 
+/// 全国高校駅伝の区間の特徴(画面に出す文。2.0.4。上の _zenkokuKukan の起伏を変えたら、ここも直す)
+const List<String> _zenkokuKukanTokuchou = [
+  '前半は上り、7.5km付近から下り',
+  '一番短い区間で、ほぼ平ら(留学生も走れる区間)',
+  '登りが多く、アップダウンもある',
+  '3区をほぼ逆に走るので、下りが多い',
+  '前半は上り、後半は下り(留学生も走れる区間)',
+  '起伏は小さい',
+  '起伏は小さい。アンカー区間',
+];
+
 /// 都道府県予選の区間(距離は全国と同じ。起伏はなし)
 const List<_Kukan> _yosenKukan = [
   _Kukan(10000, 1.0, 0, 0, 0),
@@ -3546,6 +3557,13 @@ String koukouCodeMei(int code) {
 
 /// 全国高校駅伝の区間の距離(m)
 double koukouZenkokuKukanKyori(int kk) => (kk >= 0 && kk < _zenkokuKukan.length) ? _zenkokuKukan[kk].kyori : 0;
+
+/// 全国高校駅伝の区間のコースの特徴(画面に出す文。なければ空。2.0.4)
+String koukouZenkokuKukanTokuchou(int kk) =>
+    (kk >= 0 && kk < _zenkokuKukanTokuchou.length) ? _zenkokuKukanTokuchou[kk] : '';
+
+/// 全国高校駅伝の区間の数(2.0.4)
+int get koukouZenkokuKukanSuu => _zenkokuKukan.length;
 
 // ------------------------------------------------------------
 // スカウト画面の、高校時代(直近の大会)のフィルターと大会の結果(1.9.5)

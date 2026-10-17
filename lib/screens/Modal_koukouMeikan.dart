@@ -2129,6 +2129,12 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
                       style: const TextStyle(color: HENSUU.textcolor, fontWeight: FontWeight.bold),
                     ),
                   ),
+                  // 区間のコースの特徴(2.0.4)
+                  if (koukouZenkokuKukanTokuchou(kk).isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 4),
+                      child: Text(koukouZenkokuKukanTokuchou(kk), style: _hosoku),
+                    ),
                   for (int j = 0; j < k.kukan[kk].length; j++)
                     _soushaGyou(
                       k,
@@ -2185,7 +2191,8 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
                   : [
                       const Text(
                         '各都道府県の名簿の5校が走り、1位の高校が県代表として全国高校駅伝に、上位3校が地区大会に進みます。'
-                        '予選のコースは全国と同じ距離の平らなコースですが、その日の気温や風で、県ごとにタイムの出やすさが違います。',
+                        '予選と地区大会は、全国と同じ距離で、起伏のない平らなコースを走ります(全国のコースには起伏があります)。'
+                        'その日の気温や風で、県ごとにタイムの出やすさが違います。',
                         style: _hosoku,
                       ),
                       for (int c = 0; c < koukouChikuMei.length; c++)
@@ -2232,6 +2239,16 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
         Padding(
           padding: const EdgeInsets.only(left: 12, top: 4),
           child: Text('${k.kouMei(e.kouCode)}　${e.daihyou}', style: _honbun),
+        ),
+      // 全国高校駅伝のコース(区間の距離と特徴。2.0.4)
+      const Padding(
+        padding: EdgeInsets.only(top: 12),
+        child: Text('全国高校駅伝のコース(7区間42.195km)', style: _honbun),
+      ),
+      for (int kk = 0; kk < koukouZenkokuKukanSuu; kk++)
+        Padding(
+          padding: const EdgeInsets.only(left: 12, top: 4),
+          child: Text('${_kukanKyori(kk)}　${koukouZenkokuKukanTokuchou(kk)}', style: _hosoku),
         ),
     ];
   }

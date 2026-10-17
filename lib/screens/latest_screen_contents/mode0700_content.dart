@@ -1459,6 +1459,22 @@ class _Mode0700ContentState extends State<Mode0700Content> {
                                                   'yosenBunpu_${currentGhensuu.year}',
                                                 ),
                                               ),
+                                            // 駅伝の区間ごとのタイム分布(2.0.5。Modal_kukanTimeBunpu.dart)
+                                            // 正月駅伝予選のカードと同じく、ニュース記事のカードのすぐ下に置き、
+                                            // 差が一番ついた区間を抜き出して出す
+                                            if (currentGhensuu
+                                                        .hyojiracebangou <=
+                                                    2 ||
+                                                currentGhensuu
+                                                        .hyojiracebangou ==
+                                                    5)
+                                              KukanBunpuCard(
+                                                key: ValueKey(
+                                                  'kukanBunpu_${currentGhensuu.year}_${currentGhensuu.hyojiracebangou}',
+                                                ),
+                                                race: currentGhensuu
+                                                    .hyojiracebangou,
+                                              ),
                                             // 最終区(11月駅伝予選は最終組)を走った自分の大学の選手の成績(1.9.9)
                                             // 指示画面の「==直近区間==」と同じ形。一番下の「選手の成績」まで
                                             // スクロールしなくても見られるように、ニュース記事のカードのすぐ下に置く
@@ -1481,21 +1497,6 @@ class _Mode0700ContentState extends State<Mode0700Content> {
                                               _buildGakurenSaishuuKukan(
                                                 currentGhensuu,
                                                 idJunUnivData,
-                                              ),
-                                            // 駅伝の区間ごとのタイム分布(2.0.5。Modal_kukanTimeBunpu.dart)
-                                            // 正月駅伝予選のカードと同じ形で、差が一番ついた区間を抜き出して出す
-                                            if (currentGhensuu
-                                                        .hyojiracebangou <=
-                                                    2 ||
-                                                currentGhensuu
-                                                        .hyojiracebangou ==
-                                                    5)
-                                              KukanBunpuCard(
-                                                key: ValueKey(
-                                                  'kukanBunpu_${currentGhensuu.year}_${currentGhensuu.hyojiracebangou}',
-                                                ),
-                                                race: currentGhensuu
-                                                    .hyojiracebangou,
                                               ),
                                             if (currentGhensuu
                                                     .hyojiracebangou <=

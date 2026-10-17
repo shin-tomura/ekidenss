@@ -37,6 +37,10 @@ import 'package:ekiden/kansuu/koukou.dart'
 import 'package:ekiden/screens/Modal_koukouMeikan.dart'
     show koukouPageHirakuBan; // 監督の出身校から高校名鑑の高校のページを開く(2.0.1)
 import 'package:ekiden/kansuu/shushou.dart' show shushouIdUniv; // 主将(2.0.1)
+import 'package:ekiden/screens/reset_ichiran_gamen.dart'
+    show resetIchiranGamenHiraku; // リセットで残るもの・戻るもの(2.0.3。全てリセットの確認の画面から)
+import 'package:ekiden/screens/Modal_reset_IkuseiryokuMeiseiIji.dart'
+    show ModalReset_IkuseiryokuMeiseiIji; // 設定を残してやり直す方に切り替える(2.0.3)
 import 'package:ekiden/screens/meisei_yokonarabi_settei.dart'
     show meiseiYokonarabiSetteiHiraku; // 名声の横並び設定を開く(2.0.3。入学時名声影響度設定の画面の案内から)
 import 'package:ekiden/screens/setsumei_mado.dart'; // 主将・母校パイプの説明のリンク(2.0.1)
@@ -2199,6 +2203,11 @@ class _ModalMieruNouryokuResetState extends State<ModalMieruNouryokuReset> {
   }
 }
 
+/// 「全てリセットしてやり直す」の確認の画面
+/// ・はいを押すと mode を10にし、main.dart の _runMode0010Processing でリセットする
+/// ・2.0.3から、名声・育成力と設定も初期値に戻す(何を戻すかは lib/kansuu/reset_ichiran.dart の一覧で決める)。
+///   基本的には「名声・育成力と設定を残してやり直す」をおすすめし、本当に初期値に戻したいときだけ選んでもらう。
+///   「設定を残してやり直す方にする」で、そちらの確認の画面に切り替えられる
 class ModalAllReset extends StatefulWidget {
   const ModalAllReset({super.key});
 
@@ -2207,10 +2216,40 @@ class ModalAllReset extends StatefulWidget {
 }
 
 class _ModalAllResetState extends State<ModalAllReset> {
+  ButtonStyle _botan(Color iro, Color moji) => ElevatedButton.styleFrom(
+    backgroundColor: iro,
+    foregroundColor: moji,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+    minimumSize: const Size(200, 48),
+    padding: const EdgeInsets.all(12.0),
+  );
+
+  /// 「名声・育成力と設定を残してやり直す」の確認の画面に切り替える
+  /// (その画面を閉じたら、この画面も閉じる。はいを押したときは、リセットの処理の画面に切り替わる)
+  Future<void> _nokosuHouNi() async {
+    await showGeneralDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.8),
+      barrierDismissible: true,
+      barrierLabel: '名声・育成力と設定を残してやり直す',
+      transitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (context, animation, secondaryAnimation) {
+        return const ModalReset_IkuseiryokuMeiseiIji();
+      },
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        return FadeTransition(
+          opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+          child: child,
+        );
+      },
+    );
+    if (mounted) Navigator.pop(context);
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Hive Boxにアクセス
     final Box<Ghensuu> ghensuuBox = Hive.box<Ghensuu>('ghensuuBox');
+    const String title = '全てリセットしてやり直す';
 
     return ValueListenableBuilder<Box<Ghensuu>>(
       valueListenable: ghensuuBox.listenable(),
@@ -2221,7 +2260,7 @@ class _ModalAllResetState extends State<ModalAllReset> {
           return Scaffold(
             backgroundColor: HENSUU.backgroundcolor,
             appBar: AppBar(
-              title: const Text('全リセット', style: TextStyle(color: Colors.white)),
+              title: const Text(title, style: TextStyle(color: Colors.white)),
               backgroundColor: HENSUU.backgroundcolor,
               foregroundColor: Colors.white,
             ),
@@ -2234,96 +2273,83 @@ class _ModalAllResetState extends State<ModalAllReset> {
           );
         }
 
+        const TextStyle honbun = TextStyle(
+          color: HENSUU.textcolor,
+          fontSize: HENSUU.fontsize_honbun,
+        );
+        const TextStyle botanMoji = TextStyle(
+          fontSize: HENSUU.fontsize_honbun,
+          fontWeight: FontWeight.bold,
+        );
         return Scaffold(
-          backgroundColor: HENSUU.backgroundcolor, // Scaffold全体の背景色
+          backgroundColor: HENSUU.backgroundcolor,
           appBar: AppBar(
-            title: const Text('全リセット', style: TextStyle(color: Colors.white)),
-            backgroundColor: HENSUU.backgroundcolor, // AppBarの背景色
-            foregroundColor: Colors.white, // AppBarのアイコンやテキストの色
+            title: const Text(title, style: TextStyle(color: Colors.white)),
+            backgroundColor: HENSUU.backgroundcolor,
+            foregroundColor: Colors.white,
           ),
-          body: Padding(
-            padding: const EdgeInsets.all(16.0), // SwiftUIの.padding()に相当
-            child: Column(
-              // SwiftUIのVStackに相当
-              mainAxisAlignment: MainAxisAlignment.center, // 中央寄せ
-              crossAxisAlignment: CrossAxisAlignment.center, // 中央寄せ
-              children: <Widget>[
-                Text(
-                  "本当に全てリセットしてやり直しますか？\nアルバムも消去されます。",
-                  style: TextStyle(
-                    color: HENSUU.textcolor,
-                    fontSize: HENSUU.fontsize_honbun,
-                    //fontWeight: FontWeight.bold,
+          // 文字を大きくしても、はみ出さずにスクロールできるようにする(2.0.3)
+          body: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: <Widget>[
+                  const Text(
+                    '名声・育成力と、すべての設定を初期値に戻して、1年目からやり直します'
+                    '(表示の好み・大学名・メモ・カスタム駅伝の名前とコース・高校名鑑の編集は残ります)。'
+                    'アルバムも消去されます。\n'
+                    '設定を残したままやり直すなら「名声・育成力と設定を残してやり直す」がおすすめです。'
+                    '本当に初期値に戻したいときだけ、こちらを選んでください。',
+                    style: honbun,
+                    textAlign: TextAlign.center,
                   ),
-                  textAlign: TextAlign.center, // テキストを中央寄せ
-                ),
-                const SizedBox(height: 32), // スペース
-                // 「はい」ボタン
-                ElevatedButton(
-                  onPressed: () async {
-                    setState(() {
-                      // UIを更新するためsetStateで囲む
-                      currentGhensuu.mode = 10; // gh[0].mode=10; に相当
-                    });
-                    await currentGhensuu.save(); // Hiveに保存
-                    Navigator.pop(context); // モーダルを閉じる
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green, // Swiftの.background(.green)
-                    foregroundColor:
-                        Colors.black, // Swiftの.foregroundColor(.black)
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(
-                        8,
-                      ), // Swiftの.cornerRadius(8)
-                    ),
-                    minimumSize: const Size(
-                      200,
-                      48,
-                    ), // Swiftの.frame(width: 200)とpadding()を考慮
-                    padding: const EdgeInsets.all(12.0),
-                  ),
-                  child: Text(
-                    "はい",
-                    style: TextStyle(
-                      fontSize: HENSUU.fontsize_honbun, // .font(.headline)に相当
-                      fontWeight: FontWeight.bold,
+                  const SizedBox(height: 8),
+                  // 残るもの・戻るものの一覧(reset_ichiran_gamen.dart)
+                  TextButton(
+                    onPressed: () => resetIchiranGamenHiraku(context),
+                    child: const Text(
+                      '残るもの・戻るものの一覧',
+                      style: TextStyle(
+                        color: Color.fromARGB(255, 0, 255, 0),
+                        decoration: TextDecoration.underline,
+                        decorationColor: HENSUU.textcolor,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 32), // スペース
-
-                const Divider(color: Colors.grey), // Divider
-                const SizedBox(height: 32), // スペース
-                // 「いいえ、やっぱりリセットしません。」ボタン
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context); // モーダルを閉じる
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green, // Swiftの.background(.green)
-                    foregroundColor:
-                        Colors.black, // Swiftの.foregroundColor(.black)
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(
-                        8,
-                      ), // Swiftの.cornerRadius(8)
-                    ),
-                    minimumSize: const Size(
-                      200,
-                      48,
-                    ), // Swiftの.frame(width: 200)とpadding()を考慮
-                    padding: const EdgeInsets.all(12.0),
+                  const SizedBox(height: 16),
+                  // おすすめのほう(設定を残す)に切り替える
+                  ElevatedButton(
+                    onPressed: _nokosuHouNi,
+                    style: _botan(Colors.green, Colors.black),
+                    child: const Text('設定を残してやり直す方にする', style: botanMoji),
                   ),
-                  child: Text(
-                    "いいえ、やっぱりリセットしません。",
-                    style: TextStyle(
-                      fontSize: HENSUU.fontsize_honbun, // .font(.headline)に相当
-                      fontWeight: FontWeight.bold,
-                    ),
+                  const SizedBox(height: 32),
+                  const Divider(color: Colors.grey),
+                  const SizedBox(height: 16),
+                  const Text('本当に全て初期値に戻してやり直しますか？', style: honbun, textAlign: TextAlign.center),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () async {
+                      setState(() {
+                        currentGhensuu.mode = 10;
+                      });
+                      await currentGhensuu.save(); // Hiveに保存
+                      if (context.mounted) Navigator.pop(context); // モーダルを閉じる
+                    },
+                    style: _botan(Colors.orange.shade300, Colors.black),
+                    child: const Text('はい、全て初期値に戻してやり直す', style: botanMoji),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 32),
+                  ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(context); // モーダルを閉じる
+                    },
+                    style: _botan(Colors.green, Colors.black),
+                    child: const Text('いいえ、やっぱりリセットしません。', style: botanMoji),
+                  ),
+                ],
+              ),
             ),
           ),
         );

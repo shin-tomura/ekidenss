@@ -26,6 +26,8 @@ import 'package:ekiden/screens/senryaku_entry_settei.dart'; // 戦略的エン�
 import 'package:ekiden/screens/yosen_com_siji_settei.dart'; // 正月駅伝予選の指示と集団走(1.9.9)
 import 'package:ekiden/screens/kyouka_project_settei.dart'; // 強化プロジェクト設定(2.0.1)
 import 'package:ekiden/screens/bokou_pipe_settei.dart'; // 監督の母校パイプ設定(2.0.1)
+import 'package:ekiden/screens/reset_ichiran_gamen.dart'
+    show resetIchiranGamenHiraku; // リセットで残るもの・戻るもの(2.0.3)
 import 'package:ekiden/screens/meisei_yokonarabi_settei.dart'
     show meiseiYokonarabiSetteiHiraku; // 名声の横並び設定(2.0.3)
 import 'package:ekiden/screens/Modal_TrainingEffect.dart';
@@ -189,6 +191,18 @@ class _SettingScreenState extends State<SettingScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start, // テキストを左寄せにする
         children: [
+          // リセットで残るもの・戻るものの一覧(2.0.3。reset_ichiran_gamen.dart)
+          TextButton(
+            onPressed: () => resetIchiranGamenHiraku(context),
+            child: Text(
+              "リセットで残るもの・戻るもの",
+              style: TextStyle(
+                color: const Color.fromARGB(255, 0, 255, 0),
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+              ),
+            ),
+          ),
           // ボタンは見出しで分ける(大学画面の下のほうと同じ形。1.9.4)
           _setteiMidashi('メモとデータ'),
           TextButton(
@@ -362,6 +376,44 @@ class _SettingScreenState extends State<SettingScreen>
                 textAlign: TextAlign.center, // テキストを中央寄せ
               ),
             ),
+          // 2つのリセット(2.0.3から、おすすめの「名声・育成力と設定を残してやり直す」を上にした。
+          // 何を残すかは lib/kansuu/reset_ichiran.dart の一覧で決める)
+          TextButton(
+            onPressed: () {
+              showGeneralDialog(
+                context: context,
+                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                barrierDismissible: true, // 背景タップで閉じられるようにする
+                barrierLabel: '名声・育成力と設定を残してやり直す', // アクセシビリティ用ラベル
+                transitionDuration: const Duration(
+                  milliseconds: 300,
+                ), // アニメーション時間
+                pageBuilder: (context, animation, secondaryAnimation) {
+                  // ここに表示したいモーダルのウィジェットを指定
+                  return const ModalReset_IkuseiryokuMeiseiIji(); // const を追加
+                },
+                transitionBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                      // モーダル表示時のアニメーション (例: フェードイン)
+                      return FadeTransition(
+                        opacity: CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOut,
+                        ),
+                        child: child,
+                      );
+                    },
+              );
+            },
+            child: Text(
+              "名声・育成力と設定を残してやり直す(おすすめ)",
+              style: TextStyle(
+                color: const Color.fromARGB(255, 0, 255, 0),
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+              ),
+            ),
+          ),
           //if (ghensuu.hyojiracebangou <= 2)
           TextButton(
             onPressed: () {
@@ -392,42 +444,6 @@ class _SettingScreenState extends State<SettingScreen>
             },
             child: Text(
               "全てリセットしてやり直す",
-              style: TextStyle(
-                color: const Color.fromARGB(255, 0, 255, 0),
-                decoration: TextDecoration.underline,
-                decorationColor: HENSUU.textcolor,
-              ),
-            ),
-          ),
-          TextButton(
-            onPressed: () {
-              showGeneralDialog(
-                context: context,
-                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
-                barrierDismissible: true, // 背景タップで閉じられるようにする
-                barrierLabel: '名声と育成力は維持しつつリセットしてやり直す', // アクセシビリティ用ラベル
-                transitionDuration: const Duration(
-                  milliseconds: 300,
-                ), // アニメーション時間
-                pageBuilder: (context, animation, secondaryAnimation) {
-                  // ここに表示したいモーダルのウィジェットを指定
-                  return const ModalReset_IkuseiryokuMeiseiIji(); // const を追加
-                },
-                transitionBuilder:
-                    (context, animation, secondaryAnimation, child) {
-                      // モーダル表示時のアニメーション (例: フェードイン)
-                      return FadeTransition(
-                        opacity: CurvedAnimation(
-                          parent: animation,
-                          curve: Curves.easeOut,
-                        ),
-                        child: child,
-                      );
-                    },
-              );
-            },
-            child: Text(
-              "名声と育成力は維持しつつリセットしてやり直す",
               style: TextStyle(
                 color: const Color.fromARGB(255, 0, 255, 0),
                 decoration: TextDecoration.underline,

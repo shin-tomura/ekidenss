@@ -4475,7 +4475,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           // フラグを追加
           WidgetsBinding.instance.addPostFrameCallback((_) async {
             await _runGuarded(
-              '名声と育成力を維持したリセット',
+              '名声・育成力と設定を残したリセット',
               () => _runMode101010Processing(currentGhensuu),
             );
           });
@@ -4505,7 +4505,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        '名声と育成力を維持しつつ初期データを処理中です…',
+                        '名声・育成力と設定を残して、初期データを処理中です…',
                         style: TextStyle(
                           color: HENSUU.textcolor, // テキストを白 (または指定されたテキスト色) に
                           fontSize: HENSUU.fontsize_honbun,

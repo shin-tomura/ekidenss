@@ -28,7 +28,7 @@ export 'package:ekiden/kansuu/kiji/kiji_tt.dart' show kijiTtKa, ttSaishuuRace;
 // スカウト前の高校の大会の記事(2.0.1。新入生のスカウトの画面で出す)
 export 'package:ekiden/kansuu/kiji/kiji_koukou_taikai.dart' show kijiKoukouTaikaiKa, koukouTaikaiKiji;
 // 高校の大会の記事(2.0.4。高校の大会の結果が出る日のお知らせと、高校名鑑から読む)
-export 'package:ekiden/kansuu/kiji/kiji_koukou_shinkou.dart' show kijiKoukouShinkouKa;
+export 'package:ekiden/kansuu/kiji/kiji_koukou_shinkou.dart' show kijiKoukouShinkouKa, kijiKoukouChihouSiteMei;
 
 // ------------------------------------------------------------
 // ニュース記事(箱庭スポーツ)の入口(1.9.2)
@@ -55,6 +55,7 @@ export 'package:ekiden/kansuu/kiji/kiji_koukou_shinkou.dart' show kijiKoukouShin
 // 学内メディアの「学内TT特集」も読める(kiji_tt.dart)
 // 2.0.4から、高校の大会の結果が出る日(7月下旬の高校総体・11月中旬の都道府県予選と地区大会・12月下旬の
 // 全国高校駅伝)のお知らせと、高校名鑑から、箱庭スポーツの高校の大会の記事も読める(kiji_koukou_shinkou.dart)
+// 地方版(都道府県を選んで読む「箱庭スポーツ ○○版」。高校総体と全国高校駅伝の都道府県予選)は、その記事の一覧から開く
 // ------------------------------------------------------------
 
 /// 表示中の大会の結果の記事
@@ -357,6 +358,28 @@ List<Kiji> kijiKoukouShinkouIchiran() {
   } catch (e, st) {
     debugPrint('[ニュース記事] 高校の大会の記事を作れませんでした: $e\n$st');
     return [];
+  }
+}
+
+/// 箱庭スポーツの地方版の記事(2.0.4。都道府県[ken]の、今年度の高校総体と全国高校駅伝の都道府県予選。新しい順)
+List<Kiji> kijiKoukouChihouIchiran(int ken) {
+  try {
+    final List<Kiji> list = koukouChihouKiji(ken);
+    _log(list);
+    return list;
+  } catch (e, st) {
+    debugPrint('[ニュース記事] 地方版の記事を作れませんでした: $e\n$st');
+    return [];
+  }
+}
+
+/// 地方版の記事を読めるか(2.0.4。今年度の高校の大会の記事を書く回に、地方版の記録があるか)
+bool kijiKoukouChihouAri() {
+  try {
+    return koukouChihouAri();
+  } catch (e) {
+    debugPrint('[ニュース記事] 地方版の記録を確かめられませんでした: $e');
+    return false;
   }
 }
 

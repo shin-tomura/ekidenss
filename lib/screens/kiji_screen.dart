@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:ekiden/kansuu/kiji/kiji.dart';
 import 'package:ekiden/screens/ai_copy_matome.dart';
 import 'package:ekiden/screens/kiji_hyou_view.dart'; // 表の部品(1.9.8)
+import 'package:ekiden/kansuu/koukou.dart' show koukouKenMijikai, koukouOkiniiriYomu, koukouMeiboGenzai; // 地方版(2.0.4)
+import 'package:ekiden/kansuu/koukou_meibo.dart' show KoukouMei, koukouChikuMei, koukouKenChiku; // 地方版(2.0.4)
 
 // ------------------------------------------------------------
 // ニュース記事(箱庭スポーツ)の画面(1.9.2)
@@ -328,20 +330,45 @@ void kijiTtHiraku(BuildContext context) {
 }
 
 /// 高校の大会の記事を開く(2.0.4。高校の大会の結果が出た日のお知らせのカードと、高校名鑑・今年度の高校の大会の画面から。
-/// 今年度の高校の大会の、出した大会の分だけ。新しい順)
+/// 今年度の高校の大会の、出した大会の分だけ。新しい順)。地方版の記録があれば、一覧の下に地方版の入口も置く
 void kijiKoukouHiraku(BuildContext context) {
+  _hiraku(
+    context,
+    [
+      KijiBan(
+        site: kijiSiteMei,
+        sub: '陸上ニュース・高校の大会',
+        list: kijiKoukouShinkouIchiran(),
+        kekka: true,
+        nashiMoji: '今年度の高校の大会の記事はまだありません',
+      ),
+    ],
+    shitaBotan: kijiKoukouChihouAri() ? const KijiChihouCard() : null,
+  );
+}
+
+/// 地方版の記事を開く(2.0.4。地方版の都道府県を選ぶ画面から)
+void kijiKoukouChihouHiraku(BuildContext context, int ken) {
   _hiraku(context, [
     KijiBan(
-      site: kijiSiteMei,
-      sub: '陸上ニュース・高校の大会',
-      list: kijiKoukouShinkouIchiran(),
+      site: kijiKoukouChihouSiteMei(ken),
+      sub: '高校の大会・地方版',
+      list: kijiKoukouChihouIchiran(ken),
       kekka: true,
-      nashiMoji: '今年度の高校の大会の記事はまだありません',
+      nashiMoji: '今年度のこの都道府県の記事はまだありません',
     ),
   ]);
 }
 
-void _hiraku(BuildContext context, List<KijiBan> bans) {
+/// 地方版の都道府県を選ぶ画面を開く(2.0.4。高校の大会の記事の一覧と、高校名鑑の「大会の記録」から)
+void kijiKoukouChihouErabu(BuildContext context) {
+  Navigator.of(context).push<void>(
+    MaterialPageRoute<void>(builder: (_) => const KijiChihouGamen()),
+  );
+}
+
+/// [shitaBotan] 一覧の記事の下(生成AIのボタンの上)に置くもの(なければnull。地方版の入口。2.0.4)
+void _hiraku(BuildContext context, List<KijiBan> bans, {Widget? shitaBotan}) {
   showGeneralDialog(
     context: context,
     barrierColor: Colors.black.withOpacity(0.8),
@@ -349,7 +376,7 @@ void _hiraku(BuildContext context, List<KijiBan> bans) {
     barrierLabel: kijiSiteMei,
     transitionDuration: const Duration(milliseconds: 300),
     pageBuilder: (context, animation, secondaryAnimation) {
-      return KijiIchiranGamen(bans: bans);
+      return KijiIchiranGamen(bans: bans, shitaBotan: shitaBotan);
     },
     transitionBuilder: (context, animation, secondaryAnimation, child) {
       return FadeTransition(
@@ -599,7 +626,10 @@ class KijiIchiranGamen extends StatefulWidget {
   /// サイトごとの記事(1つなら切り替えは出さない。1.9.3)
   final List<KijiBan> bans;
 
-  const KijiIchiranGamen({super.key, required this.bans});
+  /// 記事の下(生成AIのボタンの上)に置くもの(なければnull。高校の大会の記事の、地方版の入口。2.0.4)
+  final Widget? shitaBotan;
+
+  const KijiIchiranGamen({super.key, required this.bans, this.shitaBotan});
 
   @override
   State<KijiIchiranGamen> createState() => _KijiIchiranGamenState();
@@ -644,12 +674,13 @@ class _KijiIchiranGamenState extends State<KijiIchiranGamen> {
           const SizedBox(height: 12),
           const Divider(color: _sen, height: 1),
           const SizedBox(height: 16),
-          if (list.isEmpty)
+          if (list.isEmpty) ...[
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 24),
               child: Text(ban.nashiMoji, style: const TextStyle(color: _honbunIro)),
-            )
-          else ...[
+            ),
+            if (widget.shitaBotan != null) widget.shitaBotan!,
+          ] else ...[
             _topKiji(context),
             const SizedBox(height: 20),
             if (list.length > 1) ...[
@@ -663,6 +694,10 @@ class _KijiIchiranGamenState extends State<KijiIchiranGamen> {
               ),
               const SizedBox(height: 4),
               for (int i = 1; i < list.length; i++) _gyou(context, i),
+            ],
+            if (widget.shitaBotan != null) ...[
+              const SizedBox(height: 16),
+              widget.shitaBotan!,
             ],
             const SizedBox(height: 24),
             _matomeCopy(context),
@@ -1068,6 +1103,159 @@ class KijiGamen extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ------------------------------------------------------------
+// 地方版(2.0.4。都道府県を選んで読む「箱庭スポーツ ○○版」。高校総体と全国高校駅伝の都道府県予選)
+// ・高校の大会の記事の一覧の下のカードと、高校名鑑の「大会の記録」のボタンから、都道府県を選ぶ画面を開く
+// ・上には、このアプリを開いている間に最後に読んだ都道府県と、お気に入りの高校の都道府県を出す
+//   (最後に読んだ都道府県は保存しない)
+// ------------------------------------------------------------
+
+/// このアプリを開いている間に、最後に地方版を読んだ都道府県(保存しない)
+int? _chihouSaigoKen;
+
+/// 地方版の都道府県を選ぶ画面の上に出す都道府県(最後に読んだ都道府県と、お気に入りの高校の都道府県)
+List<int> _chihouOsusume() {
+  final List<int> l = [];
+  final int? saigo = _chihouSaigoKen;
+  if (saigo != null && saigo >= 0 && saigo < koukouKenChiku.length) l.add(saigo);
+  try {
+    final List<KoukouMei> meibo = koukouMeiboGenzai();
+    for (final int i in koukouOkiniiriYomu()) {
+      if (i < 0 || i >= meibo.length) continue;
+      final int ken = meibo[i].ken;
+      if (ken >= 0 && ken < koukouKenChiku.length && !l.contains(ken)) l.add(ken);
+    }
+  } catch (_) {}
+  return l;
+}
+
+/// 高校の大会の記事の一覧の下に置く、地方版の入口のカード
+class KijiChihouCard extends StatelessWidget {
+  const KijiChihouCard({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: Material(
+        color: _waku,
+        child: InkWell(
+          onTap: () => kijiKoukouChihouErabu(context),
+          child: Container(
+            decoration: const BoxDecoration(
+              border: Border(
+                left: BorderSide(color: _aka, width: 5),
+                top: BorderSide(color: _sen),
+                right: BorderSide(color: _sen),
+                bottom: BorderSide(color: _sen),
+              ),
+            ),
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+            child: const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '📰 $kijiSiteMei 地方版',
+                  style: TextStyle(color: _aka, fontSize: 13, fontWeight: FontWeight.bold),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  '都道府県を選んで、その都道府県の高校総体と全国高校駅伝の予選の記事を読めます',
+                  style: TextStyle(color: _honbunIro, fontSize: 14, height: 1.5),
+                ),
+                SizedBox(height: 4),
+                Text('都道府県を選ぶ ›', style: TextStyle(color: _usui, fontSize: 12)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 地方版の都道府県を選ぶ画面
+class KijiChihouGamen extends StatefulWidget {
+  const KijiChihouGamen({super.key});
+
+  @override
+  State<KijiChihouGamen> createState() => _KijiChihouGamenState();
+}
+
+class _KijiChihouGamenState extends State<KijiChihouGamen> {
+  static const TextStyle _midashiStyle = TextStyle(
+    color: Colors.white,
+    fontSize: 15,
+    fontWeight: FontWeight.bold,
+  );
+
+  Widget _kenBotan(BuildContext context, int ken) {
+    return OutlinedButton(
+      onPressed: () {
+        setState(() {
+          _chihouSaigoKen = ken;
+        });
+        kijiKoukouChihouHiraku(context, ken);
+      },
+      style: OutlinedButton.styleFrom(
+        foregroundColor: Colors.white,
+        side: const BorderSide(color: _sen),
+      ),
+      child: Text(koukouKenMijikai(ken)),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final List<int> osusume = _chihouOsusume();
+    return Scaffold(
+      backgroundColor: _haikei,
+      appBar: AppBar(
+        title: const Text(
+          '$kijiSiteMei 地方版',
+          style: TextStyle(color: Colors.white, fontSize: 16),
+        ),
+        backgroundColor: _haikei,
+        foregroundColor: Colors.white,
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+        children: [
+          const _SiteMei(site: '$kijiSiteMei 地方版', sub: '高校の大会', iro: _aka),
+          const SizedBox(height: 12),
+          const Text(
+            '都道府県を選ぶと、その都道府県の高校総体(県大会と地区大会)と、全国高校駅伝の都道府県予選の記事を読めます。',
+            style: TextStyle(color: _honbunIro, fontSize: 14, height: 1.6),
+          ),
+          if (osusume.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            const Text('最後に読んだ都道府県・お気に入りの高校の都道府県', style: _midashiStyle),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: [for (final int ken in osusume) _kenBotan(context, ken)],
+            ),
+          ],
+          for (int c = 0; c < koukouChikuMei.length; c++) ...[
+            const SizedBox(height: 16),
+            Text(koukouChikuMei[c], style: _midashiStyle),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                for (int ken = 0; ken < koukouKenChiku.length; ken++)
+                  if (koukouKenChiku[ken] == c) _kenBotan(context, ken),
+              ],
+            ),
+          ],
+        ],
       ),
     );
   }

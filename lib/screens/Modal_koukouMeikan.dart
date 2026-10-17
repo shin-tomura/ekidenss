@@ -12,7 +12,8 @@ import 'package:ekiden/kansuu/bokou_pipe.dart'; // この高校出身の監督(2
 import 'package:ekiden/screens/setsumei_mado.dart'
     show BokouPipeSetsumeiLink; // 「母校パイプとは」のリンク(2.0.1)
 import 'package:ekiden/kansuu/time_date.dart';
-import 'package:ekiden/screens/kiji_screen.dart' show kijiKoukouHiraku; // 高校の大会の記事(2.0.4)
+import 'package:ekiden/screens/kiji_screen.dart' show kijiKoukouHiraku, kijiKoukouChihouErabu; // 高校の大会の記事(2.0.4)
+import 'package:ekiden/kansuu/kiji/kiji.dart' show kijiKoukouChihouAri; // 地方版の記事(2.0.4)
 import 'package:ekiden/screens/Modal_senshu.dart'
     show ModalSenshuDetailView; // 高校のページの卒業生を押すと選手の詳細の小窓(2.0.3)
 
@@ -1538,6 +1539,9 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
   /// 高校の大会の記事を読めるか(2.0.4。高校の情報を表示しない設定でなく、記事を書く回があるとき)
   bool _kijiAri = false;
 
+  /// 地方版の記事を読めるか(2.0.4。今の世代の回に地方版の記録があるとき)
+  bool _chihouAri = false;
+
   static const List<String> _shumokuMei = ['1500m', '5000m', '3000m障害'];
 
   @override
@@ -1569,6 +1573,7 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
     if (Hive.isBoxOpen('kantokuBox')) {
       final KantokuData? kantoku = Hive.box<KantokuData>('kantokuBox').get('KantokuData');
       _kijiAri = kantoku != null && !koukouHyoujiNashi(kantoku) && koukouKijiNoKai() != null;
+      _chihouAri = _kijiAri && kijiKoukouChihouAri(); // 地方版(2.0.4)
     }
   }
 
@@ -1585,11 +1590,20 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
             icon: const Icon(Icons.article, color: Colors.redAccent),
             label: const Text('高校の大会のニュース記事', style: _honbun),
           ),
+          if (_chihouAri)
+            OutlinedButton.icon(
+              onPressed: () => kijiKoukouChihouErabu(context),
+              icon: const Icon(Icons.map_outlined, color: Colors.redAccent),
+              label: const Text('地方版(都道府県を選ぶ)', style: _honbun),
+            ),
         ],
       ),
       const SizedBox(height: 4),
-      const Text(
-        '今年度の高校総体・全国高校駅伝の予選と本大会の、箱庭スポーツの記事です(結果が出た大会の分)。',
+      Text(
+        _chihouAri
+            ? '今年度の高校総体・全国高校駅伝の予選と本大会の、箱庭スポーツの記事です(結果が出た大会の分)。'
+                '地方版では、都道府県ごとの高校総体と全国高校駅伝の予選の記事を読めます。'
+            : '今年度の高校総体・全国高校駅伝の予選と本大会の、箱庭スポーツの記事です(結果が出た大会の分)。',
         style: _hosoku,
       ),
       const SizedBox(height: 12),

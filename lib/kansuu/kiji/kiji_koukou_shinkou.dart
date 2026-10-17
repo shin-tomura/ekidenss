@@ -1,3 +1,4 @@
+import 'package:ekiden/constants.dart' show LocationDatabase; // 地方版の都道府県の名前(2.0.4)
 import 'package:ekiden/kansuu/koukou.dart'; // 高校の大会の記録(1.9.5・2.0.4)
 import 'package:ekiden/kansuu/koukou_meibo.dart' show KoukouMei, koukouChikuMei, koukouKenChiku;
 import 'package:ekiden/kansuu/kiji/kiji_kihon.dart';
@@ -11,6 +12,8 @@ import 'package:ekiden/kansuu/kiji/kiji_kihon.dart';
 //   (koukouKijiNoKai)。記事は開くたびに記録から作る。乱数・配信日時・記者は大会の年と記事の番号で決めるので、
 //   いつ読み返しても同じ記事になる
 // ・見出しの型は、前の年と同じ型を避ける(KantokuData.yobiint4[76]〜[78]。kiji_kihon.dart の KijiMidashiKiroku)
+// ・地方版(都道府県を選んで読む「箱庭スポーツ ○○版」): 7月下旬の高校総体(県大会・地区大会)と、
+//   11月中旬の全国高校駅伝の都道府県予選(地区大会も)。下の「地方版」を参照
 // ・守る決まり(スカウト解禁の記事と同じ):
 //   ・能力値・選手の性質・成長タイプ・隠れた逸材には触れない。持ちタイムも書かない(大学に入るときの記録なので、
 //     4月の記事に任せる)。書くのは大会の順位とタイムだけ
@@ -130,6 +133,22 @@ class _Kakite {
   String hyouMei(KoukouKirokuSousha y) {
     if (_namae(y)) return fullMei(y.name);
     return _ryuu(y) ? '留学生' : '${y.gakunen}年生';
+  }
+
+  /// 地方版の見出しの型を選ぶ(点に少しだけ乱数を足して一番高いもの。都道府県が多いので、前の年の型は残さない。
+  /// 候補がなければ[nashi])
+  int kataErabuChihou(List<({int g, int ten})> kouho, int nashi) {
+    int g = nashi;
+    int best = -1;
+    for (final ({int g, int ten}) e in kouho) {
+      if (e.ten <= 0) continue;
+      final int t = e.ten + w.r.ikutsu(10);
+      if (t > best) {
+        best = t;
+        g = e.g;
+      }
+    }
+    return g;
   }
 
   /// 見出しの型を選ぶ(点に少しだけ乱数を足す。前の年と同じ型なら2番目。候補がなければ[nashi])
@@ -881,6 +900,643 @@ List<Kiji> _zenkokuKiji(KijiKankyou k, KoukouTaikaiKiroku rec, KoukouTaikaiKirok
       kekka: true,
     ),
   ];
+}
+
+// ------------------------------------------------------------
+// 地方版(2.0.4。都道府県を選んで読む「箱庭スポーツ ○○版」)
+// ・7月下旬「高校総体」: その都道府県の県大会の各種目の優勝と、地区大会を勝ち上がって全国大会に進んだ選手、
+//   全国大会の決勝の順位(全国大会と同じ日に出るので書く)
+// ・11月中旬「全国高校駅伝の都道府県予選」: 代表校と2・3位、地区大会、区間賞、優勝校の走者。
+//   記事の日付のあとに出る全国高校駅伝の結果は書かない
+// ・記録は今の世代の回だけにある(koukou.dart の koukouChihouKirokuYomu)。都道府県が多いので、
+//   見出しの型は前の年と重ねる仕組みを使わない(点と乱数で選ぶ)
+// ------------------------------------------------------------
+
+/// 記事の番号(乱数と記者の名前に使う。都道府県の番号も乱数に入れる)
+const int _noChihouSoutai = 204;
+const int _noChihouYosen = 205;
+
+/// 地方版のサイトの名前(「箱庭スポーツ 栃木版」)
+String kijiKoukouChihouSiteMei(int ken) => '$kijiSiteMei ${koukouKenMijikai(ken)}版';
+
+/// 都道府県の名前(「栃木県」。分からなければ空)
+String _kenMei(int ken) =>
+    (ken >= 0 && ken < LocationDatabase.allPrefectures.length) ? LocationDatabase.allPrefectures[ken] : '';
+
+/// 地区の都道府県の数(1なら地区大会がない。北海道)
+int _chikuKenSuu(int c) => koukouKenChiku.where((int x) => x == c).length;
+
+/// 同じ選手か(記録の中の番号と高校の番号で見る)
+bool _onajiSousha(KoukouKirokuSousha a, KoukouKirokuSousha b) => a.id == b.id && a.kouCode == b.kouCode;
+
+/// 名前を並べる(4人までは全員、5人以上は3人と「など○人」)
+String _narabe(List<String> l, String tani) {
+  if (l.length <= 4) return l.join('、');
+  return '${l.take(3).join('、')}など${l.length}$tani';
+}
+
+/// 見出しの型(地方版の高校総体)
+const int _gcZenkokuOu = 1; // 全国大会の優勝
+const int _gcKesshou = 2; // 全国大会の決勝に何人も
+const int _gcKesshouHitori = 3; // 全国大会の決勝に1人
+const int _gcDokusen = 4; // 県大会の上位独占
+const int _gcNinen = 5; // 2年生以下の県大会の優勝
+const int _gcKenOu = 6; // 県大会の5000mの優勝(書くことがほかにないとき)
+
+List<Kiji> _chihouSoutaiKiji(KijiKankyou k, KoukouTaikaiKiroku rec, KoukouChihouKiroku ck, int ken) {
+  if (ken < 0 || ken >= ck.soutaiKen.length) return [];
+  final List<List<KoukouKirokuSousha>> kenK = ck.soutaiKen[ken];
+  if (kenK.length < 3 || kenK[1].isEmpty) return [];
+  final int c = ken < koukouKenChiku.length ? koukouKenChiku[ken] : -1;
+  final bool chikuAri = c >= 0 && c < koukouChikuMei.length && _chikuKenSuu(c) >= 2;
+  final List<List<KoukouKirokuSousha>> chikuK =
+      (c >= 0 && c < ck.soutaiChiku.length) ? ck.soutaiChiku[c] : const <List<KoukouKirokuSousha>>[];
+  final int nen = rec.nyuugakuNendo - 1;
+  final int tane = _tane(nen, _noChihouSoutai, ken);
+  final KijiKakite w = KijiKakite(k, tane);
+  final _Kakite r = _Kakite(k, w, rec);
+  final String site = kijiKoukouChihouSiteMei(ken);
+  final String kisha = _kishaMei(k, tane, site);
+  final KishaKata kata = kishaKataKara(kisha);
+  final String kenMei = _kenMei(ken);
+  final String kenTaikai = '$kenMei大会';
+  final String chikuTaikai = chikuAri ? '${koukouChikuMei[c]}大会' : '';
+  String ev(int sh) => koukouShumokuMei[sh + 1];
+
+  // 種目ごとの、全国大会に進んだこの都道府県の選手(県大会の記録と、地区大会の順位。北海道は県大会の上位6人)
+  List<({KoukouKirokuSousha y, int chikuJuni})> heMotomeru(int sh) {
+    final List<({KoukouKirokuSousha y, int chikuJuni})> l = [];
+    if (!chikuAri) {
+      for (final KoukouKirokuSousha y in kenK[sh]) {
+        l.add((y: y, chikuJuni: 0));
+      }
+      return l;
+    }
+    if (sh >= chikuK.length) return l;
+    final Set<int> tsukatta = {};
+    for (int j = 0; j < chikuK[sh].length; j++) {
+      for (int i = 0; i < kenK[sh].length; i++) {
+        if (tsukatta.contains(i) || !_onajiSousha(kenK[sh][i], chikuK[sh][j])) continue;
+        tsukatta.add(i);
+        l.add((y: kenK[sh][i], chikuJuni: j + 1));
+        break;
+      }
+    }
+    return l;
+  }
+
+  final List<List<({KoukouKirokuSousha y, int chikuJuni})>> he = [for (int sh = 0; sh < 3; sh++) heMotomeru(sh)];
+  // 種目ごとの、全国大会の決勝に残ったこの都道府県の選手(決勝の順位)
+  final List<List<({KoukouKirokuSousha y, int juni})>> ke = [
+    for (int sh = 0; sh < 3; sh++)
+      [
+        if (sh < rec.soutai.length)
+          for (int j = 0; j < rec.soutai[sh].length; j++)
+            if (he[sh].any((e) => _onajiSousha(e.y, rec.soutai[sh][j]))) (y: rec.soutai[sh][j], juni: j + 1),
+      ],
+  ];
+  int heSuu = 0;
+  int keSuu = 0;
+  final Set<String> keHito = {};
+  for (int sh = 0; sh < 3; sh++) {
+    heSuu += he[sh].length;
+    keSuu += ke[sh].length;
+    for (final e in ke[sh]) {
+      keHito.add('${e.y.id}_${e.y.kouCode}');
+    }
+  }
+  // 全国大会の優勝(5000m → 1500m → 3000m障害の順に探す)
+  ({KoukouKirokuSousha y, int sh})? ou;
+  for (final int sh in const [1, 0, 2]) {
+    if (ke[sh].isNotEmpty && ke[sh].first.juni == 1) {
+      ou = (y: ke[sh].first.y, sh: sh);
+      break;
+    }
+  }
+  // 決勝に1人だけ(一番上の順位)
+  ({KoukouKirokuSousha y, int sh, int juni})? hitori;
+  if (keHito.length == 1) {
+    for (int sh = 0; sh < 3; sh++) {
+      for (final e in ke[sh]) {
+        final ({KoukouKirokuSousha y, int sh, int juni})? mae = hitori;
+        if (mae == null || e.juni < mae.juni) hitori = (y: e.y, sh: sh, juni: e.juni);
+      }
+    }
+  }
+  // 県大会の上位独占(同じ名簿の高校が1〜3位)
+  ({int sh, int code})? dokusen;
+  for (final int sh in const [1, 0, 2]) {
+    final List<KoukouKirokuSousha> l = kenK[sh];
+    if (l.length >= 3 && l[0].kouCode < 1000 && l[0].kouCode == l[1].kouCode && l[0].kouCode == l[2].kouCode) {
+      dokusen = (sh: sh, code: l[0].kouCode);
+      break;
+    }
+  }
+  // 2年生以下の県大会の優勝(名前のない日本人)
+  int ninenSh = -1;
+  for (final int sh in const [1, 0, 2]) {
+    if (kenK[sh].isEmpty) continue;
+    final KoukouKirokuSousha y = kenK[sh].first;
+    if (!_namae(y) && !_ryuu(y) && y.gakunen <= 2) {
+      ninenSh = sh;
+      break;
+    }
+  }
+
+  final int g = r.kataErabuChihou([
+    if (ou != null) (g: _gcZenkokuOu, ten: 100),
+    if (keHito.length >= 2) (g: _gcKesshou, ten: 70 + 5 * (keHito.length > 5 ? 5 : keHito.length)),
+    if (hitori != null) (g: _gcKesshouHitori, ten: 60),
+    if (dokusen != null) (g: _gcDokusen, ten: 55),
+    if (ninenSh >= 0) (g: _gcNinen, ten: 50),
+  ], _gcKenOu);
+
+  final KoukouKirokuSousha w5 = kenK[1].first;
+  String midashi;
+  switch (g) {
+    case _gcZenkokuOu:
+      final ({KoukouKirokuSousha y, int sh}) o = ou!;
+      midashi = w.erabu([
+        '${r.atama(o.y)}、高校総体${ev(o.sh)}で日本一',
+        '$kenMeiから日本一　${r.atama(o.y)}が高校総体${ev(o.sh)}を制す',
+      ]);
+    case _gcKesshou:
+      midashi = w.erabu([
+        '高校総体の決勝に$kenMeiから${keHito.length}人',
+        '$kenMeiの${keHito.length}人、高校総体の決勝へ',
+      ]);
+    case _gcKesshouHitori:
+      final ({KoukouKirokuSousha y, int sh, int juni}) h = hitori!;
+      midashi = '${r.atama(h.y)}、高校総体${ev(h.sh)}で${h.juni}位';
+    case _gcDokusen:
+      final ({int sh, int code}) d = dokusen!;
+      midashi = '${r.kou(d.code)}、高校総体$kenTaikaiの${ev(d.sh)}で上位独占';
+    case _gcNinen:
+      final KoukouKirokuSousha y = kenK[ninenSh].first;
+      midashi = '${r.kou(y.kouCode)}の${y.gakunen}年生、高校総体$kenTaikaiの${ev(ninenSh)}を制す';
+    default:
+      midashi = w.erabu([
+        '${r.atama(w5)}、高校総体$kenTaikaiの5000mを制す',
+        '高校総体$kenTaikai、5000mは${r.atama(w5)}が頂点に',
+      ]);
+  }
+
+  final String taikai = chikuAri ? '$kenTaikaiと$chikuTaikai' : kenTaikai;
+  final String lead = switch (kata) {
+    KishaKata.suuji => '高校総体の陸上の長距離3種目(1500m・5000m・3000m障害)で、$taikaiの結果が出そろった。'
+        '${heSuu > 0 ? '$kenMeiからは、のべ$heSuu人が全国大会に進んだ。' : '$kenMeiから全国大会に進んだ選手はいなかった。'}',
+    KishaKata.joukei => '夏の全国の舞台を目指して、$kenMeiの高校生たちがトラックを駆けた。'
+        '高校総体の長距離3種目の$taikaiを振り返る。',
+    KishaKata.karakuchi => chikuAri
+        ? '高校総体の全国大会に進めるのは、$kenTaikaiの上位6人のうち、さらに$chikuTaikaiで上位6人に入った選手だけだ。'
+            '$kenMeiの長距離3種目を振り返る。'
+        : '高校総体の全国大会に進めるのは、$kenTaikaiの上位6人だけだ。$kenMeiの長距離3種目を振り返る。',
+  };
+
+  // 全国大会の優勝の段落(見出しが全国大会の優勝のとき)
+  if (g == _gcZenkokuOu) {
+    final ({KoukouKirokuSousha y, int sh}) o = ou!;
+    w.danraku('${r.yobu(o.y)}が、全国大会の${ev(o.sh)}の決勝を${jikanMoji(o.y.time)}で制し、日本一に輝いた。');
+  }
+  // 種目の段落(県大会の優勝・地区大会を勝ち上がった選手・全国大会の決勝)
+  void shumokuDan(int sh) {
+    if (kenK[sh].isEmpty) return;
+    final KoukouKirokuSousha y = kenK[sh].first;
+    final StringBuffer b = StringBuffer();
+    b.write(w.erabu([
+      '${ev(sh)}の$kenTaikaiは、${r.yobu(y)}が${jikanMoji(y.time)}で制した。',
+      '$kenTaikaiの${ev(sh)}を制したのは${r.yobu(y)}で、タイムは${jikanMoji(y.time)}だった。',
+    ]));
+    if (kenK[sh].length >= 2) {
+      final KoukouKirokuSousha y2 = kenK[sh][1];
+      final int sa = saByou(y2.time, y.time);
+      if (sa <= 1) b.write('2位の${r.yobu(y2)}とは、わずか${kinsaMoji(sa)}だった。');
+    }
+    if (chikuAri) {
+      final List<String> mei = [for (final e in he[sh]) '${r.yobu(e.y)}(${e.chikuJuni}位)'];
+      b.write(mei.isEmpty
+          ? '$chikuTaikaiでは上位6人に入れず、$kenMeiの選手は全国大会に届かなかった。'
+          : '$chikuTaikaiでは、${_narabe(mei, '人')}が上位6人に入り、全国大会に進んだ。');
+    } else if (he[sh].isNotEmpty) {
+      b.write('上位6人が全国大会に進んだ。');
+    }
+    final List<({KoukouKirokuSousha y, int juni})> kl = ke[sh];
+    if (kl.length == 1 && kl.first.juni == 1) {
+      // 優勝だけ(見出しの段落で書いた種目は書かない)
+      if (!(g == _gcZenkokuOu && ou?.sh == sh)) b.write('全国大会の決勝では、${r.yobu(kl.first.y)}が優勝した。');
+    } else if (kl.isNotEmpty) {
+      final List<String> mei = [
+        for (final e in kl)
+          e.juni == 1 ? '${r.yobu(e.y)}が優勝' : '${r.yobu(e.y)}が${e.juni}位',
+      ];
+      b.write('全国大会の決勝では、${mei.join('、')}だった。');
+    } else if (he[sh].isNotEmpty) {
+      b.write('全国大会では、決勝に残れなかった。');
+    }
+    w.danraku(b.toString());
+  }
+
+  final int sentou = switch (g) {
+    _gcZenkokuOu => ou!.sh,
+    _gcKesshouHitori => hitori!.sh,
+    _gcDokusen => dokusen!.sh,
+    _gcNinen => ninenSh,
+    _ => 1,
+  };
+  shumokuDan(sentou);
+  for (final int sh in const [1, 0, 2]) {
+    if (sh != sentou) shumokuDan(sh);
+  }
+  // 高校別(県大会の上位6人に一番多く入った名簿の高校。同じ選手の掛け持ちは1人と数える)
+  final Map<int, Set<int>> kouNin = {};
+  for (int sh = 0; sh < 3; sh++) {
+    for (final KoukouKirokuSousha y in kenK[sh]) {
+      if (y.kouCode < 0 || y.kouCode >= 1000) continue;
+      kouNin.putIfAbsent(y.kouCode, () => <int>{}).add(y.id);
+    }
+  }
+  int ooiCode = -1;
+  for (final MapEntry<int, Set<int>> e in kouNin.entries) {
+    if (ooiCode < 0 || e.value.length > kouNin[ooiCode]!.length) ooiCode = e.key;
+  }
+  if (ooiCode >= 0 && kouNin[ooiCode]!.length >= 4 && g != _gcDokusen) {
+    w.danraku('高校別では、${r.kou(ooiCode)}が3種目の上位6人に合わせて${kouNin[ooiCode]!.length}人を送り込んだ。');
+  }
+  // 記者の目
+  switch (kata) {
+    case KishaKata.suuji:
+      w.kishaNoMe(heSuu > 0
+          ? '3種目で全国大会に進んだ$kenMeiの選手は、のべ$heSuu人。そのうち決勝に残ったのは、のべ$keSuu人だった。'
+              '秋からは、全国高校駅伝の予選が始まる。'
+          : '3種目とも、$kenMeiの選手は全国大会に届かなかった。秋からは、全国高校駅伝の予選が始まる。');
+    case KishaKata.joukei:
+      w.kishaNoMe(w.erabu([
+        'トラックの夏が終わり、秋からは全国高校駅伝への道が始まる。$kenMeiの代表の座をかけた予選は11月だ。',
+        '夏の主役たちが、次はたすきを手にする。$kenMeiの全国高校駅伝の予選は11月に行われる。',
+      ]));
+    case KishaKata.karakuchi:
+      w.kishaNoMe('県大会で勝っても、全国の決勝はさらに遠い。夏のトラックの結果が、冬の駅伝の結果になるとも限らない。');
+  }
+
+  // 表のその後の欄(全国大会の決勝の順位・全国大会・地区大会まで)
+  String sonoato(int sh, KoukouKirokuSousha y) {
+    for (final e in ke[sh]) {
+      if (_onajiSousha(e.y, y)) return '全国${e.juni}位';
+    }
+    for (final e in he[sh]) {
+      if (identical(e.y, y)) return '全国大会';
+    }
+    return chikuAri ? '$chikuTaikaiまで' : '';
+  }
+
+  return [
+    Kiji(
+      category: kijiKoukouChihouSoutaiCategory,
+      midashi: midashi,
+      lead: lead,
+      honbun: w.honbun,
+      hyou: [
+        for (final int sh in const [1, 0, 2])
+          if (kenK[sh].isNotEmpty)
+            KijiHyou('高校総体 $kenTaikai ${ev(sh)}(上位6人)', const ['順位', '選手', '高校', 'タイム', 'その後'], [
+              for (int i = 0; i < kenK[sh].length; i++)
+                [
+                  '${i + 1}',
+                  r.hyouMei(kenK[sh][i]),
+                  r.kou(kenK[sh][i].kouCode),
+                  jikanMoji(kenK[sh][i].time),
+                  sonoato(sh, kenK[sh][i]),
+                ],
+            ]),
+      ],
+      haishin: _haishin(nen, koukouSoutaiMonth, koukouSoutaiDay, tane),
+      kisha: kisha,
+      jibun: false,
+      kekka: true,
+      site: site,
+    ),
+  ];
+}
+
+/// 見出しの型(地方版の全国高校駅伝の都道府県予選)
+const int _gcyNiKou = 1; // 地区代表もこの都道府県から(2校が全国へ)
+const int _gcyHatsu = 2; // 初めての代表
+const int _gcyRenzoku = 3; // 連続の代表
+const int _gcySessen = 4; // 2位との接戦
+const int _gcyDokusou = 5; // 独走
+const int _gcyKimaru = 6; // 代表が決まる(書くことがほかにないとき)
+
+List<Kiji> _chihouYosenKiji(KijiKankyou k, KoukouTaikaiKiroku rec, KoukouChihouKiroku ck, int ken) {
+  if (rec.yosenMada) return [];
+  final List<KoukouYosenKen>? yo = rec.yosen;
+  final List<KoukouChihouYosen>? cyAll = ck.yosen;
+  if (yo == null || cyAll == null || ken < 0 || ken >= yo.length || ken >= cyAll.length) return [];
+  final KoukouYosenKen yk = yo[ken];
+  if (yk.teams.isEmpty) return [];
+  final KoukouChihouYosen cy = cyAll[ken];
+  final int c = ken < koukouKenChiku.length ? koukouKenChiku[ken] : -1;
+  final bool chikuAri = c >= 0 && c < koukouChikuMei.length && _chikuKenSuu(c) >= 2;
+  final int nen = rec.nyuugakuNendo - 1;
+  final int tane = _tane(nen, _noChihouYosen, ken);
+  final KijiKakite w = KijiKakite(k, tane);
+  final _Kakite r = _Kakite(k, w, rec);
+  final String site = kijiKoukouChihouSiteMei(ken);
+  final String kisha = _kishaMei(k, tane, site);
+  final KishaKata kata = kishaKataKara(kisha);
+  final String kenMei = _kenMei(ken);
+  final String chikuTaikai = chikuAri ? '${koukouChikuMei[c]}大会' : '';
+
+  final KoukouYosenTeam t1 = yk.teams.first;
+  final String kou1 = r.kou(t1.kouCode);
+  final KoukouYosenTeam? t2 = yk.teams.length >= 2 ? yk.teams[1] : null;
+  final KoukouYosenTeam? t3 = yk.teams.length >= 3 ? yk.teams[2] : null;
+  final int? sa = t2 == null ? null : saByou(t2.time, t1.time);
+  final Set<int> kenCode = {for (final KoukouYosenTeam t in yk.teams) t.kouCode};
+  // 地区大会のこの都道府県の高校(順位つき)と、地区代表(北海道は予選の2位)
+  final List<KoukouChikuTeam> chL = (chikuAri && rec.chiku != null && c < rec.chiku!.length)
+      ? rec.chiku![c]
+      : const <KoukouChikuTeam>[];
+  final List<({KoukouChikuTeam t, int juni})> chKen = [
+    for (int j = 0; j < chL.length; j++)
+      if (kenCode.contains(chL[j].kouCode)) (t: chL[j], juni: j + 1),
+  ];
+  int chikuDai = -1;
+  if (chikuAri) {
+    for (final e in chKen) {
+      if (e.t.daihyou == 2) chikuDai = e.t.kouCode;
+    }
+  } else if (t2 != null) {
+    chikuDai = t2.kouCode;
+  }
+  // 前の回までの代表(連続の年数は、記録で確かめられるときだけ書く)
+  final List<KoukouTaikaiKiroku> zen = koukouTaikaiKirokuYomu();
+  KoukouTaikaiKiroku? kaiNo(int n) {
+    for (final KoukouTaikaiKiroku x in zen) {
+      if (x.nyuugakuNendo == n) return x;
+    }
+    return null;
+  }
+
+  int maeDaihyou(KoukouTaikaiKiroku? x) {
+    final List<KoukouYosenKen>? y = x?.yosen;
+    if (x == null || x.yosenMada || y == null || ken >= y.length || y[ken].teams.isEmpty) return -1;
+    return y[ken].teams.first.kouCode;
+  }
+
+  int renzoku = 1;
+  bool renzokuKaku = false;
+  for (int n = rec.nyuugakuNendo - 1; n > rec.nyuugakuNendo - 20; n--) {
+    final int m = maeDaihyou(kaiNo(n));
+    if (m < 0) break;
+    if (m != t1.kouCode) {
+      renzokuKaku = true;
+      break;
+    }
+    renzoku++;
+  }
+  // 初めての代表(記録を残している前の回が3回以上あり、どの回でも代表になっていない名簿の高校)
+  final List<int> maeDai = [
+    for (final KoukouTaikaiKiroku x in zen)
+      if (x.nyuugakuNendo < rec.nyuugakuNendo && maeDaihyou(x) >= 0) maeDaihyou(x),
+  ];
+  final KoukouYuushouKaisuu kai = koukouYuushouKaisuuYomu();
+  final bool hatsu = maeDai.length >= 3 &&
+      t1.kouCode >= 0 &&
+      t1.kouCode < kai.ken.length &&
+      kai.ken[t1.kouCode] == 1 &&
+      !maeDai.contains(t1.kouCode);
+
+  final int g = r.kataErabuChihou([
+    if (chikuDai >= 0) (g: _gcyNiKou, ten: chikuAri ? 85 : 45),
+    if (hatsu) (g: _gcyHatsu, ten: 80),
+    if (renzokuKaku && renzoku >= 3) (g: _gcyRenzoku, ten: 60 + 2 * (renzoku > 10 ? 10 : renzoku)),
+    if (sa != null && sa <= 10) (g: _gcySessen, ten: sa <= 3 ? 85 : 72),
+    if (sa != null && sa >= 120) (g: _gcyDokusou, ten: 50),
+  ], _gcyKimaru);
+
+  String midashi;
+  switch (g) {
+    case _gcyNiKou:
+      midashi = chikuAri
+          ? '$kenMeiから2校が全国へ　${r.kou(chikuDai)}が地区代表に'
+          : '$kou1と${r.kou(chikuDai)}、全国高校駅伝へ　$kenMei予選';
+    case _gcyHatsu:
+      midashi = w.erabu(['$kou1、初の$kenMei代表　全国高校駅伝', '全国高校駅伝$kenMei予選、$kou1が初の代表に']);
+    case _gcyRenzoku:
+      midashi = '$kou1、$renzoku年連続の$kenMei代表　全国高校駅伝';
+    case _gcySessen:
+      midashi = '全国高校駅伝$kenMei予選、$kou1が${kinsaMoji(sa ?? 0)}で競り勝つ';
+    case _gcyDokusou:
+      midashi = '$kou1が独走で$kenMei代表に　2位に${saMoji(sa ?? 0)}差';
+    default:
+      midashi = w.erabu(['全国高校駅伝$kenMei予選、$kou1が制す', '$kou1、全国高校駅伝の$kenMei代表に']);
+  }
+
+  final String saBun =
+      sa == null || t2 == null ? '' : '2位の${r.kou(t2.kouCode)}とは${sa <= 10 ? kinsaMoji(sa) : '${saMoji(sa)}差'}だった。';
+  final String lead = switch (kata) {
+    KishaKata.suuji => '全国高校駅伝の$kenMei予選(7区間42.195km)が行われ、$kou1が${jikanMoji(t1.time)}で優勝した。'
+        '$kenMei代表として、12月の全国高校駅伝に出る。$saBun',
+    KishaKata.joukei => '冬の全国の舞台へ、$kenMeiのたすきが託された。全国高校駅伝の$kenMei予選が行われ、'
+        '$kou1が代表の座をつかんだ。',
+    KishaKata.karakuchi => chikuAri
+        ? '全国高校駅伝の$kenMei予選が行われ、$kou1が制した。予選で全国への切符を手にできるのは、優勝校だけだ。'
+            '2位と3位の高校には、$chikuTaikaiでの最後の挑戦が残る。'
+        : '全国高校駅伝の$kenMei予選が行われ、$kou1が制した。$kenMeiから全国に出られるのは、2位までだ。',
+  };
+
+  // 優勝の段落(タイム・連続・2位との差・優勝校の3年生)
+  void yuushouDan() {
+    final StringBuffer b = StringBuffer('優勝した$kou1のタイムは${jikanMoji(t1.time)}。');
+    if (hatsu) {
+      b.write('記録を残し始めてから、初めての代表だ。');
+    } else if (renzokuKaku && renzoku >= 2) {
+      b.write('$renzoku年連続の代表となった。');
+    }
+    if (kata != KishaKata.suuji) b.write(saBun);
+    // 優勝校の区間賞の数
+    final int shou = cy.kukanshou.where((KoukouChihouSousha e) => e.s.kouCode == t1.kouCode).length;
+    if (shou >= 3) b.write('7区間のうち$shou区間で区間賞を取った。');
+    final List<KoukouKirokuSousha> m = [
+      for (final KoukouChihouSousha e in cy.yuushou)
+        if (e.s.kukan >= 1 && _namae(e.s)) e.s,
+    ];
+    if (m.isNotEmpty) {
+      final String mei = [
+        for (final KoukouKirokuSousha y in m.take(4))
+          '${y.kukan}区の${r.yobu(y, kouAri: false)}${y.kukanJuni >= 1 ? '(区間${y.kukanJuni == 1 ? '賞' : '${y.kukanJuni}位'})' : ''}',
+      ].join('、');
+      b.write('3年生では、$meiがたすきをつないだ。');
+    }
+    w.danraku(b.toString());
+    if (w.r.kakuritsu(40)) {
+      w.comment('「${w.erabu(_yuushouKantokuKotoba)}」と$kou1の監督は振り返った。');
+    }
+  }
+
+  // 2・3位と地区大会(北海道は予選の2位が地区代表)
+  void tsugiDan() {
+    if (t2 == null) return;
+    final String kou2 = r.kou(t2.kouCode);
+    if (!chikuAri) {
+      w.danraku('2位の$kou2も、地区代表として全国高校駅伝に出る。');
+      return;
+    }
+    final StringBuffer b = StringBuffer(
+      t3 == null ? '2位の$kou2は、$chikuTaikaiに進んだ。' : '2位の$kou2と3位の${r.kou(t3.kouCode)}は、$chikuTaikaiに進んだ。',
+    );
+    if (chKen.isNotEmpty) {
+      b.write('$chikuTaikaiでは、${[for (final e in chKen) '${r.kou(e.t.kouCode)}が${e.juni}位'].join('、')}。');
+      b.write(chikuDai >= 0
+          ? '${r.kou(chikuDai)}が地区代表の座をつかみ、$kenMeiからは2校が全国に出る。'
+          : '$kenMeiの高校は、地区代表に届かなかった。');
+    }
+    w.danraku(b.toString());
+  }
+
+  // 区間賞(1区と、ほかの区間)
+  void kukanshouDan() {
+    if (cy.kukanshou.isEmpty) return;
+    final StringBuffer b = StringBuffer();
+    final KoukouChihouSousha ikku = cy.kukanshou.first;
+    if (ikku.s.kukan == 1) {
+      b.write('1区の区間賞は${r.yobu(ikku.s)}で、${jikanMoji(ikku.s.time)}だった。');
+    }
+    final List<String> l = [
+      for (final KoukouChihouSousha e in cy.kukanshou)
+        if (e.s.kukan >= 2) '${e.s.kukan}区が${r.yobu(e.s)}',
+    ];
+    if (l.isNotEmpty) b.write('${ikku.s.kukan == 1 ? 'ほかの区間賞は、' : '区間賞は、'}${l.join('、')}だった。');
+    w.danraku(b.toString());
+  }
+
+  // 地区大会の区間賞(この都道府県の高校の選手)
+  void chikuShouDan() {
+    if (!chikuAri) return;
+    final List<List<KoukouChihouSousha>>? cs = ck.chikuKukanshou;
+    if (cs == null || c >= cs.length) return;
+    final List<String> l = [
+      for (final KoukouChihouSousha e in cs[c])
+        if (kenCode.contains(e.s.kouCode)) '${e.s.kukan}区の${r.yobu(e.s)}',
+    ];
+    if (l.isEmpty) return;
+    w.danraku('$chikuTaikaiでは、${_narabe(l, '人')}が区間賞を取った。');
+  }
+
+  // ほかの高校の3年生(区間順位の良い順に3人まで。優勝校の選手は優勝の段落で書く)
+  void sannenDan() {
+    final List<KoukouChihouSousha> l = [
+      for (final KoukouChihouSousha e in cy.namae)
+        if (e.s.kukan >= 1 && e.s.kouCode != t1.kouCode && _namae(e.s)) e,
+    ]..sort((a, b) {
+        final int x = a.s.kukanJuni.compareTo(b.s.kukanJuni);
+        return x != 0 ? x : a.teamJuni.compareTo(b.teamJuni);
+      });
+    if (l.isEmpty) return;
+    final String mei = [
+      for (final KoukouChihouSousha e in l.take(3))
+        '${e.teamJuni}位の${r.kou(e.s.kouCode)}の${r.yobu(e.s, kouAri: false)}が${e.s.kukan}区で'
+            '${e.s.kukanJuni == 1 ? '区間賞' : '区間${e.s.kukanJuni}位'}',
+    ].join('、');
+    w.danraku('ほかの高校の3年生では、$meiだった。');
+  }
+
+  final List<void Function()> dan = [yuushouDan, tsugiDan, kukanshouDan, chikuShouDan, sannenDan];
+  final int atama = g == _gcyNiKou ? 1 : 0;
+  dan[atama]();
+  for (int i = 0; i < dan.length; i++) {
+    if (i != atama) dan[i]();
+  }
+  // 記者の目
+  switch (kata) {
+    case KishaKata.suuji:
+      w.kishaNoMe('$kenMei予選の出場は${yk.shussouSuu}校。$kou1の優勝タイムは${jikanMoji(t1.time)}だった。'
+          '全国高校駅伝は12月下旬に行われる。');
+    case KishaKata.joukei:
+      w.kishaNoMe(w.erabu([
+        '$kenMeiの仲間の思いも乗せたたすきが、12月の全国の舞台へ向かう。',
+        '予選で敗れた高校の分まで、$kenMeiのたすきをつないでほしい。全国高校駅伝は12月下旬だ。',
+      ]));
+    case KishaKata.karakuchi:
+      w.kishaNoMe('予選を勝っても、全国では力の差を突きつけられることもある。12月までの1か月で、どこまで仕上げられるか。');
+  }
+
+  // 予選の結果の表の備考
+  String bikou(KoukouYosenTeam t) {
+    if (t.juni == 1) return '$kenMei代表';
+    if (t.kouCode == chikuDai) return '地区代表';
+    if (chikuAri && t.juni <= 3) return '$chikuTaikaiへ';
+    return '';
+  }
+
+  return [
+    Kiji(
+      category: kijiKoukouChihouYosenCategory,
+      midashi: midashi,
+      lead: lead,
+      honbun: w.honbun,
+      hyou: [
+        KijiHyou('全国高校駅伝 $kenMei予選', const ['順位', '高校', 'タイム', '備考'], [
+          for (final KoukouYosenTeam t in yk.teams) ['${t.juni}', r.kou(t.kouCode), jikanMoji(t.time), bikou(t)],
+        ]),
+        if (cy.kukanshou.isNotEmpty)
+          KijiHyou('$kenMei予選の区間賞', const ['区間', '選手', '高校', 'タイム'], [
+            for (final KoukouChihouSousha e in cy.kukanshou)
+              ['${e.s.kukan}区', r.hyouMei(e.s), r.kou(e.s.kouCode), jikanMoji(e.s.time)],
+          ]),
+        if (cy.yuushou.isNotEmpty)
+          KijiHyou('優勝した$kou1の走者', const ['区間', '選手', '区間順位', 'タイム'], [
+            for (final KoukouChihouSousha e in cy.yuushou)
+              ['${e.s.kukan}区', r.hyouMei(e.s), e.s.kukanJuni >= 1 ? '${e.s.kukanJuni}位' : '', jikanMoji(e.s.time)],
+          ]),
+        if (chKen.isNotEmpty)
+          KijiHyou('$chikuTaikai($kenMeiの高校)', const ['順位', '高校', 'タイム', '備考'], [
+            for (final e in chKen)
+              [
+                '${e.juni}',
+                r.kou(e.t.kouCode),
+                jikanMoji(e.t.time),
+                e.t.daihyou == 1 ? '$kenMei代表' : (e.t.daihyou == 2 ? '地区代表' : ''),
+              ],
+          ]),
+      ],
+      haishin: _haishin(nen, koukouYosenMonth, koukouYosenDay, tane),
+      kisha: kisha,
+      jibun: false,
+      kekka: true,
+      site: site,
+    ),
+  ];
+}
+
+/// 地方版の記事(2.0.4。都道府県[ken]の、出した大会の分だけ。新しい順: 全国高校駅伝の予選・高校総体)
+/// 高校の情報を表示しない設定のときと、地方版の記録がないとき(7月下旬に計算した回でないときなど)は空
+List<Kiji> koukouChihouKiji(int ken) {
+  final KijiKankyou? k = KijiKankyou.yomuRace(2);
+  if (k == null || koukouHyoujiNashi(k.kantoku)) return [];
+  final KoukouTaikaiKiroku? rec = koukouKijiNoKai();
+  if (rec == null) return [];
+  final KoukouChihouKiroku? ck = koukouChihouKirokuYomu(rec.nyuugakuNendo);
+  if (ck == null) return [];
+  final List<Kiji> l = [];
+  try {
+    l.addAll(_chihouYosenKiji(k, rec, ck, ken));
+  } catch (e, st) {
+    print('地方版の全国高校駅伝の予選の記事を作れませんでした: $e\n$st');
+  }
+  try {
+    l.addAll(_chihouSoutaiKiji(k, rec, ck, ken));
+  } catch (e, st) {
+    print('地方版の高校総体の記事を作れませんでした: $e\n$st');
+  }
+  return l;
+}
+
+/// 地方版の記事を読めるか(今年度の高校の大会の記事を書く回に、地方版の記録があるか。2.0.4)
+bool koukouChihouAri() {
+  final KoukouTaikaiKiroku? rec = koukouKijiNoKai();
+  if (rec == null) return false;
+  return koukouChihouKirokuYomu(rec.nyuugakuNendo) != null;
 }
 
 // ------------------------------------------------------------

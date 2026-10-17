@@ -163,6 +163,9 @@ ShiyouSetsu shiyouTaikai({bool setsumeisho = false}) {
   gyou.addAll([
     ..._yosen11Gyou,
     ..._yosenShougatsuGyou,
+    // 結果画面のグラフ(説明書だけ。2.0.5。Modal_yosenTimeBunpu.dart)
+    if (setsumeisho)
+      '　・結果画面の「チーム内のタイム分布」で、大学ごとの1〜10番手のタイムの広がりをグラフで見られます。',
     '・一次エントリーで選んだ選手の中から、区間エントリーで各区間に1人ずつ配置します。残りは補欠になります。',
     // コンピュータの大学の区間配置(1.9.1。kukan_haichi.dart)
     '・コンピュータの大学は、持ちタイムと能力から区間ごとのタイムを見積もり、差がつく区間から順に選手を決めます。',

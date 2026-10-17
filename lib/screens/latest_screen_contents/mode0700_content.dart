@@ -37,6 +37,7 @@ import 'package:ekiden/screens/Modal_senshu_race_bunseki.dart'
 import 'package:ekiden/screens/kiji_hyou_view.dart'; // 金特訓・銀特訓の記録の一覧表(1.9.9)
 import 'package:ekiden/kansuu/kingin_kiroku.dart'; // 金銀の記録(1.9.9)
 import 'package:ekiden/screens/koukou_taikai_oshirase.dart'; // 高校の大会の結果が出た日のお知らせ(2.0.4)
+import 'package:ekiden/screens/Modal_yosenTimeBunpu.dart'; // 正月駅伝予選のチーム内のタイム分布(2.0.5)
 
 // モーダルビューのプレースホルダー
 // 実際にはこれらのファイルを別途作成する必要があります
@@ -1520,6 +1521,68 @@ class _Mode0700ContentState extends State<Mode0700Content> {
                                                 },
                                                 child: Text(
                                                   "全大学結果概要",
+                                                  style: TextStyle(
+                                                    color: const Color.fromARGB(
+                                                      255,
+                                                      0,
+                                                      255,
+                                                      0,
+                                                    ),
+                                                    decoration: TextDecoration
+                                                        .underline,
+                                                    decorationColor:
+                                                        HENSUU.textcolor,
+                                                  ),
+                                                ),
+                                              ),
+
+                                            // 正月駅伝予選のチーム内のタイム分布(2.0.5。Modal_yosenTimeBunpu.dart)
+                                            if (currentGhensuu
+                                                    .hyojiracebangou ==
+                                                4)
+                                              TextButton(
+                                                onPressed: () {
+                                                  showGeneralDialog(
+                                                    context: context,
+                                                    barrierColor: Colors.black
+                                                        .withOpacity(0.8),
+                                                    barrierDismissible: true,
+                                                    barrierLabel:
+                                                        'チーム内のタイム分布',
+                                                    transitionDuration:
+                                                        const Duration(
+                                                          milliseconds: 300,
+                                                        ),
+                                                    pageBuilder:
+                                                        (
+                                                          context,
+                                                          animation,
+                                                          secondaryAnimation,
+                                                        ) {
+                                                          return const ModalYosenTimeBunpuView();
+                                                        },
+                                                    transitionBuilder:
+                                                        (
+                                                          context,
+                                                          animation,
+                                                          secondaryAnimation,
+                                                          child,
+                                                        ) {
+                                                          return FadeTransition(
+                                                            opacity:
+                                                                CurvedAnimation(
+                                                                  parent:
+                                                                      animation,
+                                                                  curve: Curves
+                                                                      .easeOut,
+                                                                ),
+                                                            child: child,
+                                                          );
+                                                        },
+                                                  );
+                                                },
+                                                child: Text(
+                                                  "チーム内のタイム分布",
                                                   style: TextStyle(
                                                     color: const Color.fromARGB(
                                                       255,

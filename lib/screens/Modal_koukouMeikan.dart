@@ -2235,7 +2235,7 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
         Text('まだ行われていません。12月下旬に結果が出ます。出場校は、11月中旬の都道府県予選と地区大会で決まります。', style: _hosoku),
       ];
     }
-    final List<({int kouCode, String daihyou, bool ken})> l = _shutsujouKou(k);
+    final List<({int kouCode, String chikuMei, bool ken})> l = _shutsujouKou(k);
     // 出場の回数目(12月下旬に回数を足す前の見込み。記事と同じ決め方)と、前回の全国の順位(2.0.4)
     final Map<int, ({int kaime, int renzoku, int buri})> mikomi =
         koukouShutsujouMikomi([for (final e in l) e.kouCode], k.nyuugakuNendo);
@@ -2247,22 +2247,28 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
       }
       break;
     }
-    // 1校の行(「天馬学園高(栃木)　県代表　3年連続5回目　前回2位」)
-    Widget gyou(({int kouCode, String daihyou, bool ken}) e) {
+    // 1校の行(「天馬学園高(栃木)　3年連続5回目　前回2位」。地区代表は先頭に地区の名前。
+    // 県代表か地区代表かは小見出しで分かるので、行には書かない)
+    Widget gyou(({int kouCode, String chikuMei, bool ken}) e) {
       final ({int kaime, int renzoku, int buri})? m = mikomi[e.kouCode];
       final String kaime = m == null ? '' : _shutsujouMojiSuu(m.kaime, m.renzoku, m.buri);
       final int? mj = maeJuni[e.kouCode];
       return Padding(
         padding: const EdgeInsets.only(left: 12, top: 4),
         child: Text(
-          [k.kouMei(e.kouCode), e.daihyou, if (kaime.isNotEmpty) kaime, if (mj != null) '前回$mj位'].join('　'),
+          [
+            if (!e.ken) e.chikuMei,
+            k.kouMei(e.kouCode),
+            if (kaime.isNotEmpty) kaime,
+            if (mj != null) '前回$mj位',
+          ].join('　'),
           style: _honbun,
         ),
       );
     }
 
-    final List<({int kouCode, String daihyou, bool ken})> kenDai = [for (final e in l) if (e.ken) e];
-    final List<({int kouCode, String daihyou, bool ken})> chikuDai = [for (final e in l) if (!e.ken) e];
+    final List<({int kouCode, String chikuMei, bool ken})> kenDai = [for (final e in l) if (e.ken) e];
+    final List<({int kouCode, String chikuMei, bool ken})> chikuDai = [for (final e in l) if (!e.ken) e];
     return [
       Text('まだ行われていません。12月下旬に結果が出ます。都道府県予選と地区大会で決まった出場校(${l.length}校)です。', style: _hosoku),
       const Text('出場の回数目と前回の順位は、記録を残し始めてからのものです。', style: _hosoku),
@@ -2291,14 +2297,14 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
 
   /// 都道府県予選と地区大会で決まった、全国高校駅伝の出場校(2.0.4。県代表は都道府県の順、地区代表は地区の順)
   /// 県代表は予選の1位、地区代表は地区大会の地区代表で、地区大会がない地区(北海道)は予選の2位
-  /// [ken] は県代表か(2.0.4。一覧を県代表と地区代表に分けるため)
-  List<({int kouCode, String daihyou, bool ken})> _shutsujouKou(KoukouTaikaiKiroku k) {
-    final List<({int kouCode, String daihyou, bool ken})> l = [];
+  /// [ken] は県代表か、[chikuMei] は地区代表の地区の名前(県代表は空。2.0.4。一覧を県代表と地区代表に分けるため)
+  List<({int kouCode, String chikuMei, bool ken})> _shutsujouKou(KoukouTaikaiKiroku k) {
+    final List<({int kouCode, String chikuMei, bool ken})> l = [];
     final List<KoukouYosenKen>? yo = k.yosen;
     if (yo == null) return l;
     for (int ken = 0; ken < yo.length; ken++) {
       for (final KoukouYosenTeam t in yo[ken].teams) {
-        if (t.juni == 1) l.add((kouCode: t.kouCode, daihyou: '県代表', ken: true));
+        if (t.juni == 1) l.add((kouCode: t.kouCode, chikuMei: '', ken: true));
       }
     }
     final List<List<KoukouChikuTeam>>? ch = k.chiku;
@@ -2307,16 +2313,16 @@ class _TaikaiKirokuState extends State<_TaikaiKiroku> {
         for (int ken = 0; ken < koukouKenChiku.length; ken++)
           if (koukouKenChiku[ken] == c) ken,
       ];
-      final String daihyou = '地区代表(${koukouChikuMei[c]})';
+      final String chikuMei = koukouChikuMei[c];
       if (kens.length <= 1) {
         if (kens.length == 1 && kens.first < yo.length) {
           for (final KoukouYosenTeam t in yo[kens.first].teams) {
-            if (t.juni == 2) l.add((kouCode: t.kouCode, daihyou: daihyou, ken: false));
+            if (t.juni == 2) l.add((kouCode: t.kouCode, chikuMei: chikuMei, ken: false));
           }
         }
       } else if (ch != null && c < ch.length) {
         for (final KoukouChikuTeam t in ch[c]) {
-          if (t.daihyou == 2) l.add((kouCode: t.kouCode, daihyou: daihyou, ken: false));
+          if (t.daihyou == 2) l.add((kouCode: t.kouCode, chikuMei: chikuMei, ken: false));
         }
       }
     }

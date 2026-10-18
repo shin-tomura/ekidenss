@@ -28,6 +28,13 @@
 //   開いたまま、ほかの四角を押すと、同じ段のままその大学に切り替える。
 //   説明文と次の区間の選手の部分は画面の高さの3割までにし、長いときはその中だけでスクロールする。
 //   帯が伸びて押した四角が隠れるときは、道を動かして見えるようにする(2.0.7)。
+//   説明文の上の行(走った選手)にも、区間配置確認と同じ「詳細」を置き、選手の詳細の画面を開けるようにする。
+// ・下の帯の一番上の「差の基準」で、1位との差の代わりに、押した大学それぞれの目標順位との差を出せる(2.0.7)。
+//   目標より下なら目標の順位の大学との差(「目標3位(東湊大)と120m +22秒」)、目標以内なら目標の1つ下の大学との
+//   差(「目標3位以内　4位の白鷺大に250m 45秒のリード」。区間ごとの画面の「○位との差」と同じ考え)。
+//   学連選抜は、レースの計算と同じ学連選抜の目標(監督をしていれば決めた順位、ほかは10位)で、順位は相当で比べる。
+//   目標順位は今の値(正月駅伝で復路の目標を決め直したあとは、往路の区間も決め直したあとの目標で出す)。
+//   選んだ基準は、大学や区間を替えてもそのままで、覚えない(画面を閉じたらトップに戻る)。
 // ・区間の切り替えと、表示の倍率のボタン・縮尺の棒は、画面の上に固定する(どちらも折り返す)。
 //   固定の部分は画面の高さの4割までで、超えるときは固定の部分の中だけでスクロールする。
 // ・距離は「1位が区間を走り終えたとき、ほかの大学がどれだけ後ろにいるか」を、その区間の出場校の
@@ -211,10 +218,17 @@ class _IchiDaigaku {
     this.kukanTime,
     this.tsugiSenshu,
     this.tsugiGSenshu,
+    this.mokuhyou,
   });
+
+  /// 目標順位(0が1位。学連選抜は学連選抜の目標。分からなければnull。差の基準を目標順位にしたときに使う。2.0.7)
+  final int? mokuhyou;
 
   /// 次の区間を走る選手がいるか
   bool get tsugiAri => tsugiSenshu != null || tsugiGSenshu != null;
+
+  /// 走った選手の詳細の画面を開くときの選手id(区間配置確認と同じ。分からなければnull。2.0.7)
+  int? get shousaiId => senshu?.id ?? gSenshu?.id;
 
   /// 走った選手の説明文(個人順位速報の「説明文」と同じ。末尾の改行は省く。なければnull。2.0.7)
   String? get setsumei {
@@ -263,6 +277,36 @@ class _IchiKukan {
     if (s == 0) return 'トップと並走';
     if (s < 0) return 'トップより${_kyoriMoji(-s * hayasa)}前 ${saMoji(s)}';
     return '${_kyoriMoji(s * hayasa)} +${saMoji(s)}';
+  }
+
+  /// [x]の目標順位との差の文(差の基準を目標順位にしたとき。2.0.7)
+  /// 目標より下なら「目標3位(東湊大)と120m +22秒」、目標以内なら「目標3位以内　4位の白鷺大に250m 45秒のリード」。
+  /// 学連選抜は順位相当で比べる(目標以内なら、押し出される目標の順位の大学とのリード)
+  String mokuhyouBun(_IchiDaigaku x) {
+    final int? t = x.mokuhyou;
+    if (t == null || t < 0) return '目標順位なし';
+    // 大学だけの順位の順(学連選抜は入れない。並びの番号が順位)
+    final List<_IchiDaigaku> daigaku = [for (final _IchiDaigaku y in narabi) if (!y.op) y];
+    _IchiDaigaku? juniNo(int j) => (j >= 0 && j < daigaku.length) ? daigaku[j] : null;
+    // 目標以内のときの、目標の1つ下の大学とのリードの文
+    String lead(_IchiDaigaku ushiro) {
+      final int s = saByou(ushiro.ruikei, x.ruikei);
+      return s <= 0 ? 'と並走' : 'に${_kyoriMoji(s * hayasa)} ${saMoji(s)}のリード';
+    }
+
+    final String soutou = x.op ? '相当' : '';
+    final int jibunJuni = x.op ? (x.soutouJuni ?? 0) : x.juni;
+    final _IchiDaigaku? mokuhyouDaigaku = juniNo(t);
+    if (jibunJuni > t) {
+      // 目標より下: 目標の順位の大学との差
+      if (mokuhyouDaigaku == null) return '目標${t + 1}位$soutou';
+      return '目標${t + 1}位$soutou(${mokuhyouDaigaku.mei})と${futatsuBun(x, mokuhyouDaigaku)}';
+    }
+    // 目標以内: 目標の1つ下の大学(学連選抜は、押し出される目標の順位の大学)とのリード
+    final int ushiroJuni = x.op ? t : t + 1;
+    final _IchiDaigaku? ushiro = juniNo(ushiroJuni);
+    if (ushiro == null) return '目標${t + 1}位以内$soutou';
+    return '目標${t + 1}位以内$soutou　${ushiroJuni + 1}位の${ushiro.mei}${lead(ushiro)}';
   }
 
   /// 2つの大学の間の文(道の右の括弧に出す。間なので「+」を付けない。「90m 16秒」。0秒は「並走」)
@@ -386,6 +430,7 @@ class _IchiKankei {
             kukanJuni: _kukanJuniYomu(l[i], kk),
             kukanTime: l[i].kukanTime[kk],
             tsugiSenshu: tsugiHyou?[l[i].u.id],
+            mokuhyou: l[i].u.mokuhyojuni.length > race ? l[i].u.mokuhyojuni[race] : null,
           ),
       ];
       final GakurenKukanKekka? g = gakurenAri ? gakurenKukanKekka(k.gh, kk) : null;
@@ -415,6 +460,8 @@ class _IchiKankei {
             kukanJuni: g.kukanJuni,
             kukanTime: g.kukanTime,
             tsugiGSenshu: tsugiKukanAri ? gakurenKukanSenshu(kk + 1) : null,
+            // 学連選抜の目標(レースの計算と同じく、監督をしていれば決めた順位、ほかは10位)
+            mokuhyou: gakurenMokuhyouGenzai(),
           ),
         );
       }
@@ -677,6 +724,9 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
 
   /// 押した大学(narabi の番号。-1はなし)
   int _oshita = -1;
+
+  /// 差の基準を目標順位にしているか(false: 1位との差、true: 目標順位との差。覚えない。2.0.7)
+  bool _mokuhyouKijun = false;
 
   /// 押した大学の帯をどこまで開いているか(0: 差だけ、1: 走った選手の説明文、2: 次の区間を走る選手。
   /// 四角を押すたびに進む。2.0.7)
@@ -1224,7 +1274,9 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     final String mei = x.op
         ? (soutou == null ? '学連選抜(OP)' : '${soutou + 1}位相当$henka 学連選抜')
         : '${x.juni + 1}位$henka ${x.mei}';
-    return mae.isEmpty ? '$mei　${r.saBun(x)}' : '$mei　${r.saBun(x)}　$mae';
+    // 1位との差か、目標順位との差(差の基準。2.0.7)
+    final String sa = _mokuhyouKijun ? r.mokuhyouBun(x) : r.saBun(x);
+    return mae.isEmpty ? '$mei　$sa' : '$mei　$sa　$mae';
   }
 
   @override
@@ -1307,15 +1359,56 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    // 差の基準(1位との差か、目標順位との差か。2.0.7)
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        const Text('差の基準', style: _chiisai),
+                        _komaBotan(
+                          'トップ',
+                          !_mokuhyouKijun,
+                          () => setState(() => _mokuhyouKijun = false),
+                        ),
+                        _komaBotan(
+                          '目標順位',
+                          _mokuhyouKijun,
+                          () => setState(() => _mokuhyouKijun = true),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
                     Text(
                       oshitaBun,
                       style: const TextStyle(color: HENSUU.textcolor, fontSize: 13),
                     ),
                     if (_hiraki == 1) ...[
                       const Divider(height: 12, color: Colors.white24),
-                      Text(
-                        _senshuGyou(r0, x0),
-                        style: const TextStyle(color: Colors.yellowAccent, fontSize: 13),
+                      // 走った選手の行と、区間配置確認と同じ「詳細」(選手の詳細の画面を開く。2.0.7)
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              _senshuGyou(r0, x0),
+                              style: const TextStyle(color: Colors.yellowAccent, fontSize: 13),
+                            ),
+                          ),
+                          if (x0.shousaiId != null)
+                            TextButton(
+                              onPressed: () => senshuShousaiHiraku(context, x0.shousaiId!),
+                              style: TextButton.styleFrom(
+                                minimumSize: Size.zero,
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              child: Text(
+                                '詳細',
+                                style: TextStyle(color: HENSUU.LinkColor, fontSize: 15),
+                              ),
+                            ),
+                        ],
                       ),
                       const SizedBox(height: 2),
                       _scrollBako(

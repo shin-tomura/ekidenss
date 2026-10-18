@@ -2,6 +2,7 @@
 // レースの途中の区間ごとの画面(mode 350)と、結果画面(10月駅伝・11月駅伝・正月駅伝・カスタム駅伝)の、
 // 区間ごとのタイム分布と1枚にまとめたカード(KukanBunsekiCard。右半分の「位置関係」)から開く。
 // ・幅のある道の帯に、大学名を四角で囲んで並べ、1位からの距離を縮尺どおりの間隔で出す。
+//   四角の中の大学名は、最後の「大」を省く(下の帯の文は省かない)。
 // ・画面の上で、集団の先頭の大学から四角1つ分の高さより近い大学は、集団としてまとめ、
 //   1行に3校まで横に並べる(4校目から次の行に折り返す。拡大すると集団がばらける)。
 //   集団の一番上の行は、前の大学(前が集団なら、その一番下の行)から、間の距離ぶん下に置き、
@@ -114,6 +115,10 @@ const Color _iro = Colors.lightBlueAccent;
 
 /// 自分の大学の色(区間ごとのタイム分布と同じ)
 const Color _jibunIro = Colors.orangeAccent;
+
+/// 道の中の四角に出す大学名(最後の「大」を省く。「東湊大」→「東湊」。省くと空になるときはそのまま)
+String _michiMei(String mei) =>
+    (mei.length > 1 && mei.endsWith('大')) ? mei.substring(0, mei.length - 1) : mei;
 
 /// 距離の文(「180m」「1.2km」。1kmまでは10m単位)
 String _kyoriMoji(double m) {
@@ -598,7 +603,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
           style: const TextStyle(color: Colors.white54, fontSize: 11.5),
         ),
         TextSpan(
-          text: x.op ? '学連選抜' : x.mei,
+          text: x.op ? '学連選抜' : _michiMei(x.mei),
           style: TextStyle(
             color: orange ? _jibunIro : HENSUU.textcolor,
             fontSize: 13,

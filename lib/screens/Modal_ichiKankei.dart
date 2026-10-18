@@ -3,6 +3,8 @@
 // 区間ごとのタイム分布と1枚にまとめたカード(KukanBunsekiCard。右半分の「位置関係」)から開く。
 // ・幅のある道の帯に、大学名を四角で囲んで並べ、1位からの距離を縮尺どおりの間隔で出す。
 //   四角の中の大学名は、最後の「大」を省く(下の帯の文は省かない)。
+//   大学名の後ろに、前の区間の終了時点からの順位の変化を「↑2」(緑)「↓3」(赤)「→」(灰色)で付ける
+//   (1区は付けない。学連選抜は通過順位相当で比べる。下の帯にも「5位(↑3)」の形で出す)。
 // ・画面の上で、集団の先頭の大学から四角1つ分の高さより近い大学は、集団としてまとめ、
 //   1行に3校まで横に並べる(4校目から次の行に折り返す。拡大すると集団がばらける)。
 //   集団の一番上の行は、前の大学(前が集団なら、その一番下の行)から、間の距離ぶん下に置き、
@@ -143,7 +145,31 @@ class _IchiDaigaku {
   /// 学連選抜(オープン参加)か
   final bool op;
 
-  const _IchiDaigaku(this.mei, this.ruikei, this.juni, this.jibun, this.op);
+  /// 前の区間の終了時点からの順位の変化(上げた数がプラス、下げた数がマイナス、同じなら0。
+  /// 1区はnull。学連選抜は通過順位相当で比べる。2.0.6)
+  final int? hendou;
+
+  /// 学連選抜の通過順位相当(0が1位相当。大学はnull)
+  final int? soutouJuni;
+
+  const _IchiDaigaku(
+    this.mei,
+    this.ruikei,
+    this.juni,
+    this.jibun,
+    this.op, {
+    this.hendou,
+    this.soutouJuni,
+  });
+
+  /// 順位の変化の文(「↑2」「↓3」「→」。1区はnull)
+  String? get hendouMoji {
+    final int? h = hendou;
+    if (h == null) return null;
+    if (h > 0) return '↑$h';
+    if (h < 0) return '↓${-h}';
+    return '→';
+  }
 }
 
 /// 区間1つ分の位置関係
@@ -276,7 +302,15 @@ class _IchiKankei {
       if (heikin <= 0) continue;
       final List<_IchiDaigaku> narabi = [
         for (int i = 0; i < l.length; i++)
-          _IchiDaigaku(l[i].mei, l[i].ruikei[kk], i, l[i].u.id == k.gh.MYunivid, false),
+          _IchiDaigaku(
+            l[i].mei,
+            l[i].ruikei[kk],
+            i,
+            l[i].u.id == k.gh.MYunivid,
+            false,
+            // 前の区間の終了時点の通過順位から、いくつ上げたか(1区はなし)
+            hendou: kk > 0 ? l[i].tuuka[kk - 1] - l[i].tuuka[kk] : null,
+          ),
       ];
       final GakurenKukanKekka? g = gakurenAri ? gakurenKukanKekka(k.gh, kk) : null;
       if (g != null && g.tuukaTime > 0 && g.tuukaTime < TEISUU.DEFAULTTIME) {
@@ -288,7 +322,20 @@ class _IchiKankei {
             break;
           }
         }
-        narabi.insert(basho, _IchiDaigaku('学連選抜', g.tuukaTime, -1, false, true));
+        // 学連選抜の順位の変化は、通過順位相当で比べる(1区はなし)
+        final int? gMae = g.maeTuukaJuni;
+        narabi.insert(
+          basho,
+          _IchiDaigaku(
+            '学連選抜',
+            g.tuukaTime,
+            -1,
+            false,
+            true,
+            hendou: gMae == null ? null : gMae - g.tuukaJuni,
+            soutouJuni: g.tuukaJuni,
+          ),
+        );
       }
       kukan.add(_IchiKukan(kk, kyori / heikin, narabi));
     }
@@ -610,9 +657,19 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
             fontWeight: orange ? FontWeight.bold : FontWeight.normal,
           ),
         ),
+        // 前の区間からの順位の変化(↑は緑、↓は赤、→は灰色。1区は付けない)
+        if (x.hendouMoji != null)
+          TextSpan(
+            text: ' ${x.hendouMoji}',
+            style: TextStyle(color: _hendouIro(x.hendou!), fontSize: 12),
+          ),
       ],
     );
   }
+
+  /// 順位の変化の色
+  Color _hendouIro(int h) =>
+      h > 0 ? Colors.lightGreenAccent : (h < 0 ? Colors.redAccent.shade100 : Colors.white54);
 
   /// 文の大きさ(折り返さない1行のとき)
   Size _ookisa(TextSpan span, TextScaler scaler) {
@@ -876,7 +933,13 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     if (_oshita < 0 || _oshita >= r.narabi.length) return null;
     final _IchiDaigaku x = r.narabi[_oshita];
     final String mae = r.maeBun(_oshita);
-    final String mei = x.op ? '学連選抜(OP)' : '${x.juni + 1}位 ${x.mei}';
+    // 順位の後ろに、前の区間からの変化を付ける(「5位(↑3) 青嵐大」「3位相当(↑2) 学連選抜」)
+    final String? hm = x.hendouMoji;
+    final String henka = hm == null ? '' : '($hm)';
+    final int? soutou = x.soutouJuni;
+    final String mei = x.op
+        ? (soutou == null ? '学連選抜(OP)' : '${soutou + 1}位相当$henka 学連選抜')
+        : '${x.juni + 1}位$henka ${x.mei}';
     return mae.isEmpty ? '$mei　${r.saBun(x)}' : '$mei　${r.saBun(x)}　$mae';
   }
 

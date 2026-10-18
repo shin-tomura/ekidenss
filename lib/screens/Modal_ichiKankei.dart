@@ -32,6 +32,9 @@
 //   senshu_haichi_panel.dart の部品)を出し、4回目で閉じる。最終区など次の区間の選手がいなければ3回目で閉じる。
 //   開いたまま、ほかの四角を押すと、同じ段のままその大学に切り替える。
 //   帯の一番上の行(差の基準と閉じる「×」)は固定し、その下は、まとめて帯の中でスクロールする。
+//   同じ段のまま、ほかの大学の四角を押したときは、帯のスクロールの位置を保つ(次の区間の選手は持ちタイムの表、
+//   説明文は本文の始まりが、切り替える前と同じ高さに来るようにする。測れなければスクロールの量をそのまま保つ)。
+//   同じ大学で段が進んだときと、区間を切り替えたときは、先頭に戻す。
 //   帯が伸びて押した四角が隠れるときは、道を動かして見えるようにする(2.0.7)。
 //   説明文の上の行(走った選手)にも、区間配置確認と同じ「詳細」を置き、選手の詳細の画面を開けるようにする。
 // ・下の帯の一番上の「差の基準」で、1位との差の代わりに、押した大学それぞれの目標順位との差を出せる(2.0.7)。
@@ -796,6 +799,11 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
   /// 説明文と次の区間の選手の部分のスクロール(どちらか一方しか出さないので、1つを使い回す)
   final ScrollController _setsumeiScroll = ScrollController();
 
+  /// 帯の中のスクロールする部分の中身と、その中の目印(次の区間の選手は持ちタイムの表、説明文は本文)。
+  /// 同じ段のまま、ほかの大学に切り替えたときに、目印が同じ高さに来るようにするため(2.0.7)
+  final GlobalKey _obiNakaKey = GlobalKey();
+  final GlobalKey _ankaKey = GlobalKey();
+
   /// 今のゲームの変数(次の区間の選手のパネルで使う)
   Ghensuu? _gh;
 
@@ -854,6 +862,11 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
   /// 開いたまま、ほかの四角を押すと、同じ段のままその大学に切り替える。2.0.7)
   void _hakoOsu(_IchiKukan r, int i) {
     final bool tsugi = _tsugiDaseru(r.narabi[i]);
+    // 切り替える前の、押していた大学・段・帯のスクロールの量・目印の高さ
+    final int maeOshita = _oshita;
+    final int maeHiraki = _hiraki;
+    final double? maeOffset = _setsumeiScroll.hasClients ? _setsumeiScroll.offset : null;
+    final double? maeAnka = _ankaIchi();
     setState(() {
       if (r.kk < 0) {
         // スタートは、1回目で1区を走る選手を出し、2回目で閉じる(2.0.7)
@@ -877,10 +890,22 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
         if (_hiraki == 2 && !tsugi) _hiraki = 1;
       }
     });
+    // 同じ段のまま、ほかの大学に切り替えたか(帯のスクロールの位置を保つ。2.0.7)
+    final bool tamotsu =
+        maeOshita >= 0 && maeOshita != i && _oshita == i && _hiraki == maeHiraki && _hiraki > 0;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      // 説明文は、いつも先頭から出す
-      if (_setsumeiScroll.hasClients) _setsumeiScroll.jumpTo(0);
+      // 帯のスクロール: 同じ段のまま切り替えたときは、目印が切り替える前と同じ高さに来るようにする
+      // (測れなければスクロールの量をそのまま保つ)。段が進んだときなどは先頭に戻す
+      if (_setsumeiScroll.hasClients) {
+        final ScrollPosition pos = _setsumeiScroll.position;
+        double ato = 0;
+        if (tamotsu && maeOffset != null) {
+          final double? atoAnka = _ankaIchi();
+          ato = (maeAnka != null && atoAnka != null) ? maeOffset + (atoAnka - maeAnka) : maeOffset;
+        }
+        _setsumeiScroll.jumpTo(ato.clamp(pos.minScrollExtent, pos.maxScrollExtent).toDouble());
+      }
       // 下の帯が伸びて、押した四角が隠れるときは、道を動かして見えるようにする
       final BuildContext? c = _oshitaKey.currentContext;
       if (c != null) {
@@ -891,6 +916,20 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
         );
       }
     });
+  }
+
+  /// 帯の中の目印(持ちタイムの表か、説明文の本文)の、スクロールする部分の中身の上からの高さ
+  /// (測れなければnull。2.0.7)
+  double? _ankaIchi() {
+    final RenderObject? naka = _obiNakaKey.currentContext?.findRenderObject();
+    final RenderObject? anka = _ankaKey.currentContext?.findRenderObject();
+    if (naka is! RenderBox || anka is! RenderBox) return null;
+    if (!naka.hasSize || !anka.hasSize || !anka.attached) return null;
+    try {
+      return anka.localToGlobal(Offset.zero, ancestor: naka).dy;
+    } catch (_) {
+      return null;
+    }
   }
 
   /// 次の区間を走る選手のパネル(区間配置確認のカードを開いたときと同じ。上の行・距離と主将・中身。
@@ -929,7 +968,8 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
             mainAxisSize: MainAxisSize.min,
             children: [
               senshuNouryokuRan(gh, s),
-              senshuKirokuRan(gh, s, konki),
+              // 持ちタイムの表(ほかの大学に切り替えたときに、同じ高さに来るようにする目印)
+              KeyedSubtree(key: _ankaKey, child: senshuKirokuRan(gh, s, konki)),
             ],
           ),
         ],
@@ -964,7 +1004,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
             mainAxisSize: MainAxisSize.min,
             children: [
               gakurenNouryokuRan(gh, g, tk),
-              gakurenKirokuRan(gh, g, konki),
+              KeyedSubtree(key: _ankaKey, child: gakurenKirokuRan(gh, g, konki)),
             ],
           ),
         ],
@@ -1499,6 +1539,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
                   controller: _setsumeiScroll,
                   padding: const EdgeInsets.only(right: 10),
                   child: Column(
+                    key: _obiNakaKey,
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -1536,6 +1577,8 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
                         const SizedBox(height: 2),
                         Text(
                           x0.setsumei ?? '説明文はありません',
+                          // ほかの大学に切り替えたときに、同じ高さに来るようにする目印
+                          key: _ankaKey,
                           style: TextStyle(
                             color: HENSUU.textcolor.withOpacity(0.9),
                             fontSize: 12.5,

@@ -8,7 +8,12 @@
 //   速さを全員で1つにするので、距離はタイム差に比例し、順位と位置の並びが逆にならない
 //   (ゲームとしての見せ方。1位が着いた時点か最後の大学が着いた時点か、などは考えない)。
 // ・1区から終わった区間まで切り替えられる(覚えない。開くたびに一番あとの区間)。
-// ・前の大学との間が一定の距離(_tsumeM)を超えたところは詰めて、道に切れ目の印と、その間の距離を出す。
+// ・前の大学との間が画面で一定の長さ(_tsumeGenkaiPx)を超えるところは詰めて、道に切れ目の印と、
+//   その間の距離を出す(倍率を変えても、長くなりすぎる間だけが詰まる)。
+// ・表示の倍率(1mあたりの高さ)は「−」「＋」で6段階に変えられる(文字の大きさは変わらない)。
+//   開いたときは「おまかせ」(区間ごとに、1位から最後尾までが画面の高さのおよそ2つ分に収まる
+//   一番大きい倍率)。「−」「＋」を押すとおまかせが外れ、区間を切り替えてもその倍率のまま。
+//   覚えない(画面を閉じたらおまかせに戻る)。倍率のボタンの横に縮尺の棒を出す。
 // ・11月駅伝は8位、正月駅伝は10位の下にシード権ラインを引く(10月駅伝とカスタム駅伝はなし)。
 // ・学連選抜(正月駅伝のオープン参加)は白抜きの点で出し、順位とシード権ラインに数えない。
 //   学連選抜の監督をした年は、オレンジの白抜き(区間ごとのタイム分布と同じ)。
@@ -27,11 +32,16 @@ import 'package:ekiden/kansuu/kiji/kiji_kekka.dart';
 import 'package:ekiden/kansuu/gakuren_text.dart';
 import 'package:ekiden/kansuu/gakuren_kantoku.dart';
 
-/// 1mあたりの高さ(px)
-const double _pxPerM = 0.4;
+/// 表示の倍率の段階(1mあたりの高さ(px))と名前(×1は、最初に作ったときの決め打ちの倍率)
+const List<double> _bairitsu = [0.1, 0.2, 0.4, 0.8, 1.6, 3.2];
+const List<String> _bairitsuMei = ['×1/4', '×1/2', '×1', '×2', '×4', '×8'];
 
-/// 前の大学との間がこれ(m)より空いたら、詰めて切れ目の印を出す
-const double _tsumeM = 360;
+/// おまかせの倍率: 1位から最後尾までが、画面の高さのこの倍に収まる一番大きい倍率
+const double _omakaseGamen = 2.0;
+
+/// 前の大学との間が、画面でこれ(px)より長くなるところは詰めて、切れ目の印を出す
+/// (×1のときに360m。最初に作ったときの「360mを超えたら」と同じ長さ)
+const double _tsumeGenkaiPx = 144;
 
 /// 詰めたところの高さ(px)
 const double _tsumePx = 52;
@@ -439,6 +449,12 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
   /// 押して差を出している名前の行(-1はなし)
   int _oshita = -1;
 
+  /// 表示の倍率の段階(_bairitsu の番号。おまかせのときは使わない)
+  int _dan = 2;
+
+  /// 倍率がおまかせか(「−」「＋」を押すと外れる。覚えない)
+  bool _omakase = true;
+
   static const TextStyle _chiisai = TextStyle(color: Colors.white54, fontSize: 11);
   static const TextStyle _seedMojiStyle = TextStyle(color: Colors.amberAccent, fontSize: 11);
 
@@ -493,8 +509,19 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     return h;
   }
 
-  /// 点と名前の行の位置を決める
-  _Haichi _haichi(_IchiKankei b, _IchiKukan r, double w, TextScaler scaler) {
+  /// おまかせの倍率の段階(1位から最後尾までが、画面の高さのおよそ2つ分に収まる一番大きい倍率)
+  int _omakaseDan(_IchiKukan r, double gamenTakasa) {
+    if (r.narabi.length < 2) return 2;
+    final double haba = (r.narabi.last.ruikei - r.narabi.first.ruikei) * r.hayasa;
+    int dan = 0;
+    for (int i = 0; i < _bairitsu.length; i++) {
+      if (haba * _bairitsu[i] <= gamenTakasa * _omakaseGamen) dan = i;
+    }
+    return dan;
+  }
+
+  /// 点と名前の行の位置を決める([px] は1mあたりの高さ)
+  _Haichi _haichi(_IchiKankei b, _IchiKukan r, double w, TextScaler scaler, double px) {
     final double mojiHaba = w - _mojiX - 4;
     final double ueTakasa = _takasaOf(TextSpan(text: b.ueMoji(r), style: _chiisai), mojiHaba, scaler);
     final double kiremeTakasa = _takasaOf(const TextSpan(text: '〜', style: _chiisai), mojiHaba, scaler);
@@ -522,7 +549,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
       final double d = (x.ruikei - base) * r.hayasa;
       if (i > 0) {
         final double dd = d - maeD;
-        if (dd > _tsumeM) {
+        if (dd * px > _tsumeGenkaiPx) {
           final double y0 = y;
           y += _tsumePx;
           kiremeMichi.add((y0: y0, y1: y));
@@ -530,7 +557,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
           kireme.add((top: kTop, moji: '〜 ${_kyoriMoji(dd)} 〜'));
           shitaHashi = kTop + kiremeTakasa;
         } else {
-          y += dd * _pxPerM;
+          y += dd * px;
         }
       }
       maeD = d;
@@ -601,10 +628,54 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     );
   }
 
+  /// 小さなボタン(区間の切り替えと同じ形。[onTap] がnullなら押せない)
+  Widget _komaBotan(String moji, bool on, VoidCallback? onTap) {
+    final Color iro = onTap == null ? Colors.white24 : (on ? _iro : Colors.white70);
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: on ? _iro.withOpacity(0.2) : Colors.transparent,
+          border: Border.all(color: on ? _iro : Colors.white24),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(moji, style: TextStyle(color: iro, fontSize: 13)),
+      ),
+    );
+  }
+
+  /// 縮尺の棒(棒が短すぎず長すぎない、区切りのよい距離を選ぶ)
+  Widget _shukushaku(double px) {
+    int m = 2000;
+    for (final int c in const [10, 20, 50, 100, 200, 500, 1000, 2000]) {
+      if (c * px >= 40) {
+        m = c;
+        break;
+      }
+    }
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(width: m * px, height: 3, color: Colors.white70),
+        const SizedBox(width: 6),
+        Text(
+          m < 1000 ? '${m}m' : '${m ~/ 1000}km',
+          style: const TextStyle(color: Colors.white70, fontSize: 12),
+        ),
+      ],
+    );
+  }
+
   Widget _buildHontai(BuildContext context, _IchiKankei b) {
     final int erabu = _erabu.clamp(0, b.kukan.length - 1);
     final _IchiKukan r = b.kukan[erabu];
     const TextStyle setsumei = TextStyle(color: Colors.white70, fontSize: 12, height: 1.5);
+    // 表示の倍率(おまかせのときは区間ごとに選ぶ)
+    final int dan = _omakase
+        ? _omakaseDan(r, MediaQuery.sizeOf(context).height)
+        : _dan.clamp(0, _bairitsu.length - 1);
+    final double px = _bairitsu[dan];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -653,12 +724,59 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
             style: setsumei,
           ),
         const Text('名前の行を押すと、前の大学との差が出ます。', style: setsumei),
+        const SizedBox(height: 10),
+        // 表示の倍率(「−」「＋」と、おまかせ。覚えない)と縮尺の棒
+        Wrap(
+          spacing: 8,
+          runSpacing: 6,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            _komaBotan(
+              '−',
+              false,
+              dan > 0
+                  ? () => setState(() {
+                      _omakase = false;
+                      _dan = dan - 1;
+                    })
+                  : null,
+            ),
+            Text(
+              _bairitsuMei[dan],
+              style: const TextStyle(
+                color: HENSUU.textcolor,
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            _komaBotan(
+              '＋',
+              false,
+              dan < _bairitsu.length - 1
+                  ? () => setState(() {
+                      _omakase = false;
+                      _dan = dan + 1;
+                    })
+                  : null,
+            ),
+            _komaBotan('おまかせ', _omakase, () => setState(() => _omakase = true)),
+            _shukushaku(px),
+          ],
+        ),
+        if (_omakase)
+          const Padding(
+            padding: EdgeInsets.only(top: 4),
+            child: Text(
+              'おまかせ: 1位から最後尾までが、画面のおよそ2つ分に収まる倍率で出します。',
+              style: setsumei,
+            ),
+          ),
         const SizedBox(height: 12),
         LayoutBuilder(
           builder: (context, constraints) {
             final double w = constraints.maxWidth;
             final TextScaler scaler = MediaQuery.textScalerOf(context);
-            final _Haichi h = _haichi(b, r, w, scaler);
+            final _Haichi h = _haichi(b, r, w, scaler, px);
             final double mojiHaba = w - _mojiX - 4;
             return SizedBox(
               width: w,

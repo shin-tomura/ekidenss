@@ -551,7 +551,7 @@ class _Mode0350ContentState extends State<Mode0350Content> {
                                   annai: kijiSokuhouAnnai(),
                                 ),
                               // 区間ごとのタイム分布と、情報集約パネル(1区から終わった区間まで。
-                              // 1枚のカードの左右(狭いときは上下)。2.0.6。Modal_ichiKankei.dart)
+                              // 1枚のカードの上下2段(2.0.7。2.0.6は左右)。Modal_ichiKankei.dart)
                               // 2.0.7から1区の指示の画面にも出す(スタートの並びだけ。タイム分布はまだないので出ない)
                               if (_bunsekiAri(currentGhensuu))
                                 KukanBunsekiCard(

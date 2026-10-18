@@ -26,7 +26,7 @@
 // ・四角と間の文は折り返さず、道と四角と間の文の部分だけを横にもスクロールできるようにする
 //   (文字を大きくしても、文の長さで行がずれて、距離と位置が合わなくならないように)。
 // ・大学の四角を押すと、その大学の順位・1位との差・前の大学(1位は次の大学)との差を、
-//   画面の下(「戻る」の上)に固定した帯に出す。
+//   画面の下に固定した帯に出す。
 //   もう一度押すと、帯の中に、その区間を走った選手の説明文(個人順位速報の「説明文」と同じ文)も出し、
 //   3回目で、説明文の代わりに次の区間を走る選手(区間配置確認のカードを開いたときと同じ中身。
 //   senshu_haichi_panel.dart の部品)を出し、4回目で閉じる。最終区など次の区間の選手がいなければ3回目で閉じる。
@@ -41,10 +41,11 @@
 //   目標順位は今の値(正月駅伝で復路の目標を決め直したあとは、往路の区間も決め直したあとの目標で出す)。
 //   選んだ基準は、大学や区間を替えてもそのままで、覚えない(画面を閉じたらトップに戻る)。
 // ・区間の切り替えと、表示の倍率のボタン・縮尺の棒は、画面の上に固定する(どちらも折り返す)。
-//   固定の部分は、上のバーと「戻る」を除いた高さの3割までで、超えるときは固定の部分の中だけでスクロールする。
-// ・押した大学の帯は、道の下(「戻る」の上)に置き、上のバーと「戻る」を除いた高さの4割5分までにする。
+//   固定の部分は、上のバーを除いた高さの3割までで、超えるときは固定の部分の中だけでスクロールする。
+// ・押した大学の帯は、道の下(画面の一番下)に置き、上のバーを除いた高さの4割5分までにする。
 //   道にはいつも4分の1以上を残す(小さいスマホで文字を大きくしても、道が消えて四角を押せなくならないように。
 //   2.0.6は、固定の部分が画面の高さの4割まで、帯は「戻る」の上の固定で、高さを抑えていなかった。2.0.7)
+// ・画面の一番下の「戻る」は、2.0.7でなくした(道を広くするため。左上の「←」と、Androidの戻る操作で閉じる)。
 // ・距離は「1位が区間を走り終えたとき、ほかの大学がどれだけ後ろにいるか」を、その区間の出場校の
 //   区間タイムの平均から出した速さ(全員で同じ。学連選抜は平均に入れない)で、タイム差から換算したもの。
 //   速さを全員で1つにするので、距離はタイム差に比例し、順位と位置の並びが逆にならない
@@ -559,12 +560,13 @@ void _ichiGamenHiraku(BuildContext context, int race, int? made) {
 }
 
 
-/// 区間ごとのタイム分布と、区間終了時点の位置関係を1枚にまとめたカード(2.0.6)
-/// ・左が「タイム分布」(Modal_kukanTimeBunpu.dart)、右が「位置関係」の2つのボタンで、それぞれ別に押せる。
+/// 区間ごとのタイム分布と、情報集約パネルを1枚にまとめたカード(2.0.6)
+/// ・上が「情報集約パネル」、下が「タイム分布」(Modal_kukanTimeBunpu.dart)の2つのボタンで、それぞれ別に押せる。
+///   どちらも横いっぱい(2.0.6は、左にタイム分布、右に位置関係を並べていた。2.0.7で上下2段にした)。
 ///   中身はアイコンと見出しだけ(区間の帯のグラフなどは、開いた画面で見る)。
-///   ほかのカードより目立つよう、それぞれの色(青緑・水色)の線で角を丸めて囲み、同じ色でうっすら塗る。
-///   いつも左右に並べ、文字をとても大きくしたときは、ボタンの中で折り返す(左右の高さはそろえる)
-/// ・片方が作れないときは、作れたほうだけでカードの幅を使う。両方とも作れなければ出さない
+///   ほかのカードより目立つよう、それぞれの色(水色・青緑)の線で角を丸めて囲み、同じ色でうっすら塗る。
+/// ・片方が作れないときは、作れたほうの1段だけ。両方とも作れなければ出さない
+///   (1区の指示の画面では、タイム分布はまだ作れないので、情報集約パネルの1段だけ。2.0.7)
 /// ・区間が終わるたびの画面(mode 350。[made] に終わった区間の数)の実況のカードのすぐ下と、
 ///   結果画面([made] はnull)のニュース記事のカードのすぐ下に置く
 /// ・結果は画面を出したあとで1回だけ作る。区間や大会が変わったら作り直すよう、置く側で key を付ける
@@ -639,34 +641,29 @@ class _KukanBunsekiCardState extends State<KukanBunsekiCard> {
   @override
   Widget build(BuildContext context) {
     if (!_tsukutta || (!_bunpuAri && !_ichiAri)) return const SizedBox.shrink();
+    // 上に情報集約パネル、下にタイム分布(どちらも横いっぱい。2.0.7)
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
-      // 左右の高さをそろえる(文字をとても大きくして片方だけ折り返したときも、同じ高さのボタンにする)
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (_bunpuAri)
-              Expanded(
-                child: _botan(
-                  Icons.candlestick_chart,
-                  Colors.tealAccent,
-                  'タイム分布',
-                  () => kukanBunpuGamenHiraku(context, widget.race, widget.made),
-                ),
-              ),
-            if (_bunpuAri && _ichiAri) const SizedBox(width: 8),
-            if (_ichiAri)
-              Expanded(
-                child: _botan(
-                  Icons.directions_run,
-                  _iro,
-                  '情報集約パネル',
-                  () => _ichiGamenHiraku(context, widget.race, widget.made),
-                ),
-              ),
-          ],
-        ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (_ichiAri)
+            _botan(
+              Icons.directions_run,
+              _iro,
+              '情報集約パネル',
+              () => _ichiGamenHiraku(context, widget.race, widget.made),
+            ),
+          if (_bunpuAri && _ichiAri) const SizedBox(height: 8),
+          if (_bunpuAri)
+            _botan(
+              Icons.candlestick_chart,
+              Colors.tealAccent,
+              'タイム分布',
+              () => kukanBunpuGamenHiraku(context, widget.race, widget.made),
+            ),
+        ],
       ),
     );
   }
@@ -1390,7 +1387,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
                   ),
                 ),
               )
-            // 上のバーと「戻る」を除いた高さを、上の固定の部分は3割まで、押した大学の帯は4割5分までにし、
+            // 上のバーを除いた高さを、上の固定の部分は3割まで、押した大学の帯は4割5分までにし、
             // 道にはいつも4分の1以上を残す(小さいスマホで文字を大きくしても、道が消えて四角を押せなくならないように。2.0.7)
             : LayoutBuilder(
                 builder: (context, constraints) {
@@ -1413,10 +1410,10 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
                           child: _buildHontai(context, b, r0, dan, gamenTakasa),
                         ),
                       ),
-                      // 押した大学の帯(4割5分まで。道をスクロールしていても見えるように、道の下に置く)
+                      // 押した大学の帯(4割5分まで。道をスクロールしていても見えるように、道の下(画面の一番下)に置く)
                       if (oshitaBun != null && x0 != null)
                         Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
                           child: ConstrainedBox(
                             constraints: BoxConstraints(maxHeight: takasa * 0.45),
                             child: _buildObi(context, r0, x0, oshitaBun),
@@ -1427,28 +1424,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
                 },
               ),
       ),
-      bottomNavigationBar: Container(
-        padding: const EdgeInsets.all(16),
-        color: HENSUU.backgroundcolor,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blueAccent,
-                foregroundColor: Colors.white,
-                minimumSize: const Size(double.infinity, 50),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              child: const Text("戻る", style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
-          ],
-        ),
-      ),
+      // 画面の一番下の「戻る」は、道を広くするためになくした(左上の「←」と、Androidの戻る操作で閉じる。2.0.7)
     );
   }
 

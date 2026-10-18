@@ -343,13 +343,6 @@ class _IchiKankei {
     return _IchiKankei._(kukan, e.seedSuu, gakurenJibun, k.kukansuu, race);
   }
 
-  /// 区間[r]のいちばん上の印の文(中継所・往路のゴール・ゴール)
-  String ueMoji(_IchiKukan r) {
-    if (r.kk >= zenKukansuu - 1) return 'ゴール';
-    if (race == 2 && zenKukansuu >= 6 && r.kk == 4) return '往路のゴール';
-    return '${r.kk + 1}区→${r.kk + 2}区の中継所';
-  }
-
   /// 学連選抜が走っている区間があるか
   bool get opAri => kukan.any((r) => r.narabi.any((x) => x.op));
 }
@@ -748,7 +741,6 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     for (final Size s in hakoOokisa) {
       gyouTakasa = math.max(gyouTakasa, s.height);
     }
-    final double ueTakasa = _ookisa(TextSpan(text: b.ueMoji(r), style: _chiisai), scaler).height;
     // 間の文の高さ(1行目と、詰めた間に添える「(詰めています)」)
     final double aidaMojiTakasa = _ookisa(const TextSpan(text: '0m', style: _migiStyle), scaler).height;
     final double tsumeMojiTakasa = _ookisa(const TextSpan(text: _tsumeMoji, style: _chiisai), scaler).height;
@@ -801,7 +793,8 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     final List<({double y0, double y1})> kireme = [];
     final List<Rect> waku = [];
     double? seedTop;
-    final double michiUe = ueTakasa + 4;
+    // 道の帯は、いちばん上から始める(2.0.6の開発中まで、上に「○区→○区の中継所」を出していた)
+    const double michiUe = 0;
     double shita = michiUe; // いま置いたものの下端
     double sentouY = michiUe + _sukima + gyouTakasa / 2;
     double? maeChuushin; // 前の集団の一番下の行の真ん中
@@ -1183,12 +1176,6 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
                 child: Stack(
                   children: [
                     Positioned.fill(child: CustomPaint(painter: _MichiPainter(h))),
-                    // いちばん上の印(中継所・ゴール)
-                    Positioned(
-                      left: 0,
-                      top: 0,
-                      child: Text(b.ueMoji(r), style: _chiisai, softWrap: false),
-                    ),
                     // 前の大学(集団)との間の距離と秒差(括弧の真ん中。詰めた間は「(詰めています)」を添える)
                     for (final _Aida a in h.aida)
                       Positioned(

@@ -369,14 +369,11 @@ void _ichiGamenHiraku(BuildContext context, int race, int? made) {
 }
 
 
-// カードの色(ニュース記事のカード(kiji_screen.dart の KijiLinkCard)とそろえる)
-const Color _cardWaku = Color(0xFF161616);
-const Color _cardSen = Color(0xFF333333);
-
 /// 区間ごとのタイム分布と、区間終了時点の位置関係を1枚にまとめたカード(2.0.6)
-/// ・左半分が「タイム分布」(Modal_kukanTimeBunpu.dart)、右半分が「位置関係」で、それぞれ別に押せる。
+/// ・左が「タイム分布」(Modal_kukanTimeBunpu.dart)、右が「位置関係」の2つのボタンで、それぞれ別に押せる。
 ///   中身はアイコンと見出しだけ(区間の帯のグラフなどは、開いた画面で見る)。
-///   いつも左右に分け、文字をとても大きくしたときは、半分の中で折り返す
+///   ほかのカードより目立つよう、それぞれの色(青緑・水色)の線で角を丸めて囲み、同じ色でうっすら塗る。
+///   いつも左右に並べ、文字をとても大きくしたときは、ボタンの中で折り返す(左右の高さはそろえる)
 /// ・片方が作れないときは、作れたほうだけでカードの幅を使う。両方とも作れなければ出さない
 /// ・区間が終わるたびの画面(mode 350。[made] に終わった区間の数)の実況のカードのすぐ下と、
 ///   結果画面([made] はnull)のニュース記事のカードのすぐ下に置く
@@ -419,23 +416,31 @@ class _KukanBunsekiCardState extends State<KukanBunsekiCard> {
     });
   }
 
-  /// 半分(アイコンと見出し)
-  Widget _hanbun(IconData icon, Color iro, String moji, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        child: Row(
-          children: [
-            Icon(icon, color: iro, size: 16),
-            const SizedBox(width: 4),
-            Flexible(
-              child: Text(
-                '$moji ›',
-                style: TextStyle(color: iro, fontSize: 13, fontWeight: FontWeight.bold),
+  /// ボタン1つ(アイコンと見出し。その色の線で囲み、同じ色でうっすら塗る)
+  Widget _botan(IconData icon, Color iro, String moji, VoidCallback onTap) {
+    return Material(
+      color: iro.withOpacity(0.1),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+        side: BorderSide(color: iro, width: 1.5),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Row(
+            children: [
+              Icon(icon, color: iro, size: 16),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  '$moji ›',
+                  style: TextStyle(color: iro, fontSize: 13, fontWeight: FontWeight.bold),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -446,52 +451,31 @@ class _KukanBunsekiCardState extends State<KukanBunsekiCard> {
     if (!_tsukutta || (!_bunpuAri && !_ichiAri)) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
-      child: SizedBox(
-        width: double.infinity,
-        child: Material(
-          color: _cardWaku,
-          child: Container(
-            decoration: const BoxDecoration(
-              border: Border(
-                left: BorderSide(color: Colors.tealAccent, width: 5),
-                top: BorderSide(color: _cardSen),
-                right: BorderSide(color: _cardSen),
-                bottom: BorderSide(color: _cardSen),
+      // 左右の高さをそろえる(文字をとても大きくして片方だけ折り返したときも、同じ高さのボタンにする)
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (_bunpuAri)
+              Expanded(
+                child: _botan(
+                  Icons.candlestick_chart,
+                  Colors.tealAccent,
+                  'タイム分布',
+                  () => kukanBunpuGamenHiraku(context, widget.race, widget.made),
+                ),
               ),
-            ),
-            // 左右の高さをそろえる(文字をとても大きくして片方だけ折り返したときも、境目の線と押せる所が下まで届くように)
-            child: IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (_bunpuAri)
-                    Expanded(
-                      child: _hanbun(
-                        Icons.candlestick_chart,
-                        Colors.tealAccent,
-                        'タイム分布',
-                        () => kukanBunpuGamenHiraku(context, widget.race, widget.made),
-                      ),
-                    ),
-                  if (_bunpuAri && _ichiAri)
-                    Container(
-                      width: 1,
-                      margin: const EdgeInsets.symmetric(vertical: 6),
-                      color: _cardSen,
-                    ),
-                  if (_ichiAri)
-                    Expanded(
-                      child: _hanbun(
-                        Icons.directions_run,
-                        _iro,
-                        '位置関係',
-                        () => _ichiGamenHiraku(context, widget.race, widget.made),
-                      ),
-                    ),
-                ],
+            if (_bunpuAri && _ichiAri) const SizedBox(width: 8),
+            if (_ichiAri)
+              Expanded(
+                child: _botan(
+                  Icons.directions_run,
+                  _iro,
+                  '位置関係',
+                  () => _ichiGamenHiraku(context, widget.race, widget.made),
+                ),
               ),
-            ),
-          ),
+          ],
         ),
       ),
     );

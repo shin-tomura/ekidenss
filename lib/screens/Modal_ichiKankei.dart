@@ -10,6 +10,12 @@
 //   (結果画面)の umekomi)で、区間はパネルで選んだ区間。スタートでは、まだないことを出す。
 //   通過と個人のときは、倍率の行を隠し、押した大学の帯は閉じる。覚えない(開いたときは「位置」)。
 //   スタートしかないとき(1区の指示の画面)は、ボタンを出さない。
+// ・2.0.9から、切り替えボタンの4つ目に「配置」(区間配置確認)を足した(位置 → 通過 → 個人 → 配置 → 位置。
+//   スタートしかないとき(1区の指示の画面)は、位置 → 配置 → 位置)。区間配置確認の画面を、上のバー(共有のボタンも)・
+//   大学を選ぶ行・下の「戻る」を外して入れたもの(Modal_kukanhaiti2.dart の umekomi)。配置のときは、区間を選ぶ欄が
+//   大学を選ぶ欄(「‹」「›」は端まで行くと反対の端に回る。一覧は出場校のID順で、学連選抜がいる年は最後に学連選抜)に
+//   入れ替わる。最初は自分の大学(学連選抜の監督の年は学連選抜。自分の大学が出ていない年は、ID順の最初の大学)で、
+//   画面を閉じるまで選んだ大学を覚える。大学名は1行に収め、入りきらないところは「…」で省く。
 // ・2.0.8から、おまかせのときに「おまかせ」をもう一度押すと「おまかせ ↔」(幅に合わせる)になり、道が横幅に収まるように、
 //   道の上の文字(四角の中・右の差・(詰めています)・シード権ライン)を小さくする(6割まで。それでも入らなければ
 //   横にスクロールする)。縦の縮尺は変えない。もう一度押すと戻り、「−」「＋」を押すと、おまかせと一緒に外れる。覚えない。
@@ -107,6 +113,8 @@ import 'package:ekiden/screens/Modal_kukanresult350.dart'
     show ModalKukanResultListView350; // 個人順位速報(レースの途中。2.0.8)
 import 'package:ekiden/screens/Modal_kukanresult.dart'
     show ModalKukanResultListView; // 個人順位速報(結果画面。2.0.8)
+import 'package:ekiden/screens/Modal_kukanhaiti2.dart'
+    show ModalKukanHaitiView, kukanHaitiGakurenId; // 区間配置確認(パネルの中に入れる。2.0.9)
 import 'package:ekiden/kansuu/kiji/kiji_kihon.dart';
 import 'package:ekiden/kansuu/kiji/kiji_kekka.dart';
 import 'package:ekiden/kansuu/gakuren_text.dart';
@@ -388,7 +396,17 @@ class _IchiKankei {
   /// 大会番号
   final int race;
 
-  _IchiKankei._(this.kukan, this.seed, this.gakurenJibun, this.zenKukansuu, this.race);
+  /// 配置(区間配置確認)で選べる大学(出場校のID順。学連選抜がいる年は最後に学連選抜。2.0.9)
+  final List<({int id, String mei})> haichiDaigaku;
+
+  _IchiKankei._(
+    this.kukan,
+    this.seed,
+    this.gakurenJibun,
+    this.zenKukansuu,
+    this.race,
+    this.haichiDaigaku,
+  );
 
   /// 大会[race]の結果から作る([made] を渡すと、レースの途中の1区から[made]区まで)
   /// (思わぬデータで画面が止まらないよう、作れなければnull)
@@ -509,7 +527,13 @@ class _IchiKankei {
     // レースの途中と結果画面で、区間が1つも作れなければ(思わぬデータ)、今まで通り出さない
     if (!startMae && !kukan.any((r) => r.kk >= 0)) return null;
     final int? seed = e != null ? e.seedSuu : (race == 1 ? 8 : (race == 2 ? 10 : null));
-    return _IchiKankei._(kukan, seed, gakurenJibun, k.kukansuu, race);
+    // 配置(区間配置確認)で選べる大学(区間配置確認の大学を選ぶ行と同じ。2.0.9)
+    final List<({int id, String mei})> haichiDaigaku = [
+      for (final UnivData u in k.univ)
+        if (k.shutsujou(u)) (id: u.id, mei: u.name),
+      if (gakurenAri) (id: kukanHaitiGakurenId, mei: '学連選抜(OP)'),
+    ];
+    return _IchiKankei._(kukan, seed, gakurenJibun, k.kukansuu, race, haichiDaigaku);
   }
 
   /// スタートの並び(出場校を大学のID順に並べ、学連選抜は最後。距離はみな0。
@@ -841,8 +865,11 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
   /// おまかせのときに、道が横幅に収まるように文字を小さくするか(おまかせ ↔。覚えない。2.0.8)
   bool _habaAwase = false;
 
-  /// 表示(0: 位置、1: 通過順位速報、2: 個人順位速報。覚えない。2.0.8)
+  /// 表示(0: 位置、1: 通過順位速報、2: 個人順位速報、3: 配置(区間配置確認。2.0.9)。覚えない。2.0.8)
   int _hyouji = 0;
+
+  /// 配置で選んだ大学(学連選抜は kukanHaitiGakurenId。nullなら最初の大学。画面を閉じるまで覚える。2.0.9)
+  int? _haichiUniv;
 
   static const TextStyle _chiisai = TextStyle(color: Colors.white54, fontSize: 11);
   static const TextStyle _seedMojiStyle = TextStyle(color: Colors.amberAccent, fontSize: 11);
@@ -1723,6 +1750,10 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
       children: [
         Row(
           children: [
+            // 配置(区間配置確認)のときは大学を選び、ほかのときは区間を選ぶ(2.0.9)
+            if (_hyouji == 3)
+              ..._daigakuErabi(b)
+            else ...[
             _yajirushi(
               Icons.chevron_left,
               '前の区間',
@@ -1778,11 +1809,10 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
               '次の区間',
               erabu < b.kukan.length - 1 ? () => _kukanKaeru(erabu + 1) : null,
             ),
-            // 表示の切り替え(スタートしかないときは出さない。2.0.8)
-            if (b.kukan.any((x) => x.kk >= 0)) ...[
-              const SizedBox(width: 8),
-              _hyoujiBotan(),
             ],
+            // 表示の切り替え(2.0.8。2.0.9からスタートしかないときも出す)
+            const SizedBox(width: 8),
+            _hyoujiBotan(b),
           ],
         ),
         // 表示の倍率(「−」「＋」と、おまかせ。覚えない)と縮尺の棒(位置のときだけ。2.0.8)
@@ -1843,9 +1873,16 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     );
   }
 
-  /// 表示を切り替えるボタン(押すたびに「位置」→「通過」→「個人」→「位置」。今の表示の名前を出す。2.0.8)
-  Widget _hyoujiBotan() {
-    const List<String> mei = ['位置', '通過', '個人'];
+  /// 次の表示(位置 → 通過 → 個人 → 配置 → 位置。スタートしかないときは、位置 → 配置 → 位置。2.0.9)
+  int _tsugiHyouji(_IchiKankei b) {
+    if (!b.kukan.any((x) => x.kk >= 0)) return _hyouji == 3 ? 0 : 3;
+    return (_hyouji + 1) % 4;
+  }
+
+  /// 表示を切り替えるボタン(押すたびに「位置」→「通過」→「個人」→「配置」→「位置」。今の表示の名前を出す。
+  /// 2.0.8。配置は2.0.9)
+  Widget _hyoujiBotan(_IchiKankei b) {
+    const List<String> mei = ['位置', '通過', '個人', '配置'];
     const Color iro = Colors.amberAccent;
     return Semantics(
       button: true,
@@ -1859,7 +1896,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
         clipBehavior: Clip.antiAlias,
         child: InkWell(
           onTap: () => setState(() {
-            _hyouji = (_hyouji + 1) % 3;
+            _hyouji = _tsugiHyouji(b);
             // 押した大学の帯は閉じる
             _oshita = -1;
             _hiraki = 0;
@@ -1870,7 +1907,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  mei[_hyouji.clamp(0, 2)],
+                  mei[_hyouji.clamp(0, 3)],
                   style: const TextStyle(
                     color: iro,
                     fontSize: 15,
@@ -1887,9 +1924,101 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     );
   }
 
+  /// 配置(区間配置確認)で見ている大学(最初は自分の大学。学連選抜の監督の年は学連選抜。
+  /// 自分の大学が出ていない年は、ID順の最初の大学。2.0.9)
+  int _haichiUnivIma(_IchiKankei b) {
+    final List<({int id, String mei})> l = b.haichiDaigaku;
+    final int? erabi = _haichiUniv;
+    if (erabi != null && l.any((x) => x.id == erabi)) return erabi;
+    if (b.gakurenJibun && l.any((x) => x.id == kukanHaitiGakurenId)) {
+      return kukanHaitiGakurenId;
+    }
+    final int? my = _gh?.MYunivid;
+    if (my != null && l.any((x) => x.id == my)) return my;
+    return l.isEmpty ? (my ?? 0) : l.first.id;
+  }
+
+  /// 大学を選ぶ欄(配置のとき。「‹」「›」は端まで行くと反対の端に回る(区間配置確認と同じ)。
+  /// 大学名は1行に収め、入りきらないところは「…」で省く。一覧の中では全部出す。2.0.9)
+  List<Widget> _daigakuErabi(_IchiKankei b) {
+    final List<({int id, String mei})> l = b.haichiDaigaku;
+    final int ima = _haichiUnivIma(b);
+    final int i = l.indexWhere((x) => x.id == ima);
+    void kaeru(int j) => setState(() => _haichiUniv = l[j].id);
+    return [
+      _yajirushi(
+        Icons.chevron_left,
+        '前の大学',
+        l.length > 1 ? () => kaeru(i <= 0 ? l.length - 1 : i - 1) : null,
+      ),
+      const SizedBox(width: 8),
+      Expanded(
+        child: PopupMenuButton<int>(
+          tooltip: '大学を選ぶ',
+          initialValue: ima,
+          color: const Color(0xFF2A2A2A),
+          onSelected: (id) => setState(() => _haichiUniv = id),
+          itemBuilder: (context) => [
+            for (final ({int id, String mei}) x in l)
+              PopupMenuItem<int>(
+                value: x.id,
+                child: Text(
+                  x.mei,
+                  style: TextStyle(color: x.id == ima ? _iro : HENSUU.textcolor),
+                ),
+              ),
+          ],
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+            decoration: BoxDecoration(
+              color: _iro.withOpacity(0.15),
+              border: Border.all(color: _iro),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Flexible(
+                  child: Text(
+                    i >= 0 ? l[i].mei : '',
+                    maxLines: 1,
+                    softWrap: false,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: _iro,
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                const Icon(Icons.arrow_drop_down, color: _iro, size: 22),
+              ],
+            ),
+          ),
+        ),
+      ),
+      const SizedBox(width: 8),
+      _yajirushi(
+        Icons.chevron_right,
+        '次の大学',
+        l.length > 1 ? () => kaeru(i < 0 || i >= l.length - 1 ? 0 : i + 1) : null,
+      ),
+    ];
+  }
+
   /// 通過順位速報・個人順位速報(今の速報の画面を、上のバーと下の「前・次」を外して入れる。
   /// 区間はパネルで選んだ区間。個人順位速報は、レースの途中は途中用、結果画面では結果画面用。2.0.8)
   Widget _buildSokuhou(_IchiKukan r) {
+    // 配置(区間配置確認。区間に関係なく、パネルで選んだ大学。2.0.9)
+    if (_hyouji == 3) {
+      final _IchiKankei? b = _b;
+      return ModalKukanHaitiView(
+        targetUnivid: _gh?.MYunivid ?? 0,
+        univid: b == null ? null : _haichiUnivIma(b),
+        umekomi: true,
+      );
+    }
     if (r.kk < 0) {
       return const Center(
         child: Padding(

@@ -25,9 +25,24 @@ import 'package:screenshot/screenshot.dart';
 // 大学を選ぶ欄で学連選抜(OP)を表す値(1.8.2)
 const int _gakurenId = -3;
 
+/// 学連選抜(OP)を表す値(情報集約パネルから大学を渡すときに使う。2.0.9)
+const int kukanHaitiGakurenId = _gakurenId;
+
 class ModalKukanHaitiView extends StatefulWidget {
   final int targetUnivid;
-  const ModalKukanHaitiView({super.key, required this.targetUnivid});
+
+  /// 情報集約パネルの中に入れるときに、パネルで選んだ大学(学連選抜は kukanHaitiGakurenId。
+  /// 単独で開くときはnull。2.0.9)
+  final int? univid;
+
+  /// 情報集約パネルの中に入れるか(上のバー(共有のボタンも)・大学を選ぶ行・下の「戻る」を出さない。2.0.9)
+  final bool umekomi;
+  const ModalKukanHaitiView({
+    super.key,
+    required this.targetUnivid,
+    this.univid,
+    this.umekomi = false,
+  });
 
   @override
   State<ModalKukanHaitiView> createState() => _ModalKukanHaitiViewState();
@@ -271,6 +286,8 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
             }
           }
         }
+        // 情報集約パネルの中では、パネルで選んだ大学(2.0.9)
+        if (widget.univid != null) _selectedUnivId = widget.univid;
         if (_selectedUnivId == _gakurenId && !gakurenAri) {
           _selectedUnivId = widget.targetUnivid;
         }
@@ -327,7 +344,9 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
                   children: [
                     Scaffold(
                       backgroundColor: HENSUU.backgroundcolor,
-                      appBar: AppBar(
+                      appBar: widget.umekomi
+                          ? null
+                          : AppBar(
                         title: const Text(
                           '区間配置確認',
                           style: TextStyle(
@@ -348,7 +367,9 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
                       ),
                       body: Column(
                         children: [
-                          _buildUnivSelector(entryUnivs, gakurenAri),
+                          // 情報集約パネルの中では、大学はパネルで選ぶ(2.0.9)
+                          if (!widget.umekomi)
+                            _buildUnivSelector(entryUnivs, gakurenAri),
                           // 持ちタイムの切り替え(自己ベスト/今季ベスト。1.9.1)
                           KonkiBestKirikae(onChanged: () => setState(() {})),
                           const Divider(color: Colors.white24, height: 1),
@@ -360,7 +381,7 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
                                     displaySenshuData,
                                   ),
                           ),
-                          _buildBottomBar(context),
+                          if (!widget.umekomi) _buildBottomBar(context),
                         ],
                       ),
                     ),

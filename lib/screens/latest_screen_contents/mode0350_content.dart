@@ -38,8 +38,8 @@ import 'package:ekiden/kansuu/ikku_pace.dart'; // 1区の集団のペース(1.9.
 import 'package:ekiden/screens/ikku_pace_box.dart'; // 1区のペースの予想と結果の枠(1.9.2)
 import 'package:ekiden/screens/kiji_screen.dart'; // 駅伝の実況「箱庭スポーツ中継」のカード(1.9.4)
 import 'package:ekiden/kansuu/kiji/kiji.dart'; // 実況の一覧(カードの見出しの予告。1.9.4)
-import 'package:ekiden/screens/Modal_kukanTimeBunpu.dart'; // 区間ごとのタイム分布(レースの途中も。2.0.6)
-import 'package:ekiden/screens/Modal_ichiKankei.dart'; // 区間終了時点の位置関係(2.0.6)
+import 'package:ekiden/screens/Modal_ichiKankei.dart'
+    show KukanBunsekiCard; // 区間ごとのタイム分布と区間終了時点の位置関係のカード(2.0.6)
 
 String _getCombinedDifficultyText(KantokuData kantoku, Ghensuu currentGhensuu) {
   // 難易度モードを取得 (0:通常, 1:極, 2:天)
@@ -550,24 +550,16 @@ class _Mode0350ContentState extends State<Mode0350Content> {
                                   hiraku: kijiJikkyouHiraku,
                                   annai: kijiSokuhouAnnai(),
                                 ),
-                              // 区間ごとのタイム分布と、区間終了時点の位置関係(1区から終わった区間まで。2.0.6。
-                              // Modal_kukanTimeBunpu.dart・Modal_ichiKankei.dart)
-                              if (_jikkyouAri(currentGhensuu)) ...[
-                                KukanBunpuCard(
+                              // 区間ごとのタイム分布と、区間終了時点の位置関係(1区から終わった区間まで。
+                              // 1枚のカードの左右(狭いときは上下)。2.0.6。Modal_ichiKankei.dart)
+                              if (_jikkyouAri(currentGhensuu))
+                                KukanBunsekiCard(
                                   key: ValueKey(
-                                    'kukanBunpuT_${currentGhensuu.year}_${currentGhensuu.hyojiracebangou}_${currentGhensuu.nowracecalckukan}',
+                                    'kukanBunseki_${currentGhensuu.year}_${currentGhensuu.hyojiracebangou}_${currentGhensuu.nowracecalckukan}',
                                   ),
                                   race: currentGhensuu.hyojiracebangou,
                                   made: currentGhensuu.nowracecalckukan,
                                 ),
-                                IchiKankeiCard(
-                                  key: ValueKey(
-                                    'ichiKankeiT_${currentGhensuu.year}_${currentGhensuu.hyojiracebangou}_${currentGhensuu.nowracecalckukan}',
-                                  ),
-                                  race: currentGhensuu.hyojiracebangou,
-                                  made: currentGhensuu.nowracecalckukan,
-                                ),
-                              ],
                               // 正月駅伝の往路の記事(5区が終わったあと。往路優勝を大きく取り上げる。2.0.0。kiji_ouro.dart)
                               if (_ouroOwari(currentGhensuu))
                                 KijiLinkCard(
@@ -1375,23 +1367,15 @@ class _Mode0350ContentState extends State<Mode0350Content> {
                       hiraku: kijiJikkyouHiraku,
                       annai: kijiSokuhouAnnai(),
                     ),
-                  // 区間ごとのタイム分布と、区間終了時点の位置関係(2.0.6。学連選抜の監督の年も同じ)
-                  if (_jikkyouAri(currentGhensuu)) ...[
-                    KukanBunpuCard(
+                  // 区間ごとのタイム分布と、区間終了時点の位置関係のカード(2.0.6。学連選抜の監督の年も同じ)
+                  if (_jikkyouAri(currentGhensuu))
+                    KukanBunsekiCard(
                       key: ValueKey(
-                        'kukanBunpuTG_${currentGhensuu.year}_${currentGhensuu.hyojiracebangou}_${currentGhensuu.nowracecalckukan}',
+                        'kukanBunsekiG_${currentGhensuu.year}_${currentGhensuu.hyojiracebangou}_${currentGhensuu.nowracecalckukan}',
                       ),
                       race: currentGhensuu.hyojiracebangou,
                       made: currentGhensuu.nowracecalckukan,
                     ),
-                    IchiKankeiCard(
-                      key: ValueKey(
-                        'ichiKankeiTG_${currentGhensuu.year}_${currentGhensuu.hyojiracebangou}_${currentGhensuu.nowracecalckukan}',
-                      ),
-                      race: currentGhensuu.hyojiracebangou,
-                      made: currentGhensuu.nowracecalckukan,
-                    ),
-                  ],
                   // 正月駅伝の往路の記事(5区が終わったあと。2.0.0。kiji_ouro.dart)
                   if (_ouroOwari(currentGhensuu))
                     KijiLinkCard(

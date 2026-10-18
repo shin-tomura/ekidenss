@@ -1,6 +1,7 @@
 // 駅伝の区間ごとのタイム分布(2.0.5)
-// 結果画面(10月駅伝・11月駅伝・正月駅伝・カスタム駅伝)の「区間ごとのタイム分布」のカード
-// (KukanBunpuCard。ニュース記事のカードのすぐ下)から開く。
+// 結果画面(10月駅伝・11月駅伝・正月駅伝・カスタム駅伝)の、ニュース記事のカードのすぐ下のカードから開く
+// (2.0.6から、区間終了時点の位置関係と1枚にまとめたカード(Modal_ichiKankei.dart の KukanBunsekiCard)の
+// 左半分。中身は kukanBunpuHanbun。2.0.5では KukanBunpuCard という1枚のカードだった)。
 // ・1区が一番上、最終区が一番下。各行に、その区間を走った出場校の選手の区間タイムを、
 //   区間1位からの差で点として描く(右の「1位」が区間1位、左ほど遅い)。
 // ・横軸は「1kmあたりの差」(差を区間の距離で割ったもの。区間の長さが違っても比べられる)と、
@@ -16,7 +17,7 @@
 //   グラフの画面はその区間を開いた状態で開く。
 // ・結果は記事と同じ EkidenKekka(kiji_kekka.dart)から作る。予備の配列は使わない。
 // ・2.0.6から、レースの途中(区間が終わるたびの画面。mode 350)でも、1区から終わった区間までで
-//   見られる(KukanBunpuCard と ModalKukanTimeBunpuView に made(終わった区間の数)を渡す)。
+//   見られる(kukanBunpuYomu と ModalKukanTimeBunpuView に made(終わった区間の数)を渡す)。
 //   途中のカードとグラフの画面は、差が一番ついた区間ではなく、終わったばかりの区間を出して開く。
 
 import 'dart:math' as math;
@@ -330,146 +331,113 @@ void _bunpuGamenHiraku(BuildContext context, int race, int? made) {
   );
 }
 
-// 結果画面のカードの色(ニュース記事のカード(kiji_screen.dart の KijiLinkCard)とそろえる)
-const Color _cardWaku = Color(0xFF161616);
-const Color _cardSen = Color(0xFF333333);
+// カードの薄い文字の色(ニュース記事のカード(kiji_screen.dart の KijiLinkCard)とそろえる。
+// カードの枠と線の色は、まとめたカード(Modal_ichiKankei.dart)にある)
 const Color _cardUsui = Color(0xFF9E9E9E);
 
-/// 結果画面に置くカード(2.0.5)
-/// ・正月駅伝予選のカード(Modal_yosenTimeBunpu.dart の YosenBunpuCard)と同じ形にして、
-///   差が一番ついた区間を、グラフの画面と同じ横軸(1kmあたり)で抜き出して出す
-/// ・結果は画面を出したあとで1回だけ作る(画面が出るのを遅らせない)。
-///   大会が変わったら作り直すよう、置く側で key を付ける
-/// ・結果がなければ出さない
-/// ・2.0.6から、レースの途中の区間ごとの画面(mode 350)にも置く([made] に終わった区間の数を渡す。
-///   カードには終わったばかりの区間を出す)
-class KukanBunpuCard extends StatefulWidget {
-  final int race;
-
-  /// レースの途中のとき、終わった区間の数(結果画面ではnull)
-  final int? made;
-  const KukanBunpuCard({super.key, required this.race, this.made});
-
-  @override
-  State<KukanBunpuCard> createState() => _KukanBunpuCardState();
+/// 区間ごとのタイム分布の結果(2.0.6。位置関係と1枚にまとめたカード(Modal_ichiKankei.dart の
+/// KukanBunsekiCard)で、作れたかを確かめてから半分を描くために使う)
+class KukanBunpuYomikomi {
+  final _KukanBunpu _b;
+  KukanBunpuYomikomi._(this._b);
 }
 
-class _KukanBunpuCardState extends State<KukanBunpuCard> {
-  _KukanBunpu? _b;
+/// 大会[race]の結果から作る([made] を渡すと、レースの途中の1区から[made]区まで。作れなければnull)
+KukanBunpuYomikomi? kukanBunpuYomu(int race, {int? made}) {
+  final _KukanBunpu? b = _KukanBunpu.yomu(race, made: made);
+  return b == null ? null : KukanBunpuYomikomi._(b);
+}
 
-  /// 結果を作ったか
-  bool _tsukutta = false;
+/// カードの見出し(アイコンと「区間ごとのタイム分布」)の幅
+/// (まとめたカードで、左右に分けるか上下に分けるかを決めるのに使う)
+double kukanBunpuMidashiHaba(TextScaler scaler) {
+  final TextPainter tp = TextPainter(
+    text: const TextSpan(text: '区間ごとのタイム分布', style: _cardMidashiStyle),
+    textDirection: TextDirection.ltr,
+    textScaler: scaler,
+  )..layout();
+  final double w = tp.width;
+  tp.dispose();
+  return 16 + 4 + w;
+}
 
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      final _KukanBunpu? b = _KukanBunpu.yomu(widget.race, made: widget.made);
-      if (!mounted) return;
-      setState(() {
-        _b = b;
-        _tsukutta = true;
-      });
-    });
+const TextStyle _cardMidashiStyle = TextStyle(
+  color: Colors.tealAccent,
+  fontSize: 12.5,
+  fontWeight: FontWeight.bold,
+);
+
+/// まとめたカードの、区間ごとのタイム分布の半分(2.0.6。2.0.5の結果画面のカード(KukanBunpuCard)の代わり)
+/// ・カードに出す区間(結果画面では差が一番ついた区間、レースの途中は終わったばかりの区間)の
+///   距離と自分の大学(学連選抜)の区間順位と、グラフの画面と同じ横軸(1kmあたり)の帯を出す
+/// ・[haba] は中身の幅。高さを測れるよう(左右に分けるときに IntrinsicHeight を使う)、
+///   LayoutBuilder と WidgetSpan は使わない
+Widget kukanBunpuHanbun(
+  BuildContext context,
+  KukanBunpuYomikomi y, {
+  required int race,
+  int? made,
+  required double haba,
+}) {
+  final _KukanBunpu b = y._b;
+  final _Kukan r = b.kukan[b.daihyou];
+  final ({double hidari, double migi, bool soto}) hb = b.haba(true);
+  final double w = math.max(haba, 1);
+  final List<double> sen = [
+    for (final m in _memoriIchiran(_senKankaku(w, hb.hidari, hb.migi, true), hb.hidari, true))
+      m.v,
+  ];
+  final int? jj = r.jibunJuni;
+  final String? jibunMei = b.jibunMei;
+  final GakurenKukanKekka? g = r.gakuren;
+  String? jibunBun;
+  if (jj != null && jibunMei != null) {
+    jibunBun = '$jibunMei 区間${jj + 1}位';
+  } else if (b.gakurenJibun && g != null) {
+    jibunBun = '学連選抜 区間${g.kukanJuni + 1}位相当';
   }
-
-  @override
-  Widget build(BuildContext context) {
-    final _KukanBunpu? b = _b;
-    if (_tsukutta && b == null) return const SizedBox.shrink();
-    final _Kukan? r = b == null ? null : b.kukan[b.daihyou];
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: SizedBox(
-        width: double.infinity,
-        child: Material(
-          color: _cardWaku,
-          child: InkWell(
-            onTap: () => _bunpuGamenHiraku(context, widget.race, widget.made),
-            child: Container(
-              decoration: const BoxDecoration(
-                border: Border(
-                  left: BorderSide(color: Colors.tealAccent, width: 5),
-                  top: BorderSide(color: _cardSen),
-                  right: BorderSide(color: _cardSen),
-                  bottom: BorderSide(color: _cardSen),
-                ),
-              ),
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text.rich(
-                    TextSpan(
-                      children: [
-                        WidgetSpan(
-                          alignment: PlaceholderAlignment.middle,
-                          child: Icon(
-                            Icons.candlestick_chart,
-                            color: Colors.tealAccent,
-                            size: 16,
-                          ),
-                        ),
-                        TextSpan(text: ' 区間ごとのタイム分布'),
-                      ],
-                    ),
-                    style: TextStyle(
-                      color: Colors.tealAccent,
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  if (b != null && r != null) ...[
-                    const SizedBox(height: 4),
-                    _midashiGyou(
-                      b,
-                      r,
-                      riyuu: b.tochuu ? '(終わったばかりの区間)' : '(差が一番ついた区間)',
-                    ),
-                    LayoutBuilder(
-                      builder: (context, constraints) {
-                        final double w = constraints.maxWidth;
-                        final ({double hidari, double migi, bool soto}) hb =
-                            b.haba(true);
-                        final List<double> sen = [
-                          for (final m in _memoriIchiran(
-                            _senKankaku(w, hb.hidari, hb.migi, true),
-                            hb.hidari,
-                            true,
-                          ))
-                            m.v,
-                        ];
-                        return SizedBox(
-                          width: w,
-                          height: _gyouTakasa,
-                          child: CustomPaint(
-                            painter: _KukanPainter(
-                              r,
-                              true,
-                              hb.hidari,
-                              hb.migi,
-                              sen,
-                              b.gakurenJibun,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ],
-                  const SizedBox(height: 4),
-                  const Text(
-                    'グラフを見る ›',
-                    style: TextStyle(color: _cardUsui, fontSize: 12),
-                  ),
-                ],
-              ),
+  return InkWell(
+    onTap: () => _bunpuGamenHiraku(context, race, made),
+    child: Padding(
+      padding: const EdgeInsets.all(8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.candlestick_chart, color: Colors.tealAccent, size: 16),
+              SizedBox(width: 4),
+              Flexible(child: Text('区間ごとのタイム分布', style: _cardMidashiStyle)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '${r.kk + 1}区 ${kmMoji(r.kyori)}',
+            style: const TextStyle(color: HENSUU.textcolor, fontSize: 12.5),
+          ),
+          Text(
+            b.tochuu ? '(終わったばかりの区間)' : '(差が一番ついた区間)',
+            style: const TextStyle(color: Colors.white54, fontSize: 12),
+          ),
+          if (jibunBun != null)
+            Text(
+              jibunBun,
+              style: const TextStyle(color: Colors.orangeAccent, fontSize: 12.5),
+            ),
+          const SizedBox(height: 2),
+          SizedBox(
+            width: w,
+            height: _gyouTakasa,
+            child: CustomPaint(
+              painter: _KukanPainter(r, true, hb.hidari, hb.migi, sen, b.gakurenJibun),
             ),
           ),
-        ),
+          const SizedBox(height: 4),
+          const Text('グラフを見る ›', style: TextStyle(color: _cardUsui, fontSize: 12)),
+        ],
       ),
-    );
-  }
+    ),
+  );
 }
 
 class ModalKukanTimeBunpuView extends StatefulWidget {

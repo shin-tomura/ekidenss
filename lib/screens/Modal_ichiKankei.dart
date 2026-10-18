@@ -1,11 +1,15 @@
 // 駅伝の区間終了時点の位置関係(2.0.6)
 // レースの途中の区間ごとの画面(mode 350)と、結果画面(10月駅伝・11月駅伝・正月駅伝・カスタム駅伝)の、
-// 区間ごとのタイム分布と1枚にまとめたカード(KukanBunsekiCard。右半分)から開く。
-// ・幅のある道の帯に、大学名を四角で囲んで、1位からの距離の位置(四角の真ん中)に置き、
-//   道の右に1位との差(タイムと距離)を出す。
-// ・画面の上で四角が重なる大学は、横に並べて集団のように見せる(倍率で分かれ方が変わり、拡大するとばらける)。
-//   横に並びきらないときは、次の行に回す(集団の中の位置は、四角1つ分の高さまでずれる)。
-//   道の右の差は、横に並んだ組(行)ごとに、先頭の大学の差と「ほか○校」で出す。
+// 区間ごとのタイム分布と1枚にまとめたカード(KukanBunsekiCard。右半分の「位置関係」)から開く。
+// ・幅のある道の帯に、大学名を四角で囲んで並べ、1位からの距離を縮尺どおりの間隔で出す。
+// ・画面の上で、集団の先頭の大学から四角1つ分の高さより近い大学は、集団としてまとめ、
+//   1行に3校まで横に並べる(4校目から次の行に折り返す。拡大すると集団がばらける)。
+//   集団の一番上の行は、前の大学(前が集団なら、その一番下の行)から、間の距離ぶん下に置き、
+//   集団のあとの大学は、集団の一番下の行を起点にして、集団の最後の大学との間の距離ぶん下に置く。
+//   (集団で行を折り返したぶん、そのあとの道は下にずれる。隣どうしの間は縮尺どおり)
+// ・道の右に、1位との差(距離と秒。「180m +33秒」)を出す。集団は一番上の行に、先頭の大学の差を1つだけ出す。
+// ・四角と差の文は折り返さず、道と四角と差の部分だけを横にもスクロールできるようにする
+//   (文字を大きくしても、文の長さで行がずれて、距離と位置が合わなくならないように)。
 // ・大学の四角を押すと、その大学の順位・1位との差・前の大学(1位は次の大学)との差を、
 //   画面の下(「戻る」の上)に固定した帯に出す。
 // ・区間の切り替えと、表示の倍率のボタン・縮尺の棒は、画面の上に固定する(どちらも折り返す)。
@@ -27,14 +31,15 @@
 //   「−」「＋」を押すとおまかせが外れ、区間を切り替えてもその倍率のまま。
 //   覚えない(画面を閉じたらおまかせに戻る)。倍率のボタンの横に縮尺の棒を出す。
 // ・11月駅伝は8位、正月駅伝は10位の下にシード権ラインを引く(10月駅伝とカスタム駅伝はなし)。
-//   ラインをまたいでは横に並べない。
+//   ラインをまたいでは集団にしない。詰めた間のあとも新しい集団にする。
 // ・四角の見た目: 自分の大学はオレンジの塗り、1位は太い白の枠、学連選抜(正月駅伝のオープン参加)は
 //   点線の枠(学連選抜の監督をした年はオレンジの点線)。学連選抜は順位とシード権ラインに数えない。
-// ・差は「+33秒 約180m」の形(1kmまでは10m単位、1km以上は「約1.2km」)。秒は画面と同じく切り捨ててから
-//   引き(saByou)、距離はその秒から出す。1位との差が0秒なら「トップと並走」。
+// ・差の距離は1kmまでは10m単位、1km以上は「1.2km」。秒は画面と同じく切り捨ててから引き(saByou)、
+//   距離はその秒から出す。1位との差が0秒なら「トップと並走」。
 // ・結果は記事と同じ EkidenKekka(kiji_kekka.dart)から作る。レースの途中は1区から終わった区間まで。
 //   新しく保存するものはない。作れなければカードを出さない。
-// ・2.0.6の開発中に、点と名前の行の形から四角の形に変え、2枚あったカード(タイム分布と位置関係)を1枚にした。
+// ・2.0.6の開発中に、点と名前の行の形から四角の形に変え、2枚あったカード(タイム分布と位置関係)を
+//   見出しだけの1枚にした。
 
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -45,7 +50,7 @@ import 'package:ekiden/kansuu/kiji/kiji_kekka.dart';
 import 'package:ekiden/kansuu/gakuren_text.dart';
 import 'package:ekiden/kansuu/gakuren_kantoku.dart';
 import 'package:ekiden/screens/Modal_kukanTimeBunpu.dart'
-    show KukanBunpuYomikomi, kukanBunpuYomu, kukanBunpuHanbun, kukanBunpuMidashiHaba;
+    show KukanBunpuYomikomi, kukanBunpuYomu, kukanBunpuGamenHiraku;
 
 /// 表示の倍率の段階(1mあたりの高さ(px))と名前(×1は、最初に作ったときの決め打ちの倍率)
 const List<double> _bairitsu = [0.1, 0.2, 0.4, 0.8, 1.6, 3.2];
@@ -66,11 +71,11 @@ const double _tobinukeSaitei = 50;
 /// 詰めたところの高さ(px)
 const double _tsumePx = 52;
 
-/// 道の帯の幅(画面の幅に対する割合。四角が広いときは、四角が入るまで広げる)
+/// 道の帯の幅(画面の幅に対する割合。四角が広いときは、四角が入るまで広げ、はみ出したぶんは横にスクロールする)
 const double _michiWariai = 0.6;
 
-/// 道の帯の幅の上限(画面の幅に対する割合。右の差の文の場所を残す)
-const double _michiSaidai = 0.75;
+/// 集団の1行に並べる大学の数の上限
+const int _gyouSaidai = 3;
 
 /// 四角どうし・行どうしのすきま
 const double _sukima = 4;
@@ -91,11 +96,11 @@ const Color _iro = Colors.lightBlueAccent;
 /// 自分の大学の色(区間ごとのタイム分布と同じ)
 const Color _jibunIro = Colors.orangeAccent;
 
-/// 距離の文(「約180m」「約1.2km」)
+/// 距離の文(「180m」「1.2km」。1kmまでは10m単位)
 String _kyoriMoji(double m) {
   final int r = (m / 10).round() * 10;
-  if (r < 1000) return '約${r}m';
-  return '約${(m / 1000).toStringAsFixed(1)}km';
+  if (r < 1000) return '${r}m';
+  return '${(m / 1000).toStringAsFixed(1)}km';
 }
 
 /// 大学1校分(学連選抜も)
@@ -139,20 +144,20 @@ class _IchiKukan {
   /// 1kmあたりのタイム(秒)
   int get pace => hayasa > 0 ? (1000 / hayasa).round() : 0;
 
-  /// 1位との差の文(「トップ」「+33秒 約180m」「トップと並走」「トップより5秒前 約30m」)
+  /// 1位との差の文(距離が先。「トップ」「180m +33秒」「トップと並走」「トップより30m前 5秒」)
   String saBun(_IchiDaigaku x) {
     if (identical(x, top)) return 'トップ';
     final int s = sa(x);
     if (s == 0) return 'トップと並走';
-    if (s < 0) return 'トップより${saMoji(s)}前 ${_kyoriMoji(-s * hayasa)}';
-    return '+${saMoji(s)} ${_kyoriMoji(s * hayasa)}';
+    if (s < 0) return 'トップより${_kyoriMoji(-s * hayasa)}前 ${saMoji(s)}';
+    return '${_kyoriMoji(s * hayasa)} +${saMoji(s)}';
   }
 
-  /// 2つの大学の差の文(「+5秒 約30m」。0秒は「並走」)
+  /// 2つの大学の差の文(距離が先。「30m +5秒」。0秒は「並走」)
   String futatsuBun(_IchiDaigaku osoi, _IchiDaigaku hayai) {
     final int s = saByou(osoi.ruikei, hayai.ruikei);
     if (s <= 0) return '並走';
-    return '+${saMoji(s)} ${_kyoriMoji(s * hayasa)}';
+    return '${_kyoriMoji(s * hayasa)} +${saMoji(s)}';
   }
 
   /// 名前の行を押したときの、前の大学(1位は次の大学)との差の文
@@ -294,75 +299,11 @@ void _ichiGamenHiraku(BuildContext context, int race, int? made) {
 // カードの色(ニュース記事のカード(kiji_screen.dart の KijiLinkCard)とそろえる)
 const Color _cardWaku = Color(0xFF161616);
 const Color _cardSen = Color(0xFF333333);
-const Color _cardUsui = Color(0xFF9E9E9E);
-
-/// カードの位置関係の半分の文(一番あとの区間の、自分の大学(学連選抜の監督の年は学連選抜)の位置。
-/// 出ていなければ1位と2位)
-String _ichiCardBun(_IchiKankei b, _IchiKukan r) {
-  _IchiDaigaku? jibun;
-  _IchiDaigaku? ni;
-  for (final _IchiDaigaku x in r.narabi) {
-    if (x.jibun || (b.gakurenJibun && x.op)) jibun = x;
-    if (!x.op && x.juni == 1) ni = x;
-  }
-  final _IchiDaigaku top = r.top;
-  final _IchiDaigaku? ni2 = ni;
-  String niBun() {
-    if (ni2 == null) return '';
-    final String s = r.futatsuBun(ni2, top);
-    return s == '並走' ? '2位の${ni2.mei}と並走' : '2位の${ni2.mei}とは$s';
-  }
-
-  if (jibun == null) return '${top.mei}がトップ　${niBun()}';
-  if (identical(jibun, top)) return '${top.mei} トップ　${niBun()}';
-  if (jibun.op) return '学連選抜 ${r.saBun(jibun)}';
-  return '${jibun.mei} ${jibun.juni + 1}位　${r.saBun(jibun)}';
-}
-
-/// カードの位置関係の半分(押すと位置関係の画面を開く)
-Widget _ichiHanbun(BuildContext context, _IchiKankei b, int race, int? made) {
-  final _IchiKukan r = b.kukan.last;
-  return InkWell(
-    onTap: () => _ichiGamenHiraku(context, race, made),
-    child: Padding(
-      padding: const EdgeInsets.all(8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 見出し(高さを測れるように、WidgetSpan ではなく Row にする)
-          const Row(
-            children: [
-              Icon(Icons.directions_run, color: _iro, size: 16),
-              SizedBox(width: 4),
-              Flexible(
-                child: Text(
-                  '位置関係',
-                  style: TextStyle(color: _iro, fontSize: 12.5, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '${r.kk + 1}区終了時点',
-            style: const TextStyle(color: HENSUU.textcolor, fontSize: 12.5),
-          ),
-          Text(
-            _ichiCardBun(b, r),
-            style: const TextStyle(color: _jibunIro, fontSize: 12.5),
-          ),
-          const SizedBox(height: 4),
-          const Text('位置関係を見る ›', style: TextStyle(color: _cardUsui, fontSize: 12)),
-        ],
-      ),
-    ),
-  );
-}
 
 /// 区間ごとのタイム分布と、区間終了時点の位置関係を1枚にまとめたカード(2.0.6)
-/// ・左半分が区間ごとのタイム分布(Modal_kukanTimeBunpu.dart)、右半分が位置関係。それぞれ別に押せる
-/// ・半分の幅に「区間ごとのタイム分布」の見出しが1行で収まらないとき(文字を大きくしているときなど)は、
-///   左右ではなく上下に分ける(文字の大きさとカードの幅で測って決める)
+/// ・左半分が「タイム分布」(Modal_kukanTimeBunpu.dart)、右半分が「位置関係」で、それぞれ別に押せる。
+///   中身はアイコンと見出しだけ(区間の帯のグラフなどは、開いた画面で見る)。
+///   いつも左右に分け、文字をとても大きくしたときは、半分の中で折り返す
 /// ・片方が作れないときは、作れたほうだけでカードの幅を使う。両方とも作れなければ出さない
 /// ・区間が終わるたびの画面(mode 350。[made] に終わった区間の数)の実況のカードのすぐ下と、
 ///   結果画面([made] はnull)のニュース記事のカードのすぐ下に置く
@@ -380,8 +321,11 @@ class KukanBunsekiCard extends StatefulWidget {
 }
 
 class _KukanBunsekiCardState extends State<KukanBunsekiCard> {
-  KukanBunpuYomikomi? _bunpu;
-  _IchiKankei? _ichi;
+  /// タイム分布が作れたか
+  bool _bunpuAri = false;
+
+  /// 位置関係が作れたか
+  bool _ichiAri = false;
 
   /// 結果を作ったか
   bool _tsukutta = false;
@@ -395,18 +339,38 @@ class _KukanBunsekiCardState extends State<KukanBunsekiCard> {
       final _IchiKankei? ichi = _IchiKankei.yomu(widget.race, made: widget.made);
       if (!mounted) return;
       setState(() {
-        _bunpu = bunpu;
-        _ichi = ichi;
+        _bunpuAri = bunpu != null;
+        _ichiAri = ichi != null;
         _tsukutta = true;
       });
     });
   }
 
+  /// 半分(アイコンと見出し)
+  Widget _hanbun(IconData icon, Color iro, String moji, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          children: [
+            Icon(icon, color: iro, size: 16),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                '$moji ›',
+                style: TextStyle(color: iro, fontSize: 13, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final KukanBunpuYomikomi? bunpu = _bunpu;
-    final _IchiKankei? ichi = _ichi;
-    if (!_tsukutta || (bunpu == null && ichi == null)) return const SizedBox.shrink();
+    if (!_tsukutta || (!_bunpuAri && !_ichiAri)) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: SizedBox(
@@ -422,60 +386,37 @@ class _KukanBunsekiCardState extends State<KukanBunsekiCard> {
                 bottom: BorderSide(color: _cardSen),
               ),
             ),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final double w = constraints.maxWidth;
-                // 片方だけのときは、カードの幅を全部使う
-                if (ichi == null) {
-                  return kukanBunpuHanbun(context, bunpu!, race: widget.race, made: widget.made, haba: w - 16);
-                }
-                if (bunpu == null) return _ichiHanbun(context, ichi, widget.race, widget.made);
-                // 半分の幅(中の余白8ずつを除く)に、タイム分布の見出しが1行で収まるか
-                // (ふつうの文字なら、幅360ほどの電話でも左右に収まる)
-                final double hanbun = (w - 1) / 2;
-                final bool yoko =
-                    kukanBunpuMidashiHaba(MediaQuery.textScalerOf(context)) <= hanbun - 16;
-                if (yoko) {
-                  return IntrinsicHeight(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        SizedBox(
-                          width: hanbun,
-                          child: kukanBunpuHanbun(
-                            context,
-                            bunpu,
-                            race: widget.race,
-                            made: widget.made,
-                            haba: hanbun - 16,
-                          ),
-                        ),
-                        Container(
-                          width: 1,
-                          margin: const EdgeInsets.symmetric(vertical: 8),
-                          color: _cardSen,
-                        ),
-                        SizedBox(
-                          width: hanbun,
-                          child: _ichiHanbun(context, ichi, widget.race, widget.made),
-                        ),
-                      ],
+            // 左右の高さをそろえる(文字をとても大きくして片方だけ折り返したときも、境目の線と押せる所が下まで届くように)
+            child: IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (_bunpuAri)
+                    Expanded(
+                      child: _hanbun(
+                        Icons.candlestick_chart,
+                        Colors.tealAccent,
+                        'タイム分布',
+                        () => kukanBunpuGamenHiraku(context, widget.race, widget.made),
+                      ),
                     ),
-                  );
-                }
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    kukanBunpuHanbun(context, bunpu, race: widget.race, made: widget.made, haba: w - 16),
+                  if (_bunpuAri && _ichiAri)
                     Container(
-                      height: 1,
-                      margin: const EdgeInsets.symmetric(horizontal: 10),
+                      width: 1,
+                      margin: const EdgeInsets.symmetric(vertical: 6),
                       color: _cardSen,
                     ),
-                    _ichiHanbun(context, ichi, widget.race, widget.made),
-                  ],
-                );
-              },
+                  if (_ichiAri)
+                    Expanded(
+                      child: _hanbun(
+                        Icons.directions_run,
+                        _iro,
+                        '位置関係',
+                        () => _ichiGamenHiraku(context, widget.race, widget.made),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         ),
@@ -506,31 +447,31 @@ class _Hako {
   const _Hako(this.i, this.x, this.w, this.h);
 }
 
-/// 横に並べた組(行)
+/// 四角を並べた行(集団は、1行3校までで折り返して何行かになる)
 class _Gyou {
   /// 上端
   final double y;
 
-  /// 高さ(四角と、右の差の文の高いほう)
-  double h;
+  /// 高さ
+  final double h;
 
-  /// 次の四角の左端
-  double x;
+  final List<_Hako> hako;
 
-  final List<_Hako> hako = [];
+  /// 右に差を出す大学(narabi の番号。集団の一番上の行の先頭の大学。ほかの行はnull)
+  final int? migi;
 
-  _Gyou(this.y, this.h, this.x);
+  /// 行の右端(いちばん右の四角の右のすきままで)
+  final double hashi;
+
+  const _Gyou(this.y, this.h, this.hako, this.migi, this.hashi);
 }
 
 /// 道の上の並べ方
 class _Haichi {
   final List<_Gyou> gyou;
 
-  /// 切れ目の印の文(上端・文)
-  final List<({double top, String moji})> kireme;
-
-  /// 道の切れ目(詰めたところの上と下)
-  final List<({double y0, double y1})> kiremeMichi;
+  /// 切れ目の印の文(上端・高さ・文)
+  final List<({double top, double h, String moji})> kireme;
 
   /// シード権ラインの行の上端(引かないときはnull)
   final double? seedTop;
@@ -544,17 +485,24 @@ class _Haichi {
   /// 道の帯の幅
   final double michiHaba;
 
+  /// 右の差の文の左端
+  final double migiX;
+
+  /// 全体の幅(画面より広いときは、横にスクロールする)
+  final double haba;
+
   /// 全体の高さ
   final double takasa;
 
   _Haichi(
     this.gyou,
     this.kireme,
-    this.kiremeMichi,
     this.seedTop,
     this.sentouY,
     this.michiUe,
     this.michiHaba,
+    this.migiX,
+    this.haba,
     this.takasa,
   );
 }
@@ -609,29 +557,14 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     );
   }
 
-  /// 道の右の差の文(行の先頭の大学の差と「ほか○校」)
-  TextSpan _migiSpan(_IchiKukan r, _Gyou g) {
-    final _IchiDaigaku x = r.narabi[g.hako.first.i];
-    final int hoka = g.hako.length - 1;
-    return TextSpan(
-      children: [
-        TextSpan(text: r.saBun(x), style: _migiStyle),
-        if (hoka > 0)
-          TextSpan(
-            text: ' ほか$hoka校',
-            style: const TextStyle(color: Colors.white38, fontSize: 12),
-          ),
-      ],
-    );
-  }
-
-  /// 文の大きさ(幅は[maxW]まで)
-  Size _ookisa(TextSpan span, double maxW, TextScaler scaler) {
+  /// 文の大きさ(折り返さない1行のとき)
+  Size _ookisa(TextSpan span, TextScaler scaler) {
     final TextPainter tp = TextPainter(
       text: span,
       textDirection: TextDirection.ltr,
       textScaler: scaler,
-    )..layout(maxWidth: math.max(maxW, 1));
+      maxLines: 1,
+    )..layout();
     final Size s = tp.size;
     tp.dispose();
     return s;
@@ -688,35 +621,26 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     bool omakase,
   ) {
     final int n = r.narabi.length;
-    // 四角の大きさ(四角が道の帯からはみ出さないよう、文は道の帯の幅の上限で折り返す)
-    final double hakoMojiSaidai = w * _michiSaidai - _sukima * 2 - _hakoYoko * 2 - _wakuSaidai * 2 - 2;
+    // 四角の大きさ(折り返さない1行)
     final List<Size> hakoOokisa = [
       for (int i = 0; i < n; i++)
         () {
-          final Size s = _ookisa(_hakoSpan(b, r, i), hakoMojiSaidai, scaler);
+          final Size s = _ookisa(_hakoSpan(b, r, i), scaler);
           return Size(
             s.width + _hakoYoko * 2 + _wakuSaidai * 2 + 2,
             s.height + _hakoTate * 2 + _wakuSaidai * 2,
           );
         }(),
     ];
-    double hakoHabaSaidai = 0;
-    double hakoTakasaSaidai = 0;
+    // 行の高さ(四角と、右の差の文の高いほう。どの行も同じ)
+    double gyouTakasa = _ookisa(const TextSpan(text: '0m', style: _migiStyle), scaler).height;
     for (final Size s in hakoOokisa) {
-      hakoHabaSaidai = math.max(hakoHabaSaidai, s.width);
-      hakoTakasaSaidai = math.max(hakoTakasaSaidai, s.height);
+      gyouTakasa = math.max(gyouTakasa, s.height);
     }
-    final double michiHaba = math.min(
-      math.max(w * _michiWariai, hakoHabaSaidai + _sukima * 2),
-      w * _michiSaidai,
-    );
-    final double migiHaba = math.max(w - michiHaba - 8, 1);
-
-    final double ueTakasa = _ookisa(TextSpan(text: b.ueMoji(r), style: _chiisai), w, scaler).height;
-    final double kiremeTakasa = _ookisa(const TextSpan(text: '〜', style: _chiisai), w, scaler).height;
+    final double ueTakasa = _ookisa(TextSpan(text: b.ueMoji(r), style: _chiisai), scaler).height;
+    final double kiremeTakasa = _ookisa(const TextSpan(text: '〜', style: _chiisai), scaler).height;
     final double seedTakasa = _ookisa(
       const TextSpan(text: 'シード権ライン', style: _seedMojiStyle),
-      w,
       scaler,
     ).height;
     final int opNozoku = r.narabi.where((x) => !x.op).length;
@@ -731,74 +655,96 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
       }
     }
 
-    // 各大学の本当の位置(四角の真ん中)
-    final double michiUe = ueTakasa + 4;
-    final double sentouY = michiUe + _sukima + hakoTakasaSaidai / 2;
-    final List<double> ty = [sentouY];
-    final List<({double y0, double y1})> kiremeMichi = [];
-    double y = sentouY;
-    for (int i = 1; i < n; i++) {
-      if (tsume.contains(i - 1)) {
-        final double y0 = y;
-        y += _tsumePx;
-        kiremeMichi.add((y0: y0, y1: y));
-      } else {
-        y += aida[i - 1] * px;
-      }
-      ty.add(y);
-    }
+    // 1位(いちばん前)からの距離(m)
+    final double base = r.narabi.first.ruikei;
+    final List<double> d = [for (final _IchiDaigaku x in r.narabi) (x.ruikei - base) * r.hayasa];
 
-    // 四角を行に並べる(画面の上で重なる大学は横に並べる)
-    final List<_Gyou> gyou = [];
-    final List<({double top, String moji})> kireme = [];
-    double? seedTop;
-    double shita = michiUe; // いま置いたものの下端
-    _Gyou? ima;
-    int kiremeBan = 0;
+    // 集団に分ける(集団の先頭の大学から、画面の上で四角1つ分の高さより近い大学。
+    // シード権ラインと、詰めた間はまたがない)
+    final List<List<int>> shuudan = [];
+    List<int>? ima;
     for (int i = 0; i < n; i++) {
       final _IchiDaigaku x = r.narabi[i];
-      // 詰めた間のあとは、新しい行にし、切れ目の印の文を置く
-      if (i > 0 && tsume.contains(i - 1) && kiremeBan < kiremeMichi.length) {
-        final ({double y0, double y1}) k = kiremeMichi[kiremeBan++];
-        final double kTop = math.max((k.y0 + k.y1) / 2 - kiremeTakasa / 2, shita + _sukima);
-        kireme.add((top: kTop, moji: '〜 ${_kyoriMoji(aida[i - 1])} 〜'));
-        shita = kTop + kiremeTakasa;
-        ima = null;
+      final bool seedMae = seed != null && !x.op && x.juni == seed;
+      final bool kiremeAto = i > 0 && tsume.contains(i - 1);
+      final List<int>? g = ima;
+      if (g != null && !seedMae && !kiremeAto && (d[i] - d[g.first]) * px < gyouTakasa + _sukima) {
+        g.add(i);
+      } else {
+        final List<int> atarashii = [i];
+        shuudan.add(atarashii);
+        ima = atarashii;
       }
-      // シード権ライン(シード権の順位の次の大学の前に引く。またいでは横に並べない)
-      if (seed != null && !x.op && x.juni == seed) {
+    }
+
+    // 集団ごとに置く(一番上の行は前の集団の一番下の行から、間の距離ぶん下。1行3校まで)
+    final List<_Gyou> gyou = [];
+    final List<({double top, double h, String moji})> kireme = [];
+    double? seedTop;
+    final double michiUe = ueTakasa + 4;
+    double shita = michiUe; // いま置いたものの下端
+    double sentouY = michiUe + _sukima + gyouTakasa / 2;
+    double? maeChuushin; // 前の集団の一番下の行の真ん中
+    int maeSaigo = 0; // 前の集団の最後の大学
+    for (int si = 0; si < shuudan.length; si++) {
+      final List<int> sh = shuudan[si];
+      final int saki = sh.first;
+      double top;
+      final double? mc = maeChuushin;
+      if (mc == null) {
+        top = michiUe + _sukima;
+      } else if (tsume.contains(saki - 1)) {
+        // 詰めた間: 切れ目の印の文を置き、そのすぐ下から
+        final double kTop = shita + _sukima;
+        kireme.add((top: kTop, h: kiremeTakasa, moji: '〜 ${_kyoriMoji(aida[saki - 1])} 〜'));
+        shita = kTop + kiremeTakasa;
+        top = shita + _sukima;
+      } else {
+        top = mc + (d[saki] - d[maeSaigo]) * px - gyouTakasa / 2;
+      }
+      // シード権ライン(シード権の順位の次の大学の前に引く)
+      final _IchiDaigaku x0 = r.narabi[saki];
+      if (seed != null && !x0.op && x0.juni == seed) {
         final double sTop = shita + _sukima;
         seedTop = sTop;
         shita = sTop + seedTakasa;
-        ima = null;
       }
-      final Size s = hakoOokisa[i];
-      final double nozomi = ty[i] - s.height / 2; // 四角の上端(本当の位置に置いたとき)
-      final _Gyou? g0 = ima;
-      if (g0 != null &&
-          nozomi < g0.y + g0.h + _sukima &&
-          g0.x + s.width <= michiHaba - _sukima) {
-        // 前の四角と重なるので、横に並べる
-        g0.hako.add(_Hako(i, g0.x, s.width, s.height));
-        g0.x += s.width + _sukima;
-      } else {
-        final double top = math.max(nozomi, shita + _sukima);
-        final _Gyou g = _Gyou(top, s.height, _sukima + s.width + _sukima);
-        g.hako.add(_Hako(i, _sukima, s.width, s.height));
-        gyou.add(g);
-        ima = g;
+      top = math.max(top, shita + _sukima);
+      if (si == 0) sentouY = top + gyouTakasa / 2;
+      for (int k = 0; k < sh.length; k += _gyouSaidai) {
+        final List<_Hako> hako = [];
+        double x = _sukima;
+        for (int j = k; j < sh.length && j < k + _gyouSaidai; j++) {
+          final Size z = hakoOokisa[sh[j]];
+          hako.add(_Hako(sh[j], x, z.width, z.height));
+          x += z.width + _sukima;
+        }
+        gyou.add(_Gyou(top, gyouTakasa, hako, k == 0 ? saki : null, x));
+        shita = top + gyouTakasa;
+        top = shita + _sukima;
       }
-      // 行の高さ(四角と、右の差の文の高いほう)
-      final _Gyou g1 = ima!;
-      double hakoH = 0;
-      for (final _Hako hk in g1.hako) {
-        hakoH = math.max(hakoH, hk.h);
-      }
-      g1.h = math.max(hakoH, _ookisa(_migiSpan(r, g1), migiHaba, scaler).height);
-      shita = g1.y + g1.h;
+      maeChuushin = shita - gyouTakasa / 2;
+      maeSaigo = sh.last;
     }
-    final double takasa = math.max(shita, y) + 16;
-    return _Haichi(gyou, kireme, kiremeMichi, seedTop, sentouY, michiUe, michiHaba, takasa);
+
+    // 幅(道の帯は画面の6割か、一番広い行の広いほう。右の差の文が入りきらなければ横にスクロール)
+    double gyouHaba = 0;
+    double migiHaba = 0;
+    for (final _Gyou g in gyou) {
+      gyouHaba = math.max(gyouHaba, g.hashi);
+      final int? m = g.migi;
+      if (m != null) {
+        migiHaba = math.max(
+          migiHaba,
+          _ookisa(TextSpan(text: r.saBun(r.narabi[m]), style: _migiStyle), scaler).width,
+        );
+      }
+    }
+    final double michiHaba = math.max(w * _michiWariai, gyouHaba);
+    final double migiX = michiHaba + 8;
+    final double haba = math.max(w, migiX + migiHaba + 8);
+    final double takasa = shita + 16;
+    return _Haichi(gyou, kireme, seedTop, sentouY, michiUe, michiHaba, migiX, haba, takasa);
   }
 
   /// 押した大学の帯の文(順位・1位との差・前の大学との差)
@@ -1009,7 +955,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     );
   }
 
-  /// スクロールする部分(説明の文と、道と大学名の四角)
+  /// スクロールする部分(説明の文と、道と大学名の四角。道の部分は横にもスクロールする)
   Widget _buildHontai(
     BuildContext context,
     _IchiKankei b,
@@ -1032,7 +978,14 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
             'おまかせ: 大きく空いたところを除いて、1位から最後尾までが画面のおよそ2つ分に収まる倍率で出します。',
             style: setsumei,
           ),
-        const Text('画面の上で重なる大学は、横に並べています(拡大するとばらけます)。', style: setsumei),
+        const Text(
+          '画面の上で重なる大学は、集団として1行に3校まで並べています(拡大するとばらけます)。',
+          style: setsumei,
+        ),
+        const Text(
+          '集団で行を折り返したぶん、そのあとの道は下にずれます(隣どうしの間は縮尺どおり)。',
+          style: setsumei,
+        ),
         if (r.narabi.any((x) => x.jibun))
           const Text('オレンジ: あなたの大学', style: setsumei),
         if (b.opAri)
@@ -1049,66 +1002,82 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
             final double w = constraints.maxWidth;
             final TextScaler scaler = MediaQuery.textScalerOf(context);
             final _Haichi h = _haichi(b, r, w, scaler, px, gamenTakasa, _omakase);
-            final double migiX = h.michiHaba + 8;
-            final double migiHaba = math.max(w - migiX, 1);
-            return SizedBox(
-              width: w,
-              height: h.takasa,
-              child: Stack(
-                children: [
-                  Positioned.fill(child: CustomPaint(painter: _MichiPainter(h))),
-                  // いちばん上の印(中継所・ゴール)
-                  Positioned(
-                    left: 0,
-                    top: 0,
-                    width: w,
-                    child: Text(b.ueMoji(r), style: _chiisai),
-                  ),
-                  // 詰めたところの距離
-                  for (final k in h.kireme)
+            // 道と四角と差の部分は、画面より広いときは横にもスクロールする(文は折り返さない)
+            return SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: SizedBox(
+                width: h.haba,
+                height: h.takasa,
+                child: Stack(
+                  children: [
+                    Positioned.fill(child: CustomPaint(painter: _MichiPainter(h))),
+                    // いちばん上の印(中継所・ゴール)
                     Positioned(
                       left: 0,
-                      top: k.top,
-                      width: h.michiHaba,
-                      child: Text(k.moji, style: _chiisai, textAlign: TextAlign.center),
+                      top: 0,
+                      child: Text(b.ueMoji(r), style: _chiisai, softWrap: false),
                     ),
-                  // シード権ライン
-                  if (h.seedTop != null)
-                    Positioned(
-                      left: 0,
-                      top: h.seedTop!,
-                      width: w,
-                      child: Row(
-                        children: [
-                          const Text('シード権ライン', style: _seedMojiStyle),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: SizedBox(
-                              height: 8,
-                              child: CustomPaint(painter: _TensenPainter()),
+                    // 詰めたところの距離
+                    for (final k in h.kireme)
+                      Positioned(
+                        left: 0,
+                        top: k.top,
+                        width: h.michiHaba,
+                        child: Text(
+                          k.moji,
+                          style: _chiisai,
+                          textAlign: TextAlign.center,
+                          softWrap: false,
+                        ),
+                      ),
+                    // シード権ライン
+                    if (h.seedTop != null)
+                      Positioned(
+                        left: 0,
+                        top: h.seedTop!,
+                        width: h.haba,
+                        child: Row(
+                          children: [
+                            const Text('シード権ライン', style: _seedMojiStyle, softWrap: false),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: SizedBox(
+                                height: 8,
+                                child: CustomPaint(painter: _TensenPainter()),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    // 大学の四角と、集団の一番上の行の右の差(集団ごとに1つ)
+                    for (final _Gyou g in h.gyou) ...[
+                      for (final _Hako hk in g.hako)
+                        Positioned(
+                          left: hk.x,
+                          top: g.y + (g.h - hk.h) / 2,
+                          width: hk.w,
+                          height: hk.h,
+                          child: _hakoWidget(b, r, hk),
+                        ),
+                      if (g.migi != null)
+                        Positioned(
+                          left: h.migiX,
+                          top: g.y,
+                          width: math.max(h.haba - h.migiX, 1),
+                          height: g.h,
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              r.saBun(r.narabi[g.migi!]),
+                              style: _migiStyle,
+                              softWrap: false,
+                              maxLines: 1,
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-                  // 大学の四角と、行ごとの差
-                  for (final _Gyou g in h.gyou) ...[
-                    for (final _Hako hk in g.hako)
-                      Positioned(
-                        left: hk.x,
-                        top: g.y,
-                        width: hk.w,
-                        height: hk.h,
-                        child: _hakoWidget(b, r, hk),
-                      ),
-                    Positioned(
-                      left: migiX,
-                      top: g.y,
-                      width: migiHaba,
-                      child: Text.rich(_migiSpan(r, g)),
-                    ),
+                        ),
+                    ],
                   ],
-                ],
+                ),
               ),
             );
           },
@@ -1137,7 +1106,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
         borderRadius: BorderRadius.circular(4),
       ),
       alignment: Alignment.centerLeft,
-      child: Text.rich(_hakoSpan(b, r, hk.i)),
+      child: Text.rich(_hakoSpan(b, r, hk.i), softWrap: false, maxLines: 1),
     );
     if (tensen) {
       naka = CustomPaint(
@@ -1162,19 +1131,18 @@ class _MichiPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final Paint michi = Paint()..color = _michiIro;
-    final double ue = h.michiUe;
     final double shita = size.height - 6;
-    // 道の帯(切れ目のところは空ける)
-    double y = ue;
-    for (final k in h.kiremeMichi) {
-      final double m = (k.y0 + k.y1) / 2;
-      if (m - 7 > y) {
+    // 道の帯(切れ目の印の文のところは空ける)
+    double y = h.michiUe;
+    for (final k in h.kireme) {
+      final double a = k.top - 3;
+      if (a > y) {
         canvas.drawRRect(
-          RRect.fromRectAndRadius(Rect.fromLTRB(0, y, h.michiHaba, m - 7), const Radius.circular(6)),
+          RRect.fromRectAndRadius(Rect.fromLTRB(0, y, h.michiHaba, a), const Radius.circular(6)),
           michi,
         );
       }
-      y = m + 7;
+      y = k.top + k.h + 3;
     }
     if (shita > y) {
       canvas.drawRRect(
@@ -1186,12 +1154,13 @@ class _MichiPainter extends CustomPainter {
     final Paint kiremeSen = Paint()
       ..color = Colors.white38
       ..strokeWidth = 1;
-    for (final k in h.kiremeMichi) {
-      final double m = (k.y0 + k.y1) / 2;
+    for (final k in h.kireme) {
+      final double a = k.top - 3;
+      final double c = k.top + k.h + 3;
       for (double x = 0; x < h.michiHaba; x += 6) {
         final double x2 = math.min(x + 3, h.michiHaba);
-        canvas.drawLine(Offset(x, m - 7), Offset(x2, m - 7), kiremeSen);
-        canvas.drawLine(Offset(x, m + 7), Offset(x2, m + 7), kiremeSen);
+        canvas.drawLine(Offset(x, a), Offset(x2, a), kiremeSen);
+        canvas.drawLine(Offset(x, c), Offset(x2, c), kiremeSen);
       }
     }
     // いちばん前(1位)の線

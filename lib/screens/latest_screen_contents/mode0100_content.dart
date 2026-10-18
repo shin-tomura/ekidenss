@@ -470,7 +470,8 @@ class Mode0100Content extends StatelessWidget {
                                               TEISUU.UNIVSUU * 2] ==
                                           1)
                                     const Text(
-                                      "監督・コーチ陣に変更があったようです。大学画面でご確認ください。\n\n\n",
+                                      // スカウトの前の交代予定の画面(2.0.6。8990KantokuKoutaiYotei.dart)を受けて、4月に正式に交代した形で書く
+                                      "予定どおり、監督・コーチ陣が交代しました。大学画面でご確認ください。\n\n\n",
                                       style: TextStyle(color: HENSUU.textcolor),
                                     ),
                                   if (count_riji > 0 &&

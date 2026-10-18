@@ -49,6 +49,7 @@ import 'package:ekiden/screens/0035InputUnivnameKakunin.dart';
 import 'package:ekiden/screens/8888GoldenKakutosuuView.dart';
 import 'package:ekiden/screens/8890MierukaNouryokuView.dart';
 import 'package:ekiden/screens/9000Freshmankakutoku.dart';
+import 'package:ekiden/screens/8990KantokuKoutaiYotei.dart'; // 監督・コーチの交代予定(2.0.6。スカウトの前)
 import 'package:ekiden/screens/latest_screen.dart';
 import 'package:ekiden/screens/univ_screen.dart'; // 新しく作ったUnivScreenをインポート
 import 'package:ekiden/screens/senshu_screen.dart'; // 新しく作ったUnivScreenをインポート
@@ -3118,7 +3119,11 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         gh: ghensuu,
         kantoku: kantoku,
       );
-      ghensuu.mode = 9000;
+      // 監督・コーチに変更がある年は、スカウトの前に交代予定の画面を出す
+      // (2.0.6。スキップ中は出さない。8990KantokuKoutaiYotei.dart)
+      ghensuu.mode = kantokuKoutaiYoteiAri(kantoku, ghensuu.MYunivid)
+          ? kantokuKoutaiYoteiMode
+          : 9000;
     } else {
       // スキップ中は、コンピュータスカウトがONならコンピュータの大学だけで全ラウンドを行う
       await comScoutSkip(gh: ghensuu);
@@ -4919,6 +4924,12 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           return MaterialApp(
             theme: appTheme,
             home: Scaffold(body: FirstScreen()),
+          );
+        } else if (currentGhensuu.mode == kantokuKoutaiYoteiMode) {
+          // 監督・コーチの交代予定(2.0.6。スカウトの画面と同じく、下の画面切り替えは出さない)
+          return MaterialApp(
+            theme: appTheme,
+            home: const Scaffold(body: KantokuKoutaiYoteiView()),
           );
         } else if (currentGhensuu.mode == 9000) {
           return MaterialApp(

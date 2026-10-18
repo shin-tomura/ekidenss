@@ -39,6 +39,7 @@ import 'package:ekiden/kansuu/kingin_kiroku.dart'; // 金銀の記録(1.9.9)
 import 'package:ekiden/screens/koukou_taikai_oshirase.dart'; // 高校の大会の結果が出た日のお知らせ(2.0.4)
 import 'package:ekiden/screens/Modal_yosenTimeBunpu.dart'; // 正月駅伝予選のチーム内のタイム分布(2.0.5)
 import 'package:ekiden/screens/Modal_kukanTimeBunpu.dart'; // 駅伝の区間ごとのタイム分布(2.0.5)
+import 'package:ekiden/screens/Modal_ichiKankei.dart'; // 区間終了時点の位置関係(2.0.6)
 
 // モーダルビューのプレースホルダー
 // 実際にはこれらのファイルを別途作成する必要があります
@@ -1471,6 +1472,22 @@ class _Mode0700ContentState extends State<Mode0700Content> {
                                               KukanBunpuCard(
                                                 key: ValueKey(
                                                   'kukanBunpu_${currentGhensuu.year}_${currentGhensuu.hyojiracebangou}',
+                                                ),
+                                                race: currentGhensuu
+                                                    .hyojiracebangou,
+                                              ),
+                                            // 区間終了時点の位置関係(2.0.6。Modal_ichiKankei.dart)
+                                            // 最終区が終わった時点は結果画面でしか見られないので、ここにも置く
+                                            // (最終区まで切り替えられ、最終区を開いて開く)
+                                            if (currentGhensuu
+                                                        .hyojiracebangou <=
+                                                    2 ||
+                                                currentGhensuu
+                                                        .hyojiracebangou ==
+                                                    5)
+                                              IchiKankeiCard(
+                                                key: ValueKey(
+                                                  'ichiKankei_${currentGhensuu.year}_${currentGhensuu.hyojiracebangou}',
                                                 ),
                                                 race: currentGhensuu
                                                     .hyojiracebangou,

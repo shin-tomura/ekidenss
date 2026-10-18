@@ -73,11 +73,17 @@ class EkidenKekka {
   /// 区間ごとの、区間タイムの順
   final List<List<EkidenUnivKekka>> kukanJun;
 
-  EkidenKekka._(this.k, this.jun, this.kukanJun);
+  /// 集めた区間の数(全区間のときは大会の区間数。レースの途中は、終わった区間の数。2.0.6)
+  final int made;
+
+  EkidenKekka._(this.k, this.jun, this.kukanJun, this.made);
 
   /// 結果を集める(出場校が2校より少ないときなどはnull)
-  static EkidenKekka? tsukuru(KijiKankyou k) {
-    final int ks = k.kukansuu;
+  /// [made] を渡すと、レースの途中の、1区から[made]区までの結果を集める
+  /// (2.0.6。区間ごとのタイム分布と位置関係で使う。最終順位の順(jun)は[made]区の終了時点の順になる)
+  static EkidenKekka? tsukuru(KijiKankyou k, {int? made}) {
+    final int zenbu = k.kukansuu;
+    final int ks = (made == null || made > zenbu) ? zenbu : made;
     if (ks <= 0) return null;
     final List<EkidenUnivKekka> list = [];
     for (final UnivData u in k.univ) {
@@ -120,10 +126,11 @@ class EkidenKekka {
       }
       kukanJun.add(kj);
     }
-    return EkidenKekka._(k, list, kukanJun);
+    return EkidenKekka._(k, list, kukanJun, ks);
   }
 
-  int get ks => k.kukansuu;
+  /// 集めた区間の数(全区間の結果では大会の区間数と同じ)
+  int get ks => made;
 
   int get n => jun.length;
 
@@ -193,10 +200,12 @@ class EkidenKekka {
   }
 
   /// 往路の区間数(正月駅伝で6区間以上あるときだけ5区まで。それ以外はnull)
-  int? get ouroKukansuu => (k.race == 2 && ks >= 6) ? 5 : null;
+  /// (大会の区間数で決める。レースの途中の結果でも同じ。2.0.6)
+  int? get ouroKukansuu => (k.race == 2 && k.kukansuu >= 6) ? 5 : null;
 
   /// 区間の呼び方
-  String kukanMei(int kk) => kukanYobikata(k.gh, k.race, kk, ks);
+  /// (アンカーかどうかは大会の区間数で決める。2.0.6)
+  String kukanMei(int kk) => kukanYobikata(k.gh, k.race, kk, k.kukansuu);
 }
 
 // ------------------------------------------------------------

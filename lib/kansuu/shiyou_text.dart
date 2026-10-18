@@ -161,9 +161,15 @@ ShiyouSetsu shiyouTaikai({bool setsumeisho = false}) {
     }
   }
   gyou.addAll([
-    // 結果画面のグラフ(説明書だけ。2.0.5。Modal_kukanTimeBunpu.dart)
-    if (setsumeisho)
+    // 結果画面のグラフ(説明書だけ。2.0.5。Modal_kukanTimeBunpu.dart)。
+    // 2.0.6から、レースの途中の区間ごとの画面でも見られる。区間終了時点の位置関係も足した(Modal_ichiKankei.dart)
+    if (setsumeisho) ...[
       '・駅伝の結果画面の「区間ごとのタイム分布」で、区間ごとの区間1位からの差の広がりをグラフで見られます。',
+      '　・レースの途中も、区間が終わるたびの画面で、終わった区間まで見られます。',
+      '・「区間終了時点の位置関係」では、区間が終わった時点の各大学の位置を、1位からの距離で見られます。',
+      '　・距離は、1位とのタイム差を、その区間の出場校の平均の速さで換算したものです。',
+      '　・区間が終わるたびの画面と、結果画面から開けます。',
+    ],
     ..._yosen11Gyou,
     ..._yosenShougatsuGyou,
     // 結果画面のグラフ(説明書だけ。2.0.5。Modal_yosenTimeBunpu.dart)

@@ -15,6 +15,9 @@
 // ・カードには、1kmあたりの中央値の差が一番大きい区間(差が一番ついた区間)を抜き出して出し、
 //   グラフの画面はその区間を開いた状態で開く。
 // ・結果は記事と同じ EkidenKekka(kiji_kekka.dart)から作る。予備の配列は使わない。
+// ・2.0.6から、レースの途中(区間が終わるたびの画面。mode 350)でも、1区から終わった区間までで
+//   見られる(KukanBunpuCard と ModalKukanTimeBunpuView に made(終わった区間の数)を渡す)。
+//   途中のカードとグラフの画面は、差が一番ついた区間ではなく、終わったばかりの区間を出して開く。
 
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -117,23 +120,29 @@ class _KukanBunpu {
   /// 学連選抜の監督をした年か(自分の大学の代わりに、学連選抜の選手をオレンジにする)
   final bool gakurenJibun;
 
-  _KukanBunpu._(this.e, this.kukan, this.jibunMei, this.gakurenJibun);
+  /// レースの途中か(2.0.6。終わったばかりの区間をカードに出して開く)
+  final bool tochuu;
+
+  _KukanBunpu._(this.e, this.kukan, this.jibunMei, this.gakurenJibun, this.tochuu);
 
   /// 大会[race]の結果から作る(駅伝でないときや、結果がなければnull)
+  /// [made] を渡すと、レースの途中の、1区から[made]区までで作る(2.0.6)
   /// (思わぬデータで画面が止まらないよう、作れなければnull。記事と同じ)
-  static _KukanBunpu? yomu(int race) {
+  static _KukanBunpu? yomu(int race, {int? made}) {
     try {
-      return _yomuHontai(race);
+      return _yomuHontai(race, made);
     } catch (e, st) {
       debugPrint('[区間ごとのタイム分布] 作れませんでした: $e\n$st');
       return null;
     }
   }
 
-  static _KukanBunpu? _yomuHontai(int race) {
-    final KijiKankyou? k = KijiKankyou.yomuRace(race, kekka: true);
+  static _KukanBunpu? _yomuHontai(int race, int? made) {
+    // レースの途中は、実況(kiji_jikkyou.dart)と同じく結果の記事ではない形で読む
+    final KijiKankyou? k = KijiKankyou.yomuRace(race, kekka: made == null);
     if (k == null || !k.ekiden) return null;
-    final EkidenKekka? e = EkidenKekka.tsukuru(k);
+    if (made != null && made <= 0) return null;
+    final EkidenKekka? e = EkidenKekka.tsukuru(k, made: made);
     if (e == null) return null;
     final EkidenUnivKekka? jibun = e.jibun;
     final UnivData? my = k.jibunUniv;
@@ -187,6 +196,7 @@ class _KukanBunpu {
       kukan,
       jibun == null ? null : jibun.mei,
       gakurenJibun,
+      made != null,
     );
   }
 
@@ -194,8 +204,10 @@ class _KukanBunpu {
   bool get gakurenAri => kukan.any((r) => r.gakuren != null);
 
   /// カードに出し、グラフの画面で最初に開いておく区間(並びの番号)
-  /// (1kmあたりの中央値の差が一番大きい区間 = 差が一番ついた区間)
+  /// (1kmあたりの中央値の差が一番大きい区間 = 差が一番ついた区間。
+  /// レースの途中は、終わったばかりの区間。2.0.6)
   int get daihyou {
+    if (tochuu) return kukan.length - 1;
     int best = 0;
     double bestSa = -1;
     for (int i = 0; i < kukan.length; i++) {
@@ -299,8 +311,8 @@ Widget _midashiGyou(_KukanBunpu b, _Kukan r, {String? riyuu}) {
   return Wrap(crossAxisAlignment: WrapCrossAlignment.center, children: l);
 }
 
-/// グラフの画面を開く
-void _bunpuGamenHiraku(BuildContext context, int race) {
+/// グラフの画面を開く([made] はレースの途中のとき、終わった区間の数。2.0.6)
+void _bunpuGamenHiraku(BuildContext context, int race, int? made) {
   showGeneralDialog(
     context: context,
     barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
@@ -308,7 +320,7 @@ void _bunpuGamenHiraku(BuildContext context, int race) {
     barrierLabel: '区間ごとのタイム分布', // アクセシビリティ用ラベル
     transitionDuration: const Duration(milliseconds: 300),
     pageBuilder: (context, animation, secondaryAnimation) =>
-        ModalKukanTimeBunpuView(race: race),
+        ModalKukanTimeBunpuView(race: race, made: made),
     transitionBuilder: (context, animation, secondaryAnimation, child) {
       return FadeTransition(
         opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
@@ -329,9 +341,14 @@ const Color _cardUsui = Color(0xFF9E9E9E);
 /// ・結果は画面を出したあとで1回だけ作る(画面が出るのを遅らせない)。
 ///   大会が変わったら作り直すよう、置く側で key を付ける
 /// ・結果がなければ出さない
+/// ・2.0.6から、レースの途中の区間ごとの画面(mode 350)にも置く([made] に終わった区間の数を渡す。
+///   カードには終わったばかりの区間を出す)
 class KukanBunpuCard extends StatefulWidget {
   final int race;
-  const KukanBunpuCard({super.key, required this.race});
+
+  /// レースの途中のとき、終わった区間の数(結果画面ではnull)
+  final int? made;
+  const KukanBunpuCard({super.key, required this.race, this.made});
 
   @override
   State<KukanBunpuCard> createState() => _KukanBunpuCardState();
@@ -348,7 +365,7 @@ class _KukanBunpuCardState extends State<KukanBunpuCard> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      final _KukanBunpu? b = _KukanBunpu.yomu(widget.race);
+      final _KukanBunpu? b = _KukanBunpu.yomu(widget.race, made: widget.made);
       if (!mounted) return;
       setState(() {
         _b = b;
@@ -369,7 +386,7 @@ class _KukanBunpuCardState extends State<KukanBunpuCard> {
         child: Material(
           color: _cardWaku,
           child: InkWell(
-            onTap: () => _bunpuGamenHiraku(context, widget.race),
+            onTap: () => _bunpuGamenHiraku(context, widget.race, widget.made),
             child: Container(
               decoration: const BoxDecoration(
                 border: Border(
@@ -405,7 +422,11 @@ class _KukanBunpuCardState extends State<KukanBunpuCard> {
                   ),
                   if (b != null && r != null) ...[
                     const SizedBox(height: 4),
-                    _midashiGyou(b, r, riyuu: '(差が一番ついた区間)'),
+                    _midashiGyou(
+                      b,
+                      r,
+                      riyuu: b.tochuu ? '(終わったばかりの区間)' : '(差が一番ついた区間)',
+                    ),
                     LayoutBuilder(
                       builder: (context, constraints) {
                         final double w = constraints.maxWidth;
@@ -454,7 +475,10 @@ class _KukanBunpuCardState extends State<KukanBunpuCard> {
 class ModalKukanTimeBunpuView extends StatefulWidget {
   /// 大会番号(0: 10月駅伝、1: 11月駅伝、2: 正月駅伝、5: カスタム駅伝)
   final int race;
-  const ModalKukanTimeBunpuView({super.key, required this.race});
+
+  /// レースの途中のとき、終わった区間の数(結果画面からはnull。2.0.6)
+  final int? made;
+  const ModalKukanTimeBunpuView({super.key, required this.race, this.made});
 
   @override
   State<ModalKukanTimeBunpuView> createState() =>
@@ -473,7 +497,7 @@ class _ModalKukanTimeBunpuViewState extends State<ModalKukanTimeBunpuView> {
   @override
   void initState() {
     super.initState();
-    final _KukanBunpu? b = _KukanBunpu.yomu(widget.race);
+    final _KukanBunpu? b = _KukanBunpu.yomu(widget.race, made: widget.made);
     _b = b;
     // 結果画面のカードと同じ区間を開いておく
     if (b != null) _hiraku = b.kukan[b.daihyou].kk;

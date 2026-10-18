@@ -21,6 +21,8 @@ import 'package:ekiden/screens/Modal_Taichoufuryou.dart';
 import 'package:ekiden/kansuu/ToujituHenkou_com.dart';
 import 'package:ekiden/kansuu/ShoriGuard.dart';
 import 'package:ekiden/screens/ai_copy_matome.dart'; // 生成AIに渡すテキスト(1.8.3)
+import 'package:ekiden/screens/Modal_ichiKankei.dart'
+    show KukanBunsekiCard; // 区間ごとのタイム分布と区間終了時点の位置関係のカード(2.0.6)
 
 // --- 当日変更画面ウィジェット ---
 
@@ -650,6 +652,18 @@ class _ToujitsuBHenkouScreenState extends State<ToujitsuBHenkouScreen> {
                   const SizedBox(height: 20),
                   Text(timesastr),
                   const SizedBox(height: 20),
+
+                  // 区間ごとのタイム分布と位置関係のカード(復路の当日変更の画面。往路の1区〜5区。
+                  // 2.0.6。Modal_ichiKankei.dart)
+                  if (currentGhensuu.hyojiracebangou == 2 &&
+                      currentGhensuu.nowracecalckukan > 0)
+                    KukanBunsekiCard(
+                      key: ValueKey(
+                        'kukanBunseki345_${currentGhensuu.year}_${currentGhensuu.nowracecalckukan}',
+                      ),
+                      race: 2,
+                      made: currentGhensuu.nowracecalckukan,
+                    ),
 
                   const SizedBox(height: 20),
 

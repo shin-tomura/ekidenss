@@ -20,6 +20,8 @@ import 'package:ekiden/kansuu/ikku_pace.dart'; // 1区の集団のペース(1.9.
 import 'package:ekiden/screens/ikku_pace_box.dart'; // 1区のペース予想の枠(1.9.2)
 import 'package:ekiden/screens/kiji_screen.dart'; // スタート直前号(1.9.2)
 import 'package:ekiden/kansuu/kiji/kiji.dart'; // スタート直前号のカードの見出しの予告(1.9.2)
+import 'package:ekiden/screens/Modal_ichiKankei.dart'
+    show KukanBunsekiCard; // 区間ごとのタイム分布と区間終了時点の位置関係のカード(2.0.6)
 
 class Mode0280Content extends StatefulWidget {
   final Ghensuu ghensuu;
@@ -498,6 +500,16 @@ class _Mode0280Content extends State<Mode0280Content> {
                       //const SizedBox(height: 20),
                       Text(timesastr),
                       const SizedBox(height: 20),
+                      // 区間ごとのタイム分布と位置関係のカード(復路の目標順位を決める画面。
+                      // 往路の1区〜5区。2.0.6。Modal_ichiKankei.dart)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        child: KukanBunsekiCard(
+                          key: ValueKey('kukanBunseki280_${widget.ghensuu.year}'),
+                          race: 2,
+                          made: widget.ghensuu.nowracecalckukan,
+                        ),
+                      ),
                     ],
                     if (widget.ghensuu.hyojiracebangou == 2 &&
                         widget.ghensuu.nowracecalckukan == 5)

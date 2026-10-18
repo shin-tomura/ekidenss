@@ -41,7 +41,7 @@
 //   覚えない(画面を閉じたらおまかせに戻る)。倍率のボタンの横に縮尺の棒を出す。
 // ・11月駅伝は8位、正月駅伝は10位の下にシード権ラインを引く(10月駅伝とカスタム駅伝はなし)。
 //   ラインをまたいでは集団にしない。詰めた間のあとも新しい集団にする。
-// ・四角の見た目: 自分の大学はオレンジの塗り、1位は太い白の枠、学連選抜(正月駅伝のオープン参加)は
+// ・四角の見た目: 自分の大学はオレンジの枠(文字と塗りはほかの大学と同じ)、1位は太い白の枠、学連選抜(正月駅伝のオープン参加)は
 //   点線の枠(学連選抜の監督をした年はオレンジの点線)。学連選抜は順位とシード権ラインに数えない。
 // ・距離は1kmまでは10m単位、1km以上は「1.2km」。秒は画面と同じく切り捨ててから引き(saByou)、
 //   距離はその秒から出す。間が0秒なら「並走」。四角を押したときの下の帯では、1位との差
@@ -642,7 +642,6 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
   /// 四角の中の文(順位と大学名)
   TextSpan _hakoSpan(_IchiKankei b, _IchiKukan r, int i) {
     final _IchiDaigaku x = r.narabi[i];
-    final bool orange = x.jibun || (b.gakurenJibun && x.op);
     return TextSpan(
       children: [
         // 学連選抜は短く「OP学連」(OPは順位と同じ薄い色。下の帯は「学連選抜」のまま)
@@ -652,11 +651,8 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
         ),
         TextSpan(
           text: x.op ? '学連' : _michiMei(x.mei),
-          style: TextStyle(
-            color: orange ? _jibunIro : HENSUU.textcolor,
-            fontSize: 13,
-            fontWeight: orange ? FontWeight.bold : FontWeight.normal,
-          ),
+          // 自分の大学も、文字はほかの大学と同じ(オレンジは枠だけ。読みやすいように)
+          style: const TextStyle(color: HENSUU.textcolor, fontSize: 13),
         ),
         // 前の区間からの順位の変化(↑は緑、↓は赤、→は灰色。1区は付けない)
         if (x.hendouMoji != null)
@@ -1163,7 +1159,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
         ),
         const Text('右の括弧は前の大学との間です(点線は詰めた間)。', style: setsumei),
         if (r.narabi.any((x) => x.jibun))
-          const Text('オレンジ: あなたの大学', style: setsumei),
+          const Text('オレンジの枠: あなたの大学', style: setsumei),
         if (b.opAri)
           Text(
             b.gakurenJibun
@@ -1261,7 +1257,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     Widget naka = Container(
       padding: const EdgeInsets.symmetric(horizontal: _hakoYoko, vertical: _hakoTate),
       decoration: BoxDecoration(
-        color: orange ? _jibunIro.withOpacity(0.18) : const Color(0xFF101010),
+        color: const Color(0xFF101010),
         border: tensen ? null : Border.all(color: wakuIro, width: futosa),
         borderRadius: BorderRadius.circular(4),
       ),

@@ -1102,9 +1102,9 @@ Future<void> main() async {
     //save_load_screenの中の _importFromSlot の中にもあるので、そちらも変更すること！
     final versionValue = int.tryParse(sortedUnivData[7].name_tanshuku);
     if (versionValue == null ||
-        versionValue < 22090 ||
+        versionValue < 22100 ||
         versionValue > 999999999) {
-      sortedUnivData[7].name_tanshuku = "22090"; //バージョン番号
+      sortedUnivData[7].name_tanshuku = "22100"; //バージョン番号
       await sortedUnivData[7].save();
     }
 

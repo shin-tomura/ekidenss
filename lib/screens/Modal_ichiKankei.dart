@@ -7,8 +7,10 @@
 //   集団の一番上の行は、前の大学(前が集団なら、その一番下の行)から、間の距離ぶん下に置き、
 //   集団のあとの大学は、集団の一番下の行を起点にして、集団の最後の大学との間の距離ぶん下に置く。
 //   (集団で行を折り返したぶん、そのあとの道は下にずれる。隣どうしの間は縮尺どおり)
-// ・道の右に、1位との差(距離と秒。「180m +33秒」)を出す。集団は一番上の行に、先頭の大学の差を1つだけ出す。
-// ・四角と差の文は折り返さず、道と四角と差の部分だけを横にもスクロールできるようにする
+// ・道の右に、前の大学(集団)との間を示す括弧を引き、その真ん中に間の距離と秒差(「90m 16秒」)を出す。
+//   括弧は、前の集団の一番下の行の真ん中から、次の集団の一番上の行の真ん中まで。集団の中の間は出さない。
+//   (1位との差を出していたが、隣どうしの間が縮尺どおりなので、間を出すほうが分かりやすいため、2.0.6の開発中に変えた)
+// ・四角と間の文は折り返さず、道と四角と間の文の部分だけを横にもスクロールできるようにする
 //   (文字を大きくしても、文の長さで行がずれて、距離と位置が合わなくならないように)。
 // ・大学の四角を押すと、その大学の順位・1位との差・前の大学(1位は次の大学)との差を、
 //   画面の下(「戻る」の上)に固定した帯に出す。
@@ -20,7 +22,8 @@
 //   (ゲームとしての見せ方。1位が着いた時点か最後の大学が着いた時点か、などは考えない)。
 // ・1区から終わった区間まで切り替えられる(覚えない。開くたびに一番あとの区間)。
 // ・前の大学との間のうち、飛び抜けて大きい間(その区間の間の中央値の4倍以上。大きい順に多くて3か所。
-//   _tobinukeAida)だけを詰めて、道に切れ目の印と、その間の距離を出す。倍率ではなくデータで決めるので、
+//   _tobinukeAida)だけを詰めて、道に切れ目の点線を引き、右の括弧を点線にして「(詰めています)」を添える。
+//   倍率ではなくデータで決めるので、
 //   だいたい同じくらい空いているときは詰めない。手動で倍率を選んでいるときは、1つの間が
 //   画面の高さを超えるところも詰める(拡大しすぎて、何もない道を延々とスクロールしないように)。
 //   (最初は「画面で144pxを超えたら」詰めていたが、おまかせの倍率とぶつかり、出場校の少ない大会や
@@ -34,8 +37,9 @@
 //   ラインをまたいでは集団にしない。詰めた間のあとも新しい集団にする。
 // ・四角の見た目: 自分の大学はオレンジの塗り、1位は太い白の枠、学連選抜(正月駅伝のオープン参加)は
 //   点線の枠(学連選抜の監督をした年はオレンジの点線)。学連選抜は順位とシード権ラインに数えない。
-// ・差の距離は1kmまでは10m単位、1km以上は「1.2km」。秒は画面と同じく切り捨ててから引き(saByou)、
-//   距離はその秒から出す。1位との差が0秒なら「トップと並走」。
+// ・距離は1kmまでは10m単位、1km以上は「1.2km」。秒は画面と同じく切り捨ててから引き(saByou)、
+//   距離はその秒から出す。間が0秒なら「並走」。四角を押したときの下の帯では、1位との差
+//   (「180m +33秒」。0秒なら「トップと並走」)と前の大学との差を出す。
 // ・結果は記事と同じ EkidenKekka(kiji_kekka.dart)から作る。レースの途中は1区から終わった区間まで。
 //   新しく保存するものはない。作れなければカードを出さない。
 // ・2.0.6の開発中に、点と名前の行の形から四角の形に変え、2枚あったカード(タイム分布と位置関係)を
@@ -76,6 +80,9 @@ const double _michiWariai = 0.6;
 
 /// 集団の1行に並べる大学の数の上限
 const int _gyouSaidai = 3;
+
+/// 詰めた間の括弧の文に添える言葉
+const String _tsumeMoji = '(詰めています)';
 
 /// 四角どうし・行どうしのすきま
 const double _sukima = 4;
@@ -151,6 +158,13 @@ class _IchiKukan {
     if (s == 0) return 'トップと並走';
     if (s < 0) return 'トップより${_kyoriMoji(-s * hayasa)}前 ${saMoji(s)}';
     return '${_kyoriMoji(s * hayasa)} +${saMoji(s)}';
+  }
+
+  /// 2つの大学の間の文(道の右の括弧に出す。間なので「+」を付けない。「90m 16秒」。0秒は「並走」)
+  String aidaBun(_IchiDaigaku osoi, _IchiDaigaku hayai) {
+    final int s = saByou(osoi.ruikei, hayai.ruikei);
+    if (s <= 0) return '並走';
+    return '${_kyoriMoji(s * hayasa)} ${saMoji(s)}';
   }
 
   /// 2つの大学の差の文(距離が先。「30m +5秒」。0秒は「並走」)
@@ -457,21 +471,40 @@ class _Gyou {
 
   final List<_Hako> hako;
 
-  /// 右に差を出す大学(narabi の番号。集団の一番上の行の先頭の大学。ほかの行はnull)
-  final int? migi;
-
   /// 行の右端(いちばん右の四角の右のすきままで)
   final double hashi;
 
-  const _Gyou(this.y, this.h, this.hako, this.migi, this.hashi);
+  const _Gyou(this.y, this.h, this.hako, this.hashi);
+}
+
+/// 前の大学(集団)との間の括弧1つ分
+class _Aida {
+  /// 括弧の上端(前の集団の一番下の行の真ん中)と下端(次の集団の一番上の行の真ん中)
+  final double y0;
+  final double y1;
+
+  /// 文(「90m 16秒」)
+  final String moji;
+
+  /// 詰めた間か(括弧を点線にし、文の下に「(詰めています)」を添える)
+  final bool tsume;
+
+  /// 文の上端と高さ(ほかの文やシード権ラインと重ならないように決める)
+  double top = 0;
+  double h = 0;
+
+  _Aida(this.y0, this.y1, this.moji, this.tsume);
 }
 
 /// 道の上の並べ方
 class _Haichi {
   final List<_Gyou> gyou;
 
-  /// 切れ目の印の文(上端・高さ・文)
-  final List<({double top, double h, String moji})> kireme;
+  /// 前の大学(集団)との間の括弧
+  final List<_Aida> aida;
+
+  /// 道の切れ目(詰めた間の、前の行の下端と次の行の上端)
+  final List<({double y0, double y1})> kireme;
 
   /// シード権ラインの行の上端(引かないときはnull)
   final double? seedTop;
@@ -485,8 +518,9 @@ class _Haichi {
   /// 道の帯の幅
   final double michiHaba;
 
-  /// 右の差の文の左端
-  final double migiX;
+  /// 括弧の左端と、間の文の左端
+  final double kakkoX;
+  final double mojiX;
 
   /// 全体の幅(画面より広いときは、横にスクロールする)
   final double haba;
@@ -496,12 +530,14 @@ class _Haichi {
 
   _Haichi(
     this.gyou,
+    this.aida,
     this.kireme,
     this.seedTop,
     this.sentouY,
     this.michiUe,
     this.michiHaba,
-    this.migiX,
+    this.kakkoX,
+    this.mojiX,
     this.haba,
     this.takasa,
   );
@@ -632,13 +668,20 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
           );
         }(),
     ];
-    // 行の高さ(四角と、右の差の文の高いほう。どの行も同じ)
-    double gyouTakasa = _ookisa(const TextSpan(text: '0m', style: _migiStyle), scaler).height;
+    // 行の高さ(四角の高さ。どの行も同じ)
+    double gyouTakasa = 0;
     for (final Size s in hakoOokisa) {
       gyouTakasa = math.max(gyouTakasa, s.height);
     }
     final double ueTakasa = _ookisa(TextSpan(text: b.ueMoji(r), style: _chiisai), scaler).height;
-    final double kiremeTakasa = _ookisa(const TextSpan(text: '〜', style: _chiisai), scaler).height;
+    // 間の文の高さ(1行目と、詰めた間に添える「(詰めています)」)
+    final double aidaMojiTakasa = _ookisa(const TextSpan(text: '0m', style: _migiStyle), scaler).height;
+    final double tsumeMojiTakasa = _ookisa(const TextSpan(text: _tsumeMoji, style: _chiisai), scaler).height;
+    // 詰めた間の、前の行の真ん中から次の行の真ん中までの長さ(2行の文が入るように)
+    final double tsumeNagasa = math.max(
+      _tsumePx,
+      gyouTakasa + aidaMojiTakasa + tsumeMojiTakasa + _sukima * 2,
+    );
     final double seedTakasa = _ookisa(
       const TextSpan(text: 'シード権ライン', style: _seedMojiStyle),
       scaler,
@@ -679,26 +722,26 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
 
     // 集団ごとに置く(一番上の行は前の集団の一番下の行から、間の距離ぶん下。1行3校まで)
     final List<_Gyou> gyou = [];
-    final List<({double top, double h, String moji})> kireme = [];
+    final List<_Aida> aidaList = [];
+    final List<({double y0, double y1})> kireme = [];
     double? seedTop;
     final double michiUe = ueTakasa + 4;
     double shita = michiUe; // いま置いたものの下端
     double sentouY = michiUe + _sukima + gyouTakasa / 2;
     double? maeChuushin; // 前の集団の一番下の行の真ん中
+    double maeGyouShita = michiUe; // 前の集団の一番下の行の下端
     int maeSaigo = 0; // 前の集団の最後の大学
     for (int si = 0; si < shuudan.length; si++) {
       final List<int> sh = shuudan[si];
       final int saki = sh.first;
       double top;
       final double? mc = maeChuushin;
+      final bool tsumeAto = mc != null && tsume.contains(saki - 1);
       if (mc == null) {
         top = michiUe + _sukima;
-      } else if (tsume.contains(saki - 1)) {
-        // 詰めた間: 切れ目の印の文を置き、そのすぐ下から
-        final double kTop = shita + _sukima;
-        kireme.add((top: kTop, h: kiremeTakasa, moji: '〜 ${_kyoriMoji(aida[saki - 1])} 〜'));
-        shita = kTop + kiremeTakasa;
-        top = shita + _sukima;
+      } else if (tsumeAto) {
+        // 詰めた間: 決まった長さだけ空ける(道には切れ目の点線、右には点線の括弧)
+        top = mc + tsumeNagasa - gyouTakasa / 2;
       } else {
         top = mc + (d[saki] - d[maeSaigo]) * px - gyouTakasa / 2;
       }
@@ -711,6 +754,13 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
       }
       top = math.max(top, shita + _sukima);
       if (si == 0) sentouY = top + gyouTakasa / 2;
+      // 前の集団との間の括弧(前の集団の一番下の行の真ん中から、この集団の一番上の行の真ん中まで)
+      if (mc != null) {
+        aidaList.add(
+          _Aida(mc, top + gyouTakasa / 2, r.aidaBun(r.narabi[saki], r.narabi[maeSaigo]), tsumeAto),
+        );
+        if (tsumeAto) kireme.add((y0: maeGyouShita, y1: top));
+      }
       for (int k = 0; k < sh.length; k += _gyouSaidai) {
         final List<_Hako> hako = [];
         double x = _sukima;
@@ -719,32 +769,63 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
           hako.add(_Hako(sh[j], x, z.width, z.height));
           x += z.width + _sukima;
         }
-        gyou.add(_Gyou(top, gyouTakasa, hako, k == 0 ? saki : null, x));
+        gyou.add(_Gyou(top, gyouTakasa, hako, x));
         shita = top + gyouTakasa;
         top = shita + _sukima;
       }
       maeChuushin = shita - gyouTakasa / 2;
+      maeGyouShita = shita;
       maeSaigo = sh.last;
     }
 
-    // 幅(道の帯は画面の6割か、一番広い行の広いほう。右の差の文が入りきらなければ横にスクロール)
+    // 間の文の置き場所(括弧の真ん中。前の文やシード権ラインと重なるときは、下にずらす)
+    double maeMojiShita = -1;
+    for (final _Aida a in aidaList) {
+      a.h = aidaMojiTakasa + (a.tsume ? tsumeMojiTakasa : 0);
+      double t = math.max((a.y0 + a.y1) / 2 - a.h / 2, maeMojiShita + 2);
+      final double? st = seedTop;
+      if (st != null && t < st + seedTakasa && t + a.h > st) t = st + seedTakasa + 2;
+      a.top = t;
+      maeMojiShita = t + a.h;
+    }
+
+    // 幅(道の帯は画面の6割か、一番広い行の広いほう。間の文が入りきらなければ横にスクロール)
     double gyouHaba = 0;
-    double migiHaba = 0;
     for (final _Gyou g in gyou) {
       gyouHaba = math.max(gyouHaba, g.hashi);
-      final int? m = g.migi;
-      if (m != null) {
-        migiHaba = math.max(
-          migiHaba,
-          _ookisa(TextSpan(text: r.saBun(r.narabi[m]), style: _migiStyle), scaler).width,
+    }
+    double mojiHaba = 0;
+    for (final _Aida a in aidaList) {
+      mojiHaba = math.max(mojiHaba, _ookisa(TextSpan(text: a.moji, style: _migiStyle), scaler).width);
+      if (a.tsume) {
+        mojiHaba = math.max(
+          mojiHaba,
+          _ookisa(const TextSpan(text: _tsumeMoji, style: _chiisai), scaler).width,
         );
       }
     }
     final double michiHaba = math.max(w * _michiWariai, gyouHaba);
-    final double migiX = michiHaba + 8;
-    final double haba = math.max(w, migiX + migiHaba + 8);
-    final double takasa = shita + 16;
-    return _Haichi(gyou, kireme, seedTop, sentouY, michiUe, michiHaba, migiX, haba, takasa);
+    final double kakkoX = michiHaba + 6;
+    final double mojiX = kakkoX + 14;
+    final double haba = math.max(w, mojiX + mojiHaba + 8);
+    double takasa = shita;
+    for (final _Aida a in aidaList) {
+      takasa = math.max(takasa, a.top + a.h);
+    }
+    takasa += 16;
+    return _Haichi(
+      gyou,
+      aidaList,
+      kireme,
+      seedTop,
+      sentouY,
+      michiUe,
+      michiHaba,
+      kakkoX,
+      mojiX,
+      haba,
+      takasa,
+    );
   }
 
   /// 押した大学の帯の文(順位・1位との差・前の大学との差)
@@ -986,6 +1067,10 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
           '集団で行を折り返したぶん、そのあとの道は下にずれます(隣どうしの間は縮尺どおり)。',
           style: setsumei,
         ),
+        const Text(
+          '道の右の括弧は、前の大学(集団)との間の距離と秒差です(点線の括弧は、間を詰めています)。',
+          style: setsumei,
+        ),
         if (r.narabi.any((x) => x.jibun))
           const Text('オレンジ: あなたの大学', style: setsumei),
         if (b.opAri)
@@ -995,7 +1080,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
                 : '点線の枠: 学連選抜(順位に数えない)',
             style: setsumei,
           ),
-        const Text('大学の四角を押すと、画面の下に差が出ます。', style: setsumei),
+        const Text('大学の四角を押すと、画面の下に1位との差と前の大学との差が出ます。', style: setsumei),
         const SizedBox(height: 12),
         LayoutBuilder(
           builder: (context, constraints) {
@@ -1017,17 +1102,18 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
                       top: 0,
                       child: Text(b.ueMoji(r), style: _chiisai, softWrap: false),
                     ),
-                    // 詰めたところの距離
-                    for (final k in h.kireme)
+                    // 前の大学(集団)との間の距離と秒差(括弧の真ん中。詰めた間は「(詰めています)」を添える)
+                    for (final _Aida a in h.aida)
                       Positioned(
-                        left: 0,
-                        top: k.top,
-                        width: h.michiHaba,
-                        child: Text(
-                          k.moji,
-                          style: _chiisai,
-                          textAlign: TextAlign.center,
-                          softWrap: false,
+                        left: h.mojiX,
+                        top: a.top,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(a.moji, style: _migiStyle, softWrap: false),
+                            if (a.tsume) const Text(_tsumeMoji, style: _chiisai, softWrap: false),
+                          ],
                         ),
                       ),
                     // シード権ライン
@@ -1049,8 +1135,8 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
                           ],
                         ),
                       ),
-                    // 大学の四角と、集団の一番上の行の右の差(集団ごとに1つ)
-                    for (final _Gyou g in h.gyou) ...[
+                    // 大学の四角
+                    for (final _Gyou g in h.gyou)
                       for (final _Hako hk in g.hako)
                         Positioned(
                           left: hk.x,
@@ -1059,23 +1145,6 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
                           height: hk.h,
                           child: _hakoWidget(b, r, hk),
                         ),
-                      if (g.migi != null)
-                        Positioned(
-                          left: h.migiX,
-                          top: g.y,
-                          width: math.max(h.haba - h.migiX, 1),
-                          height: g.h,
-                          child: Align(
-                            alignment: Alignment.centerLeft,
-                            child: Text(
-                              r.saBun(r.narabi[g.migi!]),
-                              style: _migiStyle,
-                              softWrap: false,
-                              maxLines: 1,
-                            ),
-                          ),
-                        ),
-                    ],
                   ],
                 ),
               ),
@@ -1122,7 +1191,18 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
   }
 }
 
-/// 道の帯・切れ目の印・いちばん前の線
+/// 点線で線を引く(パスに沿って、4px引いて3px空ける)
+void _tensenDeHiku(Canvas canvas, Path path, Paint p) {
+  for (final metric in path.computeMetrics()) {
+    double d = 0;
+    while (d < metric.length) {
+      canvas.drawPath(metric.extractPath(d, math.min(d + 4, metric.length)), p);
+      d += 7;
+    }
+  }
+}
+
+/// 道の帯・切れ目の印・いちばん前の線・間の括弧
 class _MichiPainter extends CustomPainter {
   final _Haichi h;
 
@@ -1132,17 +1212,17 @@ class _MichiPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final Paint michi = Paint()..color = _michiIro;
     final double shita = size.height - 6;
-    // 道の帯(切れ目の印の文のところは空ける)
+    // 道の帯(詰めた間の真ん中は空ける)
     double y = h.michiUe;
     for (final k in h.kireme) {
-      final double a = k.top - 3;
-      if (a > y) {
+      final double m = (k.y0 + k.y1) / 2;
+      if (m - 5 > y) {
         canvas.drawRRect(
-          RRect.fromRectAndRadius(Rect.fromLTRB(0, y, h.michiHaba, a), const Radius.circular(6)),
+          RRect.fromRectAndRadius(Rect.fromLTRB(0, y, h.michiHaba, m - 5), const Radius.circular(6)),
           michi,
         );
       }
-      y = k.top + k.h + 3;
+      y = m + 5;
     }
     if (shita > y) {
       canvas.drawRRect(
@@ -1155,12 +1235,11 @@ class _MichiPainter extends CustomPainter {
       ..color = Colors.white38
       ..strokeWidth = 1;
     for (final k in h.kireme) {
-      final double a = k.top - 3;
-      final double c = k.top + k.h + 3;
+      final double m = (k.y0 + k.y1) / 2;
       for (double x = 0; x < h.michiHaba; x += 6) {
         final double x2 = math.min(x + 3, h.michiHaba);
-        canvas.drawLine(Offset(x, a), Offset(x2, a), kiremeSen);
-        canvas.drawLine(Offset(x, c), Offset(x2, c), kiremeSen);
+        canvas.drawLine(Offset(x, m - 5), Offset(x2, m - 5), kiremeSen);
+        canvas.drawLine(Offset(x, m + 5), Offset(x2, m + 5), kiremeSen);
       }
     }
     // いちばん前(1位)の線
@@ -1171,6 +1250,23 @@ class _MichiPainter extends CustomPainter {
         ..color = Colors.white70
         ..strokeWidth = 1.5,
     );
+    // 前の大学(集団)との間の括弧(詰めた間は点線)
+    final Paint kakko = Paint()
+      ..color = Colors.white54
+      ..strokeWidth = 1
+      ..style = PaintingStyle.stroke;
+    for (final _Aida a in h.aida) {
+      final Path path = Path()
+        ..moveTo(h.kakkoX, a.y0)
+        ..lineTo(h.kakkoX + 8, a.y0)
+        ..lineTo(h.kakkoX + 8, a.y1)
+        ..lineTo(h.kakkoX, a.y1);
+      if (a.tsume) {
+        _tensenDeHiku(canvas, path, kakko);
+      } else {
+        canvas.drawPath(path, kakko);
+      }
+    }
   }
 
   @override
@@ -1196,13 +1292,7 @@ class _TensenWakuPainter extends CustomPainter {
           const Radius.circular(4),
         ),
       );
-    for (final metric in waku.computeMetrics()) {
-      double d = 0;
-      while (d < metric.length) {
-        canvas.drawPath(metric.extractPath(d, math.min(d + 4, metric.length)), p);
-        d += 7;
-      }
-    }
+    _tensenDeHiku(canvas, waku, p);
   }
 
   @override

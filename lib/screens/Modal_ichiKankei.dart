@@ -4,6 +4,15 @@
 //   大学の四角を押すと、帯に「大学名　目標○位」と1区を走る選手(区間配置確認のカードを開いたときと同じ中身)を
 //   出し、もう一度押すと閉じる。1区の指示の画面(mode 350の1区)にもカードを置き、そこではスタートだけを出す。
 // ・2.0.7から、区間は「‹」「›」で1つずつ、真ん中を押して出る一覧で好きな区間に切り替える(区間が多くても1行)。
+// ・2.0.8から、区間を選ぶ行の右の黄色のボタンを押すたびに、「位置」(道の位置関係)→「通過」(通過順位速報)→
+//   「個人」(個人順位速報)→「位置」と表示を切り替える。通過と個人は、今の速報の画面を、上のバーと下の「前・次」を
+//   外して入れたもの(Modal_tuukajuni.dart・Modal_kukanresult350.dart(レースの途中)・Modal_kukanresult.dart
+//   (結果画面)の umekomi)で、区間はパネルで選んだ区間。スタートでは、まだないことを出す。
+//   通過と個人のときは、倍率の行を隠し、押した大学の帯は閉じる。覚えない(開いたときは「位置」)。
+//   スタートしかないとき(1区の指示の画面)は、ボタンを出さない。
+// ・2.0.8から、おまかせのときに「おまかせ」をもう一度押すと「おまかせ ↔」(幅に合わせる)になり、道が横幅に収まるように、
+//   道の上の文字(四角の中・右の差・(詰めています)・シード権ライン)を小さくする(6割まで。それでも入らなければ
+//   横にスクロールする)。縦の縮尺は変えない。もう一度押すと戻り、「−」「＋」を押すと、おまかせと一緒に外れる。覚えない。
 // レースの途中の区間ごとの画面(mode 350)と、結果画面(10月駅伝・11月駅伝・正月駅伝・カスタム駅伝)の、
 // 区間ごとのタイム分布と1枚にまとめたカード(KukanBunsekiCard。右半分の「位置関係」)から開く。
 // ・幅のある道の帯に、大学名を四角で囲んで並べ、1位からの距離を縮尺どおりの間隔で出す。
@@ -92,6 +101,12 @@ import 'package:ekiden/kansuu/shushou.dart'
 import 'package:ekiden/kansuu/konki_best.dart'; // 今季ベスト(区間配置確認と同じ設定。2.0.7)
 import 'package:ekiden/screens/shushou_iro.dart'; // 主将を示す色(区間配置確認と同じ。2.0.7)
 import 'package:ekiden/screens/senshu_haichi_panel.dart'; // 区間配置確認のカードの部品(2.0.7)
+import 'package:ekiden/screens/Modal_tuukajuni.dart'
+    show ModalKukanResultListViewPass; // 通過順位速報(パネルの中に入れる。2.0.8)
+import 'package:ekiden/screens/Modal_kukanresult350.dart'
+    show ModalKukanResultListView350; // 個人順位速報(レースの途中。2.0.8)
+import 'package:ekiden/screens/Modal_kukanresult.dart'
+    show ModalKukanResultListView; // 個人順位速報(結果画面。2.0.8)
 import 'package:ekiden/kansuu/kiji/kiji_kihon.dart';
 import 'package:ekiden/kansuu/kiji/kiji_kekka.dart';
 import 'package:ekiden/kansuu/gakuren_text.dart';
@@ -105,6 +120,9 @@ const List<String> _bairitsuMei = ['×1/4', '×1/2', '×1', '×2', '×4', '×8']
 
 /// おまかせの倍率: 1位から最後尾までが、画面の高さのこの倍に収まる一番大きい倍率
 const double _omakaseGamen = 2.0;
+
+/// 幅に合わせる(おまかせ ↔)ときに、道の上の文字を小さくする下限(今の文字の大きさに対する割合。2.0.8)
+const double _habaSaishou = 0.6;
 
 /// 飛び抜けて大きい間: その区間の間の中央値の、この倍以上
 const double _tobinukeBai = 4;
@@ -820,6 +838,12 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
   /// 倍率がおまかせか(「−」「＋」を押すと外れる。覚えない)
   bool _omakase = true;
 
+  /// おまかせのときに、道が横幅に収まるように文字を小さくするか(おまかせ ↔。覚えない。2.0.8)
+  bool _habaAwase = false;
+
+  /// 表示(0: 位置、1: 通過順位速報、2: 個人順位速報。覚えない。2.0.8)
+  int _hyouji = 0;
+
   static const TextStyle _chiisai = TextStyle(color: Colors.white54, fontSize: 11);
   static const TextStyle _seedMojiStyle = TextStyle(color: Colors.amberAccent, fontSize: 11);
   static const TextStyle _migiStyle = TextStyle(color: Colors.white70, fontSize: 12);
@@ -1444,21 +1468,26 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
                         ),
                       ),
                       const Divider(height: 1, color: Colors.white24),
-                      Expanded(
-                        child: SingleChildScrollView(
-                          padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
-                          child: _buildHontai(context, b, r0, dan, gamenTakasa),
-                        ),
-                      ),
-                      // 押した大学の帯(4割5分まで。道をスクロールしていても見えるように、道の下(画面の一番下)に置く)
-                      if (oshitaBun != null && x0 != null)
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                          child: ConstrainedBox(
-                            constraints: BoxConstraints(maxHeight: takasa * 0.45),
-                            child: _buildObi(context, r0, x0, oshitaBun),
+                      // 通過順位速報・個人順位速報(2.0.8)
+                      if (_hyouji != 0)
+                        Expanded(child: _buildSokuhou(r0))
+                      else ...[
+                        Expanded(
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+                            child: _buildHontai(context, b, r0, dan, gamenTakasa),
                           ),
                         ),
+                        // 押した大学の帯(4割5分まで。道をスクロールしていても見えるように、道の下(画面の一番下)に置く)
+                        if (oshitaBun != null && x0 != null)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(maxHeight: takasa * 0.45),
+                              child: _buildObi(context, r0, x0, oshitaBun),
+                            ),
+                          ),
+                      ],
                     ],
                   );
                 },
@@ -1749,11 +1778,17 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
               '次の区間',
               erabu < b.kukan.length - 1 ? () => _kukanKaeru(erabu + 1) : null,
             ),
+            // 表示の切り替え(スタートしかないときは出さない。2.0.8)
+            if (b.kukan.any((x) => x.kk >= 0)) ...[
+              const SizedBox(width: 8),
+              _hyoujiBotan(),
+            ],
           ],
         ),
-        const SizedBox(height: 8),
-        // 表示の倍率(「−」「＋」と、おまかせ。覚えない)と縮尺の棒
-        Wrap(
+        // 表示の倍率(「−」「＋」と、おまかせ。覚えない)と縮尺の棒(位置のときだけ。2.0.8)
+        if (_hyouji == 0) ...[
+          const SizedBox(height: 8),
+          Wrap(
           spacing: 8,
           runSpacing: 6,
           crossAxisAlignment: WrapCrossAlignment.center,
@@ -1764,6 +1799,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
               dan > 0
                   ? () => setState(() {
                       _omakase = false;
+                      _habaAwase = false;
                       _dan = dan - 1;
                     })
                   : null,
@@ -1782,16 +1818,95 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
               dan < _bairitsu.length - 1
                   ? () => setState(() {
                       _omakase = false;
+                      _habaAwase = false;
                       _dan = dan + 1;
                     })
                   : null,
             ),
-            _komaBotan('おまかせ', _omakase, () => setState(() => _omakase = true)),
+            // おまかせのときに押すと、幅に合わせる(おまかせ ↔)と入れ替わる(2.0.8)
+            _komaBotan(
+              _omakase && _habaAwase ? 'おまかせ ↔' : 'おまかせ',
+              _omakase,
+              () => setState(() {
+                if (_omakase) {
+                  _habaAwase = !_habaAwase;
+                } else {
+                  _omakase = true;
+                }
+              }),
+            ),
             _shukushaku(_bairitsu[dan]),
           ],
         ),
+        ],
       ],
     );
+  }
+
+  /// 表示を切り替えるボタン(押すたびに「位置」→「通過」→「個人」→「位置」。今の表示の名前を出す。2.0.8)
+  Widget _hyoujiBotan() {
+    const List<String> mei = ['位置', '通過', '個人'];
+    const Color iro = Colors.amberAccent;
+    return Semantics(
+      button: true,
+      label: '表示の切り替え',
+      child: Material(
+        color: iro.withOpacity(0.15),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: const BorderSide(color: iro, width: 1.5),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => setState(() {
+            _hyouji = (_hyouji + 1) % 3;
+            // 押した大学の帯は閉じる
+            _oshita = -1;
+            _hiraki = 0;
+          }),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  mei[_hyouji.clamp(0, 2)],
+                  style: const TextStyle(
+                    color: iro,
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                const Icon(Icons.sync, color: iro, size: 18),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 通過順位速報・個人順位速報(今の速報の画面を、上のバーと下の「前・次」を外して入れる。
+  /// 区間はパネルで選んだ区間。個人順位速報は、レースの途中は途中用、結果画面では結果画面用。2.0.8)
+  Widget _buildSokuhou(_IchiKukan r) {
+    if (r.kk < 0) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: Text(
+            'スタート前なので、通過順位と個人順位はまだありません。',
+            style: TextStyle(color: HENSUU.textcolor),
+          ),
+        ),
+      );
+    }
+    if (_hyouji == 1) {
+      return ModalKukanResultListViewPass(umekomi: true, kukan: r.kk);
+    }
+    return widget.made == null
+        ? ModalKukanResultListView(umekomi: true, kukan: r.kk)
+        : ModalKukanResultListView350(umekomi: true, kukan: r.kk);
   }
 
   /// スクロールする部分(説明の文と、道と大学名の四角。道の部分は横にもスクロールする)
@@ -1834,14 +1949,29 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
                     : '大学の四角を押すと下に差が、もう一度押すと走った選手の説明文が出ます。'),
           style: setsumei,
         ),
+        if (_omakase && _habaAwase)
+          const Text('道が横幅に収まるように、道の上の文字を小さくします(おまかせ ↔)。', style: setsumei),
         const SizedBox(height: 12),
         LayoutBuilder(
           builder: (context, constraints) {
             final double w = constraints.maxWidth;
-            final TextScaler scaler = MediaQuery.textScalerOf(context);
-            final _Haichi h = _haichi(b, r, w, scaler, px, gamenTakasa, _omakase);
+            TextScaler scaler = MediaQuery.textScalerOf(context);
+            _Haichi h = _haichi(b, r, w, scaler, px, gamenTakasa, _omakase);
+            // 幅に合わせる(おまかせ ↔)ときは、横幅に収まるまで道の上の文字を小さくして並べ直す
+            // (文字の幅で四角の幅と右の文の幅が決まるので、何回か測り直す。6割まで。2.0.8)
+            bool chiisaku = false;
+            if (_omakase && _habaAwase && h.haba > w) {
+              final double kihon = scaler.scale(13) / 13;
+              double k = 1;
+              for (int n = 0; n < 4 && h.haba > w + 0.5 && k > _habaSaishou; n++) {
+                k = math.max(_habaSaishou, k * w / h.haba);
+                scaler = TextScaler.linear(kihon * k);
+                h = _haichi(b, r, w, scaler, px, gamenTakasa, _omakase);
+              }
+              chiisaku = true;
+            }
             // 道と四角と差の部分は、画面より広いときは横にもスクロールする(文は折り返さない)
-            return SingleChildScrollView(
+            final Widget michi = SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: SizedBox(
                 width: h.haba,
@@ -1895,6 +2025,12 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
                   ],
                 ),
               ),
+            );
+            // 文字を小さくしたときは、測ったときと同じ大きさで道の上の文字を出す
+            if (!chiisaku) return michi;
+            return MediaQuery(
+              data: MediaQuery.of(context).copyWith(textScaler: scaler),
+              child: michi,
             );
           },
         ),

@@ -42,7 +42,12 @@ import 'package:ekiden/kansuu/shushou.dart'
 enum ViewMode { time, description, analysis }
 
 class ModalKukanResultListView extends StatefulWidget {
-  const ModalKukanResultListView({super.key});
+  /// 情報集約パネルの中に入れるときに、パネルで選んだ区間(0が1区。単独で開くときはnull。2.0.8)
+  final int? kukan;
+
+  /// 情報集約パネルの中に入れるか(上のバー・画像・コピー・下の「前・次」を出さず、区間名の行だけを出す。2.0.8)
+  final bool umekomi;
+  const ModalKukanResultListView({super.key, this.kukan, this.umekomi = false});
 
   @override
   State<ModalKukanResultListView> createState() =>
@@ -409,7 +414,7 @@ class _ModalKukanResultListViewState extends State<ModalKukanResultListView> {
 
         final int raceBangou = currentGhensuu.hyojiracebangou;
 
-        final int kukanBangou = _displayKukan!;
+        final int kukanBangou = widget.kukan ?? _displayKukan!; // 情報集約パネルの中では、パネルで選んだ区間(2.0.8)
 
         return ValueListenableBuilder<Box<UnivData>>(
           valueListenable: univdataBox.listenable(),
@@ -496,7 +501,9 @@ class _ModalKukanResultListViewState extends State<ModalKukanResultListView> {
                     Scaffold(
                       backgroundColor: HENSUU.backgroundcolor,
 
-                      appBar: AppBar(
+                      appBar: widget.umekomi
+                          ? null
+                          : AppBar(
                         title: Text(
                           kukantext,
 
@@ -556,6 +563,19 @@ class _ModalKukanResultListViewState extends State<ModalKukanResultListView> {
 
                       body: Column(
                         children: <Widget>[
+                            // 情報集約パネルの中では、上のバーの代わりに区間名の行だけを出す(2.0.8)
+                            if (widget.umekomi)
+                              Padding(
+                                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                                child: Text(
+                                  '$kukantext (区間順位)',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
                           Padding(
                             padding: const EdgeInsets.symmetric(
                               vertical: 8.0,
@@ -929,7 +949,7 @@ class _ModalKukanResultListViewState extends State<ModalKukanResultListView> {
                                   ),
                           ),
 
-                          if (raceBangou != 4)
+                          if (!widget.umekomi && raceBangou != 4)
                             Padding(
                               padding: EdgeInsets.only(
                                 bottom: MediaQuery.of(context).padding.bottom,

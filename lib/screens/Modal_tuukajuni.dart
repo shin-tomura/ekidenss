@@ -16,7 +16,12 @@ import 'package:ekiden/kansuu/oufuku_kiroku.dart' show oufukuJurai; // 従来の
 import 'package:ekiden/kansuu/taikai_chouki.dart' show ouroRace; // 往路の大会番号(2.0.0)
 
 class ModalKukanResultListViewPass extends StatefulWidget {
-  const ModalKukanResultListViewPass({super.key});
+  /// 情報集約パネルの中に入れるときに、パネルで選んだ区間(0が1区。単独で開くときはnull。2.0.8)
+  final int? kukan;
+
+  /// 情報集約パネルの中に入れるか(上のバー・画像・コピー・下の「前・次」を出さず、区間名の行だけを出す。2.0.8)
+  final bool umekomi;
+  const ModalKukanResultListViewPass({super.key, this.kukan, this.umekomi = false});
 
   @override
   State<ModalKukanResultListViewPass> createState() =>
@@ -407,7 +412,7 @@ class _ModalKukanResultListViewPassState
 
         if (_displayKukan == null)
           _displayKukan = maxDisplayKukanIndex >= 0 ? maxDisplayKukanIndex : 0;
-        final int kukanBangou = _displayKukan!;
+        final int kukanBangou = widget.kukan ?? _displayKukan!; // 情報集約パネルの中では、パネルで選んだ区間(2.0.8)
         if (maxDisplayKukanIndex < 0)
           return const Center(child: Text('表示可能な区間がありません'));
         final bool isEkidenRace = raceBangou != 3 && raceBangou != 4;
@@ -457,7 +462,9 @@ class _ModalKukanResultListViewPassState
               children: [
                 Scaffold(
                   backgroundColor: HENSUU.backgroundcolor,
-                  appBar: AppBar(
+                  appBar: widget.umekomi
+                      ? null
+                      : AppBar(
                     title: Text(
                       '$kukantext (通過順位)',
                       style: const TextStyle(color: Colors.white),
@@ -503,6 +510,19 @@ class _ModalKukanResultListViewPassState
                   ),
                   body: Column(
                     children: <Widget>[
+                        // 情報集約パネルの中では、上のバーの代わりに区間名の行だけを出す(2.0.8)
+                        if (widget.umekomi)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                            child: Text(
+                              '$kukantext (通過順位)',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
                       const Divider(color: Colors.grey),
                       Expanded(
                         child: filteredUnivData.isEmpty
@@ -682,7 +702,7 @@ class _ModalKukanResultListViewPassState
                                 },
                               ),
                       ),
-                      if (maxDisplayKukanIndex > 0)
+                      if (!widget.umekomi && maxDisplayKukanIndex > 0)
                         Padding(
                           padding: EdgeInsets.only(
                             bottom: MediaQuery.of(context).padding.bottom,

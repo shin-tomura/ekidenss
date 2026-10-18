@@ -23,8 +23,10 @@
 // ・大学の四角を押すと、その大学の順位・1位との差・前の大学(1位は次の大学)との差を、
 //   画面の下(「戻る」の上)に固定した帯に出す。
 //   もう一度押すと、帯の中に、その区間を走った選手の説明文(個人順位速報の「説明文」と同じ文)も出し、
-//   3回目で閉じる。説明文を開いたまま、ほかの四角を押すと、開いたままその大学の選手に切り替える。
-//   説明文の部分は画面の高さの3割までにし、長いときはその中だけでスクロールする。
+//   3回目で、説明文の代わりに次の区間を走る選手(区間配置確認のカードを開いたときと同じ中身。
+//   senshu_haichi_panel.dart の部品)を出し、4回目で閉じる。最終区など次の区間の選手がいなければ3回目で閉じる。
+//   開いたまま、ほかの四角を押すと、同じ段のままその大学に切り替える。
+//   説明文と次の区間の選手の部分は画面の高さの3割までにし、長いときはその中だけでスクロールする。
 //   帯が伸びて押した四角が隠れるときは、道を動かして見えるようにする(2.0.7)。
 // ・区間の切り替えと、表示の倍率のボタン・縮尺の棒は、画面の上に固定する(どちらも折り返す)。
 //   固定の部分は画面の高さの4割までで、超えるときは固定の部分の中だけでスクロールする。
@@ -59,12 +61,18 @@
 
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ekiden/constants.dart';
+import 'package:ekiden/ghensuu.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/senshu_data.dart';
 import 'package:ekiden/senshu_gakuren_data.dart';
 import 'package:ekiden/kansuu/time_date.dart';
-import 'package:ekiden/kansuu/shushou.dart' show shushouShirushi; // 主将の印(個人順位速報と同じ。2.0.7)
+import 'package:ekiden/kansuu/shushou.dart'
+    show shushouShirushi, shushouKaIma; // 主将の印(個人順位速報・区間配置確認と同じ。2.0.7)
+import 'package:ekiden/kansuu/konki_best.dart'; // 今季ベスト(区間配置確認と同じ設定。2.0.7)
+import 'package:ekiden/screens/shushou_iro.dart'; // 主将を示す色(区間配置確認と同じ。2.0.7)
+import 'package:ekiden/screens/senshu_haichi_panel.dart'; // 区間配置確認のカードの部品(2.0.7)
 import 'package:ekiden/kansuu/kiji/kiji_kihon.dart';
 import 'package:ekiden/kansuu/kiji/kiji_kekka.dart';
 import 'package:ekiden/kansuu/gakuren_text.dart';
@@ -183,6 +191,11 @@ class _IchiDaigaku {
   /// 区間タイム
   final double? kukanTime;
 
+  /// 次の区間を走る選手(大学は tsugiSenshu、学連選抜は tsugiGSenshu。最終区などはnull。
+  /// 四角を3回押したときに、区間配置確認のカードを開いたときと同じ中身を出す。2.0.7)
+  final SenshuData? tsugiSenshu;
+  final Senshu_Gakuren_Data? tsugiGSenshu;
+
   const _IchiDaigaku(
     this.mei,
     this.ruikei,
@@ -196,7 +209,12 @@ class _IchiDaigaku {
     this.shozoku,
     this.kukanJuni,
     this.kukanTime,
+    this.tsugiSenshu,
+    this.tsugiGSenshu,
   });
+
+  /// 次の区間を走る選手がいるか
+  bool get tsugiAri => tsugiSenshu != null || tsugiGSenshu != null;
 
   /// 走った選手の説明文(個人順位速報の「説明文」と同じ。末尾の改行は省く。なければnull。2.0.7)
   String? get setsumei {
@@ -323,9 +341,18 @@ class _IchiKankei {
     final List<double> kyoriIchiran = k.gh.kyori_taikai_kukangoto.length > race
         ? k.gh.kyori_taikai_kukangoto[race]
         : const <double>[];
+    // 区間ごとの、区間エントリーの選手(区間 → 大学id → 選手。次の区間を走る選手に使う。2.0.7)
+    final Map<int, Map<int, SenshuData>> entryHyou = {};
+    for (final SenshuData s in k.senshu) {
+      final int en = k.entry(s);
+      if (en >= 0) (entryHyou[en] ??= <int, SenshuData>{})[s.univid] = s;
+    }
     final List<_IchiKukan> kukan = [];
     for (int kk = 0; kk < e.ks; kk++) {
       final double kyori = kyoriIchiran.length > kk ? kyoriIchiran[kk] : 0.0;
+      // 次の区間(最終区のあとはなし)
+      final bool tsugiKukanAri = kk + 1 < k.kukansuu;
+      final Map<int, SenshuData>? tsugiHyou = tsugiKukanAri ? entryHyou[kk + 1] : null;
       if (kyori <= 0) continue;
       // 区間終了時点の順(通過順位。記事と同じ並び)
       final List<EkidenUnivKekka> l = [
@@ -358,6 +385,7 @@ class _IchiKankei {
             senshu: l[i].senshu[kk],
             kukanJuni: _kukanJuniYomu(l[i], kk),
             kukanTime: l[i].kukanTime[kk],
+            tsugiSenshu: tsugiHyou?[l[i].u.id],
           ),
       ];
       final GakurenKukanKekka? g = gakurenAri ? gakurenKukanKekka(k.gh, kk) : null;
@@ -386,6 +414,7 @@ class _IchiKankei {
             shozoku: g.shozoku,
             kukanJuni: g.kukanJuni,
             kukanTime: g.kukanTime,
+            tsugiGSenshu: tsugiKukanAri ? gakurenKukanSenshu(kk + 1) : null,
           ),
         );
       }
@@ -649,11 +678,19 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
   /// 押した大学(narabi の番号。-1はなし)
   int _oshita = -1;
 
-  /// 押した大学の、走った選手の説明文を出しているか(四角を2回押すと出す。2.0.7)
-  bool _setsumei = false;
+  /// 押した大学の帯をどこまで開いているか(0: 差だけ、1: 走った選手の説明文、2: 次の区間を走る選手。
+  /// 四角を押すたびに進む。2.0.7)
+  int _hiraki = 0;
 
-  /// 説明文の部分のスクロール
+  /// 説明文と次の区間の選手の部分のスクロール(どちらか一方しか出さないので、1つを使い回す)
   final ScrollController _setsumeiScroll = ScrollController();
+
+  /// 今のゲームの変数(次の区間の選手のパネルで使う)
+  Ghensuu? _gh;
+
+  /// 持ちタイムを今季ベストで表示しているときの順位表(区間配置確認と同じ設定。初めて使うときに一度だけ作る)
+  KonkiBestJuni? _konki;
+  bool _konkiYonda = false;
 
   /// 押した大学の四角(下の帯が伸びて隠れるときに、道を動かして見えるようにする)
   final GlobalKey _oshitaKey = GlobalKey();
@@ -675,6 +712,24 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     _b = b;
     // 一番あとの区間(レースの途中は終わったばかりの区間、結果画面では最終区)を開いておく
     if (b != null) _erabu = b.kukan.length - 1;
+    final Box<Ghensuu> gBox = Hive.box<Ghensuu>('ghensuuBox');
+    _gh = gBox.isEmpty ? null : gBox.getAt(0);
+  }
+
+  /// 今季ベストの順位表(自己ベストで表示しているときはnull)
+  KonkiBestJuni? _konkiYomu() {
+    if (!_konkiYonda) {
+      _konkiYonda = true;
+      _konki = konkiBestHyoujiChuu() ? KonkiBestJuni() : null;
+    }
+    return _konki;
+  }
+
+  /// [x]の次の区間を走る選手のパネルを出せるか
+  /// (区間配置確認の部品は表示中の大会を見るので、表示中の大会がこの大会のときだけ)
+  bool _tsugiDaseru(_IchiDaigaku x) {
+    final Ghensuu? gh = _gh;
+    return x.tsugiAri && gh != null && gh.hyojiracebangou == widget.race;
   }
 
   @override
@@ -683,19 +738,23 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     super.dispose();
   }
 
-  /// 大学の四角を押したとき(1回目で差の帯、2回目で走った選手の説明文も出し、3回目で閉じる。
-  /// 説明文を開いたまま、ほかの四角を押すと、開いたままその大学の選手に切り替える。2.0.7)
-  void _hakoOsu(int i) {
+  /// 大学の四角を押したとき(1回目で差の帯、2回目で走った選手の説明文、3回目で次の区間を走る選手を出し、
+  /// 4回目で閉じる。次の区間の選手がいなければ3回目で閉じる。
+  /// 開いたまま、ほかの四角を押すと、同じ段のままその大学に切り替える。2.0.7)
+  void _hakoOsu(_IchiKukan r, int i) {
+    final bool tsugi = _tsugiDaseru(r.narabi[i]);
     setState(() {
       if (_oshita == i) {
-        if (_setsumei) {
-          _oshita = -1;
-          _setsumei = false;
+        if (_hiraki < (tsugi ? 2 : 1)) {
+          _hiraki++;
         } else {
-          _setsumei = true;
+          _oshita = -1;
+          _hiraki = 0;
         }
       } else {
         _oshita = i;
+        // 次の区間の選手を出していて、切り替えた大学にいなければ、説明文まで
+        if (_hiraki == 2 && !tsugi) _hiraki = 1;
       }
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -712,6 +771,112 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
         );
       }
     });
+  }
+
+  /// 説明文と次の区間の選手の部分(画面の高さの3割までにし、長いときはこの中だけでスクロールする。
+  /// 下の安全な余白のぶん、スクロールバーが縮まないように外す。
+  /// デスクトップで自動のスクロールバーと二重にならないように、自動のほうは止める)
+  Widget _scrollBako(BuildContext context, double gamenTakasa, Widget child) {
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxHeight: gamenTakasa * 0.3),
+      child: MediaQuery.removePadding(
+        context: context,
+        removeTop: true,
+        removeBottom: true,
+        child: Scrollbar(
+          controller: _setsumeiScroll,
+          thumbVisibility: true,
+          child: ScrollConfiguration(
+            behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+            child: SingleChildScrollView(
+              controller: _setsumeiScroll,
+              padding: const EdgeInsets.only(right: 8),
+              child: child,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 次の区間を走る選手のパネル(区間配置確認のカードを開いたときと同じ。上の行・距離と主将・中身。
+  /// 主将はカードと同じく薄い緑にして緑の枠を付ける。学連選抜は所属大学を出す。2.0.7)
+  Widget _tsugiPanel(BuildContext context, _IchiKukan r, _IchiDaigaku x) {
+    final Ghensuu? gh = _gh;
+    if (gh == null) return const SizedBox.shrink();
+    final int tk = r.kk + 1;
+    final String fuda = '${tk + 1}区';
+    final List<double> kyoriIchiran = gh.kyori_taikai_kukangoto.length > widget.race
+        ? gh.kyori_taikai_kukangoto[widget.race]
+        : const <double>[];
+    final String kyori = kyoriIchiran.length > tk ? '${kyoriIchiran[tk].toStringAsFixed(0)}m' : '';
+    const TextStyle shita = TextStyle(color: Colors.white70, fontSize: 13);
+    final KonkiBestJuni? konki = _konkiYomu();
+    final SenshuData? s = x.tsugiSenshu;
+    final Senshu_Gakuren_Data? g = x.tsugiGSenshu;
+    if (s != null) {
+      final bool shushou = shushouKaIma(s);
+      final Widget panel = Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          senshuHaichiTitle(
+            context,
+            fuda: fuda,
+            fudaIro: Colors.cyanAccent,
+            mei: s.name,
+            gakunen: s.gakunen,
+            shousaiId: s.id,
+          ),
+          Text([if (kyori.isNotEmpty) kyori, if (shushou) '主将'].join('　'), style: shita),
+          const Divider(color: Colors.white24),
+          // 中身(区間配置確認のカードと同じく、能力の行は真ん中に寄せる)
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              senshuNouryokuRan(gh, s),
+              senshuKirokuRan(gh, s, konki),
+            ],
+          ),
+        ],
+      );
+      if (!shushou) return panel;
+      return Container(
+        padding: const EdgeInsets.fromLTRB(8, 2, 8, 4),
+        decoration: BoxDecoration(
+          color: shushouIroHaikei,
+          border: Border.all(color: shushouIroSen, width: 2),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: panel,
+      );
+    }
+    if (g != null) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          senshuHaichiTitle(
+            context,
+            fuda: fuda,
+            fudaIro: Colors.cyanAccent,
+            mei: g.name,
+            gakunen: g.gakunen,
+            shousaiId: g.id,
+          ),
+          Text('$kyori 所属:${gakurenShozoku(g)}', style: shita),
+          const Divider(color: Colors.white24),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              gakurenNouryokuRan(gh, g, tk),
+              gakurenKirokuRan(gh, g, konki),
+            ],
+          ),
+        ],
+      );
+    }
+    return const SizedBox.shrink();
   }
 
   /// 説明文の上の行(「3区 佐藤 健太(2年)　区間1位 1:02:41」。
@@ -1146,47 +1311,40 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
                       oshitaBun,
                       style: const TextStyle(color: HENSUU.textcolor, fontSize: 13),
                     ),
-                    if (_setsumei) ...[
+                    if (_hiraki == 1) ...[
                       const Divider(height: 12, color: Colors.white24),
                       Text(
                         _senshuGyou(r0, x0),
                         style: const TextStyle(color: Colors.yellowAccent, fontSize: 13),
                       ),
                       const SizedBox(height: 2),
-                      // 説明文は画面の高さの3割までにし、長いときはこの中だけでスクロールする
-                      // (下の安全な余白のぶん、スクロールバーが縮まないように外す。
-                      // デスクトップで自動のスクロールバーと二重にならないように、自動のほうは止める)
-                      ConstrainedBox(
-                        constraints: BoxConstraints(maxHeight: gamenTakasa * 0.3),
-                        child: MediaQuery.removePadding(
-                          context: context,
-                          removeTop: true,
-                          removeBottom: true,
-                          child: Scrollbar(
-                            controller: _setsumeiScroll,
-                            thumbVisibility: true,
-                            child: ScrollConfiguration(
-                              behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
-                              child: SingleChildScrollView(
-                                controller: _setsumeiScroll,
-                                padding: const EdgeInsets.only(right: 8),
-                                child: Text(
-                                  x0.setsumei ?? '説明文はありません',
-                                  style: TextStyle(
-                                    color: HENSUU.textcolor.withOpacity(0.9),
-                                    fontSize: 12.5,
-                                    height: 1.5,
-                                  ),
-                                ),
-                              ),
-                            ),
+                      _scrollBako(
+                        context,
+                        gamenTakasa,
+                        Text(
+                          x0.setsumei ?? '説明文はありません',
+                          style: TextStyle(
+                            color: HENSUU.textcolor.withOpacity(0.9),
+                            fontSize: 12.5,
+                            height: 1.5,
                           ),
                         ),
                       ),
                     ],
+                    // 次の区間を走る選手(区間配置確認のカードを開いたときと同じ。2.0.7)
+                    if (_hiraki == 2) ...[
+                      const Divider(height: 12, color: Colors.white24),
+                      const Text('次の区間を走る選手', style: _chiisai),
+                      const SizedBox(height: 2),
+                      _scrollBako(context, gamenTakasa, _tsugiPanel(context, r0, x0)),
+                    ],
                     const SizedBox(height: 2),
                     Text(
-                      _setsumei ? 'もう一度押すと閉じます' : 'もう一度押すと、走った選手の説明文が出ます',
+                      _hiraki == 0
+                          ? 'もう一度押すと、走った選手の説明文が出ます'
+                          : (_hiraki == 1 && _tsugiDaseru(x0)
+                                ? 'もう一度押すと、次の区間を走る選手が出ます'
+                                : 'もう一度押すと閉じます'),
                       style: _chiisai,
                     ),
                   ],
@@ -1267,7 +1425,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
                 () => setState(() {
                   _erabu = i;
                   _oshita = -1;
-                  _setsumei = false;
+                  _hiraki = 0;
                 }),
               ),
           ],
@@ -1343,7 +1501,12 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
                 : '点線の枠: 学連選抜(順位に数えない)',
             style: setsumei,
           ),
-        const Text('大学の四角を押すと下に差が、もう一度押すと走った選手の説明文が出ます。', style: setsumei),
+        Text(
+          r.kk + 1 < b.zenKukansuu
+              ? '大学の四角を押すと下に差が、もう一度押すと走った選手の説明文、さらに押すと次の区間を走る選手が出ます。'
+              : '大学の四角を押すと下に差が、もう一度押すと走った選手の説明文が出ます。',
+          style: setsumei,
+        ),
         const SizedBox(height: 12),
         LayoutBuilder(
           builder: (context, constraints) {
@@ -1412,7 +1575,8 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     );
   }
 
-  /// 大学の四角(押すと、画面の下に差を出す。もう一度押すと走った選手の説明文も出し、3回目で消す。2.0.7)
+  /// 大学の四角(押すと、画面の下に差を出す。押すたびに、走った選手の説明文、次の区間を走る選手と進み、
+  /// その次に押すと消す。2.0.7)
   Widget _hakoWidget(_IchiKankei b, _IchiKukan r, _Hako hk) {
     final _IchiDaigaku x = r.narabi[hk.i];
     final bool orange = x.jibun || (b.gakurenJibun && x.op);
@@ -1444,7 +1608,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
       // 押した四角は、下の帯が伸びて隠れるときに見えるようにするため、印を付けておく
       key: erabareta ? _oshitaKey : null,
       behavior: HitTestBehavior.opaque,
-      onTap: () => _hakoOsu(hk.i),
+      onTap: () => _hakoOsu(r, hk.i),
       child: naka,
     );
   }

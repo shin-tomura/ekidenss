@@ -550,9 +550,10 @@ class _Mode0350ContentState extends State<Mode0350Content> {
                                   hiraku: kijiJikkyouHiraku,
                                   annai: kijiSokuhouAnnai(),
                                 ),
-                              // 区間ごとのタイム分布と、区間終了時点の位置関係(1区から終わった区間まで。
+                              // 区間ごとのタイム分布と、情報集約パネル(1区から終わった区間まで。
                               // 1枚のカードの左右(狭いときは上下)。2.0.6。Modal_ichiKankei.dart)
-                              if (_jikkyouAri(currentGhensuu))
+                              // 2.0.7から1区の指示の画面にも出す(スタートの並びだけ。タイム分布はまだないので出ない)
+                              if (_bunsekiAri(currentGhensuu))
                                 KukanBunsekiCard(
                                   key: ValueKey(
                                     'kukanBunseki_${currentGhensuu.year}_${currentGhensuu.hyojiracebangou}_${currentGhensuu.nowracecalckukan}',
@@ -1367,8 +1368,9 @@ class _Mode0350ContentState extends State<Mode0350Content> {
                       hiraku: kijiJikkyouHiraku,
                       annai: kijiSokuhouAnnai(),
                     ),
-                  // 区間ごとのタイム分布と、区間終了時点の位置関係のカード(2.0.6。学連選抜の監督の年も同じ)
-                  if (_jikkyouAri(currentGhensuu))
+                  // 区間ごとのタイム分布と、情報集約パネルのカード(2.0.6。学連選抜の監督の年も同じ。
+                  // 2.0.7から1区の指示の画面にも出す)
+                  if (_bunsekiAri(currentGhensuu))
                     KukanBunsekiCard(
                       key: ValueKey(
                         'kukanBunsekiG_${currentGhensuu.year}_${currentGhensuu.hyojiracebangou}_${currentGhensuu.nowracecalckukan}',
@@ -1642,6 +1644,14 @@ class _Mode0350ContentState extends State<Mode0350Content> {
     final int race = currentGhensuu.hyojiracebangou;
     final bool ekiden = race == 0 || race == 1 || race == 2 || race == 5;
     return ekiden && currentGhensuu.nowracecalckukan > 0;
+  }
+
+  // 区間ごとのタイム分布と情報集約パネルのカードを出すか(駅伝の、1区の指示から。2.0.7)
+  // (1区の指示の画面では、情報集約パネルのスタートの並びだけ。タイム分布はまだ作れないので出ない)
+  bool _bunsekiAri(Ghensuu currentGhensuu) {
+    final int race = currentGhensuu.hyojiracebangou;
+    final bool ekiden = race == 0 || race == 1 || race == 2 || race == 5;
+    return ekiden && currentGhensuu.nowracecalckukan >= 0;
   }
 
   // 正月駅伝の5区が終わったところ(往路のゴール)か(往路の記事のカードを出す。2.0.0)

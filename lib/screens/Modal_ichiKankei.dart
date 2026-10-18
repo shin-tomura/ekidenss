@@ -1,4 +1,9 @@
-// 駅伝の区間終了時点の位置関係(2.0.6)
+// 情報集約パネル(2.0.6で「区間終了時点の位置関係」として作り、2.0.7で名前を変えた)
+// ・2.0.7から、区間を選ぶところの一番左に「スタート」を置く(1区のスタートの前の並び。出場校を大学のID順に
+//   並べ、学連選抜は最後。距離はみな0で、順位・順位の変化・シード権ライン・右の括弧は出さない)。
+//   大学の四角を押すと、帯に「大学名　目標○位」と1区を走る選手(区間配置確認のカードを開いたときと同じ中身)を
+//   出し、もう一度押すと閉じる。1区の指示の画面(mode 350の1区)にもカードを置き、そこではスタートだけを出す。
+// ・2.0.7から、区間は「‹」「›」で1つずつ、真ん中を押して出る一覧で好きな区間に切り替える(区間が多くても1行)。
 // レースの途中の区間ごとの画面(mode 350)と、結果画面(10月駅伝・11月駅伝・正月駅伝・カスタム駅伝)の、
 // 区間ごとのタイム分布と1枚にまとめたカード(KukanBunsekiCard。右半分の「位置関係」)から開く。
 // ・幅のある道の帯に、大学名を四角で囲んで並べ、1位からの距離を縮尺どおりの間隔で出す。
@@ -253,7 +258,7 @@ class _IchiDaigaku {
 
 /// 区間1つ分の位置関係
 class _IchiKukan {
-  /// 区間(0が1区)
+  /// 区間(0が1区。-1はスタート。2.0.7)
   final int kk;
 
   /// 区間の平均の速さ(m/秒)
@@ -365,11 +370,12 @@ class _IchiKankei {
 
   /// 大会[race]の結果から作る([made] を渡すと、レースの途中の1区から[made]区まで)
   /// (思わぬデータで画面が止まらないよう、作れなければnull)
+  /// [made] が0なら、1区のスタートの前(スタートの並びだけ。2.0.7)
   static _IchiKankei? yomu(int race, {int? made}) {
     try {
       return _yomuHontai(race, made);
     } catch (e, st) {
-      debugPrint('[区間終了時点の位置関係] 作れませんでした: $e\n$st');
+      debugPrint('[情報集約パネル] 作れませんでした: $e\n$st');
       return null;
     }
   }
@@ -378,13 +384,17 @@ class _IchiKankei {
     // レースの途中は、実況(kiji_jikkyou.dart)と同じく結果の記事ではない形で読む
     final KijiKankyou? k = KijiKankyou.yomuRace(race, kekka: made == null);
     if (k == null || !k.ekiden) return null;
-    if (made != null && made <= 0) return null;
-    final EkidenKekka? e = EkidenKekka.tsukuru(k, made: made);
-    if (e == null) return null;
+    if (made != null && made < 0) return null;
+    // 1区のスタートの前(made が0)は結果がないので、スタートの並びだけを作る(2.0.7)
+    final bool startMae = made != null && made == 0;
+    final EkidenKekka? e = startMae ? null : EkidenKekka.tsukuru(k, made: made);
+    if (!startMae && e == null) return null;
     final UnivData? my = k.jibunUniv;
     final bool gakurenAri = race == 2 && gakurenKonnenAri(k.gh);
+    // 自分の大学が出場していないか(学連選抜の監督をする年)
+    final bool jibunNashi = e != null ? e.jibun == null : !(my != null && k.shutsujou(my));
     final bool gakurenJibun =
-        gakurenAri && e.jibun == null && my != null && gakurenKantokuChuu(k.kantoku, my);
+        gakurenAri && jibunNashi && my != null && gakurenKantokuChuu(k.kantoku, my);
     final List<double> kyoriIchiran = k.gh.kyori_taikai_kukangoto.length > race
         ? k.gh.kyori_taikai_kukangoto[race]
         : const <double>[];
@@ -395,7 +405,10 @@ class _IchiKankei {
       if (en >= 0) (entryHyou[en] ??= <int, SenshuData>{})[s.univid] = s;
     }
     final List<_IchiKukan> kukan = [];
-    for (int kk = 0; kk < e.ks; kk++) {
+    // スタート(1区のスタートの前の並び。いつも一番左。2.0.7)
+    final _IchiKukan? start = _startTsukuru(k, race, entryHyou, gakurenAri);
+    if (start != null) kukan.add(start);
+    for (int kk = 0; e != null && kk < e.ks; kk++) {
       final double kyori = kyoriIchiran.length > kk ? kyoriIchiran[kk] : 0.0;
       // 次の区間(最終区のあとはなし)
       final bool tsugiKukanAri = kk + 1 < k.kukansuu;
@@ -471,7 +484,55 @@ class _IchiKankei {
       kukan.add(_IchiKukan(kk, kyori / heikin, narabi));
     }
     if (kukan.isEmpty) return null;
-    return _IchiKankei._(kukan, e.seedSuu, gakurenJibun, k.kukansuu, race);
+    // レースの途中と結果画面で、区間が1つも作れなければ(思わぬデータ)、今まで通り出さない
+    if (!startMae && !kukan.any((r) => r.kk >= 0)) return null;
+    final int? seed = e != null ? e.seedSuu : (race == 1 ? 8 : (race == 2 ? 10 : null));
+    return _IchiKankei._(kukan, seed, gakurenJibun, k.kukansuu, race);
+  }
+
+  /// スタートの並び(出場校を大学のID順に並べ、学連選抜は最後。距離はみな0。
+  /// 押すと1区を走る選手を出すので、tsugiSenshu に1区の選手を入れる。2.0.7)
+  static _IchiKukan? _startTsukuru(
+    KijiKankyou k,
+    int race,
+    Map<int, Map<int, SenshuData>> entryHyou,
+    bool gakurenAri,
+  ) {
+    final Map<int, SenshuData>? ikku = entryHyou[0];
+    final List<UnivData> univs = [
+      for (final UnivData u in k.univ)
+        if (k.shutsujou(u)) u,
+    ]..sort((a, b) => a.id.compareTo(b.id));
+    final List<_IchiDaigaku> narabi = [
+      for (int i = 0; i < univs.length; i++)
+        _IchiDaigaku(
+          daigakuMei(univs[i]),
+          0,
+          i,
+          univs[i].id == k.gh.MYunivid,
+          false,
+          tsugiSenshu: ikku?[univs[i].id],
+          mokuhyou: univs[i].mokuhyojuni.length > race ? univs[i].mokuhyojuni[race] : null,
+        ),
+    ];
+    if (gakurenAri) {
+      final Senshu_Gakuren_Data? g = gakurenKukanSenshu(0);
+      if (g != null) {
+        narabi.add(
+          _IchiDaigaku(
+            '学連選抜',
+            0,
+            -1,
+            false,
+            true,
+            tsugiGSenshu: g,
+            mokuhyou: gakurenMokuhyouGenzai(),
+          ),
+        );
+      }
+    }
+    if (narabi.length < 2) return null;
+    return _IchiKukan(-1, 0, narabi);
   }
 
   /// 学連選抜が走っている区間があるか
@@ -484,7 +545,7 @@ void _ichiGamenHiraku(BuildContext context, int race, int? made) {
     context: context,
     barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
     barrierDismissible: true, // 背景タップで閉じられるようにする
-    barrierLabel: '区間終了時点の位置関係', // アクセシビリティ用ラベル
+    barrierLabel: '情報集約パネル', // アクセシビリティ用ラベル
     transitionDuration: const Duration(milliseconds: 300),
     pageBuilder: (context, animation, secondaryAnimation) =>
         ModalIchiKankeiView(race: race, made: made),
@@ -600,7 +661,7 @@ class _KukanBunsekiCardState extends State<KukanBunsekiCard> {
                 child: _botan(
                   Icons.directions_run,
                   _iro,
-                  '位置関係',
+                  '情報集約パネル',
                   () => _ichiGamenHiraku(context, widget.race, widget.made),
                 ),
               ),
@@ -797,7 +858,16 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
   void _hakoOsu(_IchiKukan r, int i) {
     final bool tsugi = _tsugiDaseru(r.narabi[i]);
     setState(() {
-      if (_oshita == i) {
+      if (r.kk < 0) {
+        // スタートは、1回目で1区を走る選手を出し、2回目で閉じる(2.0.7)
+        if (_oshita == i) {
+          _oshita = -1;
+          _hiraki = 0;
+        } else {
+          _oshita = i;
+          _hiraki = 2;
+        }
+      } else if (_oshita == i) {
         if (_hiraki < (tsugi ? 2 : 1)) {
           _hiraki++;
         } else {
@@ -928,9 +998,28 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     return ato.isEmpty ? '$ku$mei' : '$ku$mei　$ato';
   }
 
+  /// 区間の名前(「スタート」「3区」。2.0.7)
+  String _kukanMei(_IchiKukan r) => r.kk < 0 ? 'スタート' : '${r.kk + 1}区';
+
   /// 四角の中の文(順位と大学名)
   TextSpan _hakoSpan(_IchiKankei b, _IchiKukan r, int i) {
     final _IchiDaigaku x = r.narabi[i];
+    // スタートは、順位と順位の変化を付けない(学連選抜は「OP学連」。2.0.7)
+    if (r.kk < 0) {
+      return TextSpan(
+        children: [
+          if (x.op)
+            const TextSpan(
+              text: 'OP',
+              style: TextStyle(color: Colors.white54, fontSize: 11.5),
+            ),
+          TextSpan(
+            text: x.op ? '学連' : _michiMei(x.mei),
+            style: const TextStyle(color: HENSUU.textcolor, fontSize: 13),
+          ),
+        ],
+      );
+    }
     return TextSpan(
       children: [
         // 学連選抜は短く「OP学連」(OPは順位と同じ薄い色。下の帯は「学連選抜」のまま)
@@ -993,7 +1082,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
   /// おまかせの倍率の段階(詰めた間を除いた1位から最後尾までの長さが、
   /// 画面の高さのおよそ2つ分に収まる一番大きい倍率)
   int _omakaseDan(_IchiKukan r, double gamenTakasa) {
-    if (r.narabi.length < 2) return 2;
+    if (r.narabi.length < 2 || r.kk < 0) return 2;
     final List<double> aida = _aida(r);
     final Set<int> tsume = _tobinukeAida(aida);
     double nokori = 0;
@@ -1050,7 +1139,8 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
       scaler,
     ).height;
     final int opNozoku = r.narabi.where((x) => !x.op).length;
-    final int? seed = (b.seed != null && opNozoku > b.seed!) ? b.seed : null;
+    // シード権ライン(スタートは引かない。2.0.7)
+    final int? seed = (r.kk >= 0 && b.seed != null && opNozoku > b.seed!) ? b.seed : null;
 
     // 詰める間(飛び抜けて大きい間と、手動のときに画面の高さを超える間)
     final List<double> aida = _aida(r);
@@ -1243,6 +1333,12 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
   String? _oshitaBun(_IchiKukan r) {
     if (_oshita < 0 || _oshita >= r.narabi.length) return null;
     final _IchiDaigaku x = r.narabi[_oshita];
+    // スタートは、大学名と目標順位(「青嵐大　目標3位」。2.0.7)
+    if (r.kk < 0) {
+      final int? t = x.mokuhyou;
+      final String mokuhyou = (t == null || t < 0) ? '' : '　目標${t + 1}位${x.op ? '相当' : ''}';
+      return '${x.op ? '学連選抜' : x.mei}$mokuhyou';
+    }
     final String mae = r.maeBun(_oshita);
     // 順位の後ろに、前の区間からの変化を付ける(「5位(↑3) 青嵐大」「3位相当(↑2) 学連選抜」)
     final String? hm = x.hendouMoji;
@@ -1275,7 +1371,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
       backgroundColor: HENSUU.backgroundcolor,
       appBar: AppBar(
         title: const Text(
-          '区間終了時点の位置関係',
+          '情報集約パネル',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
         backgroundColor: Colors.transparent,
@@ -1378,9 +1474,11 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
         children: [
           Row(
             children: [
-              // 差の基準(1位との差か、目標順位との差か)
+              // 差の基準(1位との差か、目標順位との差か。スタートは差がないので出さない)
               Expanded(
-                child: Wrap(
+                child: r0.kk < 0
+                    ? const SizedBox.shrink()
+                    : Wrap(
                   spacing: 6,
                   runSpacing: 4,
                   crossAxisAlignment: WrapCrossAlignment.center,
@@ -1472,7 +1570,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
                       // 次の区間を走る選手(区間配置確認のカードを開いたときと同じ)
                       if (_hiraki == 2) ...[
                         const Divider(height: 12, color: Colors.white24),
-                        const Text('次の区間を走る選手', style: _chiisai),
+                        Text(r0.kk < 0 ? '1区を走る選手' : '次の区間を走る選手', style: _chiisai),
                         const SizedBox(height: 2),
                         _tsugiPanel(context, r0, x0),
                       ],
@@ -1535,27 +1633,103 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     );
   }
 
-  /// 上に固定する部分(区間の切り替えと、倍率のボタン・縮尺の棒。どちらも折り返す)
+  /// 区間を切り替える(押した大学の帯は閉じる。覚えない)
+  void _kukanKaeru(int i) {
+    setState(() {
+      _erabu = i;
+      _oshita = -1;
+      _hiraki = 0;
+    });
+  }
+
+  /// 区間を1つずつ動かす矢印([onTap] がnullなら、薄くして押せない。2.0.7)
+  Widget _yajirushi(IconData icon, String setsumei, VoidCallback? onTap) {
+    final bool dekiru = onTap != null;
+    return Semantics(
+      button: true,
+      label: setsumei,
+      child: Material(
+        color: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: BorderSide(color: dekiru ? _iro.withOpacity(0.6) : Colors.white24),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            child: Icon(icon, size: 22, color: dekiru ? _iro : Colors.white24),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 上に固定する部分(区間の切り替えと、倍率のボタン・縮尺の棒)
+  /// 区間は「‹」「›」で1つずつ、真ん中を押して出る一覧で好きな区間に切り替える(区間が多くても1行。2.0.7)
   Widget _buildKotei(_IchiKankei b, int dan) {
     final int erabu = _erabu.clamp(0, b.kukan.length - 1);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // 区間の切り替え(覚えない)
-        Wrap(
-          spacing: 6,
-          runSpacing: 6,
+        Row(
           children: [
-            for (int i = 0; i < b.kukan.length; i++)
-              _komaBotan(
-                '${b.kukan[i].kk + 1}区',
-                i == erabu,
-                () => setState(() {
-                  _erabu = i;
-                  _oshita = -1;
-                  _hiraki = 0;
-                }),
+            _yajirushi(
+              Icons.chevron_left,
+              '前の区間',
+              erabu > 0 ? () => _kukanKaeru(erabu - 1) : null,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: PopupMenuButton<int>(
+                tooltip: '区間を選ぶ',
+                initialValue: erabu,
+                color: const Color(0xFF2A2A2A),
+                onSelected: _kukanKaeru,
+                itemBuilder: (context) => [
+                  for (int i = 0; i < b.kukan.length; i++)
+                    PopupMenuItem<int>(
+                      value: i,
+                      child: Text(
+                        _kukanMei(b.kukan[i]),
+                        style: TextStyle(color: i == erabu ? _iro : HENSUU.textcolor),
+                      ),
+                    ),
+                ],
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: _iro.withOpacity(0.15),
+                    border: Border.all(color: _iro),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          _kukanMei(b.kukan[erabu]),
+                          style: const TextStyle(
+                            color: _iro,
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.arrow_drop_down, color: _iro, size: 22),
+                    ],
+                  ),
+                ),
               ),
+            ),
+            const SizedBox(width: 8),
+            _yajirushi(
+              Icons.chevron_right,
+              '次の区間',
+              erabu < b.kukan.length - 1 ? () => _kukanKaeru(erabu + 1) : null,
+            ),
           ],
         ),
         const SizedBox(height: 8),
@@ -1615,11 +1789,15 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // 説明の文は短くする(おまかせと集団の説明は、説明書に書く)
-        Text(
-          '${r.kk + 1}区終了時点のタイム差を、区間の平均の速さで距離に換算した位置関係の図です。',
-          style: setsumei,
-        ),
-        const Text('右の括弧は前の大学との間です(点線は詰めた間)。', style: setsumei),
+        if (r.kk < 0)
+          const Text('スタート前の並びです(大学のID順)。', style: setsumei)
+        else ...[
+          Text(
+            '${r.kk + 1}区終了時点のタイム差を、区間の平均の速さで距離に換算した位置関係の図です。',
+            style: setsumei,
+          ),
+          const Text('右の括弧は前の大学との間です(点線は詰めた間)。', style: setsumei),
+        ],
         if (r.narabi.any((x) => x.jibun))
           const Text('オレンジの枠: あなたの大学', style: setsumei),
         if (b.opAri)
@@ -1630,9 +1808,11 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
             style: setsumei,
           ),
         Text(
-          r.kk + 1 < b.zenKukansuu
-              ? '大学の四角を押すと下に差が、もう一度押すと走った選手の説明文、さらに押すと次の区間を走る選手が出ます。'
-              : '大学の四角を押すと下に差が、もう一度押すと走った選手の説明文が出ます。',
+          r.kk < 0
+              ? '大学の四角を押すと、下に1区を走る選手が出ます。'
+              : (r.kk + 1 < b.zenKukansuu
+                    ? '大学の四角を押すと下に差が、もう一度押すと走った選手の説明文、さらに押すと次の区間を走る選手が出ます。'
+                    : '大学の四角を押すと下に差が、もう一度押すと走った選手の説明文が出ます。'),
           style: setsumei,
         ),
         const SizedBox(height: 12),
@@ -1709,7 +1889,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     final _IchiDaigaku x = r.narabi[hk.i];
     final bool orange = x.jibun || (b.gakurenJibun && x.op);
     final bool erabareta = _oshita == hk.i;
-    final bool ichii = identical(x, r.top);
+    final bool ichii = r.kk >= 0 && identical(x, r.top);
     final Color wakuIro = erabareta
         ? _iro
         : (orange ? _jibunIro : (ichii ? Colors.white : Colors.white38));

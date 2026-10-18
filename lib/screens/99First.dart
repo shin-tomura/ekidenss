@@ -5,6 +5,8 @@ import 'package:ekiden/ghensuu.dart';
 import 'package:ekiden/save_load_screen.dart';
 import 'package:ekiden/kansuu/ShoriGuard.dart';
 import 'package:ekiden/kansuu/mokuhyou_kimekata.dart'; // 目標順位の決め方を変えたお知らせ(2.0.1)
+import 'package:ekiden/screens/reset_ichiran_gamen.dart'
+    show resetIchiranGamenHiraku, resetSaiKakunin; // 残るもの・戻るものの一覧と、もう一度確かめるダイアログ(2.0.6)
 
 class FirstScreen extends StatefulWidget {
   const FirstScreen({super.key});
@@ -24,50 +26,111 @@ class _FirstScreen extends State<FirstScreen> {
     });
   }
 
+  // 新規ゲームを始める(main.dart の mode。101010=名声・育成力と設定を残すリセット、10=全てリセット)
+  Future<void> _shinkiKaishi(int mode) async {
+    final Box<Ghensuu> ghensuuBox = Hive.box<Ghensuu>('ghensuuBox');
+    final Ghensuu currentGhensuu = ghensuuBox.getAt(0)!;
+    currentGhensuu.mode = mode;
+    currentGhensuu.gamenflag = 0; // 最新の画面にしておく(1.9.5)
+    await currentGhensuu.save();
+  }
+
   // 新規ゲーム開始の確認ダイアログを表示する関数
+  // 2.0.6から、設定タブの「名声・育成力と設定を残してやり直す」と同じリセットで始める
+  // (2.0.5までは「全てリセットしてやり直す」と同じで、変えていた設定が黙って初期値に戻っていたため)。
+  // 全て初期値に戻すほうも、ダイアログの中に小さく残す(残した設定がもとで新規ゲームの処理が
+  // 止まったときも、設定タブを開かずに全てリセットを選べるように)
   Future<void> _showNewGameConfirmDialog(BuildContext context) async {
+    const TextStyle honbun = TextStyle(color: Colors.white70, height: 1.6);
     return showDialog<void>(
       context: context,
       barrierDismissible: false, // ダイアログ外をタップしても閉じない
-      builder: (BuildContext context) {
+      builder: (BuildContext dialogContext) {
         return AlertDialog(
           backgroundColor: const Color(0xFF1A1A1A),
+          // 文字を大きくしても、本文をスクロールで読めるようにする
+          scrollable: true,
           title: const Text(
             '新規ゲーム開始の確認',
             style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
           ),
-          content: const Text(
-            '現在の進行データを破棄して、新しくゲームを開始しますか？\nこの操作は取り消せません。',
-            style: TextStyle(color: Colors.white70),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '選手・記録・年月日などのゲームの進み具合を消して、1年目から始めます。'
+                'アルバムも消去されます。',
+                style: honbun,
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                '名声・育成力と、レースや育成などの設定、表示の好みはそのまま残ります。'
+                '元には戻せません。',
+                style: honbun,
+              ),
+              // 残るもの・戻るものの一覧(reset_ichiran_gamen.dart。閉じると、このダイアログに戻る)
+              TextButton(
+                onPressed: () => resetIchiranGamenHiraku(dialogContext),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                ),
+                child: const Text(
+                  '残るもの・戻るものの一覧',
+                  style: TextStyle(
+                    color: Color(0xFF00FF00),
+                    decoration: TextDecoration.underline,
+                    decorationColor: Color(0xFF00FF00),
+                  ),
+                ),
+              ),
+              const Divider(color: Colors.grey),
+              const Text(
+                '名声・育成力と設定も初期値に戻したいときだけ',
+                style: TextStyle(color: Colors.white54, fontSize: 12),
+              ),
+              // 全てリセット(設定タブの「全てリセットしてやり直す」と同じ。
+              // もう一度確かめ、やめたら、このダイアログに戻る)
+              TextButton(
+                onPressed: () async {
+                  if (!await resetSaiKakunin(dialogContext, zenbu: true)) {
+                    return;
+                  }
+                  if (!dialogContext.mounted) return;
+                  Navigator.of(dialogContext).pop();
+                  await _shinkiKaishi(10);
+                },
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                ),
+                child: Text(
+                  '全て初期値に戻して始める',
+                  style: TextStyle(
+                    color: Colors.orange.shade300,
+                    decoration: TextDecoration.underline,
+                    decorationColor: Colors.orange.shade300,
+                  ),
+                ),
+              ),
+            ],
           ),
           actions: <Widget>[
             TextButton(
               child: const Text('キャンセル', style: TextStyle(color: Colors.grey)),
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: () => Navigator.of(dialogContext).pop(),
             ),
             TextButton(
               child: const Text(
-                '新規開始する',
+                '設定を残して始める',
                 style: TextStyle(
                   color: Color(0xFF00FF00),
                   fontWeight: FontWeight.bold,
                 ),
               ),
               onPressed: () async {
-                // ダイアログを閉じる
-                Navigator.of(context).pop();
-
-                // 新規開始処理を実行
-                final Box<Ghensuu> ghensuuBox = Hive.box<Ghensuu>('ghensuuBox');
-                final Ghensuu currentGhensuu = ghensuuBox.getAt(0)!;
-                currentGhensuu.mode = 10;
-                currentGhensuu.gamenflag = 0; // 最新の画面にしておく(1.9.5)
-                await currentGhensuu.save();
-
-                // 必要に応じてここで画面遷移などの処理を追加
-                /*ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(const SnackBar(content: Text('新規ゲームを開始しました')));*/
+                // ダイアログを閉じて、名声・育成力と設定を残すリセットで始める
+                Navigator.of(dialogContext).pop();
+                await _shinkiKaishi(101010);
               },
             ),
           ],

@@ -5,7 +5,9 @@
 //   四角の中の大学名は、最後の「大」を省く(下の帯の文は省かない)。学連選抜は四角の中では「OP学連」。
 //   大学名の後ろに、前の区間の終了時点からの順位の変化を「↑2」(緑)「↓3」(赤)「→」(灰色)で付ける
 //   (1区は付けない。学連選抜は通過順位相当で比べる。下の帯にも「5位(↑3)」の形で出す)。
-// ・画面の上で、集団の先頭の大学から四角1つ分の高さより近い大学は、集団としてまとめ、
+// ・画面の上で、隣どうしの間が四角1つ分の高さより狭い大学をつなげて集団にし、先頭から最後尾までが
+//   四角1つ分より長い集団は、その中で一番大きく空いた間で分ける(並走の大学どうしが別の集団にならないように)。
+//   集団は
 //   1行に3校まで横に並べる(4校目から次の行に折り返す。拡大すると集団がばらける)。
 //   集団の一番上の行は、前の大学(前が集団なら、その一番下の行)から、間の距離ぶん下に置き、
 //   集団のあとの大学は、集団の一番下の行を起点にして、集団の最後の大学との間の距離ぶん下に置く。
@@ -769,22 +771,47 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     final double base = r.narabi.first.ruikei;
     final List<double> d = [for (final _IchiDaigaku x in r.narabi) (x.ruikei - base) * r.hayasa];
 
-    // 集団に分ける(集団の先頭の大学から、画面の上で四角1つ分の高さより近い大学。
-    // シード権ラインと、詰めた間はまたがない)
-    final List<List<int>> shuudan = [];
-    List<int>? ima;
+    // 集団に分ける(画面の上で四角1つ分の高さ = genkaiPx)
+    // (先頭の大学から近い順に入れていくと、たまたま先頭から遠くなったところで切れて、
+    // 並走の大学どうしが別の集団になることがあったので、一番大きく空いた間で分けるようにした。2.0.6)
+    final double genkaiPx = gyouTakasa + _sukima;
+    // 1) 隣どうしの間が四角1つ分より狭いあいだは、つながった1つの集団にする
+    //    (シード権ラインと、詰めた間では必ず分ける)
+    final List<List<int>> tsunagari = [];
     for (int i = 0; i < n; i++) {
       final _IchiDaigaku x = r.narabi[i];
       final bool seedMae = seed != null && !x.op && x.juni == seed;
       final bool kiremeAto = i > 0 && tsume.contains(i - 1);
-      final List<int>? g = ima;
-      if (g != null && !seedMae && !kiremeAto && (d[i] - d[g.first]) * px < gyouTakasa + _sukima) {
-        g.add(i);
+      final bool chikai = i > 0 && (d[i] - d[i - 1]) * px < genkaiPx;
+      if (tsunagari.isNotEmpty && chikai && !seedMae && !kiremeAto) {
+        tsunagari.last.add(i);
       } else {
-        final List<int> atarashii = [i];
-        shuudan.add(atarashii);
-        ima = atarashii;
+        tsunagari.add([i]);
       }
+    }
+    // 2) 先頭から最後尾までが四角1つ分より長い集団は、その中で一番大きく空いた間で2つに分ける
+    //    (まだ長ければ繰り返す。同じ大きさの間があれば前のほうで分ける)
+    final List<List<int>> shuudan = [];
+    void wakeru(List<int> g) {
+      if (g.length < 2 || (d[g.last] - d[g.first]) * px < genkaiPx) {
+        shuudan.add(g);
+        return;
+      }
+      int kiru = 1;
+      double saidai = -1;
+      for (int j = 1; j < g.length; j++) {
+        final double a = d[g[j]] - d[g[j - 1]];
+        if (a > saidai) {
+          saidai = a;
+          kiru = j;
+        }
+      }
+      wakeru(g.sublist(0, kiru));
+      wakeru(g.sublist(kiru));
+    }
+
+    for (final List<int> g in tsunagari) {
+      wakeru(g);
     }
 
     // 集団ごとに置く(一番上の行は前の集団の一番下の行から、間の距離ぶん下。1行3校まで)

@@ -26,7 +26,7 @@
 //   3回目で、説明文の代わりに次の区間を走る選手(区間配置確認のカードを開いたときと同じ中身。
 //   senshu_haichi_panel.dart の部品)を出し、4回目で閉じる。最終区など次の区間の選手がいなければ3回目で閉じる。
 //   開いたまま、ほかの四角を押すと、同じ段のままその大学に切り替える。
-//   説明文と次の区間の選手の部分は画面の高さの3割までにし、長いときはその中だけでスクロールする。
+//   帯の一番上の行(差の基準と閉じる「×」)は固定し、その下は、まとめて帯の中でスクロールする。
 //   帯が伸びて押した四角が隠れるときは、道を動かして見えるようにする(2.0.7)。
 //   説明文の上の行(走った選手)にも、区間配置確認と同じ「詳細」を置き、選手の詳細の画面を開けるようにする。
 // ・下の帯の一番上の「差の基準」で、1位との差の代わりに、押した大学それぞれの目標順位との差を出せる(2.0.7)。
@@ -36,7 +36,10 @@
 //   目標順位は今の値(正月駅伝で復路の目標を決め直したあとは、往路の区間も決め直したあとの目標で出す)。
 //   選んだ基準は、大学や区間を替えてもそのままで、覚えない(画面を閉じたらトップに戻る)。
 // ・区間の切り替えと、表示の倍率のボタン・縮尺の棒は、画面の上に固定する(どちらも折り返す)。
-//   固定の部分は画面の高さの4割までで、超えるときは固定の部分の中だけでスクロールする。
+//   固定の部分は、上のバーと「戻る」を除いた高さの3割までで、超えるときは固定の部分の中だけでスクロールする。
+// ・押した大学の帯は、道の下(「戻る」の上)に置き、上のバーと「戻る」を除いた高さの4割5分までにする。
+//   道にはいつも4分の1以上を残す(小さいスマホで文字を大きくしても、道が消えて四角を押せなくならないように。
+//   2.0.6は、固定の部分が画面の高さの4割まで、帯は「戻る」の上の固定で、高さを抑えていなかった。2.0.7)
 // ・距離は「1位が区間を走り終えたとき、ほかの大学がどれだけ後ろにいるか」を、その区間の出場校の
 //   区間タイムの平均から出した速さ(全員で同じ。学連選抜は平均に入れない)で、タイム差から換算したもの。
 //   速さを全員で1つにするので、距離はタイム差に比例し、順位と位置の並びが逆にならない
@@ -823,32 +826,6 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     });
   }
 
-  /// 説明文と次の区間の選手の部分(画面の高さの3割までにし、長いときはこの中だけでスクロールする。
-  /// 下の安全な余白のぶん、スクロールバーが縮まないように外す。
-  /// デスクトップで自動のスクロールバーと二重にならないように、自動のほうは止める)
-  Widget _scrollBako(BuildContext context, double gamenTakasa, Widget child) {
-    return ConstrainedBox(
-      constraints: BoxConstraints(maxHeight: gamenTakasa * 0.3),
-      child: MediaQuery.removePadding(
-        context: context,
-        removeTop: true,
-        removeBottom: true,
-        child: Scrollbar(
-          controller: _setsumeiScroll,
-          thumbVisibility: true,
-          child: ScrollConfiguration(
-            behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
-            child: SingleChildScrollView(
-              controller: _setsumeiScroll,
-              padding: const EdgeInsets.only(right: 8),
-              child: child,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   /// 次の区間を走る選手のパネル(区間配置確認のカードを開いたときと同じ。上の行・距離と主将・中身。
   /// 主将はカードと同じく薄い緑にして緑の枠を付ける。学連選抜は所属大学を出す。2.0.7)
   Widget _tsugiPanel(BuildContext context, _IchiKukan r, _IchiDaigaku x) {
@@ -1317,25 +1294,41 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
                   ),
                 ),
               )
-            : Column(
-                children: [
-                  // 上に固定する部分(区間の切り替えと、倍率のボタン・縮尺の棒)。
-                  // 画面の高さの4割まで(超えるときは、この中だけでスクロールする)
-                  ConstrainedBox(
-                    constraints: BoxConstraints(maxHeight: gamenTakasa * 0.4),
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
-                      child: _buildKotei(b, dan),
-                    ),
-                  ),
-                  const Divider(height: 1, color: Colors.white24),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
-                      child: _buildHontai(context, b, r0, dan, gamenTakasa),
-                    ),
-                  ),
-                ],
+            // 上のバーと「戻る」を除いた高さを、上の固定の部分は3割まで、押した大学の帯は4割5分までにし、
+            // 道にはいつも4分の1以上を残す(小さいスマホで文字を大きくしても、道が消えて四角を押せなくならないように。2.0.7)
+            : LayoutBuilder(
+                builder: (context, constraints) {
+                  final double takasa = constraints.maxHeight;
+                  return Column(
+                    children: [
+                      // 上に固定する部分(区間の切り替えと、倍率のボタン・縮尺の棒)。
+                      // 3割まで(超えるときは、この中だけでスクロールする)
+                      ConstrainedBox(
+                        constraints: BoxConstraints(maxHeight: takasa * 0.3),
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+                          child: _buildKotei(b, dan),
+                        ),
+                      ),
+                      const Divider(height: 1, color: Colors.white24),
+                      Expanded(
+                        child: SingleChildScrollView(
+                          padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+                          child: _buildHontai(context, b, r0, dan, gamenTakasa),
+                        ),
+                      ),
+                      // 押した大学の帯(4割5分まで。道をスクロールしていても見えるように、道の下に置く)
+                      if (oshitaBun != null && x0 != null)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(maxHeight: takasa * 0.45),
+                            child: _buildObi(context, r0, x0, oshitaBun),
+                          ),
+                        ),
+                    ],
+                  );
+                },
               ),
       ),
       bottomNavigationBar: Container(
@@ -1345,104 +1338,6 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // 押した大学の差(スクロールしていても見えるように、下に固定する)。
-            // もう一度押すと、走った選手の説明文も出す(2.0.7)
-            if (oshitaBun != null && r0 != null && x0 != null)
-              Container(
-                margin: const EdgeInsets.only(bottom: 10),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                decoration: BoxDecoration(
-                  border: Border.all(color: _iro.withOpacity(0.6)),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // 差の基準(1位との差か、目標順位との差か。2.0.7)
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 4,
-                      crossAxisAlignment: WrapCrossAlignment.center,
-                      children: [
-                        const Text('差の基準', style: _chiisai),
-                        _komaBotan(
-                          'トップ',
-                          !_mokuhyouKijun,
-                          () => setState(() => _mokuhyouKijun = false),
-                        ),
-                        _komaBotan(
-                          '目標順位',
-                          _mokuhyouKijun,
-                          () => setState(() => _mokuhyouKijun = true),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      oshitaBun,
-                      style: const TextStyle(color: HENSUU.textcolor, fontSize: 13),
-                    ),
-                    if (_hiraki == 1) ...[
-                      const Divider(height: 12, color: Colors.white24),
-                      // 走った選手の行と、区間配置確認と同じ「詳細」(選手の詳細の画面を開く。2.0.7)
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              _senshuGyou(r0, x0),
-                              style: const TextStyle(color: Colors.yellowAccent, fontSize: 13),
-                            ),
-                          ),
-                          if (x0.shousaiId != null)
-                            TextButton(
-                              onPressed: () => senshuShousaiHiraku(context, x0.shousaiId!),
-                              style: TextButton.styleFrom(
-                                minimumSize: Size.zero,
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              ),
-                              child: Text(
-                                '詳細',
-                                style: TextStyle(color: HENSUU.LinkColor, fontSize: 15),
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      _scrollBako(
-                        context,
-                        gamenTakasa,
-                        Text(
-                          x0.setsumei ?? '説明文はありません',
-                          style: TextStyle(
-                            color: HENSUU.textcolor.withOpacity(0.9),
-                            fontSize: 12.5,
-                            height: 1.5,
-                          ),
-                        ),
-                      ),
-                    ],
-                    // 次の区間を走る選手(区間配置確認のカードを開いたときと同じ。2.0.7)
-                    if (_hiraki == 2) ...[
-                      const Divider(height: 12, color: Colors.white24),
-                      const Text('次の区間を走る選手', style: _chiisai),
-                      const SizedBox(height: 2),
-                      _scrollBako(context, gamenTakasa, _tsugiPanel(context, r0, x0)),
-                    ],
-                    const SizedBox(height: 2),
-                    Text(
-                      _hiraki == 0
-                          ? 'もう一度押すと、走った選手の説明文が出ます'
-                          : (_hiraki == 1 && _tsugiDaseru(x0)
-                                ? 'もう一度押すと、次の区間を走る選手が出ます'
-                                : 'もう一度押すと閉じます'),
-                      style: _chiisai,
-                    ),
-                  ],
-                ),
-              ),
             ElevatedButton(
               onPressed: () => Navigator.pop(context),
               style: ElevatedButton.styleFrom(
@@ -1457,6 +1352,146 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// 押した大学の帯(順位と差。押すたびに、走った選手の説明文、次の区間を走る選手と進む。2.0.7)
+  /// ・一番上の行(差の基準と、閉じる「×」)は固定し、その下(差の文・説明文や次の区間を走る選手・案内)は、
+  ///   まとめて帯の中でスクロールする(帯の高さは置く側で抑える)
+  /// ・「×」は、何かの理由で道が見えなくなっても帯を閉じられるようにするため
+  Widget _buildObi(
+    BuildContext context,
+    _IchiKukan r0,
+    _IchiDaigaku x0,
+    String oshitaBun,
+  ) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(10, 2, 2, 8),
+      decoration: BoxDecoration(
+        border: Border.all(color: _iro.withOpacity(0.6)),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              // 差の基準(1位との差か、目標順位との差か)
+              Expanded(
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    const Text('差の基準', style: _chiisai),
+                    _komaBotan(
+                      'トップ',
+                      !_mokuhyouKijun,
+                      () => setState(() => _mokuhyouKijun = false),
+                    ),
+                    _komaBotan(
+                      '目標順位',
+                      _mokuhyouKijun,
+                      () => setState(() => _mokuhyouKijun = true),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                onPressed: () => setState(() {
+                  _oshita = -1;
+                  _hiraki = 0;
+                }),
+                icon: const Icon(Icons.close, color: Colors.white70, size: 20),
+                tooltip: '閉じる',
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          // ここから下は、まとめて帯の中でスクロールする
+          // (デスクトップで自動のスクロールバーと二重にならないように、自動のほうは止める)
+          Flexible(
+            child: Scrollbar(
+              controller: _setsumeiScroll,
+              thumbVisibility: true,
+              child: ScrollConfiguration(
+                behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+                child: SingleChildScrollView(
+                  controller: _setsumeiScroll,
+                  padding: const EdgeInsets.only(right: 10),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        oshitaBun,
+                        style: const TextStyle(color: HENSUU.textcolor, fontSize: 13),
+                      ),
+                      if (_hiraki == 1) ...[
+                        const Divider(height: 12, color: Colors.white24),
+                        // 走った選手の行と、区間配置確認と同じ「詳細」(選手の詳細の画面を開く)
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                _senshuGyou(r0, x0),
+                                style: const TextStyle(color: Colors.yellowAccent, fontSize: 13),
+                              ),
+                            ),
+                            if (x0.shousaiId != null)
+                              TextButton(
+                                onPressed: () => senshuShousaiHiraku(context, x0.shousaiId!),
+                                style: TextButton.styleFrom(
+                                  minimumSize: Size.zero,
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                child: Text(
+                                  '詳細',
+                                  style: TextStyle(color: HENSUU.LinkColor, fontSize: 15),
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          x0.setsumei ?? '説明文はありません',
+                          style: TextStyle(
+                            color: HENSUU.textcolor.withOpacity(0.9),
+                            fontSize: 12.5,
+                            height: 1.5,
+                          ),
+                        ),
+                      ],
+                      // 次の区間を走る選手(区間配置確認のカードを開いたときと同じ)
+                      if (_hiraki == 2) ...[
+                        const Divider(height: 12, color: Colors.white24),
+                        const Text('次の区間を走る選手', style: _chiisai),
+                        const SizedBox(height: 2),
+                        _tsugiPanel(context, r0, x0),
+                      ],
+                      const SizedBox(height: 2),
+                      Text(
+                        _hiraki == 0
+                            ? 'もう一度押すと、走った選手の説明文が出ます'
+                            : (_hiraki == 1 && _tsugiDaseru(x0)
+                                  ? 'もう一度押すと、次の区間を走る選手が出ます'
+                                  : 'もう一度押すと閉じます'),
+                        style: _chiisai,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -2,7 +2,7 @@
 // レースの途中の区間ごとの画面(mode 350)と、結果画面(10月駅伝・11月駅伝・正月駅伝・カスタム駅伝)の、
 // 区間ごとのタイム分布と1枚にまとめたカード(KukanBunsekiCard。右半分の「位置関係」)から開く。
 // ・幅のある道の帯に、大学名を四角で囲んで並べ、1位からの距離を縮尺どおりの間隔で出す。
-//   四角の中の大学名は、最後の「大」を省く(下の帯の文は省かない)。
+//   四角の中の大学名は、最後の「大」を省く(下の帯の文は省かない)。学連選抜は四角の中では「OP学連」。
 //   大学名の後ろに、前の区間の終了時点からの順位の変化を「↑2」(緑)「↓3」(赤)「→」(灰色)で付ける
 //   (1区は付けない。学連選抜は通過順位相当で比べる。下の帯にも「5位(↑3)」の形で出す)。
 // ・画面の上で、集団の先頭の大学から四角1つ分の高さより近い大学は、集団としてまとめ、
@@ -645,12 +645,13 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     final bool orange = x.jibun || (b.gakurenJibun && x.op);
     return TextSpan(
       children: [
+        // 学連選抜は短く「OP学連」(OPは順位と同じ薄い色。下の帯は「学連選抜」のまま)
         TextSpan(
-          text: x.op ? 'OP ' : '${x.juni + 1} ',
+          text: x.op ? 'OP' : '${x.juni + 1} ',
           style: const TextStyle(color: Colors.white54, fontSize: 11.5),
         ),
         TextSpan(
-          text: x.op ? '学連選抜' : _michiMei(x.mei),
+          text: x.op ? '学連' : _michiMei(x.mei),
           style: TextStyle(
             color: orange ? _jibunIro : HENSUU.textcolor,
             fontSize: 13,

@@ -8,11 +8,16 @@
 //   速さを全員で1つにするので、距離はタイム差に比例し、順位と位置の並びが逆にならない
 //   (ゲームとしての見せ方。1位が着いた時点か最後の大学が着いた時点か、などは考えない)。
 // ・1区から終わった区間まで切り替えられる(覚えない。開くたびに一番あとの区間)。
-// ・前の大学との間が画面で一定の長さ(_tsumeGenkaiPx)を超えるところは詰めて、道に切れ目の印と、
-//   その間の距離を出す(倍率を変えても、長くなりすぎる間だけが詰まる)。
+// ・前の大学との間のうち、飛び抜けて大きい間(その区間の間の中央値の4倍以上。大きい順に多くて3か所。
+//   _tobinukeAida)だけを詰めて、道に切れ目の印と、その間の距離を出す。倍率ではなくデータで決めるので、
+//   だいたい同じくらい空いているときは詰めない。手動で倍率を選んでいるときは、1つの間が
+//   画面の高さを超えるところも詰める(拡大しすぎて、何もない道を延々とスクロールしないように)。
+//   (最初は「画面で144pxを超えたら」詰めていたが、おまかせの倍率とぶつかり、出場校の少ない大会や
+//   差の開いた区間で、ほとんどの間が詰められて位置関係がつかめなかったので、2.0.6の開発中に変えた)
 // ・表示の倍率(1mあたりの高さ)は「−」「＋」で6段階に変えられる(文字の大きさは変わらない)。
-//   開いたときは「おまかせ」(区間ごとに、1位から最後尾までが画面の高さのおよそ2つ分に収まる
-//   一番大きい倍率)。「−」「＋」を押すとおまかせが外れ、区間を切り替えてもその倍率のまま。
+//   開いたときは「おまかせ」(区間ごとに、詰めた間を除いた1位から最後尾までの長さが、画面の高さの
+//   およそ2つ分に収まる一番大きい倍率。大きく遅れた大学に引っぱられて先頭のほうが縮こまらないように)。
+//   「−」「＋」を押すとおまかせが外れ、区間を切り替えてもその倍率のまま。
 //   覚えない(画面を閉じたらおまかせに戻る)。倍率のボタンの横に縮尺の棒を出す。
 // ・11月駅伝は8位、正月駅伝は10位の下にシード権ラインを引く(10月駅伝とカスタム駅伝はなし)。
 // ・学連選抜(正月駅伝のオープン参加)は白抜きの点で出し、順位とシード権ラインに数えない。
@@ -39,9 +44,14 @@ const List<String> _bairitsuMei = ['×1/4', '×1/2', '×1', '×2', '×4', '×8']
 /// おまかせの倍率: 1位から最後尾までが、画面の高さのこの倍に収まる一番大きい倍率
 const double _omakaseGamen = 2.0;
 
-/// 前の大学との間が、画面でこれ(px)より長くなるところは詰めて、切れ目の印を出す
-/// (×1のときに360m。最初に作ったときの「360mを超えたら」と同じ長さ)
-const double _tsumeGenkaiPx = 144;
+/// 飛び抜けて大きい間: その区間の間の中央値の、この倍以上
+const double _tobinukeBai = 4;
+
+/// 飛び抜けて大きい間として詰めるのは、大きい順に多くてこの数まで
+const int _tobinukeSaidai = 3;
+
+/// 飛び抜けて大きい間の下限(m。並走が多くて中央値が0に近いときに、小さな間を詰めないように)
+const double _tobinukeSaitei = 50;
 
 /// 詰めたところの高さ(px)
 const double _tsumePx = 52;
@@ -509,19 +519,56 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     return h;
   }
 
-  /// おまかせの倍率の段階(1位から最後尾までが、画面の高さのおよそ2つ分に収まる一番大きい倍率)
+  /// 前の大学との間(m。[i]は narabi[i] と narabi[i+1] の間)
+  List<double> _aida(_IchiKukan r) => [
+    for (int i = 0; i + 1 < r.narabi.length; i++)
+      math.max(0.0, (r.narabi[i + 1].ruikei - r.narabi[i].ruikei) * r.hayasa),
+  ];
+
+  /// 飛び抜けて大きい間(_aida の番号。中央値の4倍以上を、大きい順に多くて3か所)
+  Set<int> _tobinukeAida(List<double> aida) {
+    if (aida.length < 2) return <int>{};
+    final List<double> narabe = List<double>.of(aida)..sort();
+    final int n = narabe.length;
+    final double chuuou = n.isOdd ? narabe[n ~/ 2] : (narabe[n ~/ 2 - 1] + narabe[n ~/ 2]) / 2;
+    final double genkai = math.max(chuuou * _tobinukeBai, _tobinukeSaitei);
+    final List<int> kouho = [
+      for (int i = 0; i < aida.length; i++)
+        if (aida[i] >= genkai) i,
+    ]..sort((a, b) => aida[b].compareTo(aida[a]));
+    return kouho.take(_tobinukeSaidai).toSet();
+  }
+
+  /// おまかせの倍率の段階(詰めた間を除いた1位から最後尾までの長さが、
+  /// 画面の高さのおよそ2つ分に収まる一番大きい倍率)
   int _omakaseDan(_IchiKukan r, double gamenTakasa) {
     if (r.narabi.length < 2) return 2;
-    final double haba = (r.narabi.last.ruikei - r.narabi.first.ruikei) * r.hayasa;
+    final List<double> aida = _aida(r);
+    final Set<int> tsume = _tobinukeAida(aida);
+    double nokori = 0;
+    for (int i = 0; i < aida.length; i++) {
+      if (!tsume.contains(i)) nokori += aida[i];
+    }
     int dan = 0;
     for (int i = 0; i < _bairitsu.length; i++) {
-      if (haba * _bairitsu[i] <= gamenTakasa * _omakaseGamen) dan = i;
+      if (nokori * _bairitsu[i] + tsume.length * _tsumePx <= gamenTakasa * _omakaseGamen) {
+        dan = i;
+      }
     }
     return dan;
   }
 
-  /// 点と名前の行の位置を決める([px] は1mあたりの高さ)
-  _Haichi _haichi(_IchiKankei b, _IchiKukan r, double w, TextScaler scaler, double px) {
+  /// 点と名前の行の位置を決める([px] は1mあたりの高さ。[gamenTakasa] は画面の高さ。
+  /// 手動で倍率を選んでいるとき([omakase] がfalse)は、1つの間が画面の高さを超えるところも詰める)
+  _Haichi _haichi(
+    _IchiKankei b,
+    _IchiKukan r,
+    double w,
+    TextScaler scaler,
+    double px,
+    double gamenTakasa,
+    bool omakase,
+  ) {
     final double mojiHaba = w - _mojiX - 4;
     final double ueTakasa = _takasaOf(TextSpan(text: b.ueMoji(r), style: _chiisai), mojiHaba, scaler);
     final double kiremeTakasa = _takasaOf(const TextSpan(text: '〜', style: _chiisai), mojiHaba, scaler);
@@ -540,6 +587,15 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     final List<({double y0, double y1})> kiremeMichi = [];
     double? seedTop;
 
+    // 詰める間(飛び抜けて大きい間と、手動のときに画面の高さを超える間)
+    final List<double> aida = _aida(r);
+    final Set<int> tsume = _tobinukeAida(aida);
+    if (!omakase) {
+      for (int i = 0; i < aida.length; i++) {
+        if (aida[i] * px > gamenTakasa) tsume.add(i);
+      }
+    }
+
     double y = ueTakasa + 14;
     double shitaHashi = ueTakasa + 4; // 前の行の下端
     final double base = r.narabi.first.ruikei;
@@ -549,7 +605,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
       final double d = (x.ruikei - base) * r.hayasa;
       if (i > 0) {
         final double dd = d - maeD;
-        if (dd * px > _tsumeGenkaiPx) {
+        if (tsume.contains(i - 1)) {
           final double y0 = y;
           y += _tsumePx;
           kiremeMichi.add((y0: y0, y1: y));
@@ -672,8 +728,9 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     final _IchiKukan r = b.kukan[erabu];
     const TextStyle setsumei = TextStyle(color: Colors.white70, fontSize: 12, height: 1.5);
     // 表示の倍率(おまかせのときは区間ごとに選ぶ)
+    final double gamenTakasa = MediaQuery.sizeOf(context).height;
     final int dan = _omakase
-        ? _omakaseDan(r, MediaQuery.sizeOf(context).height)
+        ? _omakaseDan(r, gamenTakasa)
         : _dan.clamp(0, _bairitsu.length - 1);
     final double px = _bairitsu[dan];
     return Column(
@@ -767,7 +824,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
           const Padding(
             padding: EdgeInsets.only(top: 4),
             child: Text(
-              'おまかせ: 1位から最後尾までが、画面のおよそ2つ分に収まる倍率で出します。',
+              'おまかせ: 大きく空いたところを除いて、1位から最後尾までが画面のおよそ2つ分に収まる倍率で出します。',
               style: setsumei,
             ),
           ),
@@ -776,7 +833,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
           builder: (context, constraints) {
             final double w = constraints.maxWidth;
             final TextScaler scaler = MediaQuery.textScalerOf(context);
-            final _Haichi h = _haichi(b, r, w, scaler, px);
+            final _Haichi h = _haichi(b, r, w, scaler, px, gamenTakasa, _omakase);
             final double mojiHaba = w - _mojiX - 4;
             return SizedBox(
               width: w,

@@ -17,7 +17,7 @@
 //   入れ替わる。最初は自分の大学(学連選抜の監督の年は学連選抜。自分の大学が出ていない年は、ID順の最初の大学)で、
 //   画面を閉じるまで選んだ大学を覚える。大学名は1行に収め、入りきらないところは「…」で省く。
 // ・2.0.8から、おまかせのときに「おまかせ」をもう一度押すと「おまかせ ↔」(幅に合わせる)になり、道が横幅に収まるように、
-//   道の上の文字(四角の中・右の差・(詰めています)・シード権ライン)を小さくする(6割まで。それでも入らなければ
+//   道の上の文字(四角の中・右の差・シード権ライン)を小さくする(6割まで。それでも入らなければ
 //   横にスクロールする)。縦の縮尺は変えない。もう一度押すと戻り、「−」「＋」を押すと、おまかせと一緒に外れる。覚えない。
 // レースの途中の区間ごとの画面(mode 350)と、結果画面(10月駅伝・11月駅伝・正月駅伝・カスタム駅伝)の、
 // 区間ごとのタイム分布と1枚にまとめたカード(KukanBunsekiCard。右半分の「位置関係」)から開く。
@@ -40,7 +40,9 @@
 //   2校以上の集団は、四角にぴったり合わせた薄い枠で囲む。集団どうしは、枠がくっつかないよう10px以上空ける。
 // ・画面の説明の文は短くし(「○区終了時点のタイム差を、区間の平均の速さで距離に換算した位置関係の図です」
 //   と、括弧・色・押したときのこと)、おまかせと集団の説明は説明書に書く。
-// ・道の右に、前の大学(集団)との間を示す括弧を引き、その真ん中に間の距離と秒差(「90m 16秒」)を出す。
+// ・道の右に、前の大学(集団)との間を示す括弧を引き、その真ん中に間の距離と秒差を出す。
+//   2.1.0から、距離と秒差を2行にし(「90m」の下に「16秒」)、文字を少し小さく(12→11)して幅を抑えた。
+//   文字を大きくしても文が括弧からずれないように、集団どうしの間は2行の文が収まる高さより狭くしない。
 //   括弧は、前の集団の一番下の行の真ん中から、次の集団の一番上の行の真ん中まで。集団の中の間は出さない。
 //   (1位との差を出していたが、隣どうしの間が縮尺どおりなので、間を出すほうが分かりやすいため、2.0.6の開発中に変えた)
 // ・四角と間の文は折り返さず、道と四角と間の文の部分だけを横にもスクロールできるようにする
@@ -75,7 +77,8 @@
 //   (ゲームとしての見せ方。1位が着いた時点か最後の大学が着いた時点か、などは考えない)。
 // ・1区から終わった区間まで切り替えられる(覚えない。開くたびに一番あとの区間)。
 // ・前の大学との間のうち、飛び抜けて大きい間(その区間の間の中央値の4倍以上。大きい順に多くて3か所。
-//   _tobinukeAida)だけを詰めて、道に切れ目の点線を引き、右の括弧を点線にして「(詰めています)」を添える。
+//   _tobinukeAida)だけを詰めて、道に切れ目の点線を引き、右の括弧を点線にする(2.0.9までは「(詰めています)」を
+//   添えていた。2.1.0の開発中に「(途中を省略)」にしたが、幅を取るので添え書きはなくし、点線で示す)。
 //   倍率ではなくデータで決めるので、
 //   だいたい同じくらい空いているときは詰めない。1つの間が画面の高さを超えるところも詰める
 //   (拡大しすぎて、何もない道を延々とスクロールしないように。2.0.9までは手動で倍率を選んでいるときだけ。
@@ -167,8 +170,6 @@ const int _gyouSaidai = 3;
 const int _shuudanByou = 1;
 
 /// 詰めた間の括弧の文に添える言葉
-// (2.0.9までは「(詰めています)」。差を詰めていると読まれないように、2.1.0で変えた)
-const String _tsumeMoji = '(途中を省略)';
 
 /// 四角どうし・行どうしのすきま
 const double _sukima = 4;
@@ -364,11 +365,12 @@ class _IchiKukan {
     return '目標${t + 1}位以内$soutou　${ushiroJuni + 1}位の${ushiro.mei}${lead(ushiro)}';
   }
 
-  /// 2つの大学の間の文(道の右の括弧に出す。間なので「+」を付けない。「90m 16秒」。0秒は「並走」)
+  /// 2つの大学の間の文(道の右の括弧に出す。間なので「+」を付けない。0秒は「並走」)
+  /// 2.1.0から、幅を抑えるため距離と秒差を2行にする(「90m」の下に「16秒」)
   String aidaBun(_IchiDaigaku osoi, _IchiDaigaku hayai) {
     final int s = saByou(osoi.ruikei, hayai.ruikei);
     if (s <= 0) return '並走';
-    return '${_kyoriMoji(s * hayasa)} ${saMoji(s)}';
+    return '${_kyoriMoji(s * hayasa)}\n${saMoji(s)}';
   }
 
   /// 2つの大学の差の文(距離が先。「30m +5秒」。0秒は「並走」)
@@ -780,10 +782,10 @@ class _Aida {
   final double y0;
   final double y1;
 
-  /// 文(「90m 16秒」)
+  /// 文(「90m」の下に「16秒」の2行。2.1.0)
   final String moji;
 
-  /// 詰めた間か(括弧を点線にし、文の下に「(詰めています)」を添える)
+  /// 詰めた間か(括弧を点線にする。2.1.0から添え書きはなし)
   final bool tsume;
 
   /// 文の上端と高さ(ほかの文やシード権ラインと重ならないように決める)
@@ -901,7 +903,8 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
 
   static const TextStyle _chiisai = TextStyle(color: Colors.white54, fontSize: 11);
   static const TextStyle _seedMojiStyle = TextStyle(color: Colors.amberAccent, fontSize: 11);
-  static const TextStyle _migiStyle = TextStyle(color: Colors.white70, fontSize: 12);
+  // 道の右の差の文(2.1.0から2行にし、12から11に少し小さくした)
+  static const TextStyle _migiStyle = TextStyle(color: Colors.white70, fontSize: 11);
 
   @override
   void initState() {
@@ -1217,7 +1220,6 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     double hako = 0;
     double moji = 0;
     int byouSaidai = 0;
-    bool tsumeAri = false;
     for (final _IchiKukan r in b.kukan) {
       int sentou = 0; // いまの集団の先頭(シード権ラインなどで分かれるところは見ない。多めに見積もる)
       for (int i = 0; i < r.narabi.length; i++) {
@@ -1234,10 +1236,6 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
           _ookisa(TextSpan(text: r.aidaBun(x, r.narabi[i - 1]), style: _migiStyle), scaler).width,
         );
       }
-      if (_tobinukeAida(_aida(r)).isNotEmpty) tsumeAri = true;
-    }
-    if (tsumeAri) {
-      moji = math.max(moji, _ookisa(const TextSpan(text: _tsumeMoji, style: _chiisai), scaler).width);
     }
     final double byouHaba = byouSaidai > 0
         ? _ookisa(TextSpan(text: '+$byouSaidai秒', style: _chiisai), scaler).width + _sukima
@@ -1256,13 +1254,13 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     return kekka;
   }
 
-  /// 文の大きさ(折り返さない1行のとき)
+  /// 文の大きさ(折り返さない。改行のある文は、行を重ねた大きさ。2.1.0から道の右の差の文が2行になったため、
+  /// 行の数を1つに限らないようにした)
   Size _ookisa(TextSpan span, TextScaler scaler) {
     final TextPainter tp = TextPainter(
       text: span,
       textDirection: TextDirection.ltr,
       textScaler: scaler,
-      maxLines: 1,
     )..layout();
     final Size s = tp.size;
     tp.dispose();
@@ -1332,13 +1330,12 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     for (final Size s in hakoOokisa) {
       gyouTakasa = math.max(gyouTakasa, s.height);
     }
-    // 間の文の高さ(1行目と、詰めた間に添える「(詰めています)」)
-    final double aidaMojiTakasa = _ookisa(const TextSpan(text: '0m', style: _migiStyle), scaler).height;
-    final double tsumeMojiTakasa = _ookisa(const TextSpan(text: _tsumeMoji, style: _chiisai), scaler).height;
+    // 間の文の高さ(距離と秒差の2行。2.1.0)
+    final double aidaMojiTakasa = _ookisa(const TextSpan(text: '0m\n0秒', style: _migiStyle), scaler).height;
     // 詰めた間の、前の行の真ん中から次の行の真ん中までの長さ(2行の文が入るように)
     final double tsumeNagasa = math.max(
       _tsumePx,
-      gyouTakasa + aidaMojiTakasa + tsumeMojiTakasa + _sukima * 2,
+      gyouTakasa + aidaMojiTakasa + _sukima * 2,
     );
     final double seedTakasa = _ookisa(
       const TextSpan(text: 'シード権ライン', style: _seedMojiStyle),
@@ -1418,6 +1415,15 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
         top,
         si == 0 ? shita + _sukima + (wakuAri ? _wakuYohaku : 0) : shita + _shuudanSukima + (wakuAri ? _wakuYohaku : 0),
       );
+      // 前の集団との間は、2行の差の文が括弧の中に収まる高さより狭くしない(2.1.0。文字を大きくしていても、
+      // 文が少しずつ下にずれて括弧と合わなくならないように)
+      if (mc != null) {
+        final double mojiTakasa = _ookisa(
+          TextSpan(text: r.aidaBun(r.narabi[saki], r.narabi[maeSaigo]), style: _migiStyle),
+          scaler,
+        ).height;
+        top = math.max(top, mc + mojiTakasa + 2 - gyouTakasa / 2);
+      }
       if (si == 0) sentouY = top + gyouTakasa / 2;
       // 前の集団との間の括弧(前の集団の一番下の行の真ん中から、この集団の一番上の行の真ん中まで)
       if (mc != null) {
@@ -1487,7 +1493,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     // 間の文の置き場所(括弧の真ん中。前の文やシード権ラインと重なるときは、下にずらす)
     double maeMojiShita = -1;
     for (final _Aida a in aidaList) {
-      a.h = aidaMojiTakasa + (a.tsume ? tsumeMojiTakasa : 0);
+      a.h = _ookisa(TextSpan(text: a.moji, style: _migiStyle), scaler).height;
       double t = math.max((a.y0 + a.y1) / 2 - a.h / 2, maeMojiShita + 2);
       final double? st = seedTop;
       if (st != null && t < st + seedTakasa && t + a.h > st) t = st + seedTakasa + 2;
@@ -1503,12 +1509,6 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     double mojiHaba = 0;
     for (final _Aida a in aidaList) {
       mojiHaba = math.max(mojiHaba, _ookisa(TextSpan(text: a.moji, style: _migiStyle), scaler).width);
-      if (a.tsume) {
-        mojiHaba = math.max(
-          mojiHaba,
-          _ookisa(const TextSpan(text: _tsumeMoji, style: _chiisai), scaler).width,
-        );
-      }
     }
     final double michiHaba = math.max(w * _michiWariai, gyouHaba + _wakuYohaku);
     final double kakkoX = michiHaba + 6;
@@ -2256,19 +2256,12 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
                 child: Stack(
                   children: [
                     Positioned.fill(child: CustomPaint(painter: _MichiPainter(h))),
-                    // 前の大学(集団)との間の距離と秒差(括弧の真ん中。詰めた間は「(詰めています)」を添える)
+                    // 前の大学(集団)との間の距離と秒差(括弧の真ん中。2.1.0から距離と秒差の2行。詰めた間は括弧が点線)
                     for (final _Aida a in h.aida)
                       Positioned(
                         left: h.mojiX,
                         top: a.top,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(a.moji, style: _migiStyle, softWrap: false),
-                            if (a.tsume) const Text(_tsumeMoji, style: _chiisai, softWrap: false),
-                          ],
-                        ),
+                        child: Text(a.moji, style: _migiStyle, softWrap: false),
                       ),
                     // シード権ライン
                     if (h.seedTop != null)

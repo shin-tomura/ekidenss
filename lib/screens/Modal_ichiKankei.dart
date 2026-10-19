@@ -77,13 +77,18 @@
 // ・前の大学との間のうち、飛び抜けて大きい間(その区間の間の中央値の4倍以上。大きい順に多くて3か所。
 //   _tobinukeAida)だけを詰めて、道に切れ目の点線を引き、右の括弧を点線にして「(詰めています)」を添える。
 //   倍率ではなくデータで決めるので、
-//   だいたい同じくらい空いているときは詰めない。手動で倍率を選んでいるときは、1つの間が
-//   画面の高さを超えるところも詰める(拡大しすぎて、何もない道を延々とスクロールしないように)。
+//   だいたい同じくらい空いているときは詰めない。1つの間が画面の高さを超えるところも詰める
+//   (拡大しすぎて、何もない道を延々とスクロールしないように。2.0.9までは手動で倍率を選んでいるときだけ。
+//   2.1.0から、おまかせが×2より小さくならないので、おまかせでも詰める)。
 //   (最初は「画面で144pxを超えたら」詰めていたが、おまかせの倍率とぶつかり、出場校の少ない大会や
 //   差の開いた区間で、ほとんどの間が詰められて位置関係がつかめなかったので、2.0.6の開発中に変えた)
 // ・表示の倍率(1mあたりの高さ)は「−」「＋」で6段階に変えられる(文字の大きさは変わらない)。
 //   開いたときは「おまかせ」(区間ごとに、詰めた間を除いた1位から最後尾までの長さが、画面の高さの
 //   およそ2つ分に収まる一番大きい倍率。大きく遅れた大学に引っぱられて先頭のほうが縮こまらないように)。
+//   2.1.0から、おまかせは×2より小さくしない(_omakaseSaitei。差の開いた区間で×1/2などになると、100mの差も
+//   10mの差も四角が重ならない一番小さい間隔になり、同じに見えていたため。×2なら100mが四角2つ分ほどになる)。
+//   縦が長くなるので、道の右端につまんで動かせるスクロールバーを出し、説明の「オレンジの枠」の行を押すと
+//   自分の大学(学連選抜の監督の年は学連選抜)が見える所まで動くようにした。
 //   「−」「＋」を押すとおまかせが外れ、区間を切り替えてもその倍率のまま。
 //   覚えない(画面を閉じたらおまかせに戻る)。倍率のボタンの横に縮尺の棒を出す。
 // ・11月駅伝は8位、正月駅伝は10位の下にシード権ラインを引く(10月駅伝とカスタム駅伝はなし)。
@@ -133,6 +138,9 @@ const List<String> _bairitsuMei = ['×1/4', '×1/2', '×1', '×2', '×4', '×8']
 
 /// おまかせの倍率: 1位から最後尾までが、画面の高さのこの倍に収まる一番大きい倍率
 const double _omakaseGamen = 2.0;
+
+/// おまかせの倍率の下限(_bairitsu の番号。3は×2。100mの差が四角2つ分ほどの間になる。2.1.0)
+const int _omakaseSaitei = 3;
 
 /// 幅に合わせる(おまかせ ↔)ときに、道の上の文字を小さくする下限(今の文字の大きさに対する割合。2.0.8)
 const double _habaSaishou = 0.6;
@@ -870,6 +878,12 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
   /// 押した大学の四角(下の帯が伸びて隠れるときに、道を動かして見えるようにする)
   final GlobalKey _oshitaKey = GlobalKey();
 
+  /// 自分の大学(学連選抜の監督の年は学連選抜)の四角。説明の「オレンジの枠」の行を押したときに動かす先(2.1.0)
+  final GlobalKey _jibunKey = GlobalKey();
+
+  /// 道の縦のスクロール(右端につまんで動かせるスクロールバーを出すため。2.1.0)
+  final ScrollController _michiScroll = ScrollController();
+
   /// 表示の倍率の段階(_bairitsu の番号。おまかせのときは使わない)
   int _dan = 2;
 
@@ -919,7 +933,19 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
   @override
   void dispose() {
     _setsumeiScroll.dispose();
+    _michiScroll.dispose();
     super.dispose();
+  }
+
+  /// 自分の大学(学連選抜の監督の年は学連選抜)の四角が見える所まで、道を動かす(2.1.0)
+  void _jibunHeIdou() {
+    final BuildContext? c = _jibunKey.currentContext;
+    if (c == null) return;
+    Scrollable.ensureVisible(
+      c,
+      duration: const Duration(milliseconds: 300),
+      alignment: 0.3,
+    );
   }
 
   /// 大学の四角を押したとき(1回目で差の帯、2回目で走った選手の説明文、3回目で次の区間を走る選手を出し、
@@ -1259,11 +1285,13 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
         dan = i;
       }
     }
-    return dan;
+    // ×2より小さくはしない(2.1.0。縦が長くなっても、10mと100mの差が見分けられるように)
+    return math.max(dan, _omakaseSaitei);
   }
 
   /// 大学の四角と行の置き場所を決める([px] は1mあたりの高さ。[gamenTakasa] は画面の高さ。
-  /// 手動で倍率を選んでいるとき([omakase] がfalse)は、1つの間が画面の高さを超えるところも詰める。
+  /// 1つの間が画面の高さを超えるところも詰める(2.0.9までは手動で倍率を選んでいるときだけ。2.1.0から、
+  /// おまかせが×2より小さくならず、1つの間が画面より長くなることがあるので、おまかせでも詰める)。
   /// [gyouSuu] は集団の1行に並べる大学の数(_gyouSuuKimeru。2.1.0))
   _Haichi _haichi(
     _IchiKankei b,
@@ -1272,7 +1300,6 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     TextScaler scaler,
     double px,
     double gamenTakasa,
-    bool omakase,
     int gyouSuu,
   ) {
     final int n = r.narabi.length;
@@ -1301,13 +1328,11 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     // シード権ライン(スタートは引かない。2.0.7)
     final int? seed = (r.kk >= 0 && b.seed != null && opNozoku > b.seed!) ? b.seed : null;
 
-    // 詰める間(飛び抜けて大きい間と、手動のときに画面の高さを超える間)
+    // 詰める間(飛び抜けて大きい間と、画面の高さを超える間。2.1.0から、おまかせでも画面の高さを超える間を詰める)
     final List<double> aida = _aida(r);
     final Set<int> tsume = _tobinukeAida(aida);
-    if (!omakase) {
-      for (int i = 0; i < aida.length; i++) {
-        if (aida[i] * px > gamenTakasa) tsume.add(i);
-      }
+    for (int i = 0; i < aida.length; i++) {
+      if (aida[i] * px > gamenTakasa) tsume.add(i);
     }
 
     // 1位(いちばん前)からの距離(m)
@@ -1572,10 +1597,23 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
                       if (_hyouji != 0)
                         Expanded(child: _buildSokuhou(r0))
                       else ...[
+                        // 縦が長くなるので、右端につまんで動かせるスクロールバーを出す(2.1.0。
+                        // デスクトップで自動のスクロールバーと二重にならないように、自動のほうは止める)
                         Expanded(
-                          child: SingleChildScrollView(
-                            padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
-                            child: _buildHontai(context, b, r0, dan, gamenTakasa),
+                          child: Scrollbar(
+                            controller: _michiScroll,
+                            thumbVisibility: true,
+                            interactive: true,
+                            thickness: 8,
+                            radius: const Radius.circular(4),
+                            child: ScrollConfiguration(
+                              behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+                              child: SingleChildScrollView(
+                                controller: _michiScroll,
+                                padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+                                child: _buildHontai(context, b, r0, dan, gamenTakasa),
+                              ),
+                            ),
                           ),
                         ),
                         // 押した大学の帯(4割5分まで。道をスクロールしていても見えるように、道の下(画面の一番下)に置く)
@@ -2134,15 +2172,25 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
           ),
           const Text('右の括弧は前の大学との間です(点線は途中を省略した間)。', style: setsumei),
         ],
+        // オレンジの枠の行は、押すと自分の大学(学連選抜の監督の年は学連選抜)の四角まで動く(2.1.0。下線を引く)
         if (r.narabi.any((x) => x.jibun))
-          const Text('オレンジの枠: あなたの大学', style: setsumei),
-        if (b.opAri)
-          Text(
-            b.gakurenJibun
-                ? 'オレンジの点線の枠: 学連選抜(あなたが監督。順位に数えない)'
-                : '点線の枠: 学連選抜(順位に数えない)',
-            style: setsumei,
+          GestureDetector(
+            onTap: _jibunHeIdou,
+            child: Text(
+              'オレンジの枠: あなたの大学(押すとそこまで動きます)',
+              style: setsumei.copyWith(decoration: TextDecoration.underline),
+            ),
           ),
+        if (b.opAri)
+          b.gakurenJibun
+              ? GestureDetector(
+                  onTap: _jibunHeIdou,
+                  child: Text(
+                    'オレンジの点線の枠: 学連選抜(あなたが監督。順位に数えない。押すとそこまで動きます)',
+                    style: setsumei.copyWith(decoration: TextDecoration.underline),
+                  ),
+                )
+              : const Text('点線の枠: 学連選抜(順位に数えない)', style: setsumei),
         Text(
           r.kk < 0
               ? '大学の四角を押すと、下に1区を走る選手が出ます。'
@@ -2167,7 +2215,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
               w,
               habaAwase ? TextScaler.linear(kihon * _habaSaishou) : scaler,
             );
-            _Haichi h = _haichi(b, r, w, scaler, px, gamenTakasa, _omakase, gyouSuu);
+            _Haichi h = _haichi(b, r, w, scaler, px, gamenTakasa, gyouSuu);
             // 幅に合わせる(おまかせ ↔)ときは、横幅に収まるまで道の上の文字を小さくして並べ直す
             // (文字の幅で四角の幅と右の文の幅が決まるので、何回か測り直す。6割まで。2.0.8)
             bool chiisaku = false;
@@ -2176,7 +2224,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
               for (int n = 0; n < 4 && h.haba > w + 0.5 && k > _habaSaishou; n++) {
                 k = math.max(_habaSaishou, k * w / h.haba);
                 scaler = TextScaler.linear(kihon * k);
-                h = _haichi(b, r, w, scaler, px, gamenTakasa, _omakase, gyouSuu);
+                h = _haichi(b, r, w, scaler, px, gamenTakasa, gyouSuu);
               }
               chiisaku = true;
             }
@@ -2290,13 +2338,15 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
         child: naka,
       );
     }
-    return GestureDetector(
+    final Widget hako = GestureDetector(
       // 押した四角は、下の帯が伸びて隠れるときに見えるようにするため、印を付けておく
       key: erabareta ? _oshitaKey : null,
       behavior: HitTestBehavior.opaque,
       onTap: () => _hakoOsu(r, hk.i),
       child: naka,
     );
+    // 自分の大学(学連選抜の監督の年は学連選抜)の四角にも印を付ける(説明の「オレンジの枠」の行から動く先。2.1.0)
+    return orange ? KeyedSubtree(key: _jibunKey, child: hako) : hako;
   }
 }
 

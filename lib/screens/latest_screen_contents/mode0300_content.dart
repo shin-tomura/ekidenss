@@ -1479,12 +1479,18 @@ class _Mode0300ContentState extends State<Mode0300Content> {
                         for (int count in entrySuuKukanGoto) {
                           if (count != ninzuuKukanGoto) {
                             dameFlag = true;
+                            // 知らせには自分の大学の名前を出す(2.1.0。2.0.9までは入れていなかったので、
+                            // 全大学の確認を通らない予選では大学id 0(か、前に入れた大学)の名前が出ていた)
+                            dameunivid = currentGhensuu.MYunivid;
                             break;
                           }
                         }
 
-                        if (currentGhensuu.hyojiracebangou <= 2 ||
-                            currentGhensuu.hyojiracebangou == 5) {
+                        // 全大学の確認は、自分の大学に問題がないときだけ(2.1.0。自分の大学の知らせを優先する。
+                        // 「全大学確認・変更」でほかの大学を直したときの知らせはこれまで通り)
+                        if (!dameFlag &&
+                            (currentGhensuu.hyojiracebangou <= 2 ||
+                                currentGhensuu.hyojiracebangou == 5)) {
                           int kaeri = checkEkidenEntries(
                             racebangou: currentGhensuu.hyojiracebangou,
                             ghensuu: currentGhensuu,
@@ -1645,8 +1651,11 @@ class _Mode0300ContentState extends State<Mode0300Content> {
                                 horizontal: 16.0,
                                 vertical: 10.0,
                               ), // 上下左右のパディングを均等に減らす
+                              // 11月駅伝予選は区間ではなく組なので、組の言い方にする(2.1.0)
                               content: Text(
-                                "${idJunUnivData[dameunivid].name}:区間配置に重複か空白区間があります",
+                                currentGhensuu.hyojiracebangou == 3
+                                    ? "${idJunUnivData[dameunivid].name}:組のエントリーに重複か空いた組があります"
+                                    : "${idJunUnivData[dameunivid].name}:区間配置に重複か空白区間があります",
                                 style: TextStyle(
                                   color: Colors.black,
                                   fontSize: 14.0,

@@ -216,13 +216,15 @@ class _Mode0290ContentState extends State<Mode0290Content> {
       ),
       const SizedBox(height: 8),
       if (suru && shutsujouSuu > 0) ...[
-        Row(
+        // 文字を大きくしていても右にはみ出さないように、入りきらなければ順位を選ぶ欄を次の行に回す(2.1.0)
+        Wrap(
+          spacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             const Text(
               "学連選抜の目標順位:",
               style: TextStyle(color: HENSUU.textcolor),
             ),
-            const SizedBox(width: 8),
             DropdownButton<int>(
               value: mokuhyou.clamp(0, shutsujouSuu - 1).toInt(),
               dropdownColor: const Color.fromARGB(255, 30, 30, 30),

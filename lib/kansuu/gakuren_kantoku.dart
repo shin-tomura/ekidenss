@@ -12,7 +12,8 @@ import 'package:ekiden/skip.dart';
 // プレイヤーの大学が正月駅伝に出場できない年に、プレイヤーが学連選抜の監督になれる。
 // ・KantokuData.yobiint2[75] 学連選抜の監督をするか(0=する(初期値)、1=しない)
 //   学連選抜編成の画面(mode0290.dart)で切り替えられ、各種設定のQRコードにも含める
-// ・監督をする年は、学連選抜編成の画面から区間配置を決められる(Modal_GakurenKukanHenshuu.dart)
+// ・監督をする年は、学連選抜編成の画面で区間配置を決められる(Modal_GakurenKukanHenshuu.dart。
+//   2.1.0から別の画面を開かずにその画面に直接並べ、重なりは「進む」で確かめる)
 // ・レース中は、レース画面(mode0350_content.dart)が自動で進まずに学連選抜の監督の表示になり、
 //   走る学連選抜の選手に指示を出せる(選手のsijiflagと、1区はstartchokugotobidasiflagに保存し、
 //   RaceCalc_gakuren.dartで大学の選手と同じ倍率で補正する。2区以降は損得予測も見られる)

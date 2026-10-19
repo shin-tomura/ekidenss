@@ -23,9 +23,10 @@ class Mode0290Content extends StatefulWidget {
 }
 
 class _Mode0290ContentState extends State<Mode0290Content> {
-  // 学連選抜の区間配置の画面を開いた年(アプリを起動している間だけ覚えておく。1.8.8)
-  // (区間配置を決められることに気づかずに進んでしまわないように、開いていなければ進むときに確認を出す)
-  static int _kukanHaitiHiraitaNen = -1;
+  // 学連選抜の区間配置を決める部分(2.1.0からこの画面に直接並べる。Modal_GakurenKukanHenshuu.dart)。
+  // 「進む」で、区間の重なりがないかを確かめるのに使う
+  final GlobalKey<GakurenKukanHenshuuState> _kukanHenshuuKey =
+      GlobalKey<GakurenKukanHenshuuState>();
 
   // 学連選抜の監督をしているか(自分の大学が正月駅伝に出場できず、監督をする設定のとき)
   bool _gakurenKantokuChuu() {
@@ -40,55 +41,36 @@ class _Mode0290ContentState extends State<Mode0290Content> {
     return gakurenKantokuChuu(kantoku, myUniv);
   }
 
-  // 学連選抜の区間配置を決める画面を開く
-  void _kukanHaitiHiraku() {
-    _kukanHaitiHiraitaNen = widget.ghensuu.year;
-    showGeneralDialog(
-      context: context,
-      barrierColor: Colors.black.withOpacity(0.8),
-      barrierDismissible: true,
-      barrierLabel: '学連選抜の区間配置',
-      transitionDuration: const Duration(milliseconds: 300),
-      pageBuilder: (context, _, __) => const ModalGakurenKukanHenshuu(),
-    );
-  }
-
   // 進むボタンのアクション
-  // 学連選抜の監督をしていて、この年に区間配置の画面をまだ開いていなければ、確認を出す(1.8.8)
+  // 学連選抜の監督をしていて、区間配置に重なりや空いた区間があれば、知らせて進まない(2.1.0。
+  // 大学の区間エントリーの画面と同じ。1.8.8〜2.0.9の「区間配置をまだ確かめていません」の確認は、
+  // 区間配置をこの画面に直接並べたのでなくした)
   Future<void> _handleAdvanceButton() async {
-    if (_gakurenKantokuChuu() &&
-        _kukanHaitiHiraitaNen != widget.ghensuu.year) {
-      final String? erabi = await showDialog<String>(
-        context: context,
-        builder: (BuildContext dialogContext) {
-          return AlertDialog(
-            title: const Text(
-              '学連選抜の区間配置',
-              style: TextStyle(color: Colors.black),
-            ),
-            content: const Text(
-              '学連選抜の区間配置をまだ確かめていません。このまま進むと、コンピュータが決めた区間配置で走ります。',
-              style: TextStyle(color: Colors.black),
-            ),
-            actions: <Widget>[
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop('kimeru'),
-                child: const Text('区間配置を決める'),
+    final GakurenKukanHenshuuState? henshuu = _kukanHenshuuKey.currentState;
+    if (_gakurenKantokuChuu() && henshuu != null) {
+      if (henshuu.mondaiAri) {
+        await showDialog<void>(
+          context: context,
+          builder: (BuildContext dialogContext) {
+            return AlertDialog(
+              content: const Text(
+                '学連選抜の区間配置に重複か空白区間があります',
+                style: TextStyle(color: Colors.black),
               ),
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop('susumu'),
-                child: const Text('このまま進む'),
-              ),
-            ],
-          );
-        },
-      );
-      if (!mounted) return;
-      if (erabi == 'kimeru') {
-        _kukanHaitiHiraku();
+              actions: <Widget>[
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: const Text('OK'),
+                ),
+              ],
+            );
+          },
+        );
         return;
       }
-      if (erabi != 'susumu') return; // 確認を閉じたときは進まない
+      // 選んだ配置は選ぶたびに保存しているが、保存の途中で進まないように念のためもう一度
+      await henshuu.hozon();
+      if (!mounted) return;
     }
     widget.onAdvanceMode?.call();
   }
@@ -152,28 +134,7 @@ class _Mode0290ContentState extends State<Mode0290Content> {
         onChanged: (bool v) => _gakurenKantokuHozon(kantoku, v),
         activeColor: Colors.blue,
       ),
-      // 区間配置を決めるボタンは、見落とさないように切り替えのすぐ下に横幅いっぱいで出す(1.8.8)
-      if (suru) ...[
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: _kukanHaitiHiraku,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange.shade700,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 12),
-            ),
-            child: const Text(
-              "学連選抜の区間配置を決める",
-              style: TextStyle(
-                fontSize: HENSUU.fontsize_honbun,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-      ],
+      const SizedBox(height: 8),
       if (suru && shutsujouSuu > 0) ...[
         Row(
           children: [
@@ -217,6 +178,13 @@ class _Mode0290ContentState extends State<Mode0290Content> {
           style: const TextStyle(color: Colors.white70, fontSize: 12),
         ),
         const SizedBox(height: 8),
+      ],
+      // 区間配置(2.1.0から、別の画面を開かずにここに直接並べる。大学の区間エントリーの画面と同じく、
+      // 区間ごとに選手を選び、重なりは「進む」で確かめる。Modal_GakurenKukanHenshuu.dart)
+      if (suru) ...[
+        const Divider(color: HENSUU.textcolor),
+        GakurenKukanHenshuu(key: _kukanHenshuuKey),
+        const Divider(color: HENSUU.textcolor),
       ],
       const SizedBox(height: 20),
     ];
@@ -327,7 +295,8 @@ class _Mode0290ContentState extends State<Mode0290Content> {
                           ),
                         ),
                         // 学連選抜のメンバーの今季タイム一覧表(1.8.2)
-                        const GakurenKonkiTimeLink(),
+                        // (監督をする年は、区間配置の部分の上にもあるので出さない。2.1.0)
+                        if (!_gakurenKantokuChuu()) const GakurenKonkiTimeLink(),
                         // 生成AIに渡すテキストのまとめボタン(1.8.2。区間エントリーの前の場面なので、
                         // ほかの大学の区間エントリーが分かってしまうものは出さない)
                         const AiCopyMatomeButton(entryAri: false),

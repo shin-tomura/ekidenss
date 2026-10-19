@@ -56,6 +56,8 @@
 //   もう一度押すと、帯の中に、その区間を走った選手の説明文(個人順位速報の「説明文」と同じ文)も出し、
 //   3回目で、説明文の代わりに次の区間を走る選手(区間配置確認のカードを開いたときと同じ中身。
 //   senshu_haichi_panel.dart の部品)を出し、4回目で閉じる。最終区など次の区間の選手がいなければ3回目で閉じる。
+//   2.1.0から、2回目は説明文の下に走った選手の、3回目は次の区間を走る選手の、持ちタイムの表と能力(1行に1つ)を
+//   同じ並びで出す(_kirokuToNouryoku。カードの能力の行は、下の能力に全部入るので出さない)。
 //   開いたまま、ほかの四角を押すと、同じ段のままその大学に切り替える。
 //   帯の一番上の行(差の基準と閉じる「×」)は固定し、その下は、まとめて帯の中でスクロールする。
 //   同じ段のまま、ほかの大学の四角を押したときは、帯のスクロールの位置を保つ(次の区間の選手は持ちタイムの表、
@@ -1102,7 +1104,8 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
   }
 
   /// 次の区間を走る選手のパネル(区間配置確認のカードを開いたときと同じ。上の行・距離と主将・中身。
-  /// 主将はカードと同じく薄い緑にして緑の枠を付ける。学連選抜は所属大学を出す。2.0.7)
+  /// 主将はカードと同じく薄い緑にして緑の枠を付ける。学連選抜は所属大学を出す。2.0.7。
+  /// 2.1.0から、中身は持ちタイムの表と能力(1行に1つ。_kirokuToNouryoku))
   Widget _tsugiPanel(BuildContext context, _IchiKukan r, _IchiDaigaku x) {
     final Ghensuu? gh = _gh;
     if (gh == null) return const SizedBox.shrink();
@@ -1113,7 +1116,6 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
         : const <double>[];
     final String kyori = kyoriIchiran.length > tk ? '${kyoriIchiran[tk].toStringAsFixed(0)}m' : '';
     const TextStyle shita = TextStyle(color: Colors.white70, fontSize: 13);
-    final KonkiBestJuni? konki = _konkiYomu();
     final SenshuData? s = x.tsugiSenshu;
     final Senshu_Gakuren_Data? g = x.tsugiGSenshu;
     if (s != null) {
@@ -1132,15 +1134,9 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
           ),
           Text([if (kyori.isNotEmpty) kyori, if (shushou) '主将'].join('　'), style: shita),
           const Divider(color: Colors.white24),
-          // 中身(区間配置確認のカードと同じく、能力の行は真ん中に寄せる)
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              senshuNouryokuRan(gh, s),
-              // 持ちタイムの表(ほかの大学に切り替えたときに、同じ高さに来るようにする目印)
-              KeyedSubtree(key: _ankaKey, child: senshuKirokuRan(gh, s, konki)),
-            ],
-          ),
+          // 中身(2.1.0から、持ちタイムの表と能力(1行に1つ)。2回目の走った選手と同じ並び。
+          // 持ちタイムの表に、ほかの大学に切り替えたときに同じ高さに来るようにする目印を付ける)
+          _kirokuToNouryoku(s: s, kukanIdx: tk, kirokuAnka: true) ?? const SizedBox.shrink(),
         ],
       );
       if (!shushou) return panel;
@@ -1169,29 +1165,53 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
           ),
           Text('$kyori 所属:${gakurenShozoku(g)}', style: shita),
           const Divider(color: Colors.white24),
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              gakurenNouryokuRan(gh, g, tk),
-              KeyedSubtree(key: _ankaKey, child: gakurenKirokuRan(gh, g, konki)),
-            ],
-          ),
+          _kirokuToNouryoku(g: g, kukanIdx: tk, kirokuAnka: true) ?? const SizedBox.shrink(),
         ],
       );
     }
     return const SizedBox.shrink();
   }
 
-  /// 走った選手の能力の行(大学の四角を2回押したとき。選手が分からなければnull。2.1.0)
-  /// まだ見抜いていない能力は「??」。学連選抜の選手の調子は、学連選抜で走ったときの調子
-  Widget? _hashittaNouryoku(_IchiKukan r, _IchiDaigaku x) {
+  /// 持ちタイムの表と能力(1行に1つ)。2回目に押したときは走った選手、3回目は次の区間を走る選手(2.1.0。
+  /// 答え合わせと次の予想を同じ並びで見られるように)。[kukanIdx] はその選手の区間(この区間の経験回数に使う)。
+  /// 区間配置確認のカードを開いた中身のうち、能力の行(駅伝男・平常心・調子・この区間の経験回数)は、
+  /// 下の能力に全部入るので出さない。まだ見抜いていない能力は「??」。学連選抜の選手の調子は学連選抜で走ったときの調子。
+  /// [kirokuAnka] がtrueなら、持ちタイムの表に、同じ段のままほかの大学に切り替えたときにそろえる目印を付ける(3回目)。
+  /// 選手が分からなければnull
+  Widget? _kirokuToNouryoku({
+    SenshuData? s,
+    Senshu_Gakuren_Data? g,
+    required int kukanIdx,
+    required bool kirokuAnka,
+  }) {
     final Ghensuu? gh = _gh;
-    if (gh == null || r.kk < 0) return null;
-    final SenshuData? s = x.senshu;
-    if (s != null) return senshuNouryokuZenbu(gh, s, race: widget.race, kukanIdx: r.kk);
-    final Senshu_Gakuren_Data? g = x.gSenshu;
-    if (g != null) return gakurenNouryokuZenbu(gh, g, race: widget.race, kukanIdx: r.kk);
-    return null;
+    if (gh == null || kukanIdx < 0) return null;
+    final KonkiBestJuni? konki = _konkiYomu();
+    final Widget kiroku;
+    final Widget nouryoku;
+    if (s != null) {
+      kiroku = senshuKirokuRan(gh, s, konki);
+      nouryoku = senshuNouryokuZenbu(gh, s, race: widget.race, kukanIdx: kukanIdx);
+    } else if (g != null) {
+      kiroku = gakurenKirokuRan(gh, g, konki);
+      nouryoku = gakurenNouryokuZenbu(gh, g, race: widget.race, kukanIdx: kukanIdx);
+    } else {
+      return null;
+    }
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text('持ちタイム', style: _chiisai),
+        const SizedBox(height: 2),
+        // 持ちタイムの表は、区間配置確認のカードと同じく真ん中に寄せる
+        Center(child: kirokuAnka ? KeyedSubtree(key: _ankaKey, child: kiroku) : kiroku),
+        const Divider(height: 12, color: Colors.white24),
+        const Text('能力', style: _chiisai),
+        const SizedBox(height: 2),
+        nouryoku,
+      ],
+    );
   }
 
   /// 説明文の上の行(「3区 佐藤 健太(2年)　区間1位 1:02:41」。
@@ -1877,8 +1897,10 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     _IchiDaigaku x0,
     String oshitaBun,
   ) {
-    // 2回目に押したときの、走った選手の能力(説明文の下に出す。2.1.0)
-    final Widget? hashittaNouryoku = _hiraki == 1 ? _hashittaNouryoku(r0, x0) : null;
+    // 2回目に押したときの、走った選手の持ちタイムの表と能力(説明文の下に出す。2.1.0)
+    final Widget? hashittaNaiyou = _hiraki == 1
+        ? _kirokuToNouryoku(s: x0.senshu, g: x0.gSenshu, kukanIdx: r0.kk, kirokuAnka: false)
+        : null;
     return Container(
       padding: const EdgeInsets.fromLTRB(10, 2, 2, 8),
       decoration: BoxDecoration(
@@ -1987,15 +2009,13 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
                             height: 1.5,
                           ),
                         ),
-                        // 走った選手の能力(区間配置確認の能力の行に、今季タイム一覧表の走りの能力を足したもの。2.1.0)
-                        if (hashittaNouryoku != null) ...[
+                        // 走った選手の持ちタイムの表と能力(3回目の次の区間を走る選手と同じ並び。2.1.0)
+                        if (hashittaNaiyou != null) ...[
                           const Divider(height: 12, color: Colors.white24),
-                          const Text('能力', style: _chiisai),
-                          const SizedBox(height: 2),
-                          hashittaNouryoku,
+                          hashittaNaiyou,
                         ],
                       ],
-                      // 次の区間を走る選手(区間配置確認のカードを開いたときと同じ)
+                      // 次の区間を走る選手(区間配置確認のカードの上の行と、持ちタイムの表と能力。2.1.0)
                       if (_hiraki == 2) ...[
                         const Divider(height: 12, color: Colors.white24),
                         Text(r0.kk < 0 ? '1区を走る選手' : '次の区間を走る選手', style: _chiisai),

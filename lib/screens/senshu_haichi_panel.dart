@@ -382,7 +382,9 @@ int _maeKeikenKaisuu(List<List<int>> entry, int gakunen, int race, int kukanIdx)
   return kaisuu;
 }
 
-/// 能力の行の中身([atai] は _nouryokuMei の順の値。入りきらなければ折り返す)
+/// 能力の行の中身([atai] は _nouryokuMei の順の値)
+/// 1行に1つずつ縦に並べ、数字は名前のすぐ右(スペース1つ)に出す(どの能力の数字か分かりやすいように。2.1.0)。
+/// 名前と数字が1行に入らなければ、数字を次の行に回す(_nouryokuKoumoku)
 Widget _nouryokuZenbu(
   Ghensuu gh,
   List<int> atai, {
@@ -392,18 +394,24 @@ Widget _nouryokuZenbu(
 }) {
   String mieru(int b) =>
       (b < gh.nouryokumieruflag.length && gh.nouryokumieruflag[b] == 1) ? '${atai[b]}' : '??';
+  final List<Widget> gyou = [
+    _nouryokuKoumoku(_nouryokuMei[0], mieru(0)),
+    _nouryokuKoumoku(_nouryokuMei[1], mieru(1)),
+    _nouryokuKoumoku('調子', '$chousi'),
+    _nouryokuKoumoku('安定感', '$anteikan'),
+    for (int b = 2; b < _nouryokuMei.length; b++) _nouryokuKoumoku(_nouryokuMei[b], mieru(b)),
+    if (keiken > 0) _nouryokuKoumoku('この区間の経験回数', '$keiken'),
+  ];
   return Padding(
     padding: const EdgeInsets.only(bottom: 4),
-    child: Wrap(
-      spacing: 12,
-      runSpacing: 8,
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _nouryokuKoumoku(_nouryokuMei[0], mieru(0)),
-        _nouryokuKoumoku(_nouryokuMei[1], mieru(1)),
-        _nouryokuKoumoku('調子', '$chousi'),
-        _nouryokuKoumoku('安定感', '$anteikan'),
-        for (int b = 2; b < _nouryokuMei.length; b++) _nouryokuKoumoku(_nouryokuMei[b], mieru(b)),
-        if (keiken > 0) _nouryokuKoumoku('この区間の経験回数', '$keiken'),
+        for (int i = 0; i < gyou.length; i++) ...[
+          if (i > 0) const SizedBox(height: 4),
+          gyou[i],
+        ],
       ],
     ),
   );

@@ -159,7 +159,8 @@ const int _gyouSaidai = 3;
 const int _shuudanByou = 1;
 
 /// 詰めた間の括弧の文に添える言葉
-const String _tsumeMoji = '(詰めています)';
+// (2.0.9までは「(詰めています)」。差を詰めていると読まれないように、2.1.0で変えた)
+const String _tsumeMoji = '(途中を省略)';
 
 /// 四角どうし・行どうしのすきま
 const double _sukima = 4;
@@ -2131,7 +2132,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
             '${r.kk + 1}区終了時点のタイム差を、区間の平均の速さで距離に換算した位置関係の図です。',
             style: setsumei,
           ),
-          const Text('右の括弧は前の大学との間です(点線は詰めた間)。', style: setsumei),
+          const Text('右の括弧は前の大学との間です(点線は途中を省略した間)。', style: setsumei),
         ],
         if (r.narabi.any((x) => x.jibun))
           const Text('オレンジの枠: あなたの大学', style: setsumei),

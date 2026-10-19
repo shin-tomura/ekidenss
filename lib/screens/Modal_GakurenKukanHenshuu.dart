@@ -20,7 +20,8 @@ import 'package:ekiden/screens/gakuren_copy_button.dart';
 /// ・重なりも空いた区間もないときは、選ぶたびに学連選抜の選手のデータに保存する(展望号や
 ///   生成AIに渡すコピーにすぐ出る)。重なっているあいだは画面の中だけで持ち、保存は直す前の
 ///   配置のまま(アプリを閉じると直す前に戻る)。学連選抜編成の画面の「進む」で mondaiAri を見て、
-///   重なりがあれば進ませない
+///   重なりがあれば進ませない。重なりがなければ、区間配置(kakuninGyou)と目標順位を出して、
+///   確定してよいかを必ず確かめる
 /// ・試走は、元の選手データで大学の選手と同じ試走タイムの計算をする
 ///   (±0.5%の濁しあり。1区の集団のペースと、2区以降のモチベーション低下補正は入らない)
 class GakurenKukanHenshuu extends StatefulWidget {
@@ -110,6 +111,26 @@ class GakurenKukanHenshuuState extends State<GakurenKukanHenshuu> {
     }
     // まとめて保存する(途中で終了しても、区間が重ならないように)
     if (kakikae.isNotEmpty) await _box.putAll(kakikae);
+  }
+
+  /// 「進む」の確認に出す区間配置の文(例: 「1区 山田太郎(〇〇)」。かっこの中は所属大学。
+  /// 選んでいない区間は「(未定)」)
+  List<String> kakuninGyou() {
+    final Map<int, Senshu_Gakuren_Data> senshuMap = {
+      for (final Senshu_Gakuren_Data s in _box.values) s.id: s,
+    };
+    final Map<int, UnivData> univMap = {
+      for (final u in Hive.box<UnivData>('univBox').values) u.id: u,
+    };
+    return [
+      for (int k = 0; k < _sentaku.length; k++)
+        '${k + 1}区 ${_kakuninSenshu(senshuMap[_sentaku[k]], univMap)}',
+    ];
+  }
+
+  String _kakuninSenshu(Senshu_Gakuren_Data? s, Map<int, UnivData> univMap) {
+    if (s == null) return '(未定)';
+    return '${s.name}(${univMap[s.univid]?.name ?? '---'})';
   }
 
   /// 区間[kukan]を走る選手を[senshuId]の選手にする(ほかの区間はそのまま)

@@ -65,8 +65,8 @@ const List<int> _raceIndices = [6, 7, 8, 10, 11, 12, 13, 14, 15, 16];
 //   (学連選抜の表と大学の表で列の並びがずれても取り違えないように、画面の列の番号では持たない)
 // ・どの画面から開いても同じ選び方になる。各種設定のQRコードには入れない(表示の好みのため)
 // ・画面の列は「列の記号」で持つ: 0選手名・1〜22は上の番号と同じ・-1所属大学・-2正月駅伝予選・-3メモ
-// ・メモの列(2.1.0。konki_memo.dart)は、表示するときは選手名のすぐ右に置き、選手名と一緒に固定する
-//   (横にスクロールしても見える)。「すべて外す」では外さず、「何も選んでいない」の判定にも数えない
+// ・メモの列(2.1.0。konki_memo.dart)は、表示するときは選手名のすぐ右に置く(固定はしない。ほかの列と
+//   一緒に横にスクロールする)。「すべて外す」では外さず、「何も選んでいない」の判定にも数えない
 // ------------------------------------------------------------
 
 /// 隠す列の印を保存する番号(KantokuData.yobiint3)
@@ -1087,10 +1087,7 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
           ),
           body: SafeArea(
             child: TableView.builder(
-              // メモの列を出すときは、選手名と一緒に固定する(2.1.0)
-              pinnedColumnCount: _retsu.length > 1 && _retsu[1] == _memoRetsu
-                  ? 2
-                  : 1,
+              pinnedColumnCount: 1,
               pinnedRowCount: 1,
               // 表示する列だけを出す(1.9.7。_retsu の記号の並び)
               columnCount: _retsu.length,

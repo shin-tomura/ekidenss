@@ -41,10 +41,87 @@ class _Mode0290ContentState extends State<Mode0290Content> {
     return gakurenKantokuChuu(kantoku, myUniv);
   }
 
+  // 学連選抜の目標順位の文(「目標順位: 10位」。目標順位を選べないとき(出場している大学がない)はnull)
+  String? _mokuhyouMoji() {
+    final KantokuData? kantoku = Hive.box<KantokuData>(
+      'kantokuBox',
+    ).get('KantokuData');
+    if (kantoku == null) return null;
+    final int shutsujouSuu = Hive.box<UnivData>('univBox').values
+        .where((u) => u.taikaientryflag.length > 2 && u.taikaientryflag[2] == 1)
+        .length;
+    if (shutsujouSuu <= 0) return null;
+    final int mokuhyou = gakurenMokuhyouSettei(
+      kantoku,
+    ).clamp(0, shutsujouSuu - 1).toInt();
+    return "目標順位: ${mokuhyou + 1}位";
+  }
+
+  // 学連選抜の監督のときの「進む」の確認(区間配置と目標順位を出し、確定してよいかを聞く。2.1.0)
+  // 「確定して進む」を押したときだけtrue(「戻る」や、外側を押して閉じたときは進まない)
+  Future<bool> _kakuteiKakunin(GakurenKukanHenshuuState henshuu) async {
+    final String? mokuhyou = _mokuhyouMoji();
+    final List<String> haichi = henshuu.kakuninGyou();
+    final bool? kakutei = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text(
+            '学連選抜の区間配置と目標順位',
+            style: TextStyle(color: Colors.black),
+          ),
+          // 10区間ぶんの一覧で長くなるので、中はスクロールできるようにする
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'この区間配置と目標順位で確定して進みます。よろしいですか？',
+                  style: TextStyle(color: Colors.black),
+                ),
+                const SizedBox(height: 8),
+                if (mokuhyou != null) ...[
+                  Text(
+                    mokuhyou,
+                    style: const TextStyle(
+                      color: Colors.black,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  // 「確定」でもう変えられないと読まれないように(6区のスタート前に決め直せる)
+                  const Text(
+                    '(目標順位は6区のスタート前に決め直せます)',
+                    style: TextStyle(color: Colors.black54, fontSize: 12),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                for (final String gyou in haichi)
+                  Text(gyou, style: const TextStyle(color: Colors.black)),
+              ],
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('戻る'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('確定して進む'),
+            ),
+          ],
+        );
+      },
+    );
+    return kakutei == true;
+  }
+
   // 進むボタンのアクション
   // 学連選抜の監督をしていて、区間配置に重なりや空いた区間があれば、知らせて進まない(2.1.0。
   // 大学の区間エントリーの画面と同じ。1.8.8〜2.0.9の「区間配置をまだ確かめていません」の確認は、
-  // 区間配置をこの画面に直接並べたのでなくした)
+  // 区間配置をこの画面に直接並べたのでなくした)。重なりがなくても、区間配置と目標順位で
+  // 確定してよいかを必ず確かめる(2.1.0)
   Future<void> _handleAdvanceButton() async {
     final GakurenKukanHenshuuState? henshuu = _kukanHenshuuKey.currentState;
     if (_gakurenKantokuChuu() && henshuu != null) {
@@ -68,6 +145,9 @@ class _Mode0290ContentState extends State<Mode0290Content> {
         );
         return;
       }
+      if (!mounted) return;
+      final bool kakutei = await _kakuteiKakunin(henshuu);
+      if (!kakutei || !mounted) return;
       // 選んだ配置は選ぶたびに保存しているが、保存の途中で進まないように念のためもう一度
       await henshuu.hozon();
       if (!mounted) return;

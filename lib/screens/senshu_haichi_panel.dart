@@ -395,12 +395,13 @@ Widget _nouryokuZenbu(
   String mieru(int b) =>
       (b < gh.nouryokumieruflag.length && gh.nouryokumieruflag[b] == 1) ? '${atai[b]}' : '??';
   final List<Widget> gyou = [
+    // この区間の経験回数は一番上に出す(前に走ったことがあるかが、まず目に入るように。2.1.0)
+    if (keiken > 0) _nouryokuGyou('この区間の経験回数', '$keiken'),
     _nouryokuGyou(_nouryokuMei[0], mieru(0)),
     _nouryokuGyou(_nouryokuMei[1], mieru(1)),
     _nouryokuGyou('調子', '$chousi'),
     _nouryokuGyou('安定感', '$anteikan'),
     for (int b = 2; b < _nouryokuMei.length; b++) _nouryokuGyou(_nouryokuMei[b], mieru(b)),
-    if (keiken > 0) _nouryokuGyou('この区間の経験回数', '$keiken'),
   ];
   return Padding(
     padding: const EdgeInsets.only(bottom: 4),

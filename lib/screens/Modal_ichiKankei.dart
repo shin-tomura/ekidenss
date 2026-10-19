@@ -937,6 +937,26 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     super.dispose();
   }
 
+  /// いつも出していて、つまんで動かせるスクロールバー(つまみは白っぽい色。2.1.0)
+  /// (アプリの共通の見た目は明るい画面用のままなので、ふつうの Scrollbar ではつまみが黒っぽくなり、
+  /// 黒い背景でほとんど見えなかった。色を決められる RawScrollbar にする)
+  Widget _shiroScrollbar({
+    required ScrollController controller,
+    required double thickness,
+    required Widget child,
+  }) {
+    return RawScrollbar(
+      controller: controller,
+      thumbVisibility: true,
+      interactive: true,
+      thickness: thickness,
+      radius: Radius.circular(thickness / 2),
+      thumbColor: Colors.white54,
+      minThumbLength: 40,
+      child: child,
+    );
+  }
+
   /// 自分の大学(学連選抜の監督の年は学連選抜)の四角が見える所まで、道を動かす(2.1.0)
   void _jibunHeIdou() {
     final BuildContext? c = _jibunKey.currentContext;
@@ -1598,14 +1618,12 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
                         Expanded(child: _buildSokuhou(r0))
                       else ...[
                         // 縦が長くなるので、右端につまんで動かせるスクロールバーを出す(2.1.0。
-                        // デスクトップで自動のスクロールバーと二重にならないように、自動のほうは止める)
+                        // デスクトップで自動のスクロールバーと二重にならないように、自動のほうは止める。
+                        // 黒い背景で見えるように、つまみは白っぽい色にする(_shiroScrollbar))
                         Expanded(
-                          child: Scrollbar(
+                          child: _shiroScrollbar(
                             controller: _michiScroll,
-                            thumbVisibility: true,
-                            interactive: true,
-                            thickness: 8,
-                            radius: const Radius.circular(4),
+                            thickness: 10,
                             child: ScrollConfiguration(
                               behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
                               child: SingleChildScrollView(
@@ -1696,10 +1714,11 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
           const SizedBox(height: 4),
           // ここから下は、まとめて帯の中でスクロールする
           // (デスクトップで自動のスクロールバーと二重にならないように、自動のほうは止める)
+          // (2.1.0から、黒い背景で見えるように、道のスクロールバーと同じ白っぽいつまみにする)
           Flexible(
-            child: Scrollbar(
+            child: _shiroScrollbar(
               controller: _setsumeiScroll,
-              thumbVisibility: true,
+              thickness: 6,
               child: ScrollConfiguration(
                 behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
                 child: SingleChildScrollView(

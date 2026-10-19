@@ -23,6 +23,8 @@
 // 区間ごとのタイム分布と1枚にまとめたカード(KukanBunsekiCard。右半分の「位置関係」)から開く。
 // ・幅のある道の帯に、大学名を四角で囲んで並べ、1位からの距離を縮尺どおりの間隔で出す。
 //   四角の中の大学名は、最後の「大」を省く(下の帯の文は省かない)。学連選抜は四角の中では「OP学連」。
+//   2.1.0から、四角の中を順位・大学名・順位の変化の欄に分け、区間の中ではどの四角も同じ幅にする
+//   (大学名の欄は3文字分で左寄せ。長い名前は横だけ縮め、6割まで縮めても入らなければ最後を「…」で省く)。
 //   大学名の後ろに、前の区間の終了時点からの順位の変化を「↑2」(緑)「↓3」(赤)「→」(灰色)で付ける
 //   (1区は付けない。学連選抜は通過順位相当で比べる。下の帯にも「5位(↑3)」の形で出す)。
 // ・集団(2.1.0から): 前の大学との差が1秒以内(右の括弧と同じ切り捨ての秒。「並走」か「1秒」)なら、
@@ -186,6 +188,42 @@ const double _wakuYohaku = 4;
 /// 四角の中の余白(横・縦)
 const double _hakoYoko = 6;
 const double _hakoTate = 3;
+
+/// 四角の中の大学名の欄の文字数(どの四角も同じ幅にする。長い名前は横に縮める。2.1.0)
+const int _meiMojisuu = 3;
+
+/// 大学名を横に縮める下限(これより縮めないと入らないときは、最後を「…」で省く。2.1.0)
+const double _meiChijimiSaishou = 0.6;
+
+/// 四角の中の、順位と大学名のすきま・大学名と順位の変化のすきま(2.1.0)
+const double _juniSukima = 4;
+const double _hendouSukima = 3;
+
+/// 四角の中の文字(順位と「OP」・大学名・順位の変化。順位の変化の色は変化ごとに付ける)
+const TextStyle _juniStyle = TextStyle(color: Colors.white54, fontSize: 11.5);
+const TextStyle _meiStyle = TextStyle(color: HENSUU.textcolor, fontSize: 13);
+const TextStyle _hendouStyle = TextStyle(fontSize: 12);
+
+/// 区間の四角の中の欄の幅と文の高さ(区間の中ではどの四角も同じ。2.1.0)
+class _HakoHaba {
+  /// 順位の欄(学連選抜の「OP」も。なければ0)
+  final double juni;
+
+  /// 大学名の欄(3文字分)
+  final double mei;
+
+  /// 順位の変化の欄(1区とスタートは0)
+  final double hendou;
+
+  /// 文の高さ
+  final double takasa;
+
+  const _HakoHaba(this.juni, this.mei, this.hendou, this.takasa);
+
+  /// 中身の幅(欄とすきまの合計)
+  double get naka =>
+      juni + (juni > 0 ? _juniSukima : 0) + mei + (hendou > 0 ? _hendouSukima + hendou : 0);
+}
 
 /// 四角の枠の太さの最大(四角の大きさを決めるときに、これだけ見込む)
 const double _wakuSaidai = 2;
@@ -1152,44 +1190,122 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
   /// 区間の名前(「スタート」「3区」。2.0.7)
   String _kukanMei(_IchiKukan r) => r.kk < 0 ? 'スタート' : '${r.kk + 1}区';
 
-  /// 四角の中の文(順位と大学名)
-  TextSpan _hakoSpan(_IchiKankei b, _IchiKukan r, int i) {
+  /// 四角の中の順位の欄の文(学連選抜は「OP」。スタートは大学は空。2.1.0)
+  String _juniMoji(_IchiKukan r, int i) {
     final _IchiDaigaku x = r.narabi[i];
-    // スタートは、順位と順位の変化を付けない(学連選抜は「OP学連」。2.0.7)
-    if (r.kk < 0) {
-      return TextSpan(
-        children: [
-          if (x.op)
-            const TextSpan(
-              text: 'OP',
-              style: TextStyle(color: Colors.white54, fontSize: 11.5),
+    if (x.op) return 'OP';
+    return r.kk < 0 ? '' : '${x.juni + 1}';
+  }
+
+  /// 四角の中の大学名(最後の「大」を省く。学連選抜は「学連」。下の帯は省かない)
+  String _hakoMei(_IchiDaigaku x) => x.op ? '学連' : _michiMei(x.mei);
+
+  /// 四角の中の欄の幅を、区間と文字の大きさごとに覚えておく(画面を開いているあいだだけ。2.1.0)
+  final Map<String, _HakoHaba> _hakoHabaKioku = {};
+
+  /// 区間[r]の四角の中の欄の幅(2.1.0。どの四角も同じ幅にそろえる)
+  /// 順位の欄はその区間の一番広い順位(学連選抜の「OP」も)、大学名の欄は3文字分、
+  /// 順位の変化の欄はその区間の一番広い変化(1区とスタートは変化がないので0)
+  _HakoHaba _hakoHaba(_IchiKukan r, TextScaler scaler) {
+    final String kagi = '${r.kk}:${scaler.scale(100).toStringAsFixed(2)}';
+    final _HakoHaba? kioku = _hakoHabaKioku[kagi];
+    if (kioku != null) return kioku;
+    double juni = 0;
+    double hendou = 0;
+    double takasa = 0;
+    for (int i = 0; i < r.narabi.length; i++) {
+      final String jm = _juniMoji(r, i);
+      if (jm.isNotEmpty) {
+        final Size z = _ookisa(TextSpan(text: jm, style: _juniStyle), scaler);
+        juni = math.max(juni, z.width);
+        takasa = math.max(takasa, z.height);
+      }
+      final String? hm = r.narabi[i].hendouMoji;
+      if (hm != null) {
+        final Size z = _ookisa(TextSpan(text: hm, style: _hendouStyle), scaler);
+        hendou = math.max(hendou, z.width);
+        takasa = math.max(takasa, z.height);
+      }
+    }
+    final Size mei = _ookisa(
+      TextSpan(text: '国' * _meiMojisuu, style: _meiStyle),
+      scaler,
+    );
+    takasa = math.max(takasa, mei.height);
+    final _HakoHaba h = _HakoHaba(juni, mei.width, hendou, takasa);
+    _hakoHabaKioku[kagi] = h;
+    return h;
+  }
+
+  /// 四角の中(順位・大学名・順位の変化の欄を、決まった幅で並べる。2.1.0)
+  Widget _hakoNaka(_IchiKukan r, int i, TextScaler scaler) {
+    final _HakoHaba h = _hakoHaba(r, scaler);
+    final _IchiDaigaku x = r.narabi[i];
+    final String? hm = x.hendouMoji;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // 順位(学連選抜は「OP」。順位と同じ薄い色。右寄せ)
+        if (h.juni > 0) ...[
+          SizedBox(
+            width: h.juni,
+            child: Text(
+              _juniMoji(r, i),
+              style: _juniStyle,
+              textAlign: TextAlign.right,
+              maxLines: 1,
+              softWrap: false,
             ),
-          TextSpan(
-            text: x.op ? '学連' : _michiMei(x.mei),
-            style: const TextStyle(color: HENSUU.textcolor, fontSize: 13),
+          ),
+          const SizedBox(width: _juniSukima),
+        ],
+        // 大学名(自分の大学も、文字はほかの大学と同じ。オレンジは枠だけ)
+        _hakoMeiWidget(_hakoMei(x), h, scaler),
+        // 前の区間からの順位の変化(↑は緑、↓は赤、→は灰色。1区とスタートは欄を作らない)
+        if (h.hendou > 0) ...[
+          const SizedBox(width: _hendouSukima),
+          SizedBox(
+            width: h.hendou,
+            child: hm == null
+                ? null
+                : Text(
+                    hm,
+                    style: _hendouStyle.copyWith(color: _hendouIro(x.hendou!)),
+                    maxLines: 1,
+                    softWrap: false,
+                  ),
           ),
         ],
+      ],
+    );
+  }
+
+  /// 四角の中の大学名(3文字分の欄に左寄せで入れる。長い名前は横だけ縮め、6割まで縮めても入らなければ
+  /// 最後を「…」で省く。2.1.0)
+  Widget _hakoMeiWidget(String mei, _HakoHaba h, TextScaler scaler) {
+    final Size shizen = _ookisa(TextSpan(text: mei, style: _meiStyle), scaler);
+    if (shizen.width <= h.mei) {
+      return SizedBox(
+        width: h.mei,
+        child: Text(mei, style: _meiStyle, maxLines: 1, softWrap: false),
       );
     }
-    return TextSpan(
-      children: [
-        // 学連選抜は短く「OP学連」(OPは順位と同じ薄い色。下の帯は「学連選抜」のまま)
-        TextSpan(
-          text: x.op ? 'OP' : '${x.juni + 1} ',
-          style: const TextStyle(color: Colors.white54, fontSize: 11.5),
-        ),
-        TextSpan(
-          text: x.op ? '学連' : _michiMei(x.mei),
-          // 自分の大学も、文字はほかの大学と同じ(オレンジは枠だけ。読みやすいように)
-          style: const TextStyle(color: HENSUU.textcolor, fontSize: 13),
-        ),
-        // 前の区間からの順位の変化(↑は緑、↓は赤、→は灰色。1区は付けない)
-        if (x.hendouMoji != null)
-          TextSpan(
-            text: ' ${x.hendouMoji}',
-            style: TextStyle(color: _hendouIro(x.hendou!), fontSize: 12),
-          ),
-      ],
+    String moji = mei;
+    Size z = shizen;
+    while (moji.length > 1 && z.width * _meiChijimiSaishou > h.mei) {
+      moji = moji.substring(0, moji.length - 1);
+      z = _ookisa(TextSpan(text: '$moji…', style: _meiStyle), scaler);
+    }
+    final String hyouji = moji == mei ? mei : '$moji…';
+    // 高さは文の高さのまま、横だけを欄の幅に合わせて縮める
+    return SizedBox(
+      width: h.mei,
+      height: z.height,
+      child: FittedBox(
+        fit: BoxFit.fill,
+        alignment: Alignment.centerLeft,
+        child: Text(hyouji, style: _meiStyle, maxLines: 1, softWrap: false),
+      ),
     );
   }
 
@@ -1197,12 +1313,12 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
   Color _hendouIro(int h) =>
       h > 0 ? Colors.lightGreenAccent : (h < 0 ? Colors.redAccent.shade100 : Colors.white54);
 
-  /// 四角の大きさ(折り返さない1行。枠の太さの最大と余白を見込む)
+  /// 四角の大きさ(枠の太さの最大と余白を見込む。2.1.0から、区間の中ではどの四角も同じ大きさ)
   Size _hakoOokisa(_IchiKankei b, _IchiKukan r, int i, TextScaler scaler) {
-    final Size s = _ookisa(_hakoSpan(b, r, i), scaler);
+    final _HakoHaba h = _hakoHaba(r, scaler);
     return Size(
-      s.width + _hakoYoko * 2 + _wakuSaidai * 2 + 2,
-      s.height + _hakoTate * 2 + _wakuSaidai * 2,
+      h.naka + _hakoYoko * 2 + _wakuSaidai * 2 + 2,
+      h.takasa + _hakoTate * 2 + _wakuSaidai * 2,
     );
   }
 
@@ -2303,7 +2419,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
                           top: g.y + (g.h - hk.h) / 2,
                           width: hk.w,
                           height: hk.h,
-                          child: _hakoWidget(b, r, hk),
+                          child: _hakoWidget(b, r, hk, scaler),
                         ),
                   ],
                 ),
@@ -2323,7 +2439,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
 
   /// 大学の四角(押すと、画面の下に差を出す。押すたびに、走った選手の説明文、次の区間を走る選手と進み、
   /// その次に押すと消す。2.0.7)
-  Widget _hakoWidget(_IchiKankei b, _IchiKukan r, _Hako hk) {
+  Widget _hakoWidget(_IchiKankei b, _IchiKukan r, _Hako hk, TextScaler scaler) {
     final _IchiDaigaku x = r.narabi[hk.i];
     final bool orange = x.jibun || (b.gakurenJibun && x.op);
     final bool erabareta = _oshita == hk.i;
@@ -2342,7 +2458,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
         borderRadius: BorderRadius.circular(4),
       ),
       alignment: Alignment.centerLeft,
-      child: Text.rich(_hakoSpan(b, r, hk.i), softWrap: false, maxLines: 1),
+      child: _hakoNaka(r, hk.i, scaler),
     );
     if (tensen) {
       naka = CustomPaint(

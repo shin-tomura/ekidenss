@@ -13,6 +13,7 @@ import 'package:ekiden/screens/Modal_senshu.dart';
 import 'package:ekiden/kansuu/shushou.dart'
     show shushouIdUniv, shushouShirushiMoji; // 主将(2.0.1)
 import 'package:ekiden/screens/shushou_iro.dart'; // 主将を示す色(2.0.1)
+import 'package:ekiden/kansuu/konki_memo.dart'; // 名前の右のメモの列(2.1.0)
 import 'dart:io';
 import 'package:csv/csv.dart';
 import 'package:path_provider/path_provider.dart';
@@ -59,17 +60,24 @@ const List<int> _raceIndices = [6, 7, 8, 10, 11, 12, 13, 14, 15, 16];
 // 表示する列を選ぶ(1.9.7。画面の表だけ。画像・テキストのコピー・CSVはいつも全部の列)
 // ・KantokuData.yobiint3[74] に、隠す列の印をビットで保存する(0なら全部表示。初期値)
 // ・ビットは列ごとに決めた番号: 1駅伝男・2平常心・3〜12の10種目(_eventLabels の3〜12)・
-//   13〜22の年間強化と能力(_extraCols)・23所属大学・24正月駅伝予選(23と24は学連選抜の表だけ)
+//   13〜22の年間強化と能力(_extraCols)・23所属大学・24正月駅伝予選(23と24は学連選抜の表だけ)・
+//   25メモ(2.1.0。どの表にも出す)
 //   (学連選抜の表と大学の表で列の並びがずれても取り違えないように、画面の列の番号では持たない)
 // ・どの画面から開いても同じ選び方になる。各種設定のQRコードには入れない(表示の好みのため)
-// ・画面の列は「列の記号」で持つ: 0選手名・1〜22は上の番号と同じ・-1所属大学・-2正月駅伝予選
+// ・画面の列は「列の記号」で持つ: 0選手名・1〜22は上の番号と同じ・-1所属大学・-2正月駅伝予選・-3メモ
+// ・メモの列(2.1.0。konki_memo.dart)は、表示するときは選手名のすぐ右に置き、選手名と一緒に固定する
+//   (横にスクロールしても見える)。「すべて外す」では外さず、「何も選んでいない」の判定にも数えない
 // ------------------------------------------------------------
 
 /// 隠す列の印を保存する番号(KantokuData.yobiint3)
 const int konkiRetsuIndex = 74;
 
+/// メモの列の記号(2.1.0)
+const int _memoRetsu = -3;
+
 /// 列の記号[code]の、保存するビットの番号
-int _retsuBit(int code) => code == -1 ? 23 : (code == -2 ? 24 : code);
+int _retsuBit(int code) =>
+    code == -1 ? 23 : (code == -2 ? 24 : (code == _memoRetsu ? 25 : code));
 
 /// 隠す列の印を読む(なければ0=全部表示)
 int _kakushiYomu() {
@@ -441,8 +449,9 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
 
   // ---- 表示する列(1.9.7) ----
 
-  /// この表で選べる列の記号(表の並び順。選手名は選べない)
+  /// この表で選べる列の記号(表の並び順。選手名は選べない。メモは先頭)
   List<int> get _sentakuKouho => [
+    _memoRetsu,
     if (widget.gakuren) ...[-1, -2],
     for (int c = 1; c < _eventLabels.length + _extraCols.length; c++) c,
   ];
@@ -453,6 +462,7 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
   /// 列のまとまり(右の区切り線は、次に表示する列とまとまりが違うときに引く)
   /// 0選手名・1駅伝男と平常心・2対校戦・3記録会・4夏のタイムトライアル・5年間強化と能力・6学連選抜の2列
   int _matomari(int code) {
+    if (code == _memoRetsu) return 7; // メモ(2.1.0)
     if (code < 0) return 6;
     if (code == 0) return 0;
     if (code <= 2) return 1;
@@ -464,14 +474,19 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
 
   /// 画面に出す列の並びと、右に区切り線を引く列を作る
   void _retsuTsukuru() {
-    List<int> mieru = [
+    // メモの列は別に扱う(選手名のすぐ右。2.1.0)
+    final List<int> kouho = [
       for (final int c in _sentakuKouho)
+        if (c != _memoRetsu) c,
+    ];
+    List<int> mieru = [
+      for (final int c in kouho)
         if (_mieru(c, _kakushi)) c,
     ];
     // 何も選んでいないとき(「すべて外す」のあとや、学連選抜の表だけの列しか選んでいないときの
     // 大学の表)は、選手名だけの表にせず、全部の列を出す
-    if (mieru.isEmpty) mieru = _sentakuKouho;
-    _retsu = [0, ...mieru];
+    if (mieru.isEmpty) mieru = kouho;
+    _retsu = [0, if (_mieru(_memoRetsu, _kakushi)) _memoRetsu, ...mieru];
     _migiSenRetsu = {
       for (int i = 1; i + 1 < _retsu.length; i++)
         if (_matomari(_retsu[i]) != _matomari(_retsu[i + 1])) _retsu[i],
@@ -483,6 +498,7 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
 
   /// 列の記号[code]の名前
   String _retsuMei(int code) {
+    if (code == _memoRetsu) return 'メモ';
     if (code == -1) return '所属大学';
     if (code == -2) return '正月駅伝予選';
     if (code < _eventLabels.length) return _eventLabels[code];
@@ -503,8 +519,11 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setDialog) {
             final List<int> kouho = _sentakuKouho;
-            // この表で選べる列を全部隠す印(ほかの表だけの列の印はそのまま残す)
-            final int zenbu = kouho.fold<int>(0, (m, c) => m | (1 << _retsuBit(c)));
+            // この表で選べる列を全部隠す印(ほかの表だけの列の印はそのまま残す。
+            // メモの列は「すべて外す」では外さない。2.1.0)
+            final int zenbu = kouho
+                .where((c) => c != _memoRetsu)
+                .fold<int>(0, (m, c) => m | (1 << _retsuBit(c)));
             final bool zenbuHazushita = (_kakushi & zenbu) == zenbu;
             Future<void> kaeru(int atai) async {
               setState(() {
@@ -529,7 +548,8 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
                     const Text(
                       '選んだ列を、表の並び順で詰めて表示します。何も選んでいないときは、全部の列を表示します。'
                       'どの画面から開いても同じ選び方になります。'
-                      '画像・テキストのコピー・CSVは、いつも全部の列です。',
+                      '画像・テキストのコピー・CSVは、いつも全部の列です(メモは入りません)。'
+                      'メモの列は「すべて外す」では外れません。',
                       style: TextStyle(color: Colors.white70, fontSize: 12),
                     ),
                     const SizedBox(height: 8),
@@ -1067,13 +1087,20 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
           ),
           body: SafeArea(
             child: TableView.builder(
-              pinnedColumnCount: 1,
+              // メモの列を出すときは、選手名と一緒に固定する(2.1.0)
+              pinnedColumnCount: _retsu.length > 1 && _retsu[1] == _memoRetsu
+                  ? 2
+                  : 1,
               pinnedRowCount: 1,
               // 表示する列だけを出す(1.9.7。_retsu の記号の並び)
               columnCount: _retsu.length,
               rowCount: _sortedSenshu.length + 1,
               columnBuilder: (index) {
                 final int code = _retsu[index];
+                // メモの列(2.1.0)
+                if (code == _memoRetsu) {
+                  return TableSpan(extent: FixedTableSpanExtent(44));
+                }
                 // 学連選抜の表の所属大学と正月駅伝予選の列
                 if (code == -1) {
                   return TableSpan(extent: FixedTableSpanExtent(100));
@@ -1095,6 +1122,14 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
               ),
               cellBuilder: (context, vicinity) {
                 final int code = _retsu[vicinity.column];
+                // メモの列(2.1.0)
+                if (code == _memoRetsu) {
+                  if (vicinity.row == 0) return _buildMemoHeaderCell();
+                  return _buildMemoCell(
+                    _sortedSenshu[vicinity.row - 1],
+                    vicinity.row,
+                  );
+                }
                 // 学連選抜の表の所属大学と正月駅伝予選の列(1.8.2)
                 if (code < 0) {
                   if (vicinity.row == 0) {
@@ -1170,6 +1205,151 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
             ),
           ),
       ],
+    );
+  }
+
+  // ---- メモの列(2.1.0。konki_memo.dart) ----
+
+  /// メモの文字の色(×は外す候補なので赤、ほかは黄色)
+  Color _memoIro(String memo) =>
+      memo == '×' ? Colors.redAccent : Colors.amber.shade300;
+
+  /// 選手[s]のメモを[memo]にして保存する(空ならメモを消す)
+  Future<void> _memoKaku(SenshuData s, String memo) async {
+    final String ato = konkiMemoIreru(s.name_tanshuku, memo);
+    if (ato == s.name_tanshuku) return;
+    s.name_tanshuku = ato;
+    await s.save();
+    if (mounted) setState(() {});
+  }
+
+  /// この表の選手のメモを全部消す(確かめてから。見出しの「メモ」を押したとき)
+  Future<void> _memoZenbuKesu() async {
+    final List<SenshuData> ari = [
+      for (final SenshuData s in _sortedSenshu)
+        if (konkiMemoYomu(s.name_tanshuku).isNotEmpty) s,
+    ];
+    if (ari.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('この表にはメモがありません')),
+      );
+      return;
+    }
+    final bool? kesu = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          content: Text(
+            'この表の選手のメモ(${ari.length}人分)を全部消しますか？',
+            style: const TextStyle(color: Colors.black),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('キャンセル'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('消す'),
+            ),
+          ],
+        );
+      },
+    );
+    if (kesu != true) return;
+    for (final SenshuData s in ari) {
+      s.name_tanshuku = konkiMemoIreru(s.name_tanshuku, '');
+      await s.save();
+    }
+    if (mounted) setState(() {});
+  }
+
+  /// メモの列の見出し(押すと、この表のメモを全部消すかを聞く)
+  TableViewCell _buildMemoHeaderCell() {
+    final bool migiSen = _migiSen(_memoRetsu);
+    return TableViewCell(
+      child: GestureDetector(
+        onTap: _isExporting ? null : _memoZenbuKesu,
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white24,
+            border: migiSen
+                ? Border(
+                    right: BorderSide(
+                      color: _seriesBorderColor,
+                      width: _seriesBorderWidth,
+                    ),
+                  )
+                : null,
+          ),
+          padding: const EdgeInsets.all(4),
+          alignment: Alignment.center,
+          child: const AutoSizeText(
+            'メモ',
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            minFontSize: 8,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              decoration: TextDecoration.underline,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// メモのセル(押すと、空白・✓・○・×・1〜10から選ぶ一覧が出る)
+  TableViewCell _buildMemoCell(SenshuData p, int rowIdx) {
+    final String memo = konkiMemoYomu(p.name_tanshuku);
+    final bool migiSen = _migiSen(_memoRetsu);
+    return TableViewCell(
+      child: PopupMenuButton<String>(
+        tooltip: 'メモ',
+        enabled: !_isExporting,
+        initialValue: memo,
+        color: const Color.fromARGB(255, 30, 30, 30),
+        onSelected: (String erabi) => _memoKaku(p, erabi),
+        itemBuilder: (context) => [
+          for (final String m in konkiMemoSentakushi)
+            PopupMenuItem<String>(
+              value: m,
+              height: 36,
+              child: Text(
+                m.isEmpty ? '(空白)' : m,
+                style: TextStyle(
+                  color: m.isEmpty ? Colors.white70 : _memoIro(m),
+                  fontSize: HENSUU.fontsize_honbun,
+                ),
+              ),
+            ),
+        ],
+        child: Container(
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            // 入力できる欄だと分かるように、薄い青にする
+            color: Colors.blue.withOpacity(rowIdx.isEven ? 0.10 : 0.14),
+            border: Border(
+              bottom: BorderSide(color: Colors.white.withOpacity(0.05)),
+              right: migiSen
+                  ? BorderSide(color: _seriesBorderColor, width: _seriesBorderWidth)
+                  : BorderSide.none,
+            ),
+          ),
+          child: AutoSizeText(
+            memo,
+            maxLines: 1,
+            minFontSize: 8,
+            style: TextStyle(
+              color: _memoIro(memo),
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ),
     );
   }
 

@@ -1,5 +1,6 @@
 import 'package:ekiden/senshu_data.dart';
 import 'package:ekiden/kansuu/kiji/kiji_kihon.dart' show KijiHyou; // 選手画面などの表
+import 'package:ekiden/kansuu/konki_memo.dart'; // 同じ欄に入れる今季タイム一覧表のメモ(2.1.0)
 
 // ------------------------------------------------------------
 // 金銀の記録(1.9.9)
@@ -20,6 +21,8 @@ import 'package:ekiden/kansuu/kiji/kiji_kihon.dart' show KijiHyou; // 選手画�
 //   (SenshuShokiti.dart)と、選手のQRコードで別の選手に置き換えたときに、記録を消す(kinginKirokuNashi に戻す)
 // ・書き方: 1行目は見出し「#金銀」、2行目から1学年1行で「学年:能力の番号=回数,能力の番号=回数」
 //   (例「#金銀\n2:0=2,3=1\n3:1=1」)。見出しのない文字列(初期値の「短縮」など)は、記録なしとみなす
+// ・2.1.0から、同じ欄の最後の行に今季タイム一覧表のメモ(「#メモ:○」)も入れる(konki_memo.dart)。
+//   「学年:」で始まらない行は読み飛ばすので記録には混ざらない。記録を書き直すときはメモの行を残す
 // ・能力の番号は Ghensuu.nouryokumieruflag と同じ(0駅伝男 1平常心 2長距離粘り 3スパート力 4カリスマ
 //   5登り適性 6下り適性 7アップダウン対応力 8ロード適性 9ペース変動対応力)で、10を安定感にした
 // ・この版より前に使った金銀は記録がないので分からない
@@ -144,7 +147,8 @@ void kinginKirokuTsuika(SenshuData s, int bangou, {int kaisuu = 1}) {
   final Map<int, Map<int, int>> kiroku = kinginKirokuYomu(s.name_tanshuku);
   final Map<int, int> m = kiroku.putIfAbsent(s.gakunen, () => {});
   m[bangou] = (m[bangou] ?? 0) + kaisuu;
-  s.name_tanshuku = _kaku(kiroku);
+  // 同じ欄にある今季タイム一覧表のメモ(2.1.0)は消さずに残す
+  s.name_tanshuku = konkiMemoIreru(_kaku(kiroku), konkiMemoYomu(s.name_tanshuku));
 }
 
 /// [mae](金銀を使う前の kinginNouryokuAtai)と比べて上がった能力を、10上がるごとに1回として記録する

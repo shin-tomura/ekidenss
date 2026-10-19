@@ -19,6 +19,7 @@ const List<String> konkiMemoSentakushi = [
   '',
   '✓',
   '○',
+  '△',
   '×',
   '1',
   '2',

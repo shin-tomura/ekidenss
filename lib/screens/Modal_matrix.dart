@@ -1298,7 +1298,7 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
     );
   }
 
-  /// メモのセル(押すと、空白・✓・○・×・1〜10から選ぶ一覧が出る)
+  /// メモのセル(押すと、空白・✓・○・△・×・1〜10から選ぶ一覧が出る)
   TableViewCell _buildMemoCell(SenshuData p, int rowIdx) {
     final String memo = konkiMemoYomu(p.name_tanshuku);
     final bool migiSen = _migiSen(_memoRetsu);

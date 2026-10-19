@@ -1332,6 +1332,34 @@ class _Mode0300ContentState extends State<Mode0300Content> {
     }
   }
 
+  /// 区間[iKukan]の[dai]番目(1か2。2は11月駅伝予選の組の2人目)に選んでいる選手を、ほかの区間(組)でも
+  /// 選んでいれば「3区と重複」の文を返す(なければnull。2.1.0。区間の行の下に赤字で出す。
+  /// 学連選抜の区間配置と同じ知らせ方。「進む」での重複と空白の確認は今まで通り)
+  String? _juufukuMoji(Ghensuu gh, int iKukan, int dai) {
+    final int race = gh.hyojiracebangou;
+    final int kukansuu = gh.kukansuu_taikaigoto[race];
+    final bool kumi = race == 3; // 11月駅伝予選は1組に2人
+    final List<int> opt1 = gh.SenshuSelectedOption;
+    final List<int> opt2 = gh.SenshuSelectedOption2;
+    final List<int> imaList = dai == 1 ? opt1 : opt2;
+    if (iKukan < 0 || iKukan >= imaList.length) return null;
+    final int ima = imaList[iKukan];
+    final List<String> hoka = [];
+    for (int k = 0; k < kukansuu; k++) {
+      for (int d = 1; d <= (kumi ? 2 : 1); d++) {
+        if (k == iKukan && d == dai) continue;
+        final List<int> l = d == 1 ? opt1 : opt2;
+        if (k >= l.length || l[k] != ima) continue;
+        final String mei = kumi
+            ? (k == iKukan ? 'この組のもう1人' : '${k + 1}組目')
+            : '${k + 1}区';
+        if (!hoka.contains(mei)) hoka.add(mei);
+      }
+    }
+    if (hoka.isEmpty) return null;
+    return '${hoka.join('・')}と重複';
+  }
+
   // 選手詳細モーダルを呼び出す共通関数
   Widget _buildDetailButton(SenshuData senshu) {
     return TextButton(
@@ -2258,6 +2286,28 @@ class _Mode0300ContentState extends State<Mode0300Content> {
                                                             ),
                                                           ],
                                                         ),
+                                                        // ほかの区間(組)と同じ選手を選んでいれば赤字で出す(2.1.0。
+                                                        // 文字を大きくしても横にはみ出さないように、区間の行とは別の行にして折り返す)
+                                                        if (_juufukuMoji(
+                                                              currentGhensuu,
+                                                              iKukan,
+                                                              1,
+                                                            ) !=
+                                                            null)
+                                                          Text(
+                                                            _juufukuMoji(
+                                                              currentGhensuu,
+                                                              iKukan,
+                                                              1,
+                                                            )!,
+                                                            style: const TextStyle(
+                                                              color: Colors
+                                                                  .redAccent,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold,
+                                                            ),
+                                                          ),
                                                         // 2行目に選手選択ドロップダウン1を配置（単独行）
                                                         Container(
                                                           alignment: Alignment
@@ -2457,6 +2507,27 @@ class _Mode0300ContentState extends State<Mode0300Content> {
                                                                   ),
                                                                 ],
                                                               ),
+                                                              // ほかの組と同じ選手を選んでいれば赤字で出す(2.1.0)
+                                                              if (_juufukuMoji(
+                                                                    currentGhensuu,
+                                                                    iKukan,
+                                                                    2,
+                                                                  ) !=
+                                                                  null)
+                                                                Text(
+                                                                  _juufukuMoji(
+                                                                    currentGhensuu,
+                                                                    iKukan,
+                                                                    2,
+                                                                  )!,
+                                                                  style: const TextStyle(
+                                                                    color: Colors
+                                                                        .redAccent,
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .bold,
+                                                                  ),
+                                                                ),
                                                               // 2行目に選手選択ドロップダウン2を配置（単独行）
                                                               Container(
                                                                 alignment: Alignment

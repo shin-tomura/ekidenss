@@ -4,6 +4,8 @@
 //   この区間の経験回数と、持ちタイムの行)。大学の選手と学連選抜(OP)の選手の2つの形がある
 // ・区間配置確認のカードと画像の書き出し、区間終了時点の位置関係(Modal_ichiKankei.dart)の
 //   「次の区間を走る選手」で使う
+// ・2.1.0から、情報集約パネルで大学の四角を2回押したときの、走り終わった選手の能力の行
+//   (senshuNouryokuZenbu・gakurenNouryokuZenbu)もここに置く
 // ・大会は区間配置確認と同じく gh.hyojiracebangou。持ちタイムを今季ベストで表示しているときは、
 //   [konki] に今季ベストの順位表を渡す(自己ベストのときはnull)
 // ------------------------------------------------------------
@@ -293,6 +295,115 @@ Widget senshuNouryokuRan(
         ),
         _nouryokuKoumoku("調子", "${s.chousi}"),
         if (keikenkaisuu > 0) _nouryokuKoumoku("この区間の経験回数", "$keikenkaisuu"),
+      ],
+    ),
+  );
+}
+
+/// 能力の名前(番号は Ghensuu.nouryokumieruflag と同じ。0駅伝男 1平常心 2長距離粘り 3スパート力 4カリスマ
+/// 5登り適性 6下り適性 7アップダウン対応力 8ロード適性 9ペース変動対応力。2.1.0)
+const List<String> _nouryokuMei = [
+  '駅伝男',
+  '平常心',
+  '長距離粘り',
+  'スパート力',
+  'カリスマ',
+  '登り適性',
+  '下り適性',
+  'アップダウン対応力',
+  'ロード適性',
+  'ペース変動対応力',
+];
+
+/// 走り終わった大学の選手の能力の行(2.1.0。情報集約パネルで、大学の四角を2回押したときに説明文の下に出す)
+/// 区間配置確認の能力の行(駅伝男・平常心・調子)に、今季タイム一覧表の右の走りの能力(安定感・長距離粘り〜
+/// ペース変動対応力)を足したもの。まだ見抜いていない能力は「??」(調子と安定感はいつも出す)。
+/// 大会[race]の[kukanIdx]区を走った選手で、それより前の学年に同じ区間を走ったことがあれば、その回数も出す
+Widget senshuNouryokuZenbu(
+  Ghensuu gh,
+  SenshuData s, {
+  required int race,
+  required int kukanIdx,
+}) {
+  return _nouryokuZenbu(
+    gh,
+    [
+      s.konjou,
+      s.heijousin,
+      s.choukyorinebari,
+      s.spurtryoku,
+      s.karisuma,
+      s.noboritekisei,
+      s.kudaritekisei,
+      s.noborikudarikirikaenouryoku,
+      s.tandokusou,
+      s.paceagesagetaiouryoku,
+    ],
+    chousi: s.chousi,
+    anteikan: s.anteikan,
+    keiken: _maeKeikenKaisuu(s.entrykukan_race, s.gakunen, race, kukanIdx),
+  );
+}
+
+/// 走り終わった学連選抜(OP)の選手の能力の行(senshuNouryokuZenbu と同じ中身。調子は学連選抜で走ったときの調子)
+Widget gakurenNouryokuZenbu(
+  Ghensuu gh,
+  Senshu_Gakuren_Data g, {
+  required int race,
+  required int kukanIdx,
+}) {
+  return _nouryokuZenbu(
+    gh,
+    [
+      g.konjou,
+      g.heijousin,
+      g.choukyorinebari,
+      g.spurtryoku,
+      g.karisuma,
+      g.noboritekisei,
+      g.kudaritekisei,
+      g.noborikudarikirikaenouryoku,
+      g.tandokusou,
+      g.paceagesagetaiouryoku,
+    ],
+    chousi: g.chousi,
+    anteikan: g.anteikan,
+    keiken: _maeKeikenKaisuu(g.entrykukan_race, g.gakunen, race, kukanIdx),
+  );
+}
+
+/// 今の学年より前に、大会[race]の[kukanIdx]区を走った回数
+int _maeKeikenKaisuu(List<List<int>> entry, int gakunen, int race, int kukanIdx) {
+  if (race < 0 || race >= entry.length || kukanIdx < 0) return 0;
+  int kaisuu = 0;
+  for (int i = 0; i < gakunen - 1 && i < entry[race].length; i++) {
+    if (entry[race][i] == kukanIdx) kaisuu++;
+  }
+  return kaisuu;
+}
+
+/// 能力の行の中身([atai] は _nouryokuMei の順の値。入りきらなければ折り返す)
+Widget _nouryokuZenbu(
+  Ghensuu gh,
+  List<int> atai, {
+  required int chousi,
+  required int anteikan,
+  required int keiken,
+}) {
+  String mieru(int b) =>
+      (b < gh.nouryokumieruflag.length && gh.nouryokumieruflag[b] == 1) ? '${atai[b]}' : '??';
+  return Padding(
+    padding: const EdgeInsets.only(bottom: 4),
+    child: Wrap(
+      spacing: 12,
+      runSpacing: 8,
+      children: [
+        _nouryokuKoumoku(_nouryokuMei[0], mieru(0)),
+        _nouryokuKoumoku(_nouryokuMei[1], mieru(1)),
+        _nouryokuKoumoku('調子', '$chousi'),
+        _nouryokuKoumoku('安定感', '$anteikan'),
+        for (int b = 2; b < _nouryokuMei.length; b++) _nouryokuKoumoku(_nouryokuMei[b], mieru(b)),
+        if (keiken > 0) _nouryokuKoumoku('この区間の経験回数', '$keiken'),
       ],
     ),
   );

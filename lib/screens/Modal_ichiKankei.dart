@@ -1182,6 +1182,18 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     return const SizedBox.shrink();
   }
 
+  /// 走った選手の能力の行(大学の四角を2回押したとき。選手が分からなければnull。2.1.0)
+  /// まだ見抜いていない能力は「??」。学連選抜の選手の調子は、学連選抜で走ったときの調子
+  Widget? _hashittaNouryoku(_IchiKukan r, _IchiDaigaku x) {
+    final Ghensuu? gh = _gh;
+    if (gh == null || r.kk < 0) return null;
+    final SenshuData? s = x.senshu;
+    if (s != null) return senshuNouryokuZenbu(gh, s, race: widget.race, kukanIdx: r.kk);
+    final Senshu_Gakuren_Data? g = x.gSenshu;
+    if (g != null) return gakurenNouryokuZenbu(gh, g, race: widget.race, kukanIdx: r.kk);
+    return null;
+  }
+
   /// 説明文の上の行(「3区 佐藤 健太(2年)　区間1位 1:02:41」。
   /// 学連選抜は「3区 OP 田中 翔(3年 所属:西峰大)　区間4位相当 1:03:05」。2.0.7)
   String _senshuGyou(_IchiKukan r, _IchiDaigaku x) {
@@ -1865,6 +1877,8 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     _IchiDaigaku x0,
     String oshitaBun,
   ) {
+    // 2回目に押したときの、走った選手の能力(説明文の下に出す。2.1.0)
+    final Widget? hashittaNouryoku = _hiraki == 1 ? _hashittaNouryoku(r0, x0) : null;
     return Container(
       padding: const EdgeInsets.fromLTRB(10, 2, 2, 8),
       decoration: BoxDecoration(
@@ -1973,6 +1987,13 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
                             height: 1.5,
                           ),
                         ),
+                        // 走った選手の能力(区間配置確認の能力の行に、今季タイム一覧表の走りの能力を足したもの。2.1.0)
+                        if (hashittaNouryoku != null) ...[
+                          const Divider(height: 12, color: Colors.white24),
+                          const Text('能力', style: _chiisai),
+                          const SizedBox(height: 2),
+                          hashittaNouryoku,
+                        ],
                       ],
                       // 次の区間を走る選手(区間配置確認のカードを開いたときと同じ)
                       if (_hiraki == 2) ...[

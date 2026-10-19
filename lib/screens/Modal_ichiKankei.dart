@@ -40,6 +40,8 @@
 //   集団のあとの大学は、集団の一番下の行を起点にして、集団の最後の大学との間の距離ぶん下に置く。
 //   四角が重なるほど近いときは、重ならないところまで下に広げて置く(印は付けない。右の数字が本当の差)。
 //   2校以上の集団は、四角にぴったり合わせた薄い枠で囲む。集団どうしは、枠がくっつかないよう10px以上空ける。
+//   2.1.0から、四角を行ごとに道の左右の真ん中に置く(集団は隊列のような形になる。「+1秒」は四角の右に出し、
+//   枠は道の真ん中を軸に左右同じ幅で囲む。行が道より広いときは、今まで通り左から並べて横にスクロール)。
 // ・画面の説明の文は短くし(「○区終了時点のタイム差を、区間の平均の速さで距離に換算した位置関係の図です」
 //   と、括弧・色・押したときのこと)、おまかせと集団の説明は説明書に書く。
 // ・道の右に、前の大学(集団)との間を示す括弧を引き、その真ん中に間の距離と秒差を出す。
@@ -1518,6 +1520,9 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     final List<_Aida> aidaList = [];
     final List<({double y0, double y1})> kireme = [];
     final List<Rect> waku = [];
+    // 2校以上の集団の、行の範囲(gyou の番号。kara から made の前まで)と枠の上端・下端
+    // (枠の左右は、道の幅が決まって四角を真ん中に寄せたあとで決める。2.1.0)
+    final List<({int kara, int made, double ue, double shita})> wakuKumi = [];
     double? seedTop;
     // 道の帯は、いちばん上から始める(2.0.6の開発中まで、上に「○区→○区の中継所」を出していた)
     const double michiUe = 0;
@@ -1571,7 +1576,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
         if (tsumeAto) kireme.add((y0: maeGyouShita, y1: top));
       }
       final double shuudanUe = top;
-      double shuudanMigi = 0;
+      final int gyouKara = gyou.length;
       // 集団の中は、先頭からの秒差ごとに行を分ける(2.1.0。同じ秒の大学を横に並べ、[gyouSuu]校で折り返す。
       // 秒が変わった行の右に「+1秒」を出し、折り返しの行には出さない)
       final List<({List<int> ichi, int? byou})> kumi = [];
@@ -1607,23 +1612,20 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
           x += _ookisa(TextSpan(text: byouMoji, style: _chiisai), scaler).width + _sukima;
         }
         gyou.add(_Gyou(top, gyouTakasa, hako, x, byou: byouMoji, byouX: byouX));
-        shuudanMigi = math.max(shuudanMigi, x);
         shita = top + gyouTakasa;
         top = shita + _sukima;
       }
       maeChuushin = shita - gyouTakasa / 2;
       maeGyouShita = shita;
       maeSaigo = sh.last;
-      // 2校以上の集団を囲む枠(四角にぴったり合わせる。右は最後の四角の右のすきままで)
+      // 2校以上の集団を囲む枠(上下はここで決め、左右は四角を真ん中に寄せたあとで決める)
       if (wakuAri) {
-        waku.add(
-          Rect.fromLTRB(
-            _hakoHidari - _wakuYohaku,
-            shuudanUe - _wakuYohaku,
-            shuudanMigi - _sukima + _wakuYohaku,
-            shita + _wakuYohaku,
-          ),
-        );
+        wakuKumi.add((
+          kara: gyouKara,
+          made: gyou.length,
+          ue: shuudanUe - _wakuYohaku,
+          shita: shita + _wakuYohaku,
+        ));
         shita += _wakuYohaku;
       }
     }
@@ -1655,6 +1657,55 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     final double kakkoX = michiHaba + 6;
     final double mojiX = kakkoX + 14;
     final double haba = math.max(w, mojiX + mojiHaba + 8);
+
+    // 四角を行ごとに道の左右の真ん中に置く(2.1.0。集団が隊列のような形に見えるように)。
+    // 真ん中にそろえるのは四角だけで、「+1秒」はその右に出す。「+1秒」が道からはみ出すときと、
+    // 行が道より広いときは、入るところまで左に寄せる(左端は今までの並べ始めの位置まで)
+    final double naka = michiHaba / 2;
+    for (int gi = 0; gi < gyou.length; gi++) {
+      final _Gyou g = gyou[gi];
+      if (g.hako.isEmpty) continue;
+      final double hakoHidari = g.hako.first.x;
+      final double hakoMigi = g.hako.last.x + g.hako.last.w;
+      final double hakoHaba = hakoMigi - hakoHidari;
+      // 「+1秒」の分(四角の右のすきまと文の幅。なければ0)
+      final double byouHaba = g.byou != null ? (g.hashi - _sukima) - hakoMigi : 0;
+      double hidari = naka - hakoHaba / 2;
+      hidari = math.min(hidari, michiHaba - _wakuYohaku - hakoHaba - byouHaba);
+      hidari = math.max(hidari, _hakoHidari);
+      final double dx = hidari - hakoHidari;
+      if (dx == 0) continue;
+      gyou[gi] = _Gyou(
+        g.y,
+        g.h,
+        [for (final _Hako hk in g.hako) _Hako(hk.i, hk.x + dx, hk.w, hk.h)],
+        g.hashi + dx,
+        byou: g.byou,
+        byouX: g.byouX + dx,
+      );
+    }
+    // 2校以上の集団を囲む枠(道の真ん中を軸に左右同じ幅で、四角と「+1秒」を囲む。道からははみ出さない)
+    for (final ({int kara, int made, double ue, double shita}) k in wakuKumi) {
+      double hidari = double.infinity;
+      double migi = 0;
+      for (int gi = k.kara; gi < k.made; gi++) {
+        final _Gyou g = gyou[gi];
+        if (g.hako.isEmpty) continue;
+        hidari = math.min(hidari, g.hako.first.x);
+        migi = math.max(migi, g.hashi - _sukima);
+      }
+      if (hidari == double.infinity) continue;
+      final double han = math.max(naka - hidari, migi - naka);
+      waku.add(
+        Rect.fromLTRB(
+          math.max(0.0, naka - han - _wakuYohaku),
+          k.ue,
+          math.min(michiHaba, naka + han + _wakuYohaku),
+          k.shita,
+        ),
+      );
+    }
+
     double takasa = shita;
     for (final _Aida a in aidaList) {
       takasa = math.max(takasa, a.top + a.h);

@@ -24,7 +24,7 @@
 // ・幅のある道の帯に、大学名を四角で囲んで並べ、1位からの距離を縮尺どおりの間隔で出す。
 //   四角の中の大学名は、最後の「大」を省く(下の帯の文は省かない)。学連選抜は四角の中では「OP学連」。
 //   2.1.0から、四角の中を順位・大学名・順位の変化の欄に分け、区間の中ではどの四角も同じ幅にする
-//   (大学名の欄は3文字分で左寄せ。長い名前は横だけ縮め、6割まで縮めても入らなければ最後を「…」で省く)。
+//   (大学名の欄は2文字分で左寄せ。長い名前は横だけ縮め、5割まで縮めても入らなければ最後を「…」で省く)。
 //   大学名の後ろに、前の区間の終了時点からの順位の変化を「↑2」(緑)「↓3」(赤)「→」(灰色)で付ける
 //   (1区は付けない。学連選抜は通過順位相当で比べる。下の帯にも「5位(↑3)」の形で出す)。
 // ・集団(2.1.0から): 前の大学との差が1秒以内(右の括弧と同じ切り捨ての秒。「並走」か「1秒」)なら、
@@ -189,11 +189,13 @@ const double _wakuYohaku = 4;
 const double _hakoYoko = 6;
 const double _hakoTate = 3;
 
-/// 四角の中の大学名の欄の文字数(どの四角も同じ幅にする。長い名前は横に縮める。2.1.0)
-const int _meiMojisuu = 3;
+/// 四角の中の大学名の欄の文字数(どの四角も同じ幅にする。長い名前は横に縮める。2.1.0。
+/// 開発中に3文字分で作ったが、四角を狭くするため2文字分にした)
+const int _meiMojisuu = 2;
 
-/// 大学名を横に縮める下限(これより縮めないと入らないときは、最後を「…」で省く。2.1.0)
-const double _meiChijimiSaishou = 0.6;
+/// 大学名を横に縮める下限(これより縮めないと入らないときは、最後を「…」で省く。2.1.0。
+/// 2文字分の欄に4文字の名前が入るように5割にした)
+const double _meiChijimiSaishou = 0.5;
 
 /// 四角の中の、順位と大学名のすきま・大学名と順位の変化のすきま(2.1.0)
 const double _juniSukima = 4;
@@ -209,7 +211,7 @@ class _HakoHaba {
   /// 順位の欄(学連選抜の「OP」も。なければ0)
   final double juni;
 
-  /// 大学名の欄(3文字分)
+  /// 大学名の欄(_meiMojisuu 文字分)
   final double mei;
 
   /// 順位の変化の欄(1区とスタートは0)
@@ -1204,7 +1206,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
   final Map<String, _HakoHaba> _hakoHabaKioku = {};
 
   /// 区間[r]の四角の中の欄の幅(2.1.0。どの四角も同じ幅にそろえる)
-  /// 順位の欄はその区間の一番広い順位(学連選抜の「OP」も)、大学名の欄は3文字分、
+  /// 順位の欄はその区間の一番広い順位(学連選抜の「OP」も)、大学名の欄は2文字分(_meiMojisuu)、
   /// 順位の変化の欄はその区間の一番広い変化(1区とスタートは変化がないので0)
   _HakoHaba _hakoHaba(_IchiKukan r, TextScaler scaler) {
     final String kagi = '${r.kk}:${scaler.scale(100).toStringAsFixed(2)}';
@@ -1280,7 +1282,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     );
   }
 
-  /// 四角の中の大学名(3文字分の欄に左寄せで入れる。長い名前は横だけ縮め、6割まで縮めても入らなければ
+  /// 四角の中の大学名(2文字分(_meiMojisuu)の欄に左寄せで入れる。長い名前は横だけ縮め、5割まで縮めても入らなければ
   /// 最後を「…」で省く。2.1.0)
   Widget _hakoMeiWidget(String mei, _HakoHaba h, TextScaler scaler) {
     final Size shizen = _ookisa(TextSpan(text: mei, style: _meiStyle), scaler);
@@ -1606,13 +1608,13 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
       }
     }
 
-    // 間の文の置き場所(括弧の真ん中。前の文やシード権ラインと重なるときは、下にずらす)
+    // 間の文の置き場所(括弧の真ん中。前の文と重なるときは、下にずらす)
+    // (2.0.9まではシード権ラインが画面の幅いっぱいだったので、ラインと重なる文もその下にずらしていた。
+    // 2.1.0からラインは道の帯の上だけに引くので、右の文はずらさない)
     double maeMojiShita = -1;
     for (final _Aida a in aidaList) {
       a.h = _ookisa(TextSpan(text: a.moji, style: _migiStyle), scaler).height;
-      double t = math.max((a.y0 + a.y1) / 2 - a.h / 2, maeMojiShita + 2);
-      final double? st = seedTop;
-      if (st != null && t < st + seedTakasa && t + a.h > st) t = st + seedTakasa + 2;
+      final double t = math.max((a.y0 + a.y1) / 2 - a.h / 2, maeMojiShita + 2);
       a.top = t;
       maeMojiShita = t + a.h;
     }
@@ -2379,15 +2381,25 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
                         top: a.top,
                         child: Text(a.moji, style: _migiStyle, softWrap: false),
                       ),
-                    // シード権ライン
+                    // シード権ライン(2.1.0から、道の帯の上だけに引く。右の括弧と差の文には重ならない。
+                    // 文字を大きくして文が道の帯より長くなっても、はみ出さないように後ろを切る)
                     if (h.seedTop != null)
                       Positioned(
                         left: 0,
                         top: h.seedTop!,
-                        width: h.haba,
+                        width: h.michiHaba,
                         child: Row(
                           children: [
-                            const Text('シード権ライン', style: _seedMojiStyle, softWrap: false),
+                            ConstrainedBox(
+                              constraints: BoxConstraints(maxWidth: h.michiHaba * 0.7),
+                              child: const Text(
+                                'シード権ライン',
+                                style: _seedMojiStyle,
+                                softWrap: false,
+                                maxLines: 1,
+                                overflow: TextOverflow.clip,
+                              ),
+                            ),
                             const SizedBox(width: 6),
                             Expanded(
                               child: SizedBox(

@@ -384,7 +384,7 @@ int _maeKeikenKaisuu(List<List<int>> entry, int gakunen, int race, int kukanIdx)
 
 /// 能力の行の中身([atai] は _nouryokuMei の順の値)
 /// 1行に1つずつ縦に並べ、数字は名前のすぐ右(スペース1つ)に出す(どの能力の数字か分かりやすいように。2.1.0)。
-/// 名前と数字が1行に入らなければ、数字を次の行に回す(_nouryokuKoumoku)
+/// 名前と数字が1行に入らなければ、数字を次の行に回す(_nouryokuGyou)
 Widget _nouryokuZenbu(
   Ghensuu gh,
   List<int> atai, {
@@ -395,12 +395,12 @@ Widget _nouryokuZenbu(
   String mieru(int b) =>
       (b < gh.nouryokumieruflag.length && gh.nouryokumieruflag[b] == 1) ? '${atai[b]}' : '??';
   final List<Widget> gyou = [
-    _nouryokuKoumoku(_nouryokuMei[0], mieru(0)),
-    _nouryokuKoumoku(_nouryokuMei[1], mieru(1)),
-    _nouryokuKoumoku('調子', '$chousi'),
-    _nouryokuKoumoku('安定感', '$anteikan'),
-    for (int b = 2; b < _nouryokuMei.length; b++) _nouryokuKoumoku(_nouryokuMei[b], mieru(b)),
-    if (keiken > 0) _nouryokuKoumoku('この区間の経験回数', '$keiken'),
+    _nouryokuGyou(_nouryokuMei[0], mieru(0)),
+    _nouryokuGyou(_nouryokuMei[1], mieru(1)),
+    _nouryokuGyou('調子', '$chousi'),
+    _nouryokuGyou('安定感', '$anteikan'),
+    for (int b = 2; b < _nouryokuMei.length; b++) _nouryokuGyou(_nouryokuMei[b], mieru(b)),
+    if (keiken > 0) _nouryokuGyou('この区間の経験回数', '$keiken'),
   ];
   return Padding(
     padding: const EdgeInsets.only(bottom: 4),
@@ -414,6 +414,34 @@ Widget _nouryokuZenbu(
         ],
       ],
     ),
+  );
+}
+
+/// 走り終わった選手の能力の1行(「長距離粘り 81」。2.1.0)
+/// 名前は情報集約パネルの説明文と同じ色と大きさ、数字は白の太字(区間配置確認のカードのオレンジの数字
+/// (_nouryokuKoumoku)とは分けて、説明文に続けて読みやすい色にする)。入りきらなければ数字を次の行に回す
+Widget _nouryokuGyou(String label, String value) {
+  return Wrap(
+    crossAxisAlignment: WrapCrossAlignment.center,
+    children: [
+      Text(
+        "$label ",
+        style: TextStyle(
+          color: HENSUU.textcolor.withOpacity(0.9),
+          fontSize: 12.5,
+          decoration: TextDecoration.none,
+        ),
+      ),
+      Text(
+        value,
+        style: const TextStyle(
+          color: HENSUU.textcolor,
+          fontWeight: FontWeight.bold,
+          fontSize: 13,
+          decoration: TextDecoration.none,
+        ),
+      ),
+    ],
   );
 }
 

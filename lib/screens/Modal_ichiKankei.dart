@@ -248,6 +248,15 @@ const Color _jibunIro = Colors.orangeAccent;
 String _michiMei(String mei) =>
     (mei.length > 1 && mei.endsWith('大')) ? mei.substring(0, mei.length - 1) : mei;
 
+/// 道の右の括弧の秒差の文(1分未満は「40秒」、1分以上は「3'40"」。2.1.0。
+/// 幅を抑えるため、記事などの「3分40秒」(saMoji)より短い、今季タイム一覧表のタイムと同じ書き方にする。
+/// 四角を押したときの下の帯は、場所に余裕があるので「3分40秒」のまま)
+String _aidaByouMoji(int sa) {
+  final int s = sa.abs();
+  if (s < 60) return '$s秒';
+  return '${s ~/ 60}\'${(s % 60).toString().padLeft(2, '0')}"';
+}
+
 /// 距離の文(「180m」「1.2km」。1kmまでは10m単位)
 String _kyoriMoji(double m) {
   final int r = (m / 10).round() * 10;
@@ -411,11 +420,12 @@ class _IchiKukan {
   }
 
   /// 2つの大学の間の文(道の右の括弧に出す。間なので「+」を付けない。0秒は「並走」)
-  /// 2.1.0から、幅を抑えるため距離と秒差を2行にする(「90m」の下に「16秒」)
+  /// 2.1.0から、幅を抑えるため距離と秒差を2行にし(「90m」の下に「16秒」)、1分以上の秒差は
+  /// 今季タイム一覧表のタイムと同じ「3'40"」の形にする(_aidaByouMoji)
   String aidaBun(_IchiDaigaku osoi, _IchiDaigaku hayai) {
     final int s = saByou(osoi.ruikei, hayai.ruikei);
     if (s <= 0) return '並走';
-    return '${_kyoriMoji(s * hayasa)}\n${saMoji(s)}';
+    return '${_kyoriMoji(s * hayasa)}\n${_aidaByouMoji(s)}';
   }
 
   /// 2つの大学の差の文(距離が先。「30m +5秒」。0秒は「並走」)

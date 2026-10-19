@@ -162,8 +162,11 @@ const double _tobinukeSaitei = 50;
 /// 詰めたところの高さ(px)
 const double _tsumePx = 52;
 
-/// 道の帯の幅(画面の幅に対する割合。四角が広いときは、四角が入るまで広げ、はみ出したぶんは横にスクロールする)
-const double _michiWariai = 0.6;
+/// 道の帯の右に置く括弧と差の文の、文以外の幅(括弧までのすきま6・括弧から文まで14・文の右の余白8)
+/// (2.1.0から、道の帯は画面の幅からこの幅と差の文の幅を引いた残り全部にする。2.0.9までは画面の幅の6割と
+/// 決めていたが、差の文を2行にして細くしたら、右に大きな余白が残ったため。四角の行のほうが広いときは
+/// 四角に合わせ、はみ出したぶんは横にスクロールする)
+const double _migiYohaku = 6.0 + 14.0 + 8.0;
 
 /// 集団の1行に並べる大学の数の上限(画面の幅に合わせて、これ以下で決める。_gyouSuuKimeru。2.1.0)
 const int _gyouSaidai = 3;
@@ -1327,6 +1330,28 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
   /// 集団の1行に並べる大学の数を、画面の幅と文字の大きさごとに覚えておく(画面を開いているあいだだけ。2.1.0)
   final Map<String, int> _gyouSuuKioku = {};
 
+  /// 一番長い差の文の幅を、文字の大きさごとに覚えておく(画面を開いているあいだだけ。2.1.0)
+  final Map<String, double> _aidaMojiHabaKioku = {};
+
+  /// パネルで見られる全部の区間(スタートと終わった区間)の、一番長い差の文の幅(2.1.0)
+  /// 道の帯の幅と1行に並べる数をこれで決める(区間を切り替えるたびに道の幅が変わらないように)
+  double _aidaMojiHabaSaidai(_IchiKankei b, TextScaler scaler) {
+    final String kagi = scaler.scale(100).toStringAsFixed(2);
+    final double? kioku = _aidaMojiHabaKioku[kagi];
+    if (kioku != null) return kioku;
+    double moji = 0;
+    for (final _IchiKukan r in b.kukan) {
+      for (int i = 1; i < r.narabi.length; i++) {
+        moji = math.max(
+          moji,
+          _ookisa(TextSpan(text: r.aidaBun(r.narabi[i], r.narabi[i - 1]), style: _migiStyle), scaler).width,
+        );
+      }
+    }
+    _aidaMojiHabaKioku[kagi] = moji;
+    return moji;
+  }
+
   /// 集団の1行に並べる大学の数(2.1.0)
   /// 「四角の行 + 右の括弧と差の文」が画面の幅[w]に入る一番大きい数を、3校 → 2校 → 1校の順に試して決める
   /// (1校でも入らなければ1校にして、横にスクロールする)。区間を切り替えるたびに数が変わらないように、
@@ -1336,7 +1361,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     final int? kioku = _gyouSuuKioku[kagi];
     if (kioku != null) return kioku;
     double hako = 0;
-    double moji = 0;
+    final double moji = _aidaMojiHabaSaidai(b, scaler);
     int byouSaidai = 0;
     for (final _IchiKukan r in b.kukan) {
       int sentou = 0; // いまの集団の先頭(シード権ラインなどで分かれるところは見ない。多めに見積もる)
@@ -1349,10 +1374,6 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
         } else {
           sentou = i;
         }
-        moji = math.max(
-          moji,
-          _ookisa(TextSpan(text: r.aidaBun(x, r.narabi[i - 1]), style: _migiStyle), scaler).width,
-        );
       }
     }
     final double byouHaba = byouSaidai > 0
@@ -1360,10 +1381,9 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
         : 0;
     int kekka = 1;
     for (int suu = _gyouSaidai; suu >= 1; suu--) {
-      // _haichi の幅の決め方と同じ(道の帯は画面の6割か一番広い行の広いほう、その右に括弧と差の文)
+      // _haichi の幅の決め方と同じ(一番広い行の右に、括弧と差の文が入るか)
       final double gyouHashi = _hakoHidari + suu * (hako + _sukima) + byouHaba;
-      final double michiHaba = math.max(w * _michiWariai, gyouHashi + _wakuYohaku);
-      if (michiHaba + 6 + 14 + moji + 8 <= w) {
+      if (gyouHashi + _wakuYohaku + _migiYohaku + moji <= w) {
         kekka = suu;
         break;
       }
@@ -1619,7 +1639,9 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
       maeMojiShita = t + a.h;
     }
 
-    // 幅(道の帯は画面の6割か、一番広い行の広いほう。間の文が入りきらなければ横にスクロール)
+    // 幅(道の帯は、画面の幅から括弧と差の文の幅を引いた残り全部か、一番広い行の広いほう。2.1.0。
+    // 差の文の幅は、区間を切り替えても道の幅が変わらないように、パネルの全部の区間で一番長い文で決める。
+    // 四角の行が広くて入りきらなければ横にスクロール)
     double gyouHaba = 0;
     for (final _Gyou g in gyou) {
       gyouHaba = math.max(gyouHaba, g.hashi);
@@ -1628,7 +1650,8 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     for (final _Aida a in aidaList) {
       mojiHaba = math.max(mojiHaba, _ookisa(TextSpan(text: a.moji, style: _migiStyle), scaler).width);
     }
-    final double michiHaba = math.max(w * _michiWariai, gyouHaba + _wakuYohaku);
+    final double zentaiMoji = math.max(mojiHaba, _aidaMojiHabaSaidai(b, scaler));
+    final double michiHaba = math.max(w - _migiYohaku - zentaiMoji, gyouHaba + _wakuYohaku);
     final double kakkoX = michiHaba + 6;
     final double mojiX = kakkoX + 14;
     final double haba = math.max(w, mojiX + mojiHaba + 8);

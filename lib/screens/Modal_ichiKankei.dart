@@ -46,6 +46,9 @@
 //     上から3分の1に来るように、コマを変えるたびに道を動かす(指で道を動かすと再生を止める)。焦点の大学は水色の枠
 //   ・大学の四角を押すと、その大学に焦点を移す(下の帯は出さない)。倍率は「−」「＋」で、おまかせのときは×4。
 //     再生中は途中の省略(点線)をしない(省略が出たり消えたりして道が跳ねないように)
+//   ・四角の中の順位は、そのコマの時点の順位(その地点を通った順)。順位の変化は、数字を出さずに、前の中継所から
+//     順位を上げた大学に「↑」(緑)、下げた大学に「↓」(赤)だけを出す(変わらなければ何も出さない。勢いの向きが
+//     分かるように。1区の演出のあいだは出さない)。位置は今まで通り「↑2」「↓3」「→」
 //   ・推移から位置に切り替えると、推移で見ていた区間を出す。覚えない(開いたときは「位置」)
 // ・2.0.8〜2.0.9は、おまかせのときに「おまかせ」をもう一度押すと「おまかせ ↔」(幅に合わせる)になり、道が横幅に
 //   収まるように道の上の文字を6割まで小さくしていた。2.1.0で、集団の1行に画面の幅に入るだけ並べるようになり、
@@ -258,7 +261,13 @@ const double _juniSukima = 4;
 const double _hendouSukima = 3;
 
 /// 四角の中の文字(順位と「OP」・大学名・順位の変化。順位の変化の色は変化ごとに付ける)
-const TextStyle _juniStyle = TextStyle(color: Colors.white54, fontSize: 11.5);
+/// (順位は2.1.1から、白い太字で少し大きくした(それまでは薄い灰色の11.5)。推移でコマごとに変わる順位が目に入るように。
+///  位置も同じにし、学連選抜の「OP」も同じ字)
+const TextStyle _juniStyle = TextStyle(
+  color: HENSUU.textcolor,
+  fontSize: 14,
+  fontWeight: FontWeight.bold,
+);
 const TextStyle _meiStyle = TextStyle(color: HENSUU.textcolor, fontSize: 13);
 const TextStyle _hendouStyle = TextStyle(fontSize: 12);
 
@@ -2027,7 +2036,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
         juni = math.max(juni, z.width);
         takasa = math.max(takasa, z.height);
       }
-      final String? hm = r.narabi[i].hendouMoji;
+      final String? hm = _hendouHyouji(r, r.narabi[i]);
       if (hm != null) {
         final Size z = _ookisa(TextSpan(text: hm, style: _hendouStyle), scaler);
         hendou = math.max(hendou, z.width);
@@ -2035,14 +2044,14 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
       }
     }
     // 推移(2.1.1)は、地点ごとに順位と順位の変化が変わるので、出うる一番広い文でも測る
-    // (区間の途中で欄の幅が変わって、四角の大きさが揺れないように)
+    // (区間の途中で欄の幅が変わって、四角の大きさが揺れないように。順位の変化は矢印だけ)
     if (r.suii) {
       final int n = r.narabi.where((x) => !x.op).length;
       final Size jz = _ookisa(TextSpan(text: '$n', style: _juniStyle), scaler);
       juni = math.max(juni, jz.width);
       takasa = math.max(takasa, jz.height);
       if (r.kk > 0) {
-        for (final String hm in ['↑$n', '↓$n']) {
+        for (final String hm in ['↑', '↓']) {
           final Size z = _ookisa(TextSpan(text: hm, style: _hendouStyle), scaler);
           hendou = math.max(hendou, z.width);
           takasa = math.max(takasa, z.height);
@@ -2061,7 +2070,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
   Widget _hakoNaka(_IchiKukan r, int i, TextScaler scaler) {
     final _HakoHaba h = _hakoHaba(r, scaler);
     final _IchiDaigaku x = r.narabi[i];
-    final String? hm = x.hendouMoji;
+    final String? hm = _hendouHyouji(r, x);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -2131,6 +2140,14 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
         child: Text(hyouji, style: _meiStyle, maxLines: 1, softWrap: false),
       ),
     );
+  }
+
+  /// 四角の中の順位の変化の文(位置は「↑2」「↓3」「→」。推移は矢印だけで、変わらなければなし。2.1.1)
+  String? _hendouHyouji(_IchiKukan r, _IchiDaigaku x) {
+    if (!r.suii) return x.hendouMoji;
+    final int? h = x.hendou;
+    if (h == null || h == 0) return null;
+    return h > 0 ? '↑' : '↓';
   }
 
   /// 順位の変化の色

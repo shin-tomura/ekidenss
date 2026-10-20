@@ -313,6 +313,36 @@ String _courseNoKotoba(KukanTokuchou t, {required bool anchor, required bool nag
   }
 }
 
+/// 因縁の地の文を「(名前)は」のあとに続けられる形にする(2.1.0)
+/// 2文以上のときは、前の文が名詞で終わるなら「、」でつなぎ(「区間15位、3つ順位を上げた。」)、
+/// そうでなければ「。」のまま続ける(「15分台だった。それが今は…」)。最後は「。」で終わる
+String _innenTsunagu(String bun) {
+  final List<String> bu = [
+    for (final String b in bun.split('。'))
+      if (b.trim().isNotEmpty) b.trim(),
+  ];
+  if (bu.isEmpty) return '';
+  final StringBuffer sb = StringBuffer(bu.first);
+  for (int i = 1; i < bu.length; i++) {
+    sb.write(KijiKakite.bunmatsuShurui(bu[i - 1]) == 2 ? '、' : '。');
+    sb.write(bu[i]);
+  }
+  sb.write('。');
+  return sb.toString();
+}
+
+/// 4年生の最後の駅伝か(正月駅伝と、そのあとのカスタム駅伝。2.1.0)
+bool _saigoNoEkiden(KijiKankyou k, SenshuData s) =>
+    s.gakunen == 4 && (k.race == 2 || k.race == 5);
+
+/// 振るわなかった選手の因縁のあとの締め(2.1.0)
+/// 昨年より区間順位を上げた選手には「苦しみました」と言わず、4年生の最後の駅伝では「次につながります」と言わない
+String _kurushiShime(KijiKankyou k, SenshuData s, Innen i) {
+  if (i.shurui == InnenShurui.juniUe) return '去年からの成長は、しっかり見せてくれましたね';
+  if (_saigoNoEkiden(k, s)) return '今日は苦しみましたが、最後まで走り切りました';
+  return '今日は苦しみましたが、この経験は次につながります';
+}
+
 Kiji? _kukanJikkyou(
   KijiKankyou k,
   int kk, {
@@ -782,7 +812,8 @@ Kiji? _kukanJikkyou(
           kai(
             nkGyakuten
                 ? '${myouji(js.name)}、${ji.first.kotoba}。その思いが、最後の1枠を引き寄せましたね'
-                : '${myouji(js.name)}は${ji.first.bun.replaceAll('。', '')}。今日は届きませんでしたが、この悔しさは必ず次につながります',
+                : '${myouji(js.name)}は${_innenTsunagu(ji.first.bun)}今日は届きませんでしたが、'
+                      '${_saigoNoEkiden(k, js) ? 'この悔しさは、後輩たちが晴らしてくれるはずです' : 'この悔しさは必ず次につながります'}',
           );
         } else if (js != null && jh != null && nkGyakuten && jh.kiwaYoi != null) {
           kai('${myouji(js.name)}の${jh.kiwaYoi}が、この区間の選手の中で際立っていました。最後の1枠を引き寄せたのは、そこです');
@@ -1150,7 +1181,7 @@ Kiji? _kukanJikkyou(
       kai('${myouji(s.name)}は${h.kiwaWarui}で差をつけられました。この区間との相性が出てしまいましたね');
     } else if (mi.isNotEmpty && mi.first.ten >= 45 && (!yoi || w.nobiKotobaTsukaeru(mi.first.kotoba))) {
       if (yoi) w.nobiKotobaTsukatta(mi.first.kotoba);
-      kai(yoi ? '${myouji(s.name)}、${mi.first.kotoba}、という走りでしたね' : '${myouji(s.name)}は${mi.first.bun.replaceAll('。', '')}。今日は苦しみましたが、この経験は次につながります');
+      kai(yoi ? '${myouji(s.name)}、${mi.first.kotoba}、という走りでしたね' : '${myouji(s.name)}は${_innenTsunagu(mi.first.bun)}${_kurushiShime(k, s, mi.first)}');
     } else if (kata == KishaKata.karakuchi && warui && mokuhyouAri && my.tuuka > mokuhyou) {
       kai('区間${juniMoji(my.kukanJuni)}は厳しいですね。目標の${juniMoji(mokuhyou)}まで、残りの区間で取り返せる差かどうか');
     } else if (yoi) {

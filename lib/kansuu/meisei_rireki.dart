@@ -103,6 +103,25 @@ List<MeiseiRirekiGyou> meiseiRirekiYomu(int nenmae, int univid) {
   return list;
 }
 
+/// [nenmae]年前(0が今年度)に、全大学が得た名声の合計(名声設定の画面の説明に出す。2.1.1)
+/// (量が1以上の行が1つもない年は、記録なしとしてnull。名声の編集などの量0の行は数に入らない)
+int? meiseiRirekiZenUnivGoukei(int nenmae) {
+  final UnivData? s = _slot(nenmae);
+  if (s == null || !s.name_tanshuku.startsWith(_midashi)) return null;
+  int goukei = 0;
+  bool ari = false;
+  for (final String gyou in s.name_tanshuku.split('\n').skip(1)) {
+    final List<String> p = gyou.split('\t');
+    if (p.length < 3) continue;
+    final int? id = int.tryParse(p[0]);
+    final int? ryou = int.tryParse(p[1]);
+    if (id == null || ryou == null || ryou <= 0) continue;
+    ari = true;
+    goukei += ryou;
+  }
+  return ari ? goukei : null;
+}
+
 /// 駅伝の名前(履歴の文に使う。カスタム駅伝は設定した名前)
 String meiseiRirekiEkidenMei(int racebangou) {
   switch (racebangou) {

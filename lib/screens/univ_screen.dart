@@ -25,6 +25,8 @@ import 'package:ekiden/screens/ModalChartSenshu.dart';
 import 'package:ekiden/kansuu/ChartPanelUniv.dart';
 import 'package:ekiden/screens/Modal_ChartHyojiHijyojiKirikae.dart'; // レーダーチャートのパネルの表示・非表示(2.0.3)
 import 'package:ekiden/kansuu/meisei_rireki.dart'; // 名声の履歴(1.8.8)
+import 'package:ekiden/kansuu/meisei_kotei.dart'
+    show meiseiKotei; // 名声設定の画面の説明に、コンピュータの大学の名声を固定中であることを添える(2.1.1)
 import 'package:ekiden/kansuu/shiyou_text.dart'; // 留学生の入学の決まり(1.8.9)
 import 'package:ekiden/kansuu/kiji/kiji_kihon.dart'
     show KijiHyou, univSandaiHyou, konkiKaisaiZumi; // 三大駅伝の成績の表(1.9.8)
@@ -3018,10 +3020,28 @@ class _ModalMeiseiHenkouState extends State<ModalMeiseiHenkou> {
   static const int minMeisei = 9;
   static const int defaultMaxMeisei = 100000;
 
+  // 画面を開いたときの名声(大学idごと)。閉じるときに比べ、変わった大学だけ名声の履歴に
+  // 「名声を編集」を1行書く(2.1.1。スライダーで変えたときも書く。何度変えても1大学1行で、
+  // 値が同じなら書かない。2.1.0までは、数字の欄から離れるたびに書き(値が同じでも)、スライダーでは書いていなかった)
+  final Map<int, int> _hirakuMaeMeisei = {};
+  // 閉じるときの処理を始めたか(戻るボタンと端末の戻るの両方から呼ばれても1回だけにする。2.1.1)
+  bool _tojiruShoriZumi = false;
+  // 昨年度に全大学が得た名声の合計(説明に出す。記録がなければnull。開いているあいだは変わらない。2.1.1)
+  int? _sakunendoGoukei;
+  // コンピュータの大学の名声を固定しているか(説明に1行添える。2.1.1)
+  bool _kotei = false;
+
   @override
   void initState() {
     super.initState();
     _univBox = Hive.box<UnivData>('univBox');
+    for (final UnivData u in _univBox.values) {
+      _hirakuMaeMeisei[u.id] = u.meisei_total;
+    }
+    _sakunendoGoukei = meiseiRirekiZenUnivGoukei(1);
+    _kotei = meiseiKotei(
+      Hive.box<KantokuData>('kantokuBox').get('KantokuData'),
+    );
   }
 
   @override
@@ -3074,12 +3094,7 @@ class _ModalMeiseiHenkouState extends State<ModalMeiseiHenkou> {
           _updateMeiseiValues(univ, newValue);
         });
         await univ.save();
-        // 名声の履歴に、名声を編集したことを書く(年ごとの名声を作り直すので、内訳と合わなくなるため。1.8.8)
-        await meiseiRirekiTsuika(
-          univ.id,
-          '名声を編集(10年分の合計を$newValueにした)',
-          0,
-        );
+        // 名声の履歴の「名声を編集」は、閉じるときにまとめて書く(_tojiruShori。2.1.1)
       }
     }
   }
@@ -3112,10 +3127,56 @@ class _ModalMeiseiHenkouState extends State<ModalMeiseiHenkou> {
     }
   }
 
-  Future<bool> _onWillPop() async {
+  /// 閉じるときの処理。名声の順位を付け直し、名声が変わった大学ごとに、名声の履歴に「名声を編集」を書く
+  /// (年ごとの名声を作り直すので、内訳と合わなくなるため。1.8.8。2.1.1から、閉じるときにまとめて書く)。
+  /// 戻るボタンと端末の戻るの両方から呼ぶので、1回だけ行い、行ったときはtrueを返す
+  /// (2回目からはfalse。続けて押されても2回閉じないように)
+  Future<bool> _tojiruShori() async {
+    if (_tojiruShoriZumi) return false;
+    _tojiruShoriZumi = true;
     FocusScope.of(context).unfocus();
     await _updateMeiseiRanking();
+    final List<UnivData> univs = _univBox.values.toList()
+      ..sort((a, b) => a.id.compareTo(b.id));
+    for (final UnivData u in univs) {
+      final int? mae = _hirakuMaeMeisei[u.id];
+      if (mae == null || mae == u.meisei_total) continue;
+      await meiseiRirekiTsuika(
+        u.id,
+        '名声を編集(10年分の合計を${u.meisei_total}にした)',
+        0,
+      );
+    }
     return true;
+  }
+
+  Future<bool> _onWillPop() async {
+    return await _tojiruShori();
+  }
+
+  /// 上の説明の文(2.1.1から、決まった名声の量(年間獲得総名声12060など)をやめ、このデータの昨年度の実績を出す。
+  /// 決まった量は、全大学が目標1位のときの総合順位の名声だけで、目標順位で割る分・区間賞・倍率などを入れていなかったため)
+  String _setsumeiBun(int currentMaxMeisei, int univSuu) {
+    final List<String> bun = [
+      '名声を${minMeisei}から${currentMaxMeisei}の間で設定できます。',
+      '名声は、各大学が過去10年に得た名声の合計です。',
+    ];
+    final int? goukei = _sakunendoGoukei;
+    if (goukei == null || univSuu <= 0) {
+      bun.add('昨年度の記録はまだありません。');
+    } else {
+      bun.add(
+        'このデータの昨年度、全大学が得た名声は${goukei}でした(1大学あたり${(goukei / univSuu).round()})。',
+      );
+    }
+    if (_kotei) {
+      bun.add('コンピュータの大学の名声は固定中です(駅伝などで得ても合計は変わりません)。');
+    }
+    bun.add('駅伝などで得られる名声の量は、説明書の「名声」に一覧があります。');
+    bun.add(
+      'また、戻った直後の画面上では名声変更が反映されていないですが、一回自分の大学ボタンをタップしていただければ画面に反映されます。（気にならなければいちいちタップする必要もありません。）',
+    );
+    return bun.join('\n');
   }
 
   int _calculateAverageMeisei(List<UnivData> univs) {
@@ -3167,6 +3228,13 @@ class _ModalMeiseiHenkouState extends State<ModalMeiseiHenkou> {
 
           final int currentMaxMeisei = _calculateCurrentMaxMeisei();
           final int averageMeisei = _calculateAverageMeisei(allUnivs);
+          // 今の名声の1位と最下位(平均名声の下に小さく出す。2.1.1)
+          final int ichiiMeisei = allUnivs
+              .map((e) => e.meisei_total)
+              .reduce(max);
+          final int saikaiMeisei = allUnivs
+              .map((e) => e.meisei_total)
+              .reduce(min);
           // itemCountを元に戻す
           final int itemCount = allUnivs.length + 1;
 
@@ -3199,6 +3267,15 @@ class _ModalMeiseiHenkouState extends State<ModalMeiseiHenkou> {
                       ),
                       textAlign: TextAlign.center,
                     ),
+                    // 今の名声の1位と最下位(2.1.1)
+                    Text(
+                      "(1位 $ichiiMeisei・${allUnivs.length}位 $saikaiMeisei)",
+                      style: TextStyle(
+                        color: HENSUU.textcolor,
+                        fontSize: HENSUU.fontsize_honbun - 2,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
                     const SizedBox(height: 16),
                     const Divider(color: Colors.grey),
                     Expanded(
@@ -3212,8 +3289,11 @@ class _ModalMeiseiHenkouState extends State<ModalMeiseiHenkou> {
                               child: Column(
                                 children: [
                                   Text(
-                                    // 50000の部分をcurrentMaxMeiseiに置き換える
-                                    "名声を9から$currentMaxMeiseiの間で設定できます。\nなお、このゲームの年間獲得総名声は12060、過去9年積み上がる+各大学最低1補償で12年以降4月時点での総合計は108570、30大学の平均値は3619になります。\nまた、戻った直後の画面上では名声変更が反映されていないですが、一回自分の大学ボタンをタップしていただければ画面に反映されます。（気にならなければいちいちタップする必要もありません。）",
+                                    // 2.1.1から、昨年度の実績などを出す(_setsumeiBun)
+                                    _setsumeiBun(
+                                      currentMaxMeisei,
+                                      allUnivs.length,
+                                    ),
                                     style: TextStyle(
                                       color: HENSUU.textcolor,
                                       fontSize: HENSUU.fontsize_honbun,
@@ -3299,8 +3379,8 @@ class _ModalMeiseiHenkouState extends State<ModalMeiseiHenkou> {
                     const SizedBox(height: 16),
                     ElevatedButton(
                       onPressed: () async {
-                        FocusScope.of(context).unfocus();
-                        await _updateMeiseiRanking();
+                        // 名声の順位の付け直しと、名声の履歴の「名声を編集」(2.1.1。続けて押されたときは何もしない)
+                        if (!await _tojiruShori()) return;
                         if (mounted) {
                           Navigator.pop(context);
                         }

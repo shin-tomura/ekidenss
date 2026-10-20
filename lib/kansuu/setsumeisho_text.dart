@@ -8,16 +8,28 @@ import 'package:ekiden/kansuu/shiyou_text.dart';
 // ・書き方の決まりはCLAUDE.md(1行に1つのことを「・」で始めて書く、など)。
 //   「・」で始まらない行は、そのままの文として出す(はじめに・最後に・プライバシーポリシー)。
 // ・表示(折りたたみ)は lib/screens/setsumeisho_tab.dart。
+// ・2.1.1から、長い見出しには要点(youten。3〜5行)を付け、見出しを開くと要点だけを出す。
+//   本文(今までの全文)と図は、その下の「くわしく」を開くと出る。本文が5行くらいまでの見出しには要点を付けない。
+//   要点は説明書だけの文で、生成AI向けの仕様には入らない。設定で仕組みがなくなっても間違いにならない言い方にし
+//   (「〜ことがあります」など)、設定で変わる量や細かい条件は本文に任せる。
+// ・2.1.1から、画面の操作(どこを押すと何が出るか)は「画面の使い方」のグループの見出しに書き、
+//   決まりの見出しには書かない(結果画面のお知らせ・情報集約パネル・今季タイム一覧表のメモは、
+//   shiyou_text.dart の「大会と人数」「名声」の説明書だけの行から移した)。
 // ------------------------------------------------------------
 
 /// 説明書の見出し1つ分と、その中の最後に出す参考資料の図(説明書だけ)
 class SetsumeishoKoumoku {
   const SetsumeishoKoumoku(
     this.setsu, {
+    this.youten = const [],
     this.zuSetsumei = '',
     this.zu = const [],
   });
   final ShiyouSetsu setsu;
+
+  /// 要点(見出しを開いたときに最初に出す3〜5行。2.1.1)。空なら本文をそのまま出す。
+  /// 要点があるときは、本文と図はその下の「くわしく」を開くと出る
+  final List<String> youten;
 
   /// 図の説明(図の上に出す)
   final String zuSetsumei;
@@ -36,37 +48,44 @@ class SetsumeishoGroup {
 }
 
 /// 説明書タブに出すグループと見出しの並び
+/// (2.1.1から「このゲームについて」「画面の使い方」「読み物」を足し、長い見出しには要点を付けた)
 List<SetsumeishoGroup> setsumeishoGroupList() {
   return [
-    const SetsumeishoGroup('', [SetsumeishoKoumoku(_hajimeni)]),
+    SetsumeishoGroup('このゲームについて', [
+      const SetsumeishoKoumoku(_hajimeni),
+      SetsumeishoKoumoku(_ichinenNagare()),
+      const SetsumeishoKoumoku(_seiseiAI),
+    ]),
     SetsumeishoGroup('レースの決まり', [
-      SetsumeishoKoumoku(shiyouTaikai(setsumeisho: true)),
-      SetsumeishoKoumoku(shiyouMokuhyou(setsumeisho: true)),
-      SetsumeishoKoumoku(shiyouSiji(setsumeisho: true)),
+      SetsumeishoKoumoku(shiyouTaikai(setsumeisho: true), youten: _youtenTaikai),
+      SetsumeishoKoumoku(shiyouMokuhyou(setsumeisho: true), youten: _youtenMokuhyou()),
+      SetsumeishoKoumoku(shiyouSiji(setsumeisho: true), youten: _youtenSiji),
       // 主将(2.0.1)
-      SetsumeishoKoumoku(shiyouShushou(setsumeisho: true)),
-      SetsumeishoKoumoku(shiyouShuudansou(setsumeisho: true)),
+      SetsumeishoKoumoku(shiyouShushou(setsumeisho: true), youten: _youtenShushou()),
+      SetsumeishoKoumoku(shiyouShuudansou(setsumeisho: true), youten: _youtenShuudansou),
       SetsumeishoKoumoku(shiyouKeiken(setsumeisho: true)),
-      SetsumeishoKoumoku(shiyouGakuren(setsumeisho: true)),
+      SetsumeishoKoumoku(shiyouGakuren(setsumeisho: true), youten: _youtenGakuren),
     ]),
     SetsumeishoGroup('選手と能力', [
       SetsumeishoKoumoku(
         shiyouNouryoku(setsumeisho: true),
+        youten: _youtenNouryoku,
         // △は、駅伝の2区と3区・正月駅伝予選(ロード適性とペース変動対応力)と、
         // クロカン1万(坂の能力とペース変動対応力)。「少し効く」から直した(1.8.6)
         zuSetsumei:
             '参考資料: ロード適性・ペース変動対応力と各競技との関係性(○はよく効く、△はほかの能力と一緒に効く)',
         zu: const ['lib/assets/gazou/nouryoku.png'],
       ),
-      SetsumeishoKoumoku(shiyouMochiTime(setsumeisho: true)),
-      SetsumeishoKoumoku(shiyouSuuchi(setsumeisho: true)),
+      SetsumeishoKoumoku(shiyouMochiTime(setsumeisho: true), youten: _youtenMochiTime),
+      SetsumeishoKoumoku(shiyouSuuchi(setsumeisho: true), youten: _youtenSuuchi),
       // 留学生の入学の決まり(1.8.9)
-      SetsumeishoKoumoku(shiyouRyuugakusei(setsumeisho: true)),
+      SetsumeishoKoumoku(shiyouRyuugakusei(setsumeisho: true), youten: _youtenRyuugakusei),
     ]),
     SetsumeishoGroup('育成と名声', [
-      SetsumeishoKoumoku(shiyouIkusei(setsumeisho: true)),
+      SetsumeishoKoumoku(shiyouIkusei(setsumeisho: true), youten: _youtenIkusei()),
       SetsumeishoKoumoku(
         shiyouMeisei(setsumeisho: true),
+        youten: _youtenMeisei,
         zuSetsumei: '参考資料: 各大会での獲得名声初期値一覧(目標順位1位の場合)',
         zu: const [
           'lib/assets/gazou/meisei_10.png',
@@ -77,13 +96,21 @@ List<SetsumeishoGroup> setsumeishoGroupList() {
         ],
       ),
     ]),
-    const SetsumeishoGroup('', [SetsumeishoKoumoku(_seiseiAI)]),
-    const SetsumeishoGroup('', [SetsumeishoKoumoku(_newsKiji)]),
+    // 画面の操作(2.1.1。決まりの見出しから移した)
+    const SetsumeishoGroup('画面の使い方', [
+      SetsumeishoKoumoku(_kekkaOshirase),
+      SetsumeishoKoumoku(_panel, youten: _youtenPanel),
+      SetsumeishoKoumoku(_konkiMemo),
+      SetsumeishoKoumoku(_gakunaiKiroku, youten: _youtenGakunaiKiroku),
+    ]),
+    // 遊ぶのに知らなくてもよい読み物(2.1.1)
+    const SetsumeishoGroup('読み物', [
+      SetsumeishoKoumoku(_newsKiji, youten: _youtenNewsKiji),
+      SetsumeishoKoumoku(_koukouJidai, youten: _youtenKoukouJidai),
+    ]),
     const SetsumeishoGroup('その他', [
-      SetsumeishoKoumoku(_gakunaiKiroku),
-      SetsumeishoKoumoku(_kantokuCoach),
-      SetsumeishoKoumoku(_koukouJidai),
-      SetsumeishoKoumoku(_reset),
+      SetsumeishoKoumoku(_kantokuCoach, youten: _youtenKantokuCoach),
+      SetsumeishoKoumoku(_reset, youten: _youtenReset),
       SetsumeishoKoumoku(_pcBan),
       SetsumeishoKoumoku(_saigoni),
       SetsumeishoKoumoku(_privacy),
@@ -91,16 +118,229 @@ List<SetsumeishoGroup> setsumeishoGroupList() {
   ];
 }
 
+// はじめに(2.1.1から短くした。総監督が決めることと「大学の個性」の案内は「1年の流れ」に移した)
 const ShiyouSetsu _hajimeni = ShiyouSetsu('はじめに', [
   '箱庭小駅伝SSをダウンロードしていただき誠にありがとうございます。',
   'このゲームは文字情報だけの駅伝シミュレーションゲームです。',
-  '総監督(あなた)ができることは、選手の区間配置とレース中の指示、新入生スカウト、練習メニューの選択、金特訓・銀特訓など、限られたことだけです。',
-  '選手は基本的に勝手に成長します。',
+  '総監督(あなた)ができることは限られていて、選手は基本的に勝手に成長します。',
   '肩の力を抜いて、ご自身のペースでお付き合いいただければ幸いです。',
   'なお、このゲームに登場する団体名・個人名は実在する団体・個人とは一切関係ありません。',
   '各種設定やデータのセーブ・ロード、コースの紹介・編集などは、画面の上の「設定」タブにあります。',
-  '大学ごとの設定(実力発揮度・スカウト方針・区間配置の方針など)は、大学画面の「大学の個性」にまとめてあります。',
-  '「大学の個性」では、スピード型・距離型などの型を選んで、実力発揮度・銀の使い道・スカウト方針をまとめてそろえることもできます。',
+]);
+
+// 1年の流れ(2.1.1。日付は main.dart の年間の予定と同じ)
+// ・新入生のスカウトは、内部では年度替わり(4月5日)の処理の中だが、プレイヤーの感覚では前の年度の3月の終わりなので、
+//   3月の終わりに書く(卒業の処理のあとにスカウトの画面に進むので、「卒業し、スカウトします」の順で合う)
+// ・記録会は、記録会時期設定で9月か11〜12月のどちらか(初期値は11〜12月)
+// ・難易度モードの「天」は金銀の支給がないので、春の金銀と金特訓・銀特訓を書かない
+ShiyouSetsu _ichinenNagare() {
+  final bool ten = setsumeishoNanidoMode() == 2;
+  final bool kugatsu = setsumeishoKirokukaiKugatsu();
+  final String? customMei = setsumeishoCustomMei();
+  const String kirokukai = '記録会(市民ハーフ・トラック1万・トラック5千)があります。';
+  return ShiyouSetsu('1年の流れ', [
+    ten ? '・4月:新入生が入学します。' : '・4月:新入生が入学し、春の金銀が支給されます。',
+    '・4月:選手ごとの1年間の練習メニュー(年間強化練習)を決めます。',
+    '・5月:対校戦(5000m・1万m・ハーフ)があります。',
+    '・6月:11月駅伝予選があります。',
+    ten
+        ? '・7月:夏合宿があります(今の設定では金銀が支給されないので、金特訓・銀特訓はできません)。'
+        : '・7月:夏合宿で、金特訓・銀特訓をします。',
+    '・7月下旬〜8月:夏のタイムトライアル(クロカン・登り・下り・ロード)があります。',
+    if (kugatsu) '・9月:$kirokukai',
+    '・10月:10月駅伝と正月駅伝予選があります。',
+    '・11月:11月駅伝があります。',
+    if (!kugatsu) '・11月〜12月:$kirokukai',
+    '・1月:正月駅伝があります。',
+    if (customMei != null) '・2月:カスタム駅伝($customMei)があります。',
+    '・3月:フルマラソンがあります。',
+    '・3月の終わり:4年生が卒業し、来年度の新入生をスカウトします。',
+    ten
+        ? '・総監督が決めるのは、エントリー・区間配置・指示・スカウト・練習メニューです。'
+        : '・総監督が決めるのは、エントリー・区間配置・指示・スカウト・練習メニュー・金銀の使い道です。',
+    '・基本走力は、春と夏に自動で成長します。',
+    '・大学ごとの設定(実力発揮度・スカウト方針・区間配置の方針など)は、大学画面の「大学の個性」にまとめてあります。',
+    '　・スピード型・距離型などの型を選んで、実力発揮度・銀の使い道・スカウト方針をまとめてそろえることもできます。',
+    '・記録会の時期は、設定タブの「記録会時期設定」で、カスタム駅伝は「カスタム駅伝設定」で変えられます。',
+  ]);
+}
+
+// ---- 要点(2.1.1。見出しを開いたときに最初に出す。本文は「くわしく」) ----
+// ・1行に1つのことを、本文の言葉で短く書く。量や細かい条件は書かない(本文に任せる)
+// ・設定で仕組みがなくなっても間違いにならない言い方にする(変わるものは関数にして今の設定で書き分ける)
+// ・サプライズの仕組み(温情の支給・隠れた逸材)と矛盾しないように、「〜だけ」と言い切らない
+
+const List<String> _youtenTaikai = [
+  '・駅伝は10月・11月・正月の3つで、11月駅伝と正月駅伝には予選があります。',
+  '・一次エントリーで選んだ選手を、区間エントリーで各区間に1人ずつ置きます。',
+  '・スタート前の当日変更で、区間の選手を補欠と入れ替えられます。',
+];
+
+List<String> _youtenMokuhyou() => [
+  '・駅伝の目標順位は、あなたが決めます(対校戦と駅伝予選は決まっています)。',
+  setsumeishoNanidoMode() == 0
+      ? '・目標順位を達成すると、金銀がもらえ、選手の能力を見抜く力がつくことがあります。'
+      : '・目標順位を達成すると、選手の能力を見抜く力がつくことがあります。',
+  '・目標順位から外れた順位で襷を受けると、タイムが悪くなることがあります。',
+  '・目標順位が低いほど、駅伝の順位で得られる名声は小さくなります。',
+];
+
+const List<String> _youtenSiji = [
+  '・駅伝と11月駅伝予選では、選手が走り出す直前に指示を出せます。',
+  '・1区と11月駅伝予選は「スタート直後飛び出し」、2区以降は「前半突っ込み」か「前半抑え」です。',
+  '・成功確率は、飛び出しと前半突っ込みが駅伝男、前半抑えが平常心で決まります。',
+  '・正月駅伝予選では、選手ごとにフリー走か集団走を選べます。',
+];
+
+List<String> _youtenShushou() => [
+  '・どの大学にも、3年生か4年生の中から1人、主将がいます。',
+  if (setsumeishoShushouTokutenHataraku())
+    '・主将は、駅伝の2区以降を指示なしで走っても、目標順位による悪化がかかりません。',
+  '・あなたの大学の主将は、9月下旬まで、3・4年生の選手画面で代えられます。',
+];
+
+const List<String> _youtenShuudansou = [
+  '・駅伝の1区と11月駅伝予選の各組は、全大学の選手が1つの集団で走ります。',
+  '・集団のペースは、おもにカリスマが一番高い選手が作ります。',
+  '・集団のペースが本来のペースより遅いと損、少し速いと得、速すぎると大失速することがあります。',
+  '・直前順位予想などの画面で、1区の集団のペースの予想を見られます。',
+];
+
+const List<String> _youtenGakuren = [
+  '・正月駅伝に出られなかった大学から1人ずつ選ばれた、10人のオープン参加のチームです。',
+  '・あなたの大学が正月駅伝に出られない年は、あなたが学連選抜の監督をします(しないこともできます)。',
+  '・目標順位を1位にして総合1位相当に導くと、あなたの大学の名声が大きく上がります。',
+];
+
+const List<String> _youtenNouryoku = [
+  '・基本走力は、すべてのタイムのもとになる見えない能力で、春と夏に成長します。',
+  '・駅伝男と平常心は、指示の成功確率に直結します。',
+  '・長距離粘り・スパート力・登りや下りなどの適性は、効く区間や種目がそれぞれ違います。',
+  '・駅伝男からペース変動対応力までの能力は、自然には変わりません。',
+];
+
+const List<String> _youtenMochiTime = [
+  '・持ちタイムは記録会や大会での自己ベストで、種目ごとに効く能力が違います。',
+  '・今の実力を比べるときは、今季ベスト(今年度の最高記録)が目安になります。',
+  '・ロード・登り・下り・クロカンの1万は、夏の学内タイムトライアルの記録です。',
+];
+
+const List<String> _youtenSuuchi = [
+  '・タイムは小さいほど良く、能力値は大きいほど良いです。',
+  '・基本走力は見えないので、持ちタイムが実力の目安になります。',
+  '・能力値の「??」は、まだ見抜けていない能力です(目標順位の達成で見抜く力がつくことがあります)。',
+];
+
+const List<String> _youtenRyuugakusei = [
+  '・在籍できる留学生は1大学に1人までで、受け入れ中の大学に4月に入学します。',
+  '・留学生は、新入生スカウトの対象外です。',
+  '・受け入れと優秀度は、大学画面の「大学の個性」で変えられます。',
+];
+
+List<String> _youtenIkusei() => [
+  '・基本走力は春と夏に自動で成長し、総監督が直接上げる方法はありません。',
+  '・選手ごとに、1年間の練習メニュー(年間強化練習)を決めます。',
+  setsumeishoNanidoMode() == 2
+      ? '・今の設定では金銀が支給されないので、夏合宿の金特訓・銀特訓はできません。'
+      : '・金銀は、夏合宿の金特訓・銀特訓で、選手の能力を上げるのに使います。',
+  '・成長の仕方は選手ごとに違い、伸び悩んだ選手が再び伸びることもあります。',
+];
+
+const List<String> _youtenMeisei = [
+  '・各大学の名声は、過去10年に得た名声の合計です。',
+  '・名声が高いほど、有力な新入生が入学しやすくなります。',
+  '・名声は、駅伝の順位と区間賞、対校戦の順位などで得られます(駅伝予選では得られません)。',
+  '・駅伝の順位で得られる名声は、目標順位が低いほど小さくなります。',
+];
+
+const List<String> _youtenPanel = [
+  '・駅伝の結果画面とレース中の画面のカードで、区間ごとのタイムの広がりをグラフで見られます。',
+  '・同じカードの「情報集約パネル」では、区間が終わった時点の各大学の位置を、道の上に並べて見られます。',
+  '・パネルは、通過順位・個人順位・区間配置の表示にも切り替えられます。',
+  '・大学の四角を押すと、走った選手や次の区間を走る選手のことも出ます。',
+];
+
+const List<String> _youtenGakunaiKiroku = [
+  '・記録画面の記録は、歴代10位まで残します。',
+  '・学内記録と学内順位は、あなたが総監督をしている大学だけ記録します。',
+];
+
+const List<String> _youtenNewsKiji = [
+  '・駅伝・駅伝予選・対校戦の結果画面の「ニュース記事」で、大会の記事を読めます。',
+  '・レース前の展望記事や、駅伝のレース中の区間ごとの実況もあります。',
+  '・自分の大学の学内メディアと、正月駅伝の学連選抜通信の記事もあります。',
+  '・卒業生特集や年間表彰など、その日だけ読める記事もあります。',
+];
+
+const List<String> _youtenKoukouJidai = [
+  '・日本人の選手と一部の留学生には、出身校と高校時代の実績があります。',
+  '・高校時代は、レースや育成の計算には影響しません。',
+  '・高校の大会は、次の4月に大学に入る世代が、毎年決まった時期に走ります。',
+  '・設定タブの「高校名鑑」で、高校の紹介や大会の記録を見られます。',
+];
+
+const List<String> _youtenKantokuCoach = [
+  '・監督とコーチはOBが就任し、レースや育成の計算には影響しません。',
+  '・監督の母校の新入生は、スカウトでその大学を選びやすくなります。',
+  '・あなたの大学は、OBの選手画面から、監督やコーチを進言できます。',
+];
+
+const List<String> _youtenReset = [
+  '・やり直すときは、設定タブの「名声・育成力と設定を残してやり直す」がおすすめです。',
+  '・セーブデータを読み込むと、ゲームの進み具合・名声・設定・大学名は、セーブしたときの値になります。',
+  '・何が残り何が変わるかは、設定タブの一番上の「リセット・ロード・QRで残るもの・変わるもの」で見られます。',
+];
+
+// ---- 画面の使い方(2.1.1。shiyou_text.dart の説明書だけの行から移した) ----
+
+// 結果画面のお知らせ(2.1.0。kekka_oshirase.dart・taikousen_nyuushou_oshirase.dart)
+const ShiyouSetsu _kekkaOshirase = ShiyouSetsu('結果画面のお知らせ', [
+  '・駅伝と駅伝予選の結果画面の一番上で、優勝・3位以内・シード権獲得・予選突破を知らせます。',
+  '　・大学の過去最高順位も知らせます(ゲームを始めてからの記録で比べ、初出場のときは出しません)。',
+  '　・目標順位を達成したかどうかに関係なく出します。',
+  '・対校戦で自分の大学の選手が個人8位以内に入ると、その種目の結果画面の一番上で知らせます。',
+  '　・ハーフのあとは、総合で3位以内に入ったことも知らせます。',
+]);
+
+// タイム分布と情報集約パネル(2.0.5〜2.1.0。Modal_kukanTimeBunpu.dart・Modal_yosenTimeBunpu.dart・Modal_ichiKankei.dart)
+const ShiyouSetsu _panel = ShiyouSetsu('タイム分布と情報集約パネル', [
+  '・駅伝の結果画面のカードの「タイム分布」で、区間ごとの区間1位からの差の広がりをグラフで見られます。',
+  '　・レースの途中も、区間が終わるたびの画面の同じカードで、終わった区間まで見られます。',
+  '　・正月駅伝の、復路の目標順位を決める画面と復路の当日変更の画面にも、同じカードがあります。',
+  '・駅伝予選の結果画面の「チーム内のタイム分布」で、大学ごとの1〜10番手のタイムの広がりをグラフで見られます。',
+  '・駅伝の同じカードの「情報集約パネル」では、区間が終わった時点の各大学の位置を、1位からの距離で見られます。',
+  '　・カードには、道の小さな見取り図と、自分の大学の今の順位と1位からの差も出ます。',
+  '　・区間は、画面の上の「‹」「›」か、真ん中を押して出る一覧で切り替えます。',
+  '　・一番左の「スタート」では、出場校が大学のID順に並び、押すと1区を走る選手が出ます。',
+  '　・1区の指示の画面にもカードがあり、そこでは「スタート」だけを見られます。',
+  '　・区間を選ぶ行の右の黄色のボタンを押すたびに、「位置」「通過」「個人」「配置」と表示が切り替わります。',
+  '　・「通過」は通過順位速報、「個人」は個人順位速報で、区間はパネルで選んだ区間です。',
+  '　・「配置」は区間配置確認で、区間を選ぶ欄が大学を選ぶ欄に変わります(1区の指示の画面でも見られます)。',
+  '　・距離は、1位とのタイム差を、その区間の出場校の平均の速さで換算したものです。',
+  '　・前の大学との差が1秒以内でつながる大学を、集団として枠で囲みます(拡大・縮小しても変わりません)。',
+  '　・枠の中は、先頭と同じ秒の大学を横に並べ、1秒遅れるごとに次の行にして「+1秒」と出します。',
+  '　・1行には右の差が画面に入るだけ並べ、入らなくなったら次の行に折り返します。',
+  '　・四角の幅は大学名の長さに合わせ、道の真ん中にそろえて置きます。',
+  '　・集団でない大学は1校ずつ並べ、近くて重なるときは縮尺より少し広げて置きます(右の差が実際の差です)。',
+  '　・道の右には、前の大学(集団)との間の距離と秒差を出します。',
+  '　・大学名の後ろに、前の区間からの順位の変化を「↑2」「↓3」「→」で出します。',
+  '　・大学の四角を押すと順位と差が、もう一度押すと、その区間を走った選手の説明文が出ます。',
+  '　・さらに押すと、次の区間を走る選手が出ます。',
+  '　・走った選手と次の区間を走る選手には、持ちタイムの表と能力(まだ分からない能力は「??」)も出ます。',
+  '　・説明文と次の区間を走る選手の「詳細」で、その選手の詳細を見られます。',
+  '　・下の帯の「差の基準」で、トップとの差と、押した大学の目標順位との差を切り替えられます。',
+  '　・表示の倍率は、画面の「−」「＋」で変えられます(開いたときは、おまかせの倍率)。',
+  '　・おまかせは、途中を省略した間を除いて、1位から最後尾までが道の見える高さのおよそ2つ分に収まる倍率です。',
+  '　・ただし、おまかせは×4より小さくはしません(差の開いた区間でも、数十mの差が見分けられるように)。',
+  '　・表示の倍率で、道の見える高さより長くなる間は、点線で途中を省略します。',
+  '　・道の右端のスクロールバーをつまんで動かすと、長い道も一気に動けます。',
+]);
+
+// 今季タイム一覧表のメモ(2.1.0。konki_memo.dart)
+const ShiyouSetsu _konkiMemo = ShiyouSetsu('今季タイム一覧表のメモ', [
+  '・今季タイム一覧表の名前の右の「メモ」の欄に、✓・○・△・×や1〜10を付けて、配置を考えるメモにできます。',
+  '　・区間配置とは連動しません。メモは選手ごとに残り、画像・テキストのコピー・CSVには入りません。',
+  '　・見出しの「メモ」を押すと、その表のメモを全部消せます。「列を選ぶ」で隠すこともできます。',
 ]);
 
 const ShiyouSetsu _seiseiAI = ShiyouSetsu('生成AIと遊ぶ(テキストのコピー)', [

@@ -108,7 +108,8 @@
 //   自分の大学(学連選抜の監督の年は学連選抜)が見える所まで動くようにした。
 //   「−」「＋」を押すとおまかせが外れ、区間を切り替えてもその倍率のまま。
 //   覚えない(画面を閉じたらおまかせに戻る)。倍率のボタンの横に縮尺の棒を出す。
-// ・11月駅伝は8位、正月駅伝は10位の下にシード権ラインを引く(10月駅伝とカスタム駅伝はなし)。
+// ・11月駅伝は8位、正月駅伝は10位の大学のすぐ下にシード権ラインを引く(10月駅伝とカスタム駅伝はなし。
+//   学連選抜が10位と11位の間にいても、学連選抜はラインの下。2.1.0で直した)。
 //   ラインをまたいでは集団にしない。詰めた間のあとも新しい集団にする。
 // ・四角の見た目: 自分の大学はオレンジの枠(文字と塗りはほかの大学と同じ)、1位は太い白の枠、学連選抜(正月駅伝のオープン参加)は
 //   点線の枠(学連選抜の監督をした年はオレンジの点線)。学連選抜は順位とシード権ラインに数えない。
@@ -1680,6 +1681,18 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     final int opNozoku = r.narabi.where((x) => !x.op).length;
     // シード権ライン(スタートは引かない。2.0.7)
     final int? seed = (r.kk >= 0 && b.seed != null && opNozoku > b.seed!) ? b.seed : null;
+    // ラインを引く場所: シード権の最後の順位(正月駅伝は10位)の大学のすぐ下(narabi のこの番号の前)。
+    // 学連選抜が10位と11位の間にいても、学連選抜はラインの下になる(シード権はないので。2.1.0。
+    // それまでは11位の大学のすぐ上に引いていたので、学連選抜がラインの上に出ていた)
+    int? seedMaeBangou;
+    if (seed != null) {
+      for (int i = 0; i + 1 < n; i++) {
+        if (!r.narabi[i].op && r.narabi[i].juni == seed - 1) {
+          seedMaeBangou = i + 1;
+          break;
+        }
+      }
+    }
 
     // 詰める間(画面の高さを超える間だけ。2.1.0から、おまかせでも詰める。飛び抜けて大きい間を詰めるのはやめた)
     final List<double> aida = _aida(r);
@@ -1697,7 +1710,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     final List<List<int>> shuudan = [];
     for (int i = 0; i < n; i++) {
       final _IchiDaigaku x = r.narabi[i];
-      final bool seedMae = seed != null && !x.op && x.juni == seed;
+      final bool seedMae = i == seedMaeBangou;
       final bool kiremeAto = i > 0 && tsume.contains(i - 1);
       final bool chikai =
           i > 0 && saByou(x.ruikei, r.narabi[i - 1].ruikei) <= _shuudanByou;
@@ -1738,9 +1751,8 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
       } else {
         top = mc + (d[saki] - d[maeSaigo]) * px - gyouTakasa / 2;
       }
-      // シード権ライン(シード権の順位の次の大学の前に引く)
-      final _IchiDaigaku x0 = r.narabi[saki];
-      if (seed != null && !x0.op && x0.juni == seed) {
+      // シード権ライン(シード権の最後の順位の大学のすぐ下。学連選抜がいても、その上。2.1.0)
+      if (saki == seedMaeBangou) {
         final double sTop = shita + _sukima;
         seedTop = sTop;
         shita = sTop + seedTakasa;

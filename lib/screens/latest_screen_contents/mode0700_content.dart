@@ -38,6 +38,7 @@ import 'package:ekiden/screens/kiji_hyou_view.dart'; // 金特訓・銀特訓の
 import 'package:ekiden/kansuu/kingin_kiroku.dart'; // 金銀の記録(1.9.9)
 import 'package:ekiden/screens/koukou_taikai_oshirase.dart'; // 高校の大会の結果が出た日のお知らせ(2.0.4)
 import 'package:ekiden/screens/taikousen_nyuushou_oshirase.dart'; // 対校戦の入賞のお知らせ(2.1.0)
+import 'package:ekiden/screens/kekka_oshirase.dart'; // 駅伝・駅伝予選の結果のお知らせ(2.1.0)
 import 'package:ekiden/screens/Modal_yosenTimeBunpu.dart'; // 正月駅伝予選のチーム内のタイム分布(2.0.5)
 import 'package:ekiden/screens/Modal_ichiKankei.dart'
     show KukanBunsekiCard; // 区間ごとのタイム分布(2.0.5)と区間終了時点の位置関係(2.0.6)のカード
@@ -1302,6 +1303,7 @@ class _Mode0700ContentState extends State<Mode0700Content> {
                                             TaikousenNyuushouOshirase(
                                               gh: currentGhensuu,
                                               senshu: idJunSenshuData,
+                                              univ: idJunUnivData,
                                             ),
                                             // ニュース記事(箱庭スポーツ。対校戦の種目ごとの結果の記事。1.9.2)
                                             KijiLinkCard(
@@ -1427,6 +1429,11 @@ class _Mode0700ContentState extends State<Mode0700Content> {
                                                   color: HENSUU.textcolor,
                                                 ),
                                               ), // ★コンマを追加★
+                                            // 優勝・3位以内・シード権獲得・予選突破・大学の過去最高順位のお知らせ(2.1.0)
+                                            EkidenKekkaOshirase(
+                                              gh: currentGhensuu,
+                                              univ: idJunUnivData,
+                                            ),
 
                                             // 区間配置確認と今季タイム一覧表(1.9.9。よく使うので、目立つボタンにしてリンクの列の一番上に置いた。kukan_haiti_button.dart)
                                             KakuninButtons(

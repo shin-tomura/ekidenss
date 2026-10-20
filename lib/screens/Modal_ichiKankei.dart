@@ -20,12 +20,20 @@
 //   中継所ごとの位置の図を、なめらかにつないで動かして見せる(_suiiKoma)。区間の中は、どの大学もその区間を
 //   同じペースで走ったとみなし、各地点を通ったときのタイム差を、位置の図と同じく区間の平均の速さ(前の区間の速さから
 //   この区間の速さへ少しずつ変える)で距離にする。区間の終わりで、位置の図とぴったり同じになる。
-//   ・1区はスタート直後の飛び出しや集団走があり、途中の動きを作れないので、1区終了時点から(2区から)再生する
-//     (2区が終わるまでは、推移を順番に入れない)。地点(「○km地点」)は出さない(区間の中の動きは推定なので、
-//     作り物だと分かるように)。区間名と区間の距離と、数字のない進み具合の棒だけを出す
+//   ・1区は、飛び出した選手と集団の記録をもとにした演出にする(_IkkuEnshutsu・_ikkuJikoku。2.1.1の開発中は、
+//     途中の動きを作れないので1区終了時点から再生していた)。スタートから、飛び出した選手は区間の4割まで集団の前で
+//     差を広げ(成功は集団のタイムの1%、失敗は0.5%)、そこからは1区のタイムに向かう。飛び出さなかった選手は、
+//     集団のペース(集団を引っ張った選手のペース。ikku_pace.dart の記録)で一緒に進み、最後の4分の1でばらけて
+//     1区のタイムに向かう。集団のペースが速すぎた選手(1区のタイムが集団のタイムより3%以上遅い)は、半分から遅れ始める。
+//     集団の中は同じタイムなので、同じ順位にし、並びは集団を引っ張った大学を先頭に大学のID順(結果が先に分からないように)。
+//     集団のペースの記録がない(別の大会の記録など)ときは、今まで通り1区終了時点から(2区から)にする。
+//     推移は、1区が終わったら(1区の演出ができないときは2区が終わったら)順番に入れる
+//   ・地点(「○km地点」)は出さない(区間の中の動きは推定なので、作り物だと分かるように)。
+//     区間名と区間の距離と、数字のない進み具合の棒だけを出す
 //   ・再生の時間は区間の距離に比例し、ふつうは1kmあたり0.25秒(正月駅伝の区間がおよそ5秒)。ゆっくり(半分の速さ)・
 //     はやい(2倍)を選べる。選んでいる区間から、終わった区間の最後まで続けて再生する。
-//     「最初から」を押すと、どの区間を見ていても1区終了時点(2区の始め)に戻り、最後まで通しで再生する
+//     「最初から」を押すと、どの区間を見ていても最初(1区の演出ができればスタート、できなければ1区終了時点)に戻り、
+//     最後まで通しで再生する
 //   ・推移の画面では、再生の前も、止めたときも、再生し終えたあとも、いつも推移の描き方(途中を省略しない)にする
 //     (2.1.1の開発中は、区間の終わり(進み具合が1)だけ位置の図をそのまま使っていたので、再生し終えた瞬間に
 //     途中が省略されて道が縮み、焦点の大学が画面の外に出ていた)
@@ -168,6 +176,8 @@ import 'package:ekiden/kansuu/kiji/kiji_kihon.dart';
 import 'package:ekiden/kansuu/kiji/kiji_kekka.dart';
 import 'package:ekiden/kansuu/gakuren_text.dart';
 import 'package:ekiden/kansuu/gakuren_kantoku.dart';
+import 'package:ekiden/kansuu/ikku_pace.dart'
+    show IkkuPaceKekka, ikkuPaceKekkaYomu; // 推移の1区の演出に使う集団のペースの記録(2.1.1)
 import 'package:ekiden/screens/Modal_kukanTimeBunpu.dart'
     show KukanBunpuYomikomi, kukanBunpuYomu, kukanBunpuGamenHiraku;
 
@@ -187,6 +197,18 @@ const List<String> _suiiHayasaMei = ['ゆっくり', 'ふつう', 'はやい'];
 
 /// 推移で、焦点の大学を置く高さ(道が見えている高さの、上からこの割合のところ)
 const double _suiiShotenTakasa = 1 / 3;
+
+/// 推移の1区の演出(2.1.1): 集団がばらけ始めるところ(区間の最後の4分の1)
+const double _ikkuBarakeIchi = 0.75;
+
+/// 集団のペースが速すぎた選手(1区のタイムが集団のタイムのこの倍より遅い)と、遅れ始めるところ(区間の半分)
+const double _ikkuShissokuWariai = 1.03;
+const double _ikkuShissokuIchi = 0.5;
+
+/// 飛び出した選手の差が一番開くところ(区間の4割)と、その差(集団のタイムに対する割合。成功・失敗)
+const double _ikkuTobidashiIchi = 0.4;
+const double _ikkuTobidashiSeikou = 0.01;
+const double _ikkuTobidashiShippai = 0.005;
 
 /// おまかせの倍率の下限(_bairitsu の番号。4は×4。四角どうしの一番小さい間隔が約24mになり、
 /// 数十mの差が見分けられる。2.1.0。開発中は3(×2)だった)
@@ -507,14 +529,18 @@ class _IchiKankei {
   /// 配置(区間配置確認)で選べる大学(出場校のID順。学連選抜がいる年は最後に学連選抜。2.0.9)
   final List<({int id, String mei})> haichiDaigaku;
 
+  /// 推移の1区の演出の材料(作れなければnull。2.1.1)
+  final _IkkuEnshutsu? ikku;
+
   _IchiKankei._(
     this.kukan,
     this.seed,
     this.gakurenJibun,
     this.zenKukansuu,
     this.race,
-    this.haichiDaigaku,
-  );
+    this.haichiDaigaku, {
+    this.ikku,
+  });
 
   /// 大会[race]の結果から作る([made] を渡すと、レースの途中の1区から[made]区まで)
   /// (思わぬデータで画面が止まらないよう、作れなければnull)
@@ -642,7 +668,15 @@ class _IchiKankei {
         if (k.shutsujou(u)) (id: u.id, mei: u.name),
       if (gakurenAri) (id: kukanHaitiGakurenId, mei: '学連選抜(OP)'),
     ];
-    return _IchiKankei._(kukan, seed, gakurenJibun, k.kukansuu, race, haichiDaigaku);
+    return _IchiKankei._(
+      kukan,
+      seed,
+      gakurenJibun,
+      k.kukansuu,
+      race,
+      haichiDaigaku,
+      ikku: e == null ? null : _IkkuEnshutsu.tsukuru(k, race, kukan),
+    );
   }
 
   /// スタートの並び(出場校を大学のID順に並べ、学連選抜は最後。距離はみな0。
@@ -697,6 +731,128 @@ class _IchiKankei {
 
 /// 区間をまたいで同じ大学を見分ける印(大学id。学連選抜は-1。推移で使う。2.1.1)
 int _daigakuKagi(_IchiDaigaku x) => x.op ? -1 : (x.univId ?? -2);
+
+/// 推移の1区の演出の材料(2.1.1。上のヘッダーの説明を参照)
+class _IkkuEnshutsu {
+  /// 集団の1区のタイム(秒。集団を引っ張った選手のペース)
+  final double shuudanTime;
+
+  /// 大学ごと(_daigakuKagi)の飛び出し(0: なし、1: 失敗、2: 成功)
+  final Map<int, int> tobidashi;
+
+  /// 集団を引っ張った大学(_daigakuKagi。分からなければnull)
+  final int? hipparuKagi;
+
+  const _IkkuEnshutsu(this.shuudanTime, this.tobidashi, this.hipparuKagi);
+
+  /// 大会[race]の1区の図から作る(集団のペースの記録がない・別の大会の記録・思わぬデータのときはnull)。
+  /// 飛び出しの印は選手に残っている(次の大会のエントリーで消える)ので、レースの途中と結果画面で読める
+  static _IkkuEnshutsu? tsukuru(KijiKankyou k, int race, List<_IchiKukan> kukan) {
+    if (k.gh.hyojiracebangou != race) return null;
+    final IkkuPaceKekka? pace = ikkuPaceKekkaYomu(k.kantoku, k.gh);
+    if (pace == null || pace.pace <= 0) return null;
+    _IchiKukan? ikku;
+    for (final _IchiKukan r in kukan) {
+      if (r.kk == 0) {
+        ikku = r;
+        break;
+      }
+    }
+    if (ikku == null) return null;
+    final Map<int, int> tobidashi = {};
+    int? hipparu;
+    final List<double> shuudanTime = [];
+    for (final _IchiDaigaku x in ikku.narabi) {
+      final int kagi = _daigakuKagi(x);
+      final int flag = x.op
+          ? (x.gSenshu?.startchokugotobidasiflag ?? 0)
+          : (x.senshu?.startchokugotobidasiflag ?? 0);
+      final int seikou = x.op
+          ? (x.gSenshu?.startchokugotobidasiseikouflag ?? 0)
+          : (x.senshu?.startchokugotobidasiseikouflag ?? 0);
+      final int tobi = flag == 1 ? (seikou == 1 ? 2 : 1) : 0;
+      tobidashi[kagi] = tobi;
+      if (tobi == 0) shuudanTime.add(x.ruikei);
+      final int? pm = pace.pacemakerId;
+      if (!x.op && pm != null && x.senshu?.id == pm) hipparu = kagi;
+    }
+    // 集団の選手の1区のタイムの真ん中が、記録の集団のペースから大きく外れていれば、別の記録とみなして使わない
+    if (shuudanTime.isEmpty) return null;
+    shuudanTime.sort();
+    final double mannaka = shuudanTime[shuudanTime.length ~/ 2];
+    if ((mannaka / pace.pace - 1).abs() > 0.1) return null;
+    return _IkkuEnshutsu(pace.pace, tobidashi, hipparu);
+  }
+}
+
+/// 推移の1区の演出で、1区の[x](0〜1)の地点を通る時刻(秒。2.1.1)。
+/// [t] はその大学の1区のタイム、[g] は集団のタイム、[tobi] は飛び出し(0: なし、1: 失敗、2: 成功)
+double _ikkuJikoku(double t, double g, int tobi, double x) {
+  if (tobi == 0) {
+    // 集団: 集団のペースで進み、ばらけ始めるところ(速すぎた選手は半分)からは、1区のタイムに向かってまっすぐ
+    final double b = t > g * _ikkuShissokuWariai ? _ikkuShissokuIchi : _ikkuBarakeIchi;
+    final double tb = g * b;
+    if (t <= tb) return t * x;
+    if (x <= b) return g * x;
+    return tb + (t - tb) * (x - b) / (1 - b);
+  }
+  // 飛び出し: 区間の4割で集団との差が一番開き、そこからは1区のタイムに向かってまっすぐ
+  final double sa = g * (tobi == 2 ? _ikkuTobidashiSeikou : _ikkuTobidashiShippai);
+  final double tp = g * _ikkuTobidashiIchi - sa;
+  if (tp <= 0 || t <= tp) return t * x;
+  if (x <= _ikkuTobidashiIchi) return tp * x / _ikkuTobidashiIchi;
+  return tp + (t - tp) * (x - _ikkuTobidashiIchi) / (1 - _ikkuTobidashiIchi);
+}
+
+/// 推移の1区の演出の、区間の途中の位置関係([ato] は1区の終了時点、[p] は進み具合(0〜1)。2.1.1)
+/// ・同じタイムの大学(集団)は同じ順位にし、並びは集団を引っ張った大学を先頭に、大学のID順(学連選抜は最後)
+///   (結果の順に並べると、集団の中の並びで結果が先に分かってしまうため)
+/// ・1区なので、順位の変化(↑↓)は出さない。[p] が1なら、1区の終了時点の図と同じ中身
+_IchiKukan _suiiKomaIkku(_IchiKukan ato, double p, _IkkuEnshutsu e) {
+  if (p >= 1) return _IchiKukan(ato.kk, ato.hayasa, ato.narabi, suii: true);
+  final double x = p < 0 ? 0.0 : p;
+  final double g = e.shuudanTime;
+  final List<({_IchiDaigaku d, double t, int jun})> l = [];
+  for (final _IchiDaigaku d in ato.narabi) {
+    final int kagi = _daigakuKagi(d);
+    final double t = _ikkuJikoku(d.ruikei, g, e.tobidashi[kagi] ?? 0, x);
+    final int jun = kagi == e.hipparuKagi ? -1 : (d.op ? 1000000 : (d.univId ?? 999999));
+    l.add((d: d, t: t, jun: jun));
+  }
+  l.sort((a, b) {
+    final int c = a.t.compareTo(b.t);
+    return c != 0 ? c : a.jun.compareTo(b.jun);
+  });
+  final List<_IchiDaigaku> narabi = [];
+  for (int i = 0; i < l.length; i++) {
+    // 前にいる大学の数(学連選抜は数えない。同じタイムは前に数えない)
+    int mae = 0;
+    for (int j = 0; j < l.length; j++) {
+      if (!l[j].d.op && l[j].t < l[i].t - 1e-6) mae++;
+    }
+    final _IchiDaigaku d = l[i].d;
+    narabi.add(
+      _IchiDaigaku(
+        d.mei,
+        l[i].t,
+        d.op ? -1 : mae,
+        d.jibun,
+        d.op,
+        soutouJuni: d.op ? mae : null,
+        senshu: d.senshu,
+        gSenshu: d.gSenshu,
+        shozoku: d.shozoku,
+        kukanJuni: d.kukanJuni,
+        kukanTime: d.kukanTime,
+        tsugiSenshu: d.tsugiSenshu,
+        tsugiGSenshu: d.tsugiGSenshu,
+        mokuhyou: d.mokuhyou,
+        univId: d.univId,
+      ),
+    );
+  }
+  return _IchiKukan(ato.kk, ato.hayasa, narabi, suii: true);
+}
 
 /// 推移(2.1.1)の、区間の途中の位置関係。[mae] は前の区間の終了時点、[ato] はこの区間の終了時点、
 /// [p] は区間の進み具合(0〜1)。
@@ -1330,14 +1486,24 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView>
 
   // ---- 推移(2.1.1) ----
 
-  /// 推移で見られる区間か(並びの[i]番が2区より後ろで、1つ前の並びがその前の区間のとき)
-  bool _suiiDekiru(_IchiKankei b, int i) =>
-      i >= 1 &&
-      i < b.kukan.length &&
-      b.kukan[i].kk >= 1 &&
-      b.kukan[i - 1].kk == b.kukan[i].kk - 1;
+  /// 推移で見られる区間か(並びの[i]番が2区より後ろで、1つ前の並びがその前の区間のとき。
+  /// 1区は、1つ前がスタートで、1区の演出の材料があるとき。2.1.1)
+  bool _suiiDekiru(_IchiKankei b, int i) {
+    if (i < 1 || i >= b.kukan.length) return false;
+    final int kk = b.kukan[i].kk;
+    final int maeKk = b.kukan[i - 1].kk;
+    if (kk == 0) return maeKk == -1 && b.ikku != null;
+    return kk >= 1 && maeKk == kk - 1;
+  }
 
-  /// 推移で見られる区間(並びの番号。1区終了時点からなので2区から)
+  /// 推移の、並びの[i]番の区間の、進み具合[p]の図(1区は演出。_suiiDekiru のときだけ呼ぶ)
+  _IchiKukan _suiiZu(_IchiKankei b, int i, double p) {
+    final _IkkuEnshutsu? e = b.ikku;
+    if (b.kukan[i].kk == 0 && e != null) return _suiiKomaIkku(b.kukan[i], p, e);
+    return _suiiKoma(b.kukan[i - 1], b.kukan[i], p);
+  }
+
+  /// 推移で見られる区間(並びの番号。1区の演出ができれば1区から、できなければ2区から)
   List<int> _suiiKouho(_IchiKankei b) => [
     for (int i = 0; i < b.kukan.length; i++)
       if (_suiiDekiru(b, i)) i,
@@ -1505,9 +1671,16 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView>
   /// 図[r]の中の、焦点の大学の番号(narabi の番号。いなければ-1)
   int _suiiShotenBan(_IchiKukan r) {
     if (_shotenJuniMode) {
+      // 並び(学連選抜を除く)の[j]番目の大学(1区の演出で集団が同じ順位のときも追えるように。2.1.1)
       final int n = r.narabi.where((x) => !x.op).length;
       final int j = _shotenJuni.clamp(0, math.max(0, n - 1));
-      return r.narabi.indexWhere((x) => !x.op && x.juni == j);
+      int c = 0;
+      for (int i = 0; i < r.narabi.length; i++) {
+        if (r.narabi[i].op) continue;
+        if (c == j) return i;
+        c++;
+      }
+      return -1;
     }
     return r.narabi.indexWhere((x) => _daigakuKagi(x) == _shotenKagi);
   }
@@ -2051,7 +2224,10 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView>
     // 学連選抜が10位と11位の間にいても、学連選抜はラインの下になる(シード権はないので。2.1.0。
     // それまでは11位の大学のすぐ上に引いていたので、学連選抜がラインの上に出ていた)
     int? seedMaeBangou;
-    if (seed != null) {
+    // シード権の最後の順位の大学が何校もある(推移の1区の演出で、集団が同じ順位のとき。2.1.1)ときは引かない
+    final int seedSaigo = seed == null ? -1 : seed - 1;
+    if (seed != null &&
+        r.narabi.where((x) => !x.op && x.juni == seedSaigo).length == 1) {
       for (int i = 0; i + 1 < n; i++) {
         if (!r.narabi[i].op && r.narabi[i].juni == seed - 1) {
           seedMaeBangou = i + 1;
@@ -2341,7 +2517,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView>
     final bool suii = _hyouji == 4 && b != null && _suiiDekiru(b, _suiiKukan);
     if (b != null) {
       r = suii
-          ? _suiiKoma(b.kukan[_suiiKukan - 1], b.kukan[_suiiKukan], _suiiP)
+          ? _suiiZu(b, _suiiKukan, _suiiP)
           : b.kukan[_erabu.clamp(0, b.kukan.length - 1)];
     }
     final _IchiKukan? r0 = r;
@@ -2986,7 +3162,9 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView>
   Widget _suiiShotenBotan(_IchiKankei b, _IchiKukan r) {
     final int n = r.narabi.where((x) => !x.op).length;
     final int? seed = (b.seed != null && n > b.seed!) ? b.seed : null;
-    String juniMei(int j) => '${j + 1}位${seed != null && j == seed - 1 ? '(シード権ライン)' : ''}';
+    // シード権の最後の順位(0が1位。ないときは-1)
+    final int seedSaigo = seed == null ? -1 : seed - 1;
+    String juniMei(int j) => '${j + 1}位${j == seedSaigo ? '(シード権ライン)' : ''}';
     // 大学は大学idの順(学連選抜は最後)
     final List<_IchiDaigaku> daigaku = List<_IchiDaigaku>.of(r.narabi)
       ..sort((a, c) {
@@ -3242,6 +3420,8 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView>
         if (r.suii) ...[
           // 推移(2.1.1。つないだ動きだと分かるように。地点は出さない)
           const Text('中継所ごとの位置関係を、なめらかにつないだ動きです。', style: setsumei),
+          if (r.kk == 0)
+            const Text('1区は、飛び出した選手と集団の記録をもとにした演出です。', style: setsumei),
           const Text('水色の枠: 焦点の大学(大学の四角を押すと、その大学を追います)。', style: setsumei),
         ] else if (r.kk < 0)
           const Text('スタート前の並びです(大学のID順)。', style: setsumei)

@@ -82,18 +82,18 @@
 //   速さを全員で1つにするので、距離はタイム差に比例し、順位と位置の並びが逆にならない
 //   (ゲームとしての見せ方。1位が着いた時点か最後の大学が着いた時点か、などは考えない)。
 // ・1区から終わった区間まで切り替えられる(覚えない。開くたびに一番あとの区間)。
-// ・前の大学との間のうち、飛び抜けて大きい間(その区間の間の中央値の4倍以上。大きい順に多くて3か所。
-//   _tobinukeAida)だけを詰めて、道に切れ目の点線を引き、右の括弧を点線にする(2.0.9までは「(詰めています)」を
-//   添えていた。2.1.0の開発中に「(途中を省略)」にしたが、幅を取るので添え書きはなくし、点線で示す)。
-//   倍率ではなくデータで決めるので、
-//   だいたい同じくらい空いているときは詰めない。1つの間が画面の高さを超えるところも詰める
-//   (拡大しすぎて、何もない道を延々とスクロールしないように。2.0.9までは手動で倍率を選んでいるときだけ。
-//   2.1.0から、おまかせが×4より小さくならないので、おまかせでも詰める)。
-//   (最初は「画面で144pxを超えたら」詰めていたが、おまかせの倍率とぶつかり、出場校の少ない大会や
-//   差の開いた区間で、ほとんどの間が詰められて位置関係がつかめなかったので、2.0.6の開発中に変えた)
+// ・前の大学との間のうち、その倍率で描くと画面の高さより長くなる間だけを詰めて(_tsumeAida)、
+//   道に切れ目の点線を引き、右の括弧を点線にする(拡大しすぎて、何もない道を延々とスクロールしないように。
+//   2.0.9までは「(詰めています)」を添えていた。2.1.0の開発中に「(途中を省略)」にしたが、幅を取るので
+//   添え書きはなくし、点線で示す)。
+//   (2.0.6〜2.1.0の開発中は、飛び抜けて大きい間(その区間の間の中央値の4倍以上。大きい順に多くて3か所)も
+//   詰めていた。大きく遅れた大学に引っぱられて、おまかせで先頭のほうが縮こまらないようにするためだったが、
+//   接戦の区間では100mほどの間まで詰められて気になり、おまかせに×4の下限ができて役目もほぼなくなったので、
+//   2.1.0の開発中に、画面の高さより長い間だけにした。最初は「画面で144pxを超えたら」詰めていたが、
+//   出場校の少ない大会や差の開いた区間で、ほとんどの間が詰められて位置関係がつかめなかった)
 // ・表示の倍率(1mあたりの高さ)は「−」「＋」で6段階に変えられる(文字の大きさは変わらない)。
 //   開いたときは「おまかせ」(区間ごとに、詰めた間を除いた1位から最後尾までの長さが、画面の高さの
-//   およそ2つ分に収まる一番大きい倍率。大きく遅れた大学に引っぱられて先頭のほうが縮こまらないように)。
+//   およそ2つ分に収まる一番大きい倍率。詰める間は倍率ごとに違うので、倍率ごとに数え直す)。
 //   2.1.0から、おまかせは×4より小さくしない(_omakaseSaitei。差の開いた区間で×1/2などになると、100mの差も
 //   10mの差も四角が重ならない一番小さい間隔になり、同じに見えていたため。開発中は×2にしたが、四角どうしの
 //   一番小さい間隔(約38px)が約48mになり、80mと10mがほとんど同じに見えたので×4にした(約24m))。
@@ -155,15 +155,6 @@ const int _omakaseSaitei = 4;
 
 /// 幅に合わせる(おまかせ ↔)ときに、道の上の文字を小さくする下限(今の文字の大きさに対する割合。2.0.8)
 const double _habaSaishou = 0.6;
-
-/// 飛び抜けて大きい間: その区間の間の中央値の、この倍以上
-const double _tobinukeBai = 4;
-
-/// 飛び抜けて大きい間として詰めるのは、大きい順に多くてこの数まで
-const int _tobinukeSaidai = 3;
-
-/// 飛び抜けて大きい間の下限(m。並走が多くて中央値が0に近いときに、小さな間を詰めないように)
-const double _tobinukeSaitei = 50;
 
 /// 詰めたところの高さ(px)
 const double _tsumePx = 52;
@@ -1457,32 +1448,25 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
       math.max(0.0, (r.narabi[i + 1].ruikei - r.narabi[i].ruikei) * r.hayasa),
   ];
 
-  /// 飛び抜けて大きい間(_aida の番号。中央値の4倍以上を、大きい順に多くて3か所)
-  Set<int> _tobinukeAida(List<double> aida) {
-    if (aida.length < 2) return <int>{};
-    final List<double> narabe = List<double>.of(aida)..sort();
-    final int n = narabe.length;
-    final double chuuou = n.isOdd ? narabe[n ~/ 2] : (narabe[n ~/ 2 - 1] + narabe[n ~/ 2]) / 2;
-    final double genkai = math.max(chuuou * _tobinukeBai, _tobinukeSaitei);
-    final List<int> kouho = [
-      for (int i = 0; i < aida.length; i++)
-        if (aida[i] >= genkai) i,
-    ]..sort((a, b) => aida[b].compareTo(aida[a]));
-    return kouho.take(_tobinukeSaidai).toSet();
-  }
+  /// 詰める間(_aida の番号。1mあたり[px]で描くと、画面の高さ[gamenTakasa]より長くなる間。2.1.0)
+  Set<int> _tsumeAida(List<double> aida, double px, double gamenTakasa) => {
+    for (int i = 0; i < aida.length; i++)
+      if (aida[i] * px > gamenTakasa) i,
+  };
 
   /// おまかせの倍率の段階(詰めた間を除いた1位から最後尾までの長さが、
   /// 画面の高さのおよそ2つ分に収まる一番大きい倍率)
   int _omakaseDan(_IchiKukan r, double gamenTakasa) {
     if (r.narabi.length < 2 || r.kk < 0) return 2;
     final List<double> aida = _aida(r);
-    final Set<int> tsume = _tobinukeAida(aida);
-    double nokori = 0;
-    for (int i = 0; i < aida.length; i++) {
-      if (!tsume.contains(i)) nokori += aida[i];
-    }
     int dan = 0;
     for (int i = 0; i < _bairitsu.length; i++) {
+      // 詰める間は倍率ごとに違うので、倍率ごとに数え直す(2.1.0)
+      final Set<int> tsume = _tsumeAida(aida, _bairitsu[i], gamenTakasa);
+      double nokori = 0;
+      for (int j = 0; j < aida.length; j++) {
+        if (!tsume.contains(j)) nokori += aida[j];
+      }
       if (nokori * _bairitsu[i] + tsume.length * _tsumePx <= gamenTakasa * _omakaseGamen) {
         dan = i;
       }
@@ -1492,7 +1476,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
   }
 
   /// 大学の四角と行の置き場所を決める([px] は1mあたりの高さ。[gamenTakasa] は画面の高さ。
-  /// 1つの間が画面の高さを超えるところも詰める(2.0.9までは手動で倍率を選んでいるときだけ。2.1.0から、
+  /// 1つの間が画面の高さを超えるところだけを詰める(2.0.9までは手動で倍率を選んでいるときだけ。2.1.0から、
   /// おまかせが×4より小さくならず、1つの間が画面より長くなることがあるので、おまかせでも詰める)。
   /// [gyouSuu] は集団の1行に並べる大学の数(_gyouSuuKimeru。2.1.0))
   _Haichi _haichi(
@@ -1529,12 +1513,9 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     // シード権ライン(スタートは引かない。2.0.7)
     final int? seed = (r.kk >= 0 && b.seed != null && opNozoku > b.seed!) ? b.seed : null;
 
-    // 詰める間(飛び抜けて大きい間と、画面の高さを超える間。2.1.0から、おまかせでも画面の高さを超える間を詰める)
+    // 詰める間(画面の高さを超える間だけ。2.1.0から、おまかせでも詰める。飛び抜けて大きい間を詰めるのはやめた)
     final List<double> aida = _aida(r);
-    final Set<int> tsume = _tobinukeAida(aida);
-    for (int i = 0; i < aida.length; i++) {
-      if (aida[i] * px > gamenTakasa) tsume.add(i);
-    }
+    final Set<int> tsume = _tsumeAida(aida, px, gamenTakasa);
 
     // 1位(いちばん前)からの距離(m)
     final double base = r.narabi.first.ruikei;

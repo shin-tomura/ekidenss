@@ -682,6 +682,11 @@ void _ichiGamenHiraku(BuildContext context, int race, int? made) {
 ///   どちらも横いっぱい(2.0.6は、左にタイム分布、右に位置関係を並べていた。2.0.7で上下2段にした)。
 ///   中身はアイコンと見出しだけ(区間の帯のグラフなどは、開いた画面で見る)。
 ///   ほかのカードより目立つよう、それぞれの色(水色・青緑)の線で角を丸めて囲み、同じ色でうっすら塗る。
+/// ・2.1.0から、情報集約パネルのボタンだけ大きくし(好評なので目立たせる)、左に道の小さな見取り図
+///   (_mini。1位・2位と、自分の大学とその前後の5校まで。並び順どおりに置き、順位が飛ぶところに「⋮」)、
+///   右に見出しと、自分の大学の今の位置のひとこと(_hitokoto)と、何の画面かの説明を出す。
+///   見取り図は絵として扱い、スマホの文字の大きさの設定で大きくしない(はみ出さないように。同じ内容は
+///   右のひとことに文で出す)。距離と秒は、パネルの中の帯と同じ計算
 /// ・片方が作れないときは、作れたほうの1段だけ。両方とも作れなければ出さない
 ///   (1区の指示の画面では、タイム分布はまだ作れないので、情報集約パネルの1段だけ。2.0.7)
 /// ・区間が終わるたびの画面(mode 350。[made] に終わった区間の数)の実況のカードのすぐ下と、
@@ -706,6 +711,9 @@ class _KukanBunsekiCardState extends State<KukanBunsekiCard> {
   /// 位置関係が作れたか
   bool _ichiAri = false;
 
+  /// 作った位置関係(情報集約パネルのボタンの見取り図とひとことに使う。2.1.0)
+  _IchiKankei? _ichi;
+
   /// 結果を作ったか
   bool _tsukutta = false;
 
@@ -720,6 +728,7 @@ class _KukanBunsekiCardState extends State<KukanBunsekiCard> {
       setState(() {
         _bunpuAri = bunpu != null;
         _ichiAri = ichi != null;
+        _ichi = ichi;
         _tsukutta = true;
       });
     });
@@ -755,9 +764,191 @@ class _KukanBunsekiCardState extends State<KukanBunsekiCard> {
     );
   }
 
+  /// 自分の大学(学連選抜の監督の年は学連選抜)か
+  static bool _jibunKa(_IchiKankei b, _IchiDaigaku x) => x.jibun || (b.gakurenJibun && x.op);
+
+  /// 自分の大学のひとこと(「3区終了　東西大 5位・トップから320m(58秒)」など。2.1.0)
+  String _hitokoto(_IchiKankei b, _IchiKukan r) {
+    if (r.kk < 0) return '1区のスタートの並びを見られます';
+    final String kukan = '${r.kk + 1}区終了';
+    final List<_IchiDaigaku> daigaku = [
+      for (final _IchiDaigaku x in r.narabi)
+        if (!x.op) x,
+    ];
+    String kyoriByou(int byou) => '${_kyoriMoji(byou * r.hayasa)}(${saMoji(byou)})';
+    _IchiDaigaku? mitsuketa;
+    for (final _IchiDaigaku x in r.narabi) {
+      if (_jibunKa(b, x)) {
+        mitsuketa = x;
+        break;
+      }
+    }
+    final _IchiDaigaku? j = mitsuketa;
+    // 自分の大学が走っていないときは、トップと2位の差
+    if (j == null) {
+      if (daigaku.length < 2) return '$kukan　トップは${r.top.mei}';
+      final int sa2 = saByou(daigaku[1].ruikei, daigaku[0].ruikei);
+      return sa2 <= 0
+          ? '$kukan　トップは${daigaku[0].mei}、2位と並走'
+          : '$kukan　トップは${daigaku[0].mei}、2位と${kyoriByou(sa2)}差';
+    }
+    final String mei = j.op ? '学連選抜' : j.mei;
+    // 1位なら、2位との差
+    if (!j.op && identical(j, r.top)) {
+      if (daigaku.length < 2) return '$kukan　$mei 1位';
+      final int sa2 = saByou(daigaku[1].ruikei, j.ruikei);
+      return sa2 <= 0 ? '$kukan　$mei 1位・2位と並走' : '$kukan　$mei 1位・2位と${kyoriByou(sa2)}差';
+    }
+    final String juni = j.op ? '${(j.soutouJuni ?? 0) + 1}位相当' : '${j.juni + 1}位';
+    final int saTop = r.sa(j);
+    if (saTop == 0) return '$kukan　$mei $juni・トップと並走';
+    if (saTop < 0) return '$kukan　$mei $juni・トップより${kyoriByou(-saTop)}前';
+    return '$kukan　$mei $juni・トップから${kyoriByou(saTop)}';
+  }
+
+  /// 見取り図に載せる大学(narabi の番号。1位・2位と、自分の大学とその前後。足りなければ前から5校まで)
+  static List<int> _miniBangou(_IchiKankei b, _IchiKukan r) {
+    final int n = r.narabi.length;
+    int j = -1;
+    for (int i = 0; i < n; i++) {
+      if (_jibunKa(b, r.narabi[i])) {
+        j = i;
+        break;
+      }
+    }
+    final Set<int> ban = {0, 1, if (j >= 0) ...[j - 1, j, j + 1]};
+    ban.removeWhere((i) => i < 0 || i >= n);
+    for (int i = 2; ban.length < 5 && i < n; i++) {
+      ban.add(i);
+    }
+    return ban.toList()..sort();
+  }
+
+  /// 見取り図の四角1つ(順位と2文字の大学名。自分の大学はオレンジ、1位は白の枠)
+  Widget _miniHako(_IchiKankei b, _IchiKukan r, _IchiDaigaku x) {
+    final bool orange = _jibunKa(b, x);
+    final bool ichii = r.kk >= 0 && identical(x, r.top);
+    final Color wakuIro = orange ? _jibunIro : (ichii ? Colors.white : Colors.white38);
+    final String juni = r.kk < 0 ? '' : (x.op ? 'OP ' : '${x.juni + 1} ');
+    return Container(
+      height: 17,
+      padding: const EdgeInsets.symmetric(horizontal: 3),
+      decoration: BoxDecoration(
+        color: const Color(0xFF101010),
+        border: Border.all(color: wakuIro, width: (orange || ichii) ? 1.5 : 1),
+        borderRadius: BorderRadius.circular(3),
+      ),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.centerLeft,
+        child: Text.rich(
+          TextSpan(
+            children: [
+              if (juni.isNotEmpty)
+                TextSpan(text: juni, style: const TextStyle(color: Colors.white54, fontSize: 9)),
+              TextSpan(
+                text: x.op ? '学連' : _michiMei(x.mei),
+                style: const TextStyle(color: HENSUU.textcolor, fontSize: 10),
+              ),
+            ],
+          ),
+          maxLines: 1,
+          softWrap: false,
+        ),
+      ),
+    );
+  }
+
+  /// 道の小さな見取り図(並び順どおりに置き、順位が飛ぶところと、後ろに続くところに「⋮」。
+  /// 絵として扱い、文字の大きさの設定では大きくしない。2.1.0)
+  Widget _mini(BuildContext context, _IchiKankei b, _IchiKukan r) {
+    const Widget tensen = Center(
+      child: Text('⋮', style: TextStyle(color: Colors.white38, fontSize: 10, height: 1.1)),
+    );
+    final List<int> ban = _miniBangou(b, r);
+    final List<Widget> naka = [];
+    for (int k = 0; k < ban.length; k++) {
+      if (k > 0) naka.add(ban[k] == ban[k - 1] + 1 ? const SizedBox(height: 3) : tensen);
+      naka.add(_miniHako(b, r, r.narabi[ban[k]]));
+    }
+    if (ban.isNotEmpty && ban.last < r.narabi.length - 1) naka.add(tensen);
+    return MediaQuery(
+      data: MediaQuery.of(context).copyWith(textScaler: TextScaler.noScaling),
+      child: Container(
+        width: 72,
+        padding: const EdgeInsets.fromLTRB(6, 6, 6, 4),
+        decoration: BoxDecoration(
+          color: _michiIro,
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: naka,
+        ),
+      ),
+    );
+  }
+
+  /// 情報集約パネルのボタン(ほかより大きく、左に見取り図、右に見出し・ひとこと・説明。2.1.0)
+  Widget _panelBotan(BuildContext context, _IchiKankei b) {
+    final _IchiKukan r = b.kukan.last;
+    return Material(
+      color: _iro.withOpacity(0.18),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: const BorderSide(color: _iro, width: 2),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => _ichiGamenHiraku(context, widget.race, widget.made),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(10, 10, 12, 10),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _mini(context, b, r),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.directions_run, color: _iro, size: 18),
+                        SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            '情報集約パネル ›',
+                            style: TextStyle(color: _iro, fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _hitokoto(b, r),
+                      style: const TextStyle(color: HENSUU.textcolor, fontSize: 13),
+                    ),
+                    const SizedBox(height: 2),
+                    const Text(
+                      '道の上で、各大学の位置を見られます',
+                      style: TextStyle(color: Colors.white70, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!_tsukutta || (!_bunpuAri && !_ichiAri)) return const SizedBox.shrink();
+    final _IchiKankei? ichi = _ichi;
     // 上に情報集約パネル、下にタイム分布(どちらも横いっぱい。2.0.7)
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
@@ -765,14 +956,9 @@ class _KukanBunsekiCardState extends State<KukanBunsekiCard> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (_ichiAri)
-            _botan(
-              Icons.directions_run,
-              _iro,
-              '情報集約パネル',
-              () => _ichiGamenHiraku(context, widget.race, widget.made),
-            ),
-          if (_bunpuAri && _ichiAri) const SizedBox(height: 8),
+          // 情報集約パネルは大きく(見取り図とひとこと付き。2.1.0)
+          if (ichi != null) _panelBotan(context, ichi),
+          if (_bunpuAri && ichi != null) const SizedBox(height: 8),
           if (_bunpuAri)
             _botan(
               Icons.candlestick_chart,

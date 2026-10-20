@@ -82,7 +82,7 @@
 //   速さを全員で1つにするので、距離はタイム差に比例し、順位と位置の並びが逆にならない
 //   (ゲームとしての見せ方。1位が着いた時点か最後の大学が着いた時点か、などは考えない)。
 // ・1区から終わった区間まで切り替えられる(覚えない。開くたびに一番あとの区間)。
-// ・前の大学との間のうち、その倍率で描くと画面の高さより長くなる間だけを詰めて(_tsumeAida)、
+// ・前の大学との間のうち、その倍率で描くと、道が見えている高さより長くなる間だけを詰めて(_tsumeAida)、
 //   道に切れ目の点線を引き、右の括弧を点線にする(拡大しすぎて、何もない道を延々とスクロールしないように。
 //   2.0.9までは「(詰めています)」を添えていた。2.1.0の開発中に「(途中を省略)」にしたが、幅を取るので
 //   添え書きはなくし、点線で示す)。
@@ -91,8 +91,11 @@
 //   接戦の区間では100mほどの間まで詰められて気になり、おまかせに×4の下限ができて役目もほぼなくなったので、
 //   2.1.0の開発中に、画面の高さより長い間だけにした。最初は「画面で144pxを超えたら」詰めていたが、
 //   出場校の少ない大会や差の開いた区間で、ほとんどの間が詰められて位置関係がつかめなかった)
+//   道が見えている高さは、上のバーと、上に固定する部分(区間の切り替えと倍率のボタン)と区切りの線を除いた高さ
+//   (_koteiKey で固定する部分の高さを描いたあとに測る。押した大学の帯の分は引かない(押すたびに省略が変わって
+//   道が動かないように)。2.1.0の開発中まで、機械の画面全体の高さを使っていた)
 // ・表示の倍率(1mあたりの高さ)は「−」「＋」で6段階に変えられる(文字の大きさは変わらない)。
-//   開いたときは「おまかせ」(区間ごとに、詰めた間を除いた1位から最後尾までの長さが、画面の高さの
+//   開いたときは「おまかせ」(区間ごとに、詰めた間を除いた1位から最後尾までの長さが、道が見えている高さの
 //   およそ2つ分に収まる一番大きい倍率。詰める間は倍率ごとに違うので、倍率ごとに数え直す)。
 //   2.1.0から、おまかせは×4より小さくしない(_omakaseSaitei。差の開いた区間で×1/2などになると、100mの差も
 //   10mの差も四角が重ならない一番小さい間隔になり、同じに見えていたため。開発中は×2にしたが、四角どうしの
@@ -936,6 +939,12 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
   /// 道の縦のスクロール(右端につまんで動かせるスクロールバーを出すため。2.1.0)
   final ScrollController _michiScroll = ScrollController();
 
+  /// 上に固定する部分(区間の切り替えと倍率のボタン)。道が見えている高さを出すために、描いたあとに高さを測る(2.1.0)
+  final GlobalKey _koteiKey = GlobalKey();
+
+  /// 測った、上に固定する部分の高さ(測る前はnull。2.1.0)
+  double? _koteiTakasa;
+
   /// 表示の倍率の段階(_bairitsu の番号。おまかせのときは使わない)
   int _dan = 2;
 
@@ -1008,6 +1017,18 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
       minThumbLength: 40,
       child: child,
     );
+  }
+
+  /// 上に固定する部分の高さを測る(前と違えば描き直す。文字の大きさや折り返しで変わるため。2.1.0)
+  void _koteiHakaru() {
+    if (!mounted) return;
+    final RenderObject? ro = _koteiKey.currentContext?.findRenderObject();
+    if (ro is! RenderBox || !ro.hasSize) return;
+    final double h = ro.size.height;
+    final double? mae = _koteiTakasa;
+    if (mae == null || (h - mae).abs() > 0.5) {
+      setState(() => _koteiTakasa = h);
+    }
   }
 
   /// 自分の大学(学連選抜の監督の年は学連選抜)の四角が見える所まで、道を動かす(2.1.0)
@@ -1448,14 +1469,14 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
       math.max(0.0, (r.narabi[i + 1].ruikei - r.narabi[i].ruikei) * r.hayasa),
   ];
 
-  /// 詰める間(_aida の番号。1mあたり[px]で描くと、画面の高さ[gamenTakasa]より長くなる間。2.1.0)
+  /// 詰める間(_aida の番号。1mあたり[px]で描くと、道が見えている高さ[gamenTakasa]より長くなる間。2.1.0)
   Set<int> _tsumeAida(List<double> aida, double px, double gamenTakasa) => {
     for (int i = 0; i < aida.length; i++)
       if (aida[i] * px > gamenTakasa) i,
   };
 
   /// おまかせの倍率の段階(詰めた間を除いた1位から最後尾までの長さが、
-  /// 画面の高さのおよそ2つ分に収まる一番大きい倍率)
+  /// 道が見えている高さ[gamenTakasa]のおよそ2つ分に収まる一番大きい倍率)
   int _omakaseDan(_IchiKukan r, double gamenTakasa) {
     if (r.narabi.length < 2 || r.kk < 0) return 2;
     final List<double> aida = _aida(r);
@@ -1475,8 +1496,8 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     return math.max(dan, _omakaseSaitei);
   }
 
-  /// 大学の四角と行の置き場所を決める([px] は1mあたりの高さ。[gamenTakasa] は画面の高さ。
-  /// 1つの間が画面の高さを超えるところだけを詰める(2.0.9までは手動で倍率を選んでいるときだけ。2.1.0から、
+  /// 大学の四角と行の置き場所を決める([px] は1mあたりの高さ。[gamenTakasa] は道が見えている高さ。
+  /// 1つの間が道が見えている高さを超えるところだけを詰める(2.0.9までは手動で倍率を選んでいるときだけ。2.1.0から、
   /// おまかせが×4より小さくならず、1つの間が画面より長くなることがあるので、おまかせでも詰める)。
   /// [gyouSuu] は集団の1行に並べる大学の数(_gyouSuuKimeru。2.1.0))
   _Haichi _haichi(
@@ -1778,12 +1799,9 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
   @override
   Widget build(BuildContext context) {
     final _IchiKankei? b = _b;
-    final double gamenTakasa = MediaQuery.sizeOf(context).height;
     _IchiKukan? r;
-    int dan = 2;
     if (b != null) {
       r = b.kukan[_erabu.clamp(0, b.kukan.length - 1)];
-      dan = _omakase ? _omakaseDan(r, gamenTakasa) : _dan.clamp(0, _bairitsu.length - 1);
     }
     final _IchiKukan? r0 = r;
     final String? oshitaBun = r0 == null ? null : _oshitaBun(r0);
@@ -1818,11 +1836,21 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
             : LayoutBuilder(
                 builder: (context, constraints) {
                   final double takasa = constraints.maxHeight;
+                  // 道が見えている高さ(上に固定する部分と区切りの線を除く。押した大学の帯の分は引かない。
+                  // 固定する部分は描いたあとに測り、測る前は2割と見込む。2.1.0)
+                  final double michiTakasa =
+                      math.max(100.0, takasa - (_koteiTakasa ?? takasa * 0.2) - 1);
+                  WidgetsBinding.instance.addPostFrameCallback((_) => _koteiHakaru());
+                  // 表示の倍率(おまかせは、道が見えている高さで決める。2.1.0)
+                  final int dan = _omakase
+                      ? _omakaseDan(r0, michiTakasa)
+                      : _dan.clamp(0, _bairitsu.length - 1);
                   return Column(
                     children: [
                       // 上に固定する部分(区間の切り替えと、倍率のボタン・縮尺の棒)。
                       // 3割まで(超えるときは、この中だけでスクロールする)
                       ConstrainedBox(
+                        key: _koteiKey,
                         constraints: BoxConstraints(maxHeight: takasa * 0.3),
                         child: SingleChildScrollView(
                           padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
@@ -1846,7 +1874,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
                               child: SingleChildScrollView(
                                 controller: _michiScroll,
                                 padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
-                                child: _buildHontai(context, b, r0, dan, gamenTakasa),
+                                child: _buildHontai(context, b, r0, dan, michiTakasa),
                               ),
                             ),
                           ),

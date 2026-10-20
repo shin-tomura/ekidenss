@@ -104,8 +104,8 @@
 //   2.1.0から、おまかせは×4より小さくしない(_omakaseSaitei。差の開いた区間で×1/2などになると、100mの差も
 //   10mの差も四角が重ならない一番小さい間隔になり、同じに見えていたため。開発中は×2にしたが、四角どうしの
 //   一番小さい間隔(約38px)が約48mになり、80mと10mがほとんど同じに見えたので×4にした(約24m))。
-//   縦が長くなるので、道の右端につまんで動かせるスクロールバーを出し、説明の「オレンジの枠」の行を押すと
-//   自分の大学(学連選抜の監督の年は学連選抜)が見える所まで動くようにした。
+//   縦が長くなるので、道の右端につまんで動かせるスクロールバーを出した(2.1.0の開発中は、説明の「オレンジの枠」の
+//   行を押すと自分の大学まで動くようにもしたが、何が起きるか分かりにくく、ボタンにすると固定の行が増えるのでなくした)。
 //   「−」「＋」を押すとおまかせが外れ、区間を切り替えてもその倍率のまま。
 //   覚えない(画面を閉じたらおまかせに戻る)。倍率のボタンの横に縮尺の棒を出す。
 // ・11月駅伝は8位、正月駅伝は10位の大学のすぐ下にシード権ラインを引く(10月駅伝とカスタム駅伝はなし。
@@ -1117,9 +1117,6 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
   /// 押した大学の四角(下の帯が伸びて隠れるときに、道を動かして見えるようにする)
   final GlobalKey _oshitaKey = GlobalKey();
 
-  /// 自分の大学(学連選抜の監督の年は学連選抜)の四角。説明の「オレンジの枠」の行を押したときに動かす先(2.1.0)
-  final GlobalKey _jibunKey = GlobalKey();
-
   /// 道の縦のスクロール(右端につまんで動かせるスクロールバーを出すため。2.1.0)
   final ScrollController _michiScroll = ScrollController();
 
@@ -1210,17 +1207,6 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     if (mae == null || (h - mae).abs() > 0.5) {
       setState(() => _koteiTakasa = h);
     }
-  }
-
-  /// 自分の大学(学連選抜の監督の年は学連選抜)の四角が見える所まで、道を動かす(2.1.0)
-  void _jibunHeIdou() {
-    final BuildContext? c = _jibunKey.currentContext;
-    if (c == null) return;
-    Scrollable.ensureVisible(
-      c,
-      duration: const Duration(milliseconds: 300),
-      alignment: 0.3,
-    );
   }
 
   /// 大学の四角を押したとき(1回目で差の帯、2回目で走った選手の説明文、3回目で次の区間を走る選手を出し、
@@ -2608,25 +2594,15 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
           ),
           const Text('右の括弧は前の大学との間です(点線は途中を省略した間)。', style: setsumei),
         ],
-        // オレンジの枠の行は、押すと自分の大学(学連選抜の監督の年は学連選抜)の四角まで動く(2.1.0。下線を引く)
         if (r.narabi.any((x) => x.jibun))
-          GestureDetector(
-            onTap: _jibunHeIdou,
-            child: Text(
-              'オレンジの枠: あなたの大学(押すとそこまで動きます)',
-              style: setsumei.copyWith(decoration: TextDecoration.underline),
-            ),
-          ),
+          const Text('オレンジの枠: あなたの大学', style: setsumei),
         if (b.opAri)
-          b.gakurenJibun
-              ? GestureDetector(
-                  onTap: _jibunHeIdou,
-                  child: Text(
-                    'オレンジの点線の枠: 学連選抜(あなたが監督。順位に数えない。押すとそこまで動きます)',
-                    style: setsumei.copyWith(decoration: TextDecoration.underline),
-                  ),
-                )
-              : const Text('点線の枠: 学連選抜(順位に数えない)', style: setsumei),
+          Text(
+            b.gakurenJibun
+                ? 'オレンジの点線の枠: 学連選抜(あなたが監督。順位に数えない)'
+                : '点線の枠: 学連選抜(順位に数えない)',
+            style: setsumei,
+          ),
         Text(
           r.kk < 0
               ? '大学の四角を押すと、下に1区を走る選手が出ます。'
@@ -2757,8 +2733,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
       onTap: () => _hakoOsu(r, hk.i),
       child: naka,
     );
-    // 自分の大学(学連選抜の監督の年は学連選抜)の四角にも印を付ける(説明の「オレンジの枠」の行から動く先。2.1.0)
-    return orange ? KeyedSubtree(key: _jibunKey, child: hako) : hako;
+    return hako;
   }
 }
 

@@ -3024,6 +3024,9 @@ class _ModalMeiseiHenkouState extends State<ModalMeiseiHenkou> {
   // 「名声を編集」を1行書く(2.1.1。スライダーで変えたときも書く。何度変えても1大学1行で、
   // 値が同じなら書かない。2.1.0までは、数字の欄から離れるたびに書き(値が同じでも)、スライダーでは書いていなかった)
   final Map<int, int> _hirakuMaeMeisei = {};
+  // 画面を開いたときの年ごとの名声(大学idごと)。閉じるときに名声が開いたときと同じ値に戻っていれば、
+  // 年ごとの名声もこの形に戻す(動かしてから元の値に戻したときに、内訳が均等に崩れないように。2.1.1)
+  final Map<int, List<int>> _hirakuMaeNengoto = {};
   // 閉じるときの処理を始めたか(戻るボタンと端末の戻るの両方から呼ばれても1回だけにする。2.1.1)
   bool _tojiruShoriZumi = false;
   // 昨年度に全大学が得た名声の合計(説明に出す。記録がなければnull。開いているあいだは変わらない。2.1.1)
@@ -3037,6 +3040,7 @@ class _ModalMeiseiHenkouState extends State<ModalMeiseiHenkou> {
     _univBox = Hive.box<UnivData>('univBox');
     for (final UnivData u in _univBox.values) {
       _hirakuMaeMeisei[u.id] = u.meisei_total;
+      _hirakuMaeNengoto[u.id] = List<int>.of(u.meisei_yeargoto);
     }
     _sakunendoGoukei = meiseiRirekiZenUnivGoukei(1);
     _kotei = meiseiKotei(
@@ -3067,6 +3071,9 @@ class _ModalMeiseiHenkouState extends State<ModalMeiseiHenkou> {
   }
 
   void _updateMeiseiValues(UnivData univ, int newMeiseiTotal) {
+    // 今の名声と同じなら、年ごとの名声を作り直さない(欄やスライダーを触っただけで、
+    // 内訳が10年に均等に崩れないように。2.1.1。2.1.0までは、同じ値でも作り直していた)
+    if (newMeiseiTotal == univ.meisei_total) return;
     univ.meisei_total = newMeiseiTotal;
 
     final int baseValue = newMeiseiTotal ~/ 10;
@@ -3140,12 +3147,31 @@ class _ModalMeiseiHenkouState extends State<ModalMeiseiHenkou> {
       ..sort((a, b) => a.id.compareTo(b.id));
     for (final UnivData u in univs) {
       final int? mae = _hirakuMaeMeisei[u.id];
-      if (mae == null || mae == u.meisei_total) continue;
+      if (mae == null) continue;
+      if (mae == u.meisei_total) {
+        // 開いたときと同じ値に戻っていれば、年ごとの名声も開いたときの形に戻し、履歴には書かない(2.1.1)
+        final List<int>? maeNengoto = _hirakuMaeNengoto[u.id];
+        if (maeNengoto != null &&
+            !_onajiNengoto(maeNengoto, u.meisei_yeargoto)) {
+          u.meisei_yeargoto = List<int>.of(maeNengoto);
+          await u.save();
+        }
+        continue;
+      }
       await meiseiRirekiTsuika(
         u.id,
         '名声を編集(10年分の合計を${u.meisei_total}にした)',
         0,
       );
+    }
+    return true;
+  }
+
+  /// 年ごとの名声が同じか(2.1.1)
+  bool _onajiNengoto(List<int> a, List<int> b) {
+    if (a.length != b.length) return false;
+    for (int i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
     }
     return true;
   }

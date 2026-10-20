@@ -23,6 +23,9 @@ import 'package:ekiden/kansuu/scout_com.dart' show isComScoutOn;
 // ・下の画面切り替えは出さない(スカウトの画面と同じく、この画面だけの MaterialApp で出す)
 // ・ほかの大学は、母校パイプで取り合いに関わる監督だけを出す(コーチは出さない)
 // ・この画面で終了しても、起動し直して「続きから再開」を選ぶと、この画面に戻る
+// ・「スカウトへ進む」は画面の一番下に固定し、上の中身だけをスクロールする(2.1.0。交代が多いと、
+//   ボタンがスクロールしないと見えず、迷わせそうだったため)。中身が続くと分かるように、右端に
+//   白っぽいスクロールバーを出す(情報集約パネルと同じ。黒い背景で見えるように)
 // ------------------------------------------------------------
 
 /// 交代予定の画面のモード
@@ -87,6 +90,15 @@ class _KantokuKoutaiYoteiViewState extends State<KantokuKoutaiYoteiView> {
   bool _pipeKiku = false;
   bool _pipeJibunKiku = true;
   bool _susunda = false; // ボタンの二度押しを防ぐ
+
+  /// 中身の縦のスクロール(右端のスクロールバーのため。2.1.0)
+  final ScrollController _scroll = ScrollController();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -228,51 +240,76 @@ class _KantokuKoutaiYoteiViewState extends State<KantokuKoutaiYoteiView> {
     return Scaffold(
       backgroundColor: HENSUU.backgroundcolor,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                '監督・コーチの交代予定',
-                style: TextStyle(
-                  color: HENSUU.textcolor,
-                  fontSize: HENSUU.fontsize_honbun + 4,
-                  fontWeight: FontWeight.bold,
+        child: Column(
+          children: [
+            // 中身(ここだけスクロールする。2.1.0)
+            Expanded(
+              child: RawScrollbar(
+                controller: _scroll,
+                thumbVisibility: true,
+                interactive: true,
+                thickness: 6,
+                radius: const Radius.circular(3),
+                thumbColor: Colors.white54,
+                minThumbLength: 40,
+                child: ScrollConfiguration(
+                  // デスクトップで自動のスクロールバーと二重にならないように、自動のほうは止める
+                  behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+                  child: SingleChildScrollView(
+                    controller: _scroll,
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          '監督・コーチの交代予定',
+                          style: TextStyle(
+                            color: HENSUU.textcolor,
+                            fontSize: HENSUU.fontsize_honbun + 4,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        const Text('4月から、次のように監督・コーチが代わる予定です。', style: _honbun),
+                        const SizedBox(height: 16),
+                        if (_jibun.isNotEmpty) ...[
+                          Text('${_myUnivMei}大学(あなたの大学)', style: _honbun.copyWith(fontWeight: FontWeight.bold)),
+                          const Divider(color: Colors.grey),
+                          for (final _Seki s in _jibun) _sekiGyou(s),
+                          const Divider(color: Colors.grey),
+                          const SizedBox(height: 12),
+                        ],
+                        if (_hoka.isNotEmpty) ...[
+                          Text('監督が代わる予定の大学', style: _honbun.copyWith(fontWeight: FontWeight.bold)),
+                          const Divider(color: Colors.grey),
+                          for (final _Hoka h in _hoka) _hokaGyou(h),
+                          const Divider(color: Colors.grey),
+                          const SizedBox(height: 12),
+                        ],
+                        if (_pipeKiku) ...[
+                          Text(
+                            _pipeJibunKiku
+                                ? '・監督の母校の新入生は、スカウトでその大学を選びやすくなります。'
+                                : '・ほかの大学の監督の母校の新入生は、スカウトでその大学を選びやすくなります。',
+                            style: _hosoku,
+                          ),
+                          const Text(
+                            '・今回のスカウトから、新しい監督の母校で効きます(去ると決まった監督の母校には効きません)。',
+                            style: _hosoku,
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                      ],
+                    ),
+                  ),
                 ),
               ),
-              const SizedBox(height: 12),
-              const Text('4月から、次のように監督・コーチが代わる予定です。', style: _honbun),
-              const SizedBox(height: 16),
-              if (_jibun.isNotEmpty) ...[
-                Text('${_myUnivMei}大学(あなたの大学)', style: _honbun.copyWith(fontWeight: FontWeight.bold)),
-                const Divider(color: Colors.grey),
-                for (final _Seki s in _jibun) _sekiGyou(s),
-                const Divider(color: Colors.grey),
-                const SizedBox(height: 12),
-              ],
-              if (_hoka.isNotEmpty) ...[
-                Text('監督が代わる予定の大学', style: _honbun.copyWith(fontWeight: FontWeight.bold)),
-                const Divider(color: Colors.grey),
-                for (final _Hoka h in _hoka) _hokaGyou(h),
-                const Divider(color: Colors.grey),
-                const SizedBox(height: 12),
-              ],
-              if (_pipeKiku) ...[
-                Text(
-                  _pipeJibunKiku
-                      ? '・監督の母校の新入生は、スカウトでその大学を選びやすくなります。'
-                      : '・ほかの大学の監督の母校の新入生は、スカウトでその大学を選びやすくなります。',
-                  style: _hosoku,
-                ),
-                const Text(
-                  '・今回のスカウトから、新しい監督の母校で効きます(去ると決まった監督の母校には効きません)。',
-                  style: _hosoku,
-                ),
-                const SizedBox(height: 16),
-              ],
-              const SizedBox(height: 8),
-              Center(
+            ),
+            // 「スカウトへ進む」は一番下に固定する(交代が多くても、いつも見えるように。2.1.0)
+            const Divider(height: 1, color: Colors.white24),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              child: Center(
                 child: ElevatedButton(
                   onPressed: _susumu,
                   style: ElevatedButton.styleFrom(
@@ -288,9 +325,8 @@ class _KantokuKoutaiYoteiViewState extends State<KantokuKoutaiYoteiView> {
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

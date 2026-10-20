@@ -23,8 +23,10 @@
 // 区間ごとのタイム分布と1枚にまとめたカード(KukanBunsekiCard。右半分の「位置関係」)から開く。
 // ・幅のある道の帯に、大学名を四角で囲んで並べ、1位からの距離を縮尺どおりの間隔で出す。
 //   四角の中の大学名は、最後の「大」を省く(下の帯の文は省かない)。学連選抜は四角の中では「OP学連」。
-//   2.1.0から、四角の中を順位・大学名・順位の変化の欄に分け、区間の中ではどの四角も同じ幅にする
-//   (大学名の欄は2文字分で左寄せ。長い名前は横だけ縮め、5割まで縮めても入らなければ最後を「…」で省く)。
+//   2.1.0から、四角の中を順位・大学名・順位の変化の欄に分ける。順位と順位の変化の欄は区間の中でそろえ、
+//   大学名の欄は名前の長さにする(4文字分まで。それより長い名前は横だけ縮め、5割まで縮めても入らなければ
+//   最後を「…」で省く。2.1.0の開発中は、どの四角も同じ幅(大学名は2文字分)にしていたが、4文字の名前を
+//   2文字分に縮めると読みにくかったので、名前の長さに合わせた)。
 //   大学名の後ろに、前の区間の終了時点からの順位の変化を「↑2」(緑)「↓3」(赤)「→」(灰色)で付ける
 //   (1区は付けない。学連選抜は通過順位相当で比べる。下の帯にも「5位(↑3)」の形で出す)。
 // ・集団(2.1.0から): 前の大学との差が1秒以内(右の括弧と同じ切り捨ての秒。「並走」か「1秒」)なら、
@@ -33,8 +35,10 @@
 //   同じ枠に入り、集団走のように見えていた)
 //   集団の中は、先頭と同じ秒の大学を1行目に横に並べ、1秒遅れるごとに次の行にし、秒が変わった行の右に
 //   「+1秒」を出す(同じ秒で入りきらずに折り返した行には出さない)。
-//   1行に並べる数は3校までで、「四角の行 + 右の括弧と差の文」が画面の幅に入る一番大きい数(3→2→1)にする
-//   (_gyouSuuKimeru。パネルで見られる全部の区間で決め、画面を閉じるまで同じ)。
+//   1行には、「四角の行 + 右の括弧と差の文」が画面の幅に入るだけ並べ、入らなくなったら次の行に折り返す
+//   (数の上限はなし。四角の幅は名前で違うので、行ごとに決める。入る幅(_gyouJougen)は、右の差の文を
+//   パネルで見られる全部の区間で一番長い文にして決めるので、区間を切り替えても同じ並びなら同じ折り返し。
+//   2.1.0の開発中は、3校までの数(3→2→1)をパネル全体で決めていた)。
 //   集団でない大学は1校ずつ縦に並べ、どの間にも右の括弧と差を出す。
 //   集団の一番上の行は、前の大学(前が集団なら、その一番下の行)から、間の距離ぶん下に置き、
 //   集団のあとの大学は、集団の一番下の行を起点にして、集団の最後の大学との間の距離ぶん下に置く。
@@ -118,7 +122,6 @@
 
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kDebugMode; // 大学名の欄の幅の試しのボタン(開発中のビルドだけ。2.1.0)
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ekiden/constants.dart';
 import 'package:ekiden/ghensuu.dart';
@@ -169,9 +172,6 @@ const double _tsumePx = 52;
 /// 四角に合わせ、はみ出したぶんは横にスクロールする)
 const double _migiYohaku = 6.0 + 14.0 + 8.0;
 
-/// 集団の1行に並べる大学の数の上限(画面の幅に合わせて、これ以下で決める。_gyouSuuKimeru。2.1.0)
-const int _gyouSaidai = 3;
-
 /// 前の大学との差がこの秒以内なら、同じ集団にする(右の括弧と同じ切り捨ての秒。2.1.0)
 const int _shuudanByou = 1;
 
@@ -193,14 +193,10 @@ const double _wakuYohaku = 4;
 const double _hakoYoko = 6;
 const double _hakoTate = 3;
 
-/// 四角の中の大学名の欄の文字数(どの四角も同じ幅にする。長い名前は横に縮める。2.1.0。
-/// 開発中に3文字分で作ったが、四角を狭くするため2文字分にした。
-/// 4文字の名前が読みにくいので、2.1.0の開発中に、開発中のビルドだけ「大学名の幅(試し)」のボタンで
-/// 2・2.5・3文字分を切り替えて試している(_meiHabaMoji)。決まったら、ここにその値を入れて、ボタンは消す)
-const int _meiMojisuu = 2;
+/// 四角の中の大学名の欄の上限の文字数(欄は名前の長さにし、これより長い名前は横に縮める。2.1.0)
+const int _meiMojisuu = 4;
 
-/// 大学名を横に縮める下限(これより縮めないと入らないときは、最後を「…」で省く。2.1.0。
-/// 2文字分の欄に4文字の名前が入るように5割にした)
+/// 大学名を横に縮める下限(これより縮めないと入らないときは、最後を「…」で省く。2.1.0)
 const double _meiChijimiSaishou = 0.5;
 
 /// 四角の中の、順位と大学名のすきま・大学名と順位の変化のすきま(2.1.0)
@@ -212,12 +208,13 @@ const TextStyle _juniStyle = TextStyle(color: Colors.white54, fontSize: 11.5);
 const TextStyle _meiStyle = TextStyle(color: HENSUU.textcolor, fontSize: 13);
 const TextStyle _hendouStyle = TextStyle(fontSize: 12);
 
-/// 区間の四角の中の欄の幅と文の高さ(区間の中ではどの四角も同じ。2.1.0)
+/// 区間の四角の中の欄の幅と文の高さ(2.1.0。順位と順位の変化の欄は区間の中でそろえる。
+/// 大学名の欄は名前の長さで、ここには上限を持つ)
 class _HakoHaba {
   /// 順位の欄(学連選抜の「OP」も。なければ0)
   final double juni;
 
-  /// 大学名の欄(_meiMojisuu 文字分)
+  /// 大学名の欄の上限(_meiMojisuu 文字分)
   final double mei;
 
   /// 順位の変化の欄(1区とスタートは0)
@@ -228,9 +225,9 @@ class _HakoHaba {
 
   const _HakoHaba(this.juni, this.mei, this.hendou, this.takasa);
 
-  /// 中身の幅(欄とすきまの合計)
-  double get naka =>
-      juni + (juni > 0 ? _juniSukima : 0) + mei + (hendou > 0 ? _hendouSukima + hendou : 0);
+  /// 大学名の欄が[meiHaba]のときの、中身の幅(欄とすきまの合計)
+  double naka(double meiHaba) =>
+      juni + (juni > 0 ? _juniSukima : 0) + meiHaba + (hendou > 0 ? _hendouSukima + hendou : 0);
 }
 
 /// 四角の枠の太さの最大(四角の大きさを決めるときに、これだけ見込む)
@@ -997,7 +994,7 @@ class _Hako {
   const _Hako(this.i, this.x, this.w, this.h);
 }
 
-/// 四角を並べた行(集団は、1行3校までで折り返して何行かになる)
+/// 四角を並べた行(集団は、画面の幅に入らなくなったら折り返して何行かになる)
 class _Gyou {
   /// 上端
   final double y;
@@ -1133,10 +1130,6 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
 
   /// 測った、上に固定する部分の高さ(測る前はnull。2.1.0)
   double? _koteiTakasa;
-
-  /// 四角の中の大学名の欄の幅(何文字分か。2.1.0の開発中に、開発中のビルドだけ2・2.5・3を切り替えて試す。
-  /// 覚えない(開くたびに _meiMojisuu)。決まったら _meiMojisuu に入れて、この切り替えは消す)
-  double _meiHabaMoji = _meiMojisuu.toDouble();
 
   /// 表示の倍率の段階(_bairitsu の番号。おまかせのときは使わない)
   int _dan = 2;
@@ -1459,11 +1452,11 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
   /// 四角の中の欄の幅を、区間と文字の大きさごとに覚えておく(画面を開いているあいだだけ。2.1.0)
   final Map<String, _HakoHaba> _hakoHabaKioku = {};
 
-  /// 区間[r]の四角の中の欄の幅(2.1.0。どの四角も同じ幅にそろえる)
-  /// 順位の欄はその区間の一番広い順位(学連選抜の「OP」も)、大学名の欄は2文字分(_meiMojisuu)、
+  /// 区間[r]の四角の中の欄の幅(2.1.0)
+  /// 順位の欄はその区間の一番広い順位(学連選抜の「OP」も)、大学名の欄の上限は4文字分(_meiMojisuu)、
   /// 順位の変化の欄はその区間の一番広い変化(1区とスタートは変化がないので0)
   _HakoHaba _hakoHaba(_IchiKukan r, TextScaler scaler) {
-    final String kagi = '${r.kk}:${scaler.scale(100).toStringAsFixed(2)}:$_meiHabaMoji';
+    final String kagi = '${r.kk}:${scaler.scale(100).toStringAsFixed(2)}';
     final _HakoHaba? kioku = _hakoHabaKioku[kagi];
     if (kioku != null) return kioku;
     double juni = 0;
@@ -1483,15 +1476,15 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
         takasa = math.max(takasa, z.height);
       }
     }
-    // 大学名の欄は「国」1文字の幅の _meiHabaMoji 倍(2.5文字分も試せるように。2.1.0の開発中)
-    final Size mei = _ookisa(const TextSpan(text: '国', style: _meiStyle), scaler);
+    // 大学名の欄の上限は「国」4文字分
+    final Size mei = _ookisa(TextSpan(text: '国' * _meiMojisuu, style: _meiStyle), scaler);
     takasa = math.max(takasa, mei.height);
-    final _HakoHaba h = _HakoHaba(juni, mei.width * _meiHabaMoji, hendou, takasa);
+    final _HakoHaba h = _HakoHaba(juni, mei.width, hendou, takasa);
     _hakoHabaKioku[kagi] = h;
     return h;
   }
 
-  /// 四角の中(順位・大学名・順位の変化の欄を、決まった幅で並べる。2.1.0)
+  /// 四角の中(順位・大学名・順位の変化の欄を並べる。順位と変化の欄は区間でそろえ、大学名は名前の長さ。2.1.0)
   Widget _hakoNaka(_IchiKukan r, int i, TextScaler scaler) {
     final _HakoHaba h = _hakoHaba(r, scaler);
     final _IchiDaigaku x = r.narabi[i];
@@ -1534,13 +1527,17 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     );
   }
 
-  /// 四角の中の大学名(2文字分(_meiMojisuu)の欄に左寄せで入れる。長い名前は横だけ縮め、5割まで縮めても入らなければ
-  /// 最後を「…」で省く。2.1.0)
+  /// 四角の中の大学名の欄の幅(名前の長さ。上限は4文字分。2.1.0)
+  double _hakoMeiHaba(String mei, _HakoHaba h, TextScaler scaler) =>
+      math.min(_ookisa(TextSpan(text: mei, style: _meiStyle), scaler).width, h.mei);
+
+  /// 四角の中の大学名(名前の長さの欄。4文字分(_meiMojisuu)より長い名前は、4文字分に横だけ縮め、
+  /// 5割まで縮めても入らなければ最後を「…」で省く。2.1.0)
   Widget _hakoMeiWidget(String mei, _HakoHaba h, TextScaler scaler) {
     final Size shizen = _ookisa(TextSpan(text: mei, style: _meiStyle), scaler);
     if (shizen.width <= h.mei) {
       return SizedBox(
-        width: h.mei,
+        width: shizen.width,
         child: Text(mei, style: _meiStyle, maxLines: 1, softWrap: false),
       );
     }
@@ -1567,23 +1564,21 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
   Color _hendouIro(int h) =>
       h > 0 ? Colors.lightGreenAccent : (h < 0 ? Colors.redAccent.shade100 : Colors.white54);
 
-  /// 四角の大きさ(枠の太さの最大と余白を見込む。2.1.0から、区間の中ではどの四角も同じ大きさ)
+  /// 四角の大きさ(枠の太さの最大と余白を見込む。2.1.0から、高さは区間の中で同じ、幅は大学名の長さで変わる)
   Size _hakoOokisa(_IchiKankei b, _IchiKukan r, int i, TextScaler scaler) {
     final _HakoHaba h = _hakoHaba(r, scaler);
+    final double meiHaba = _hakoMeiHaba(_hakoMei(r.narabi[i]), h, scaler);
     return Size(
-      h.naka + _hakoYoko * 2 + _wakuSaidai * 2 + 2,
+      h.naka(meiHaba) + _hakoYoko * 2 + _wakuSaidai * 2 + 2,
       h.takasa + _hakoTate * 2 + _wakuSaidai * 2,
     );
   }
-
-  /// 集団の1行に並べる大学の数を、画面の幅と文字の大きさごとに覚えておく(画面を開いているあいだだけ。2.1.0)
-  final Map<String, int> _gyouSuuKioku = {};
 
   /// 一番長い差の文の幅を、文字の大きさごとに覚えておく(画面を開いているあいだだけ。2.1.0)
   final Map<String, double> _aidaMojiHabaKioku = {};
 
   /// パネルで見られる全部の区間(スタートと終わった区間)の、一番長い差の文の幅(2.1.0)
-  /// 道の帯の幅と1行に並べる数をこれで決める(区間を切り替えるたびに道の幅が変わらないように)
+  /// 道の帯の幅と1行に並べる幅をこれで決める(区間を切り替えるたびに道の幅が変わらないように)
   double _aidaMojiHabaSaidai(_IchiKankei b, TextScaler scaler) {
     final String kagi = scaler.scale(100).toStringAsFixed(2);
     final double? kioku = _aidaMojiHabaKioku[kagi];
@@ -1601,45 +1596,11 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     return moji;
   }
 
-  /// 集団の1行に並べる大学の数(2.1.0)
-  /// 「四角の行 + 右の括弧と差の文」が画面の幅[w]に入る一番大きい数を、3校 → 2校 → 1校の順に試して決める
-  /// (1校でも入らなければ1校にして、横にスクロールする)。区間を切り替えるたびに数が変わらないように、
-  /// パネルで見られる全部の区間(スタートと終わった区間)の、一番広い四角・一番長い差の文・一番長い「+○秒」で決める
-  int _gyouSuuKimeru(_IchiKankei b, double w, TextScaler scaler) {
-    final String kagi = '${w.toStringAsFixed(1)}:${scaler.scale(100).toStringAsFixed(2)}:$_meiHabaMoji';
-    final int? kioku = _gyouSuuKioku[kagi];
-    if (kioku != null) return kioku;
-    double hako = 0;
-    final double moji = _aidaMojiHabaSaidai(b, scaler);
-    int byouSaidai = 0;
-    for (final _IchiKukan r in b.kukan) {
-      int sentou = 0; // いまの集団の先頭(シード権ラインなどで分かれるところは見ない。多めに見積もる)
-      for (int i = 0; i < r.narabi.length; i++) {
-        hako = math.max(hako, _hakoOokisa(b, r, i, scaler).width);
-        if (i == 0) continue;
-        final _IchiDaigaku x = r.narabi[i];
-        if (saByou(x.ruikei, r.narabi[i - 1].ruikei) <= _shuudanByou) {
-          byouSaidai = math.max(byouSaidai, saByou(x.ruikei, r.narabi[sentou].ruikei));
-        } else {
-          sentou = i;
-        }
-      }
-    }
-    final double byouHaba = byouSaidai > 0
-        ? _ookisa(TextSpan(text: '+$byouSaidai秒', style: _chiisai), scaler).width + _sukima
-        : 0;
-    int kekka = 1;
-    for (int suu = _gyouSaidai; suu >= 1; suu--) {
-      // _haichi の幅の決め方と同じ(一番広い行の右に、括弧と差の文が入るか)
-      final double gyouHashi = _hakoHidari + suu * (hako + _sukima) + byouHaba;
-      if (gyouHashi + _wakuYohaku + _migiYohaku + moji <= w) {
-        kekka = suu;
-        break;
-      }
-    }
-    _gyouSuuKioku[kagi] = kekka;
-    return kekka;
-  }
+  /// 集団の1行に四角(と「+1秒」)を並べてよい右端(2.1.0)
+  /// 「四角の行 + 右の括弧と差の文」が画面の幅[w]に入るところまで。区間を切り替えても同じ並びなら同じ折り返しに
+  /// なるように、右の差の文は、パネルで見られる全部の区間で一番長い文で見込む(_haichi の道の幅の決め方と同じ)
+  double _gyouJougen(_IchiKankei b, double w, TextScaler scaler) =>
+      w - _wakuYohaku - _migiYohaku - _aidaMojiHabaSaidai(b, scaler);
 
   /// 文の大きさ(折り返さない。改行のある文は、行を重ねた大きさ。2.1.0から道の右の差の文が2行になったため、
   /// 行の数を1つに限らないようにした)
@@ -1690,7 +1651,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
   /// 大学の四角と行の置き場所を決める([px] は1mあたりの高さ。[gamenTakasa] は道が見えている高さ。
   /// 1つの間が道が見えている高さを超えるところだけを詰める(2.0.9までは手動で倍率を選んでいるときだけ。2.1.0から、
   /// おまかせが×4より小さくならず、1つの間が画面より長くなることがあるので、おまかせでも詰める)。
-  /// [gyouSuu] は集団の1行に並べる大学の数(_gyouSuuKimeru。2.1.0))
+  /// 集団の1行には、画面の幅に入るだけ並べる(_gyouJougen。2.1.0)
   _Haichi _haichi(
     _IchiKankei b,
     _IchiKukan r,
@@ -1698,8 +1659,9 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     TextScaler scaler,
     double px,
     double gamenTakasa,
-    int gyouSuu,
   ) {
+    // 集団の1行に四角(と「+1秒」)を並べてよい右端(2.1.0)
+    final double jougen = _gyouJougen(b, w, scaler);
     final int n = r.narabi.length;
     // 四角の大きさ(折り返さない1行)
     final List<Size> hakoOokisa = [
@@ -1752,7 +1714,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
       }
     }
 
-    // 集団ごとに置く(一番上の行は前の集団の一番下の行から、間の距離ぶん下。1行3校まで)
+    // 集団ごとに置く(一番上の行は前の集団の一番下の行から、間の距離ぶん下。1行には画面の幅に入るだけ)
     final List<_Gyou> gyou = [];
     final List<_Aida> aidaList = [];
     final List<({double y0, double y1})> kireme = [];
@@ -1814,8 +1776,8 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
       }
       final double shuudanUe = top;
       final int gyouKara = gyou.length;
-      // 集団の中は、先頭からの秒差ごとに行を分ける(2.1.0。同じ秒の大学を横に並べ、[gyouSuu]校で折り返す。
-      // 秒が変わった行の右に「+1秒」を出し、折り返しの行には出さない)
+      // 集団の中は、先頭からの秒差ごとに行を分ける(2.1.0。同じ秒の大学を横に並べ、画面の幅に入らなくなったら
+      // 折り返す(数の上限はなし。1行に1校は置く)。秒が変わった行の右に「+1秒」を出し、折り返しの行には出さない)
       final List<({List<int> ichi, int? byou})> kumi = [];
       int j = 0;
       while (j < sh.length) {
@@ -1826,11 +1788,23 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
           onaji.add(sh[j]);
           j++;
         }
-        for (int k = 0; k < onaji.length; k += gyouSuu) {
-          kumi.add((
-            ichi: onaji.sublist(k, math.min(k + gyouSuu, onaji.length)),
-            byou: (k == 0 && byou0 > 0) ? byou0 : null,
-          ));
+        int k = 0;
+        while (k < onaji.length) {
+          // 秒が変わった最初の行は、右の「+1秒」の幅も見込む
+          final bool byouAri = k == 0 && byou0 > 0;
+          final double byouMojiHaba = byouAri
+              ? _ookisa(TextSpan(text: '+$byou0秒', style: _chiisai), scaler).width + _sukima
+              : 0;
+          final List<int> gyouNoIchi = [];
+          double gyouHashi = _hakoHidari;
+          while (k < onaji.length) {
+            final double tsugiHaba = hakoOokisa[onaji[k]].width + _sukima;
+            if (gyouNoIchi.isNotEmpty && gyouHashi + tsugiHaba + byouMojiHaba > jougen) break;
+            gyouNoIchi.add(onaji[k]);
+            gyouHashi += tsugiHaba;
+            k++;
+          }
+          kumi.add((ichi: gyouNoIchi, byou: byouAri ? byou0 : null));
         }
       }
       for (final ({List<int> ichi, int? byou}) g in kumi) {
@@ -2443,28 +2417,6 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
             _shukushaku(_bairitsu[dan]),
           ],
         ),
-          // 大学名の欄の幅の試し(開発中のビルドだけ。2.1.0の開発中。決まったら消す)
-          if (kDebugMode) ...[
-            const SizedBox(height: 6),
-            Wrap(
-              spacing: 8,
-              runSpacing: 6,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                const Text('大学名の幅(試し)', style: TextStyle(color: Colors.white54, fontSize: 12)),
-                for (final double m in const [2.0, 2.5, 3.0])
-                  _komaBotan(
-                    m == m.roundToDouble() ? '${m.toInt()}' : '$m',
-                    _meiHabaMoji == m,
-                    () => setState(() {
-                      _meiHabaMoji = m;
-                      _hakoHabaKioku.clear();
-                      _gyouSuuKioku.clear();
-                    }),
-                  ),
-              ],
-            ),
-          ],
         ],
       ],
     );
@@ -2694,14 +2646,8 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
             TextScaler scaler = MediaQuery.textScalerOf(context);
             final bool habaAwase = _omakase && _habaAwase;
             final double kihon = scaler.scale(13) / 13;
-            // 集団の1行に並べる数(2.1.0)。おまかせ ↔ のときは、文字を一番小さくした(6割)ときに入る数にし、
-            // 下で、その数が横幅に入るところまで文字を小さくする(文字が小さくなって3校が入るなら3校)
-            final int gyouSuu = _gyouSuuKimeru(
-              b,
-              w,
-              habaAwase ? TextScaler.linear(kihon * _habaSaishou) : scaler,
-            );
-            _Haichi h = _haichi(b, r, w, scaler, px, gamenTakasa, gyouSuu);
+            // 集団の1行には、画面の幅に入るだけ並べる(2.1.0。_haichi の中で行ごとに決める)
+            _Haichi h = _haichi(b, r, w, scaler, px, gamenTakasa);
             // 幅に合わせる(おまかせ ↔)ときは、横幅に収まるまで道の上の文字を小さくして並べ直す
             // (文字の幅で四角の幅と右の文の幅が決まるので、何回か測り直す。6割まで。2.0.8)
             bool chiisaku = false;
@@ -2710,7 +2656,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
               for (int n = 0; n < 4 && h.haba > w + 0.5 && k > _habaSaishou; n++) {
                 k = math.max(_habaSaishou, k * w / h.haba);
                 scaler = TextScaler.linear(kihon * k);
-                h = _haichi(b, r, w, scaler, px, gamenTakasa, gyouSuu);
+                h = _haichi(b, r, w, scaler, px, gamenTakasa);
               }
               chiisaku = true;
             }

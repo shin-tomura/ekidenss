@@ -3538,9 +3538,13 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView>
                             duration: const Duration(milliseconds: 150),
                             left: hk.x,
                             top: g.y + (g.h - hk.h) / 2,
-                            width: hk.w,
-                            height: hk.h,
-                            child: _hakoWidget(b, r, hk, scaler),
+                            // 幅と高さはすべらせず、すぐに変える(1区から2区に変わると順位の変化の欄が増えて四角が広がる。
+                            // 幅もすべらせると、途中のこまで中身が四角からはみ出していた。2.1.1の開発中)
+                            child: SizedBox(
+                              width: hk.w,
+                              height: hk.h,
+                              child: _hakoWidget(b, r, hk, scaler),
+                            ),
                           )
                         else
                           Positioned(

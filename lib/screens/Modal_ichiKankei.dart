@@ -24,7 +24,11 @@
 //     (2区が終わるまでは、推移を順番に入れない)。地点(「○km地点」)は出さない(区間の中の動きは推定なので、
 //     作り物だと分かるように)。区間名と区間の距離と、数字のない進み具合の棒だけを出す
 //   ・再生の時間は区間の距離に比例し、ふつうは1kmあたり0.25秒(正月駅伝の区間がおよそ5秒)。ゆっくり(半分の速さ)・
-//     はやい(2倍)を選べる。選んでいる区間から、終わった区間の最後まで続けて再生する
+//     はやい(2倍)を選べる。選んでいる区間から、終わった区間の最後まで続けて再生する。
+//     「最初から」を押すと、どの区間を見ていても1区終了時点(2区の始め)に戻り、最後まで通しで再生する
+//   ・推移の画面では、再生の前も、止めたときも、再生し終えたあとも、いつも推移の描き方(途中を省略しない)にする
+//     (2.1.1の開発中は、区間の終わり(進み具合が1)だけ位置の図をそのまま使っていたので、再生し終えた瞬間に
+//     途中が省略されて道が縮み、焦点の大学が画面の外に出ていた)
 //   ・焦点は、大学(その大学を追う)か順位(その順位にいる大学を追う。シード権の最後の順位には「(シード権ライン)」)。
 //     最初は自分の大学(学連選抜の監督の年は学連選抜。出ていなければ1位)。焦点の大学は、道が見えている高さの
 //     上から3分の1に来るように、道を自動で動かす(再生中は少しずつ追い、指で道を動かすと止める)。焦点の大学は水色の枠
@@ -701,10 +705,10 @@ int _daigakuKagi(_IchiDaigaku x) => x.op ? -1 : (x.univId ?? -2);
 /// ・距離に換算する速さも、前の区間の速さからこの区間の速さへ少しずつ変える(区間の境目で図が跳ねないように)
 /// ・順位は累計タイムの順(学連選抜は数えず、前にいる大学の数を順位相当にする)。同じタイムは、この区間の
 ///   終了時点の並びの順。順位の変化は、前の区間の終了時点から
-/// ・[p] が1なら、この区間の終了時点の図そのもの(位置の図とぴったり同じ)
+/// ・[p] が1なら、この区間の終了時点の図と同じ中身を、推移の描き方(途中を省略しないなど)で描く
 /// ・前の区間にいない大学(思わぬデータ)は、この区間の終了時点のタイムのまま
 _IchiKukan _suiiKoma(_IchiKukan mae, _IchiKukan ato, double p) {
-  if (p >= 1) return ato;
+  if (p >= 1) return _IchiKukan(ato.kk, ato.hayasa, ato.narabi, suii: true);
   final double t = p < 0 ? 0.0 : p;
   final Map<int, _IchiDaigaku> maeMap = {
     for (final _IchiDaigaku x in mae.narabi) _daigakuKagi(x): x,
@@ -1419,6 +1423,21 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView>
     if (t != null && !t.isActive) t.start();
   }
 
+  /// 最初から(1区終了時点、2区の始めから)最後まで通しで再生する(どの区間を見ていても)
+  void _suiiSaishoKara() {
+    final _IchiKankei? b = _b;
+    if (b == null) return;
+    final List<int> kouho = _suiiKouho(b);
+    if (kouho.isEmpty) return;
+    setState(() {
+      _suiiKukan = kouho.first;
+      _suiiKaishi = kouho.first;
+      _suiiP = 0;
+      _suiiOuYoyaku = true;
+    });
+    _suiiSaisei();
+  }
+
   /// 止める
   void _suiiTomeru() {
     _ticker?.stop();
@@ -1450,7 +1469,11 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView>
       } else {
         _suiiP = 1;
         _ticker?.stop();
-        setState(() => _saisei = false);
+        setState(() {
+          _saisei = false;
+          // 再生し終えたら、焦点の大学が見えるように、もう一度道を合わせる
+          _suiiOuYoyaku = true;
+        });
         return;
       }
     }
@@ -2786,6 +2809,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView>
             runSpacing: 6,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
+              _suiiSaishoBotan(),
               _suiiSaiseiBotan(),
               _komaBotan(
                 _suiiHayasaMei[_suiiHayasaBan.clamp(0, _suiiHayasaMei.length - 1)],
@@ -2902,6 +2926,32 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView>
         (ki >= 0 && ki < kouho.length - 1) ? () => _suiiKukanKaeru(kouho[ki + 1]) : null,
       ),
     ];
+  }
+
+  /// 推移の「最初から」のボタン(1区終了時点から最後まで通しで再生する。2.1.1)
+  Widget _suiiSaishoBotan() {
+    return Semantics(
+      button: true,
+      label: '最初から再生する',
+      child: GestureDetector(
+        onTap: _suiiSaishoKara,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            border: Border.all(color: _iro),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.skip_previous, color: _iro, size: 18),
+              SizedBox(width: 2),
+              Text('最初から', style: TextStyle(color: _iro, fontSize: 13)),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   /// 推移の「再生」「停止」のボタン(2.1.1)

@@ -78,6 +78,12 @@ String resetBunruiMei(ResetBunrui b) {
   }
 }
 
+/// 「名声・育成力と設定を残してやり直す」で、「名声は初期値に戻す」を選んだときのモード(2.1.1)
+/// (選ばないときは今まで通り101010。main.dart の _runMode101010Processing で、どちらも同じリセットをし、
+///  こちらは名声と名声の履歴だけ新しいゲームと同じにする。選んだことをモードで覚えるので、
+///  リセットの途中でアプリが閉じても、同じ選び方でやり直される)
+const int nokosuResetMeiseiShokikaMode = 101011;
+
 /// リセットで残すか([zenbu] が true なら「全てリセットしてやり直す」、false なら「名声・育成力と設定を残してやり直す」)
 bool resetNokosu(ResetBunrui b, {required bool zenbu}) {
   switch (b) {
@@ -433,7 +439,7 @@ List<ResetKoumoku> resetIchiran() {
       _kantoku(3, 75, 75),
       _kantoku(2, 85, 85),
     ], qr: ResetQr.atai),
-    ResetKoumoku('名声・名声の履歴', '育成と名声', ResetBunrui.seiryoku, [], qr: ResetQr.ichibu, qrHosoku: '名声だけ入ります。読み込むと、年ごとの名声を均して作り直し、名声の履歴に読み込んだことが残ります。'),
+    ResetKoumoku('名声・名声の履歴', '育成と名声', ResetBunrui.seiryoku, [], qr: ResetQr.ichibu, qrHosoku: '名声だけ入ります。読み込むと、年ごとの名声を均して作り直し、名声の履歴に読み込んだことが残ります。', hosoku: '設定を残すリセットでも、「名声は初期値に戻す」を選ぶと、名声と名声の履歴は新しいゲームと同じになります。'),
     ResetKoumoku('駅伝名声設定', '育成と名声', ResetBunrui.rule, [
       // 大学id 1〜6 の文字の欄(10月・11月・正月駅伝の名声倍率の分子と分母。初期値はどれも1)
       for (int id = 1; id <= 6; id++) _tanshuku(id, shokichi: '1'),

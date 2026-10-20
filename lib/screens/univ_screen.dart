@@ -27,6 +27,8 @@ import 'package:ekiden/screens/Modal_ChartHyojiHijyojiKirikae.dart'; // レー�
 import 'package:ekiden/kansuu/meisei_rireki.dart'; // 名声の履歴(1.8.8)
 import 'package:ekiden/kansuu/meisei_kotei.dart'
     show meiseiKotei; // 名声設定の画面の説明に、コンピュータの大学の名声を固定中であることを添える(2.1.1)
+import 'package:ekiden/kansuu/ShokitiUnivdata.dart'
+    show meiseiShokitiModosu, shokiMeiseiGoukei; // 名声設定の画面の「全大学の名声を初期値に戻す」(2.1.1)
 import 'package:ekiden/kansuu/shiyou_text.dart'; // 留学生の入学の決まり(1.8.9)
 import 'package:ekiden/kansuu/kiji/kiji_kihon.dart'
     show KijiHyou, univSandaiHyou, konkiKaisaiZumi; // 三大駅伝の成績の表(1.9.8)
@@ -3033,6 +3035,9 @@ class _ModalMeiseiHenkouState extends State<ModalMeiseiHenkou> {
   int? _sakunendoGoukei;
   // コンピュータの大学の名声を固定しているか(説明に1行添える。2.1.1)
   bool _kotei = false;
+  // 「全大学の名声を初期値に戻す」で戻した大学(大学id)。閉じるときに、名声の履歴に「名声を初期値に戻した」と書く
+  // (戻したあとに数字やスライダーで変えた大学は外し、今まで通り「名声を編集」と書く。2.1.1)
+  final Set<int> _shokitiModoshita = {};
 
   @override
   void initState() {
@@ -3074,6 +3079,8 @@ class _ModalMeiseiHenkouState extends State<ModalMeiseiHenkou> {
     // 今の名声と同じなら、年ごとの名声を作り直さない(欄やスライダーを触っただけで、
     // 内訳が10年に均等に崩れないように。2.1.1。2.1.0までは、同じ値でも作り直していた)
     if (newMeiseiTotal == univ.meisei_total) return;
+    // 初期値に戻したあとに変えたときは、「名声を編集」として書く(2.1.1)
+    _shokitiModoshita.remove(univ.id);
     univ.meisei_total = newMeiseiTotal;
 
     final int baseValue = newMeiseiTotal ~/ 10;
@@ -3148,9 +3155,11 @@ class _ModalMeiseiHenkouState extends State<ModalMeiseiHenkou> {
     for (final UnivData u in univs) {
       final int? mae = _hirakuMaeMeisei[u.id];
       if (mae == null) continue;
-      if (mae == u.meisei_total) {
+      final List<int>? maeNengoto = _hirakuMaeNengoto[u.id];
+      // 「全大学の名声を初期値に戻す」で戻した大学か(2.1.1)
+      final bool modoshita = _shokitiModoshita.contains(u.id);
+      if (mae == u.meisei_total && !modoshita) {
         // 開いたときと同じ値に戻っていれば、年ごとの名声も開いたときの形に戻し、履歴には書かない(2.1.1)
-        final List<int>? maeNengoto = _hirakuMaeNengoto[u.id];
         if (maeNengoto != null &&
             !_onajiNengoto(maeNengoto, u.meisei_yeargoto)) {
           u.meisei_yeargoto = List<int>.of(maeNengoto);
@@ -3158,13 +3167,79 @@ class _ModalMeiseiHenkouState extends State<ModalMeiseiHenkou> {
         }
         continue;
       }
+      // 初期値に戻しても、年ごとの名声が開いたときと同じなら(もともと初期値のまま)、履歴には書かない(2.1.1)
+      if (modoshita &&
+          maeNengoto != null &&
+          _onajiNengoto(maeNengoto, u.meisei_yeargoto)) {
+        continue;
+      }
       await meiseiRirekiTsuika(
         u.id,
-        '名声を編集(10年分の合計を${u.meisei_total}にした)',
+        modoshita
+            ? '名声を初期値に戻した(10年分の合計を${u.meisei_total}にした)'
+            : '名声を編集(10年分の合計を${u.meisei_total}にした)',
         0,
       );
     }
     return true;
+  }
+
+  /// 全大学の名声を初期値に戻す(確かめてから。2.1.1)
+  /// ・過去9年分を新しいゲームの値にし、今年度に得た名声は残す(ShokitiUnivdata.dart の meiseiShokitiModosu)
+  /// ・1年あたりは最低1なので、どの大学も合計は9以上になる(名声で割る計算が0にならない)
+  /// ・すぐに保存し、名声の順位と名声の履歴は、閉じるときにまとめて直す(_tojiruShori)
+  Future<void> _shokitiModosu() async {
+    FocusScope.of(context).unfocus();
+    final List<UnivData> univs = _univBox.values.toList()
+      ..sort((a, b) => a.id.compareTo(b.id));
+    if (univs.isEmpty) return;
+    final bool? ok = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext c) => AlertDialog(
+        backgroundColor: Colors.grey[900],
+        // 文字を大きくしても、本文をスクロールで読めるようにする
+        scrollable: true,
+        title: const Text(
+          '名声を初期値に戻しますか',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: Text(
+          '全大学の過去9年分の名声を、新しいゲームを始めたときの値に戻します。\n'
+          '大学を選ぶ画面の並びで、一番上の大学が${shokiMeiseiGoukei(univs.first.id)}、'
+          '一番下の大学が${shokiMeiseiGoukei(univs.last.id)}です。\n'
+          '今年度に得た名声は、そのまま残ります。',
+          style: const TextStyle(
+            color: HENSUU.textcolor,
+            fontSize: HENSUU.fontsize_honbun,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(c).pop(false),
+            child: const Text('やめる', style: TextStyle(color: Colors.white)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(c).pop(true),
+            child: Text(
+              '戻す',
+              style: TextStyle(
+                color: Colors.orange.shade300,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    for (final UnivData u in univs) {
+      meiseiShokitiModosu(u);
+      await u.save();
+      _shokitiModoshita.add(u.id);
+      // 数字の欄も戻した値にする(欄はHiveのキーで持っている)
+      _controllers[u.key as int]?.text = '${u.meisei_total}';
+    }
+    if (mounted) setState(() {});
   }
 
   /// 年ごとの名声が同じか(2.1.1)
@@ -3301,6 +3376,19 @@ class _ModalMeiseiHenkouState extends State<ModalMeiseiHenkou> {
                         fontSize: HENSUU.fontsize_honbun - 2,
                       ),
                       textAlign: TextAlign.center,
+                    ),
+                    // 全大学の名声を初期値に戻す(2.1.1。1行に1つだけ置き、文字を大きくしても折り返す)
+                    TextButton(
+                      onPressed: _shokitiModosu,
+                      child: const Text(
+                        '全大学の名声を初期値に戻す',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Color.fromARGB(255, 0, 255, 0),
+                          decoration: TextDecoration.underline,
+                          decorationColor: HENSUU.textcolor,
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 16),
                     const Divider(color: Colors.grey),

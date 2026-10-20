@@ -18,13 +18,39 @@ int shokiMeiseiNen(int univid) {
   return atai < 1 ? 1 : atai;
 }
 
+/// 大学[univ]の過去9年分の名声を、新しいゲームの初期値(1年あたり shokiMeiseiNen)にし、合計を計算し直す
+/// (名声設定の画面の「全大学の名声を初期値に戻す」。2.1.1)。
+/// ・今年度に得た名声(meisei_yeargoto[0])は残す(年間表彰の年間最優秀チームと、今年度の名声の履歴が崩れないように)
+/// ・1年あたりは最低1なので、合計はいつも9以上(名声で割る計算が0にならない)
+/// ・保存(save)と名声の順位の付け直しは呼び出し側で行う
+void meiseiShokitiModosu(UnivData univ) {
+  final int kotoshi = univ.meisei_yeargoto.isNotEmpty
+      ? math.max(0, univ.meisei_yeargoto[0])
+      : 0;
+  final int nen = shokiMeiseiNen(univ.id);
+  univ.meisei_yeargoto = [
+    kotoshi,
+    for (int ii = 1; ii < TEISUU.MEISEIHOZONNENSUU; ii++) nen,
+  ];
+  univ.meisei_total = kotoshi + nen * (TEISUU.MEISEIHOZONNENSUU - 1);
+}
+
+/// 新しいゲームの名声の合計(過去9年分。名声設定の画面の確認の文に使う。2.1.1)
+int shokiMeiseiGoukei(int univid) =>
+    shokiMeiseiNen(univid) * (TEISUU.MEISEIHOZONNENSUU - 1);
+
+/// [meiseiShokika] は、名声と育成力を維持するリセット([ikuseiryoku_meisei_ijiflag] が true)でも、
+/// 名声と名声の履歴だけは新しいゲームと同じにするとき(「名声は初期値に戻す」を選んだとき。2.1.1)
 Future<void> ShokitiUnivdata(
   bool ikuseiryoku_meisei_ijiflag,
-  Box<UnivData> univBox,
-) async {
+  Box<UnivData> univBox, {
+  bool meiseiShokika = false,
+}) async {
   int temptotal = 0;
+  // 名声を残すか(育成力を残すかは、今まで通り ikuseiryoku_meisei_ijiflag で決める。2.1.1)
+  final bool meiseiNokosu = ikuseiryoku_meisei_ijiflag && !meiseiShokika;
   // 名声の履歴は、名声を作り直すときに消す(名声と育成力を維持するときは、名声と一緒に残す。1.8.8)
-  if (ikuseiryoku_meisei_ijiflag == false) {
+  if (meiseiNokosu == false) {
     await meiseiRirekiZenbuKesu();
   }
   // 高校の大会の記録と優勝回数は、どちらの新しいゲームでも消す(選手と年を作り直すため。1.9.5)
@@ -40,7 +66,7 @@ Future<void> ShokitiUnivdata(
     // var temptotal=0;
     temptotal = 0; // Dartでのint変数の宣言
 
-    if (ikuseiryoku_meisei_ijiflag == false) {
+    if (meiseiNokosu == false) {
       // sortedunivdata[i].meisei_yeargoto[0]=0;
       // DartのList<int>を初期化していると仮定
       if (univ.meisei_yeargoto.isNotEmpty) {

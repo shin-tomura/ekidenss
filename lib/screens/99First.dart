@@ -7,6 +7,8 @@ import 'package:ekiden/kansuu/ShoriGuard.dart';
 import 'package:ekiden/kansuu/mokuhyou_kimekata.dart'; // 目標順位の決め方を変えたお知らせ(2.0.1)
 import 'package:ekiden/screens/reset_ichiran_gamen.dart'
     show resetIchiranGamenHiraku, resetSaiKakunin; // 残るもの・戻るものの一覧と、もう一度確かめるダイアログ(2.0.6)
+import 'package:ekiden/kansuu/reset_ichiran.dart'
+    show nokosuResetMeiseiShokikaMode; // 名声は初期値に戻すときのモード(2.1.1)
 
 class FirstScreen extends StatefulWidget {
   const FirstScreen({super.key});
@@ -40,12 +42,16 @@ class _FirstScreen extends State<FirstScreen> {
   // (2.0.5までは「全てリセットしてやり直す」と同じで、変えていた設定が黙って初期値に戻っていたため)。
   // 全て初期値に戻すほうも、ダイアログの中に小さく残す(残した設定がもとで新規ゲームの処理が
   // 止まったときも、設定タブを開かずに全てリセットを選べるように)
+  // 2.1.1から、設定タブと同じ「名声は初期値に戻す」を選べる(毎回チェックなしから始める。選んだときは mode 101011)
   Future<void> _showNewGameConfirmDialog(BuildContext context) async {
     const TextStyle honbun = TextStyle(color: Colors.white70, height: 1.6);
+    // 「名声は初期値に戻す」を選んでいるか(2.1.1)
+    bool meiseiShokika = false;
     return showDialog<void>(
       context: context,
       barrierDismissible: false, // ダイアログ外をタップしても閉じない
-      builder: (BuildContext dialogContext) {
+      builder: (BuildContext c) => StatefulBuilder(
+        builder: (BuildContext dialogContext, StateSetter setDialogState) {
         return AlertDialog(
           backgroundColor: const Color(0xFF1A1A1A),
           // 文字を大きくしても、本文をスクロールで読めるようにする
@@ -64,10 +70,34 @@ class _FirstScreen extends State<FirstScreen> {
                 style: honbun,
               ),
               const SizedBox(height: 8),
-              const Text(
-                '名声・育成力と、レースや育成などの設定、表示の好みはそのまま残ります。'
-                '元には戻せません。',
+              Text(
+                meiseiShokika
+                    ? '名声は初期値に戻します。育成力と、レースや育成などの設定、表示の好みはそのまま残ります。'
+                          '元には戻せません。'
+                    : '名声・育成力と、レースや育成などの設定、表示の好みはそのまま残ります。'
+                          '元には戻せません。',
                 style: honbun,
+              ),
+              // 名声は初期値に戻す(2.1.1。設定タブの「名声・育成力と設定を残してやり直す」と同じ)
+              CheckboxListTile(
+                value: meiseiShokika,
+                onChanged: (bool? v) {
+                  setDialogState(() {
+                    meiseiShokika = v ?? false;
+                  });
+                },
+                controlAffinity: ListTileControlAffinity.leading,
+                contentPadding: EdgeInsets.zero,
+                activeColor: Colors.green,
+                side: const BorderSide(color: Colors.white70, width: 2),
+                title: const Text(
+                  '名声は初期値に戻す',
+                  style: TextStyle(color: Colors.white),
+                ),
+                subtitle: const Text(
+                  '新しいゲームと同じ名声にします。名声の内訳も消えます。',
+                  style: TextStyle(color: Colors.white54),
+                ),
               ),
               // 残るもの・戻るものの一覧(reset_ichiran_gamen.dart。閉じると、このダイアログに戻る)
               TextButton(
@@ -129,13 +159,17 @@ class _FirstScreen extends State<FirstScreen> {
               ),
               onPressed: () async {
                 // ダイアログを閉じて、名声・育成力と設定を残すリセットで始める
+                // (「名声は初期値に戻す」を選んでいれば101011。2.1.1)
                 Navigator.of(dialogContext).pop();
-                await _shinkiKaishi(101010);
+                await _shinkiKaishi(
+                  meiseiShokika ? nokosuResetMeiseiShokikaMode : 101010,
+                );
               },
             ),
           ],
         );
-      },
+        },
+      ),
     );
   }
 

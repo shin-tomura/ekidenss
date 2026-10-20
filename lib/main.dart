@@ -81,7 +81,8 @@ import 'package:ekiden/kansuu/reset_ichiran.dart'
         ResetBunrui,
         resetNokosu,
         resetMaeniToru,
-        resetAtoDeModosu; // リセットで残すもの・戻すものの一覧(2.0.3)
+        resetAtoDeModosu, // リセットで残すもの・戻すものの一覧(2.0.3)
+        nokosuResetMeiseiShokikaMode; // 設定を残すリセットで、名声は初期値に戻すときのモード(2.1.1)
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 // ★ここに buildAppTheme() 関数を記述する★
@@ -1585,7 +1586,9 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     _isMode10Processing = true; // 実行開始
     // ★★★ フラグを設定 END ★★★
 
-    print('現在モード101010: 初期処理を実行中...');
+    print('現在モード${ghensuu.mode}: 初期処理を実行中...');
+    // 「名声は初期値に戻す」を選んだか(モード101011。2.1.1。ghensuu はこのあと初期化するので、先に読む)
+    final bool meiseiShokika = ghensuu.mode == nokosuResetMeiseiShokikaMode;
     // リセットで残すものと戻すものは、一覧(reset_ichiran.dart)で決める(2.0.3)。
     // 残すことになっている設定の値を先に取っておき、今まで通りのリセットのあとで書き戻す
     final ResetDougu? resetDougu = ResetDougu.yomu();
@@ -1665,6 +1668,8 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
     await ShokitiUnivdata(
       resetNokosu(ResetBunrui.seiryoku, zenbu: false),
       _univBox,
+      // 「名声は初期値に戻す」を選んだときは、名声と名声の履歴だけ新しいゲームと同じにする(育成力は残す。2.1.1)
+      meiseiShokika: meiseiShokika,
     );
     print('ShokitiUnivdata完了');
     // 戻す設定を一覧の初期値にし、残す設定を書き戻す(新しい選手を作る前に。reset_ichiran.dart。2.0.3)
@@ -4494,7 +4499,10 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
               ),
             ),
           );
-        } else if (currentGhensuu.mode == 101010 && !_isMode10Processing) {
+        } else if ((currentGhensuu.mode == 101010 ||
+                currentGhensuu.mode == nokosuResetMeiseiShokikaMode) &&
+            !_isMode10Processing) {
+          // 101011は、同じリセットで名声だけ初期値に戻す(2.1.1)
           // フラグを追加
           WidgetsBinding.instance.addPostFrameCallback((_) async {
             await _runGuarded(

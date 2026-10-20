@@ -22,7 +22,12 @@ import 'package:ekiden/qr_processor.dart' show qrKakidashiYobiBangou; // QRコ�
 /// リセットを、もう一度確かめるダイアログ(2.0.4。2つのリセットの確認の画面で、進むボタンを押したあと)
 /// [zenbu] が true なら「全てリセットしてやり直す」、false なら「名声・育成力と設定を残してやり直す」。
 /// 進むボタンを押したときだけ true(「やめる」とダイアログの外を押したときは false で、確認の画面に戻る)
-Future<bool> resetSaiKakunin(BuildContext context, {required bool zenbu}) async {
+/// [meiseiShokika] は、設定を残すリセットで「名声は初期値に戻す」を選んだとき(文を合わせる。2.1.1)
+Future<bool> resetSaiKakunin(
+  BuildContext context, {
+  required bool zenbu,
+  bool meiseiShokika = false,
+}) async {
   const TextStyle honbun = TextStyle(color: HENSUU.textcolor, fontSize: HENSUU.fontsize_honbun);
   final bool? ok = await showDialog<bool>(
     context: context,
@@ -38,8 +43,11 @@ Future<bool> resetSaiKakunin(BuildContext context, {required bool zenbu}) async 
         zenbu
             ? 'ゲームの進み具合に加えて、名声・育成力と、すべての設定が初期値に戻ります。アルバムも消去されます。'
                 '元には戻せません。'
+            : meiseiShokika
+            ? '選手・記録・年月日などのゲームの進み具合が消え、1年目からやり直します。アルバムも消去されます。'
+                  '名声は初期値に戻り、育成力と設定は残ります。元には戻せません。'
             : '選手・記録・年月日などのゲームの進み具合が消え、1年目からやり直します。アルバムも消去されます。'
-                '名声・育成力と設定は残ります。元には戻せません。',
+                  '名声・育成力と設定は残ります。元には戻せません。',
         style: honbun,
       ),
       actions: [

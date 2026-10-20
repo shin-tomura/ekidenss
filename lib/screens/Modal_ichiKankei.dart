@@ -17,7 +17,7 @@
 //   入れ替わる。最初は自分の大学(学連選抜の監督の年は学連選抜。自分の大学が出ていない年は、ID順の最初の大学)で、
 //   画面を閉じるまで選んだ大学を覚える。大学名は1行に収め、入りきらないところは「…」で省く。
 // ・2.1.1から、切り替えボタンの5つ目に「推移」を足した(位置 → 通過 → 個人 → 配置 → 推移 → 位置)。
-//   中継所ごとの位置の図を、なめらかにつないで動かして見せる(_suiiKoma)。区間の中は、どの大学もその区間を
+//   中継所ごとの位置の図を、区間を5つに分けてつなぎ、コマ送りで見せる(_suiiKoma)。区間の中は、どの大学もその区間を
 //   同じペースで走ったとみなし、各地点を通ったときのタイム差を、位置の図と同じく区間の平均の速さ(前の区間の速さから
 //   この区間の速さへ少しずつ変える)で距離にする。区間の終わりで、位置の図とぴったり同じになる。
 //   ・1区は、飛び出した選手と集団の記録をもとにした演出にする(_IkkuEnshutsu・_ikkuJikoku。2.1.1の開発中は、
@@ -29,9 +29,13 @@
 //     集団のペースの記録がない(別の大会の記録など)ときは、今まで通り1区終了時点から(2区から)にする。
 //     推移は、1区が終わったら(1区の演出ができないときは2区が終わったら)順番に入れる
 //   ・地点(「○km地点」)は出さない(区間の中の動きは推定なので、作り物だと分かるように)。
-//     区間名と区間の距離と、数字のない進み具合の棒だけを出す
-//   ・再生の時間は区間の距離に比例し、ふつうは1kmあたり0.25秒(正月駅伝の区間がおよそ5秒)。ゆっくり(半分の速さ)・
-//     はやい(2倍)を選べる。選んでいる区間から、終わった区間の最後まで続けて再生する。
+//     区間名と区間の距離と、数字のない進み具合の丸だけを出す
+//   ・コマ送り(2.1.1の開発中は、画面の書き換えに合わせてなめらかに動かしていたが、電池を使うのでやめた):
+//     区間を5つに分け、1コマずつ図を切り替える(すべらせない)。区間の始め(中継所)は0コマ目で、前の区間の
+//     5コマ目と同じ図なので、続けて再生するときと◀▶では1回にまとめ、中継所のコマは2倍止まる。
+//     1コマはふつう1秒(ゆっくり2秒・はやい0.5秒。区間の距離には関係ない)。再生は1コマごとに1回だけ動くタイマーで進め、
+//     コマのあいだは何も計算・描画しない。◀▶(「1コマ」)は止めてから1コマ動かし、区間をまたぐ。
+//     進み具合は5つの丸(区間の始めは全部白、中継所は全部黒)。選んでいる区間から、終わった区間の最後まで続けて再生する。
 //     「最初から」を押すと、どの区間を見ていても最初(1区の演出ができればスタート、できなければ1区終了時点)に戻り、
 //     最後まで通しで再生する
 //   ・推移の画面では、再生の前も、止めたときも、再生し終えたあとも、いつも推移の描き方(途中を省略しない)にする
@@ -39,10 +43,9 @@
 //     途中が省略されて道が縮み、焦点の大学が画面の外に出ていた)
 //   ・焦点は、大学(その大学を追う)か順位(その順位にいる大学を追う。シード権の最後の順位には「(シード権ライン)」)。
 //     最初は自分の大学(学連選抜の監督の年は学連選抜。出ていなければ1位)。焦点の大学は、道が見えている高さの
-//     上から3分の1に来るように、道を自動で動かす(再生中は少しずつ追い、指で道を動かすと止める)。焦点の大学は水色の枠
+//     上から3分の1に来るように、コマを変えるたびに道を動かす(指で道を動かすと再生を止める)。焦点の大学は水色の枠
 //   ・大学の四角を押すと、その大学に焦点を移す(下の帯は出さない)。倍率は「−」「＋」で、おまかせのときは×4。
 //     再生中は途中の省略(点線)をしない(省略が出たり消えたりして道が跳ねないように)
-//   ・四角が別の行や集団に移るときは、短くすべらせる(AnimatedPositioned)。描き直しは1秒に30回ほどまで
 //   ・推移から位置に切り替えると、推移で見ていた区間を出す。覚えない(開いたときは「位置」)
 // ・2.0.8〜2.0.9は、おまかせのときに「おまかせ」をもう一度押すと「おまかせ ↔」(幅に合わせる)になり、道が横幅に
 //   収まるように道の上の文字を6割まで小さくしていた。2.1.0で、集団の1行に画面の幅に入るだけ並べるようになり、
@@ -149,9 +152,9 @@
 // ・2.0.6の開発中に、点と名前の行の形から四角の形に変え、2枚あったカード(タイム分布と位置関係)を
 //   見出しだけの1枚にした。
 
+import 'dart:async' show Timer; // 推移のコマ送りの再生(2.1.1)
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart' show Ticker; // 推移の再生(2.1.1)
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ekiden/constants.dart';
 import 'package:ekiden/ghensuu.dart';
@@ -188,11 +191,11 @@ const List<String> _bairitsuMei = ['×1/4', '×1/2', '×1', '×2', '×4', '×8']
 /// おまかせの倍率: 1位から最後尾までが、画面の高さのこの倍に収まる一番大きい倍率
 const double _omakaseGamen = 2.0;
 
-/// 推移(2.1.1)の再生の時間(1kmあたりの秒。ふつうのとき。正月駅伝の区間がおよそ5秒)
-const double _suiiByouKm = 0.25;
+/// 推移(2.1.1)の、1つの区間のコマの数(区間を5つに分ける。0コマ目が区間の始め、5コマ目が中継所)
+const int _suiiKomaSuu = 5;
 
-/// 推移の速さ(ゆっくり・ふつう・はやい)の倍率と名前
-const List<double> _suiiHayasa = [0.5, 1.0, 2.0];
+/// 推移の速さ(ゆっくり・ふつう・はやい)の、1コマの時間(ミリ秒)と名前。中継所のコマはこの2倍止まる
+const List<int> _suiiKomaMs = [2000, 1000, 500];
 const List<String> _suiiHayasaMei = ['ゆっくり', 'ふつう', 'はやい'];
 
 /// 推移で、焦点の大学を置く高さ(道が見えている高さの、上からこの割合のところ)
@@ -1344,8 +1347,7 @@ class _Haichi {
   );
 }
 
-class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView>
-    with SingleTickerProviderStateMixin {
+class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
   _IchiKankei? _b;
 
   /// 見ている区間(並びの番号)
@@ -1398,8 +1400,8 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView>
   int _hyouji = 0;
 
   // ---- 推移(2.1.1。上のヘッダーの説明を参照) ----
-  /// 再生の時を刻む(推移で再生しているときだけ動かす)
-  Ticker? _ticker;
+  /// 次のコマに進めるタイマー(再生しているときだけ。1コマごとに1回だけ動く)
+  Timer? _suiiTimer;
 
   /// 推移で見ている区間(並びの番号。前の並びが1つ前の区間のときだけ。_suiiKouho)
   int _suiiKukan = 0;
@@ -1407,18 +1409,14 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView>
   /// 再生を始めた区間(最後まで再生し終えたあとに「再生」を押すと、ここからもう一度)
   int _suiiKaishi = 0;
 
-  /// 区間の進み具合(0〜1)
-  double _suiiP = 0;
+  /// 区間の中のコマ(0〜_suiiKomaSuu。0が区間の始め、_suiiKomaSuu が中継所)
+  int _suiiKomaBan = 0;
 
   /// 再生しているか
   bool _saisei = false;
 
-  /// 速さ(_suiiHayasa の番号。1がふつう)
+  /// 速さ(_suiiKomaMs の番号。1がふつう)
   int _suiiHayasaBan = 1;
-
-  /// 前の刻みの時刻と、前に描き直した時刻(再生を始めるたびに null に戻す)
-  Duration? _suiiMaeTick;
-  Duration? _suiiMaeKoushin;
 
   /// 焦点: 順位で追うか(true なら _shotenJuni の順位にいる大学、false なら _shotenKagi の大学)
   bool _shotenJuniMode = false;
@@ -1432,7 +1430,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView>
   int _suiiShotenI = -1;
   double? _suiiShotenY;
 
-  /// 止めているときにも、一度だけ焦点の大学まで道を動かすか(焦点・区間・倍率を変えたときと、推移を開いたとき)
+  /// 次に描いたあとに、焦点の大学まで道を動かすか(コマ・焦点・区間・倍率を変えたときと、推移を開いたとき)
   bool _suiiOuYoyaku = false;
 
   /// 道の部分の中身と道の帯(焦点の大学まで道を動かすときに、道の上端の高さを測る)
@@ -1456,8 +1454,6 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView>
     if (b != null) _erabu = b.kukan.length - 1;
     final Box<Ghensuu> gBox = Hive.box<Ghensuu>('ghensuuBox');
     _gh = gBox.isEmpty ? null : gBox.getAt(0);
-    // 推移の再生の時を刻む(2.1.1。再生しているときだけ動かす)
-    _ticker = createTicker(_suiiTick);
   }
 
   /// 今季ベストの順位表(自己ベストで表示しているときはnull)
@@ -1478,7 +1474,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView>
 
   @override
   void dispose() {
-    _ticker?.dispose();
+    _suiiTimer?.cancel();
     _setsumeiScroll.dispose();
     _michiScroll.dispose();
     super.dispose();
@@ -1517,13 +1513,6 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView>
     return l.length > kk ? l[kk] : 0.0;
   }
 
-  /// 並びの[i]番の区間を再生する時間(秒。区間の距離に比例。距離が分からなければ20km分)
-  double _suiiByou(_IchiKankei b, int i) {
-    final double kyori = _suiiKyori(b.kukan[i].kk);
-    final double km = (kyori > 0 ? kyori : 20000) / 1000;
-    return math.max(0.5, km * _suiiByouKm / _suiiHayasa[_suiiHayasaBan.clamp(0, _suiiHayasa.length - 1)]);
-  }
-
   /// 推移の区間の名前(「3区(21.4km)」)
   String _suiiKukanMei(_IchiKankei b, int i) {
     final int kk = b.kukan[i].kk;
@@ -1539,8 +1528,9 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView>
     final int erabu = _erabu.clamp(0, b.kukan.length - 1);
     _suiiKukan = kouho.firstWhere((i) => i >= erabu, orElse: () => kouho.last);
     _suiiKaishi = _suiiKukan;
-    _suiiP = 0;
+    _suiiKomaBan = 0;
     _saisei = false;
+    _suiiTimer?.cancel();
     _suiiOuYoyaku = true;
     if (!_shotenKimeta) {
       _shotenKimeta = true;
@@ -1564,8 +1554,83 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView>
   /// 推移を閉じるとき(setState の中で呼ぶ)。再生を止め、位置では推移で見ていた区間を出す
   void _suiiTojiru(_IchiKankei b) {
     _saisei = false;
-    _ticker?.stop();
+    _suiiTimer?.cancel();
     if (_suiiDekiru(b, _suiiKukan)) _erabu = _suiiKukan;
+  }
+
+  /// 今のコマに止まる時間(中継所のコマは2倍)
+  Duration _suiiKomaJikan() {
+    final int ms = _suiiKomaMs[_suiiHayasaBan.clamp(0, _suiiKomaMs.length - 1)];
+    return Duration(milliseconds: _suiiKomaBan >= _suiiKomaSuu ? ms * 2 : ms);
+  }
+
+  /// 次のコマに進めるタイマーを、今のコマに止まる時間で仕掛け直す(再生しているときだけ)
+  void _suiiTimerShikakeru() {
+    _suiiTimer?.cancel();
+    if (!_saisei) return;
+    _suiiTimer = Timer(_suiiKomaJikan(), _suiiJidouSusumu);
+  }
+
+  /// 一番最後のコマ(最後の区間の中継所)か
+  bool _suiiSaigo(_IchiKankei b) {
+    final List<int> kouho = _suiiKouho(b);
+    return kouho.isEmpty || (_suiiKukan == kouho.last && _suiiKomaBan >= _suiiKomaSuu);
+  }
+
+  /// 一番最初のコマ(最初の区間の始め)か
+  bool _suiiSaisho(_IchiKankei b) {
+    final List<int> kouho = _suiiKouho(b);
+    return kouho.isEmpty || (_suiiKukan == kouho.first && _suiiKomaBan <= 0);
+  }
+
+  /// 1コマ進める(setState の中で呼ぶ)。中継所の次は、次の区間の1コマ目(区間の始めは中継所と同じ図なので飛ばす)。
+  /// 一番最後のコマなら何もしない
+  void _suiiSusumeru(_IchiKankei b) {
+    if (_suiiKomaBan < _suiiKomaSuu) {
+      _suiiKomaBan++;
+    } else {
+      final List<int> kouho = _suiiKouho(b);
+      final int ki = kouho.indexOf(_suiiKukan);
+      if (ki < 0 || ki + 1 >= kouho.length) return;
+      _suiiKukan = kouho[ki + 1];
+      _suiiKomaBan = 1;
+    }
+    _suiiOuYoyaku = true;
+  }
+
+  /// 1コマ戻す(setState の中で呼ぶ)。区間の1コマ目の前は、前の区間の中継所(区間の始めと同じ図)。
+  /// 一番最初のコマなら何もしない
+  void _suiiModosu(_IchiKankei b) {
+    final List<int> kouho = _suiiKouho(b);
+    final int ki = kouho.indexOf(_suiiKukan);
+    if (_suiiKomaBan <= 0) {
+      // 区間の始め(前の区間の中継所と同じ図)からは、前の区間の4コマ目へ
+      if (ki <= 0) return;
+      _suiiKukan = kouho[ki - 1];
+      _suiiKomaBan = _suiiKomaSuu - 1;
+    } else if (_suiiKomaBan == 1 && ki > 0) {
+      _suiiKukan = kouho[ki - 1];
+      _suiiKomaBan = _suiiKomaSuu;
+    } else {
+      _suiiKomaBan--;
+    }
+    _suiiOuYoyaku = true;
+  }
+
+  /// 再生しているときに、タイマーで次のコマに進む(一番最後のコマで止める)
+  void _suiiJidouSusumu() {
+    final _IchiKankei? b = _b;
+    if (!mounted || b == null || !_saisei || _hyouji != 4) return;
+    if (!_suiiDekiru(b, _suiiKukan) || _suiiSaigo(b)) {
+      _suiiTomeru();
+      return;
+    }
+    setState(() {
+      _suiiSusumeru(b);
+      // 一番最後のコマ(最後の区間の中継所)まで来たら止める
+      if (_suiiSaigo(b)) _saisei = false;
+    });
+    _suiiTimerShikakeru();
   }
 
   /// 再生する(最後まで再生し終えていたら、再生を始めた区間からもう一度)
@@ -1575,21 +1640,19 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView>
     final List<int> kouho = _suiiKouho(b);
     if (kouho.isEmpty) return;
     setState(() {
-      if (_suiiP >= 1) {
+      if (_suiiSaigo(b)) {
         _suiiKukan = kouho.contains(_suiiKaishi) ? _suiiKaishi : kouho.first;
-        _suiiP = 0;
-      } else if (_suiiP <= 0) {
+        _suiiKomaBan = 0;
+        _suiiOuYoyaku = true;
+      } else if (_suiiKomaBan <= 0) {
         _suiiKaishi = _suiiKukan;
       }
       _saisei = true;
-      _suiiMaeTick = null;
-      _suiiMaeKoushin = null;
     });
-    final Ticker? t = _ticker;
-    if (t != null && !t.isActive) t.start();
+    _suiiTimerShikakeru();
   }
 
-  /// 最初から(1区終了時点、2区の始めから)最後まで通しで再生する(どの区間を見ていても)
+  /// 最初から(1区の演出ができればスタート、できなければ2区の始めから)最後まで通しで再生する(どの区間を見ていても)
   void _suiiSaishoKara() {
     final _IchiKankei? b = _b;
     if (b == null) return;
@@ -1598,7 +1661,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView>
     setState(() {
       _suiiKukan = kouho.first;
       _suiiKaishi = kouho.first;
-      _suiiP = 0;
+      _suiiKomaBan = 0;
       _suiiOuYoyaku = true;
     });
     _suiiSaisei();
@@ -1606,47 +1669,24 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView>
 
   /// 止める
   void _suiiTomeru() {
-    _ticker?.stop();
+    _suiiTimer?.cancel();
     if (!mounted) return;
     setState(() => _saisei = false);
   }
 
-  /// 再生の時を刻む(区間の距離に比例した時間で進め、区間の終わりで次の区間へ。最後の区間の終わりで止める。
-  /// 描き直しは1秒に30回ほどまで)
-  void _suiiTick(Duration elapsed) {
-    final Duration? mae = _suiiMaeTick;
-    _suiiMaeTick = elapsed;
+  /// ◀▶(「1コマ」)。再生していれば止めてから、1コマ戻す・進める
+  void _suiiKomaOkuri(bool susumu) {
     final _IchiKankei? b = _b;
-    if (mae == null || b == null || !_saisei || !mounted) return;
-    if (!_suiiDekiru(b, _suiiKukan)) {
-      _suiiTomeru();
-      return;
-    }
-    // 1回の刻みは0.1秒までにする(ほかの画面を開いていたあいだなどに、区間を飛ばさないように)
-    final double dt = math.min(0.1, (elapsed - mae).inMicroseconds / 1000000.0);
-    if (dt <= 0) return;
-    _suiiP += dt / _suiiByou(b, _suiiKukan);
-    if (_suiiP >= 1) {
-      final List<int> kouho = _suiiKouho(b);
-      final int ichi = kouho.indexOf(_suiiKukan);
-      if (ichi >= 0 && ichi + 1 < kouho.length) {
-        _suiiKukan = kouho[ichi + 1];
-        _suiiP = 0;
+    if (b == null) return;
+    _suiiTimer?.cancel();
+    setState(() {
+      _saisei = false;
+      if (susumu) {
+        _suiiSusumeru(b);
       } else {
-        _suiiP = 1;
-        _ticker?.stop();
-        setState(() {
-          _saisei = false;
-          // 再生し終えたら、焦点の大学が見えるように、もう一度道を合わせる
-          _suiiOuYoyaku = true;
-        });
-        return;
+        _suiiModosu(b);
       }
-    }
-    final Duration? k = _suiiMaeKoushin;
-    if (k != null && elapsed - k < const Duration(milliseconds: 33)) return;
-    _suiiMaeKoushin = elapsed;
-    setState(() {});
+    });
   }
 
   /// 推移の区間を選ぶ(その区間の始めに移る。再生しているかはそのまま)
@@ -1654,9 +1694,10 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView>
     setState(() {
       _suiiKukan = i;
       _suiiKaishi = i;
-      _suiiP = 0;
+      _suiiKomaBan = 0;
       _suiiOuYoyaku = true;
     });
+    _suiiTimerShikakeru();
   }
 
   /// 焦点の大学を、[x]の大学にする(推移で大学の四角を押したとき)
@@ -1686,11 +1727,11 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView>
   }
 
   /// 焦点の大学が、道が見えている高さの上から3分の1に来るように、道を動かす(描いたあとに呼ぶ)。
-  /// 再生中は少しずつ追い(焦点を変えたときも、なめらかに移る)、止めているときは、焦点・区間・倍率を
-  /// 変えたときと推移を開いたときだけ、一度に動かす(指で動かした道を勝手に戻さないように)
+  /// コマ・焦点・区間・倍率を変えたときと推移を開いたときだけ、一度に動かす(すべらせない。
+  /// 指で動かした道を、コマが変わるまでは勝手に戻さないように)
   void _suiiOu() {
     if (!mounted || _hyouji != 4 || !_michiScroll.hasClients) return;
-    if (!_saisei && !_suiiOuYoyaku) return;
+    if (!_suiiOuYoyaku) return;
     final double? y = _suiiShotenY;
     if (y == null) return;
     final RenderObject? naka = _suiiNakaKey.currentContext?.findRenderObject();
@@ -1707,11 +1748,9 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView>
     final double mokuhyou = (8 + ue + y - pos.viewportDimension * _suiiShotenTakasa)
         .clamp(pos.minScrollExtent, pos.maxScrollExtent)
         .toDouble();
-    final double ima = pos.pixels;
-    final double ato = _saisei ? ima + (mokuhyou - ima) * 0.35 : mokuhyou;
     _suiiOuYoyaku = false;
-    if ((ato - ima).abs() < 0.5) return;
-    _michiScroll.jumpTo(ato);
+    if ((mokuhyou - pos.pixels).abs() < 0.5) return;
+    _michiScroll.jumpTo(mokuhyou);
   }
 
   /// いつも出していて、つまんで動かせるスクロールバー(つまみは白っぽい色。2.1.0)
@@ -2517,7 +2556,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView>
     final bool suii = _hyouji == 4 && b != null && _suiiDekiru(b, _suiiKukan);
     if (b != null) {
       r = suii
-          ? _suiiZu(b, _suiiKukan, _suiiP)
+          ? _suiiZu(b, _suiiKukan, _suiiKomaBan / _suiiKomaSuu)
           : b.kukan[_erabu.clamp(0, b.kukan.length - 1)];
     }
     final _IchiKukan? r0 = r;
@@ -2977,7 +3016,8 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView>
           ],
         ),
         ],
-        // 推移の再生の行(再生・速さ・焦点・倍率。文字を大きくしたら折り返す)と、区間の中の進み具合の棒(2.1.1)
+        // 推移の再生の行(最初から・1コマ戻る・再生・1コマ進む・速さ・焦点・倍率。文字を大きくしたら折り返す)と、
+        // 区間の中の進み具合の丸(2.1.1)
         if (sr != null) ...[
           const SizedBox(height: 8),
           Wrap(
@@ -2985,12 +3025,35 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView>
             runSpacing: 6,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              _suiiSaishoBotan(),
-              _suiiSaiseiBotan(),
+              _suiiBotan(
+                setsumei: '最初から再生する',
+                mae: Icons.skip_previous,
+                moji: '最初から',
+                onTap: _suiiSaishoKara,
+              ),
+              _suiiBotan(
+                setsumei: '1コマ戻る',
+                mae: Icons.chevron_left,
+                moji: '1コマ',
+                onTap: _suiiSaisho(b) ? null : () => _suiiKomaOkuri(false),
+              ),
+              _suiiBotan(
+                setsumei: _saisei ? '止める' : '再生する',
+                mae: _saisei ? Icons.pause : Icons.play_arrow,
+                moji: _saisei ? '停止' : '再生',
+                onTap: _saisei ? _suiiTomeru : _suiiSaisei,
+                nuri: true,
+              ),
+              _suiiBotan(
+                setsumei: '1コマ進む',
+                moji: '1コマ',
+                ato: Icons.chevron_right,
+                onTap: _suiiSaigo(b) ? null : () => _suiiKomaOkuri(true),
+              ),
               _komaBotan(
                 _suiiHayasaMei[_suiiHayasaBan.clamp(0, _suiiHayasaMei.length - 1)],
                 false,
-                () => setState(() => _suiiHayasaBan = (_suiiHayasaBan + 1) % _suiiHayasa.length),
+                () => setState(() => _suiiHayasaBan = (_suiiHayasaBan + 1) % _suiiKomaMs.length),
               ),
               _suiiShotenBotan(b, sr),
               _komaBotan(
@@ -3026,12 +3089,25 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView>
             ],
           ),
           const SizedBox(height: 8),
-          // 区間の中の進み具合(数字は出さない。地点は推定なので)
-          LinearProgressIndicator(
-            value: _suiiP.clamp(0.0, 1.0).toDouble(),
-            minHeight: 3,
-            backgroundColor: Colors.white12,
-            valueColor: const AlwaysStoppedAnimation<Color>(Colors.white54),
+          // 区間の中の進み具合(5つの丸。区間の始めは全部白、中継所は全部黒。数字は出さない。地点は推定なので)
+          Semantics(
+            label: '区間の中のコマ ${_suiiKomaBan.clamp(0, _suiiKomaSuu)}/$_suiiKomaSuu',
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (int j = 0; j < _suiiKomaSuu; j++)
+                  Container(
+                    width: 10,
+                    height: 10,
+                    margin: const EdgeInsets.only(right: 6),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: j < _suiiKomaBan ? Colors.white70 : Colors.transparent,
+                      border: Border.all(color: Colors.white54),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ],
       ],
@@ -3104,53 +3180,37 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView>
     ];
   }
 
-  /// 推移の「最初から」のボタン(1区終了時点から最後まで通しで再生する。2.1.1)
-  Widget _suiiSaishoBotan() {
+  /// 推移の小さなボタン(「最初から」「1コマ」「再生」「停止」。[mae]・[ato] は文字の前・後ろのアイコン。
+  /// [onTap] がnullなら薄くして押せない。[nuri] は塗る(再生・停止)。2.1.1)
+  Widget _suiiBotan({
+    required String setsumei,
+    required String moji,
+    IconData? mae,
+    IconData? ato,
+    VoidCallback? onTap,
+    bool nuri = false,
+  }) {
+    final Color iro = onTap == null ? Colors.white24 : _iro;
     return Semantics(
       button: true,
-      label: '最初から再生する',
+      label: setsumei,
       child: GestureDetector(
-        onTap: _suiiSaishoKara,
+        onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            border: Border.all(color: _iro),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: const Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.skip_previous, color: _iro, size: 18),
-              SizedBox(width: 2),
-              Text('最初から', style: TextStyle(color: _iro, fontSize: 13)),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// 推移の「再生」「停止」のボタン(2.1.1)
-  Widget _suiiSaiseiBotan() {
-    final bool on = _saisei;
-    return Semantics(
-      button: true,
-      label: on ? '止める' : '再生する',
-      child: GestureDetector(
-        onTap: on ? _suiiTomeru : _suiiSaisei,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-            color: _iro.withOpacity(0.2),
-            border: Border.all(color: _iro),
+            color: (nuri && onTap != null) ? _iro.withOpacity(0.2) : Colors.transparent,
+            border: Border.all(color: iro),
             borderRadius: BorderRadius.circular(6),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(on ? Icons.pause : Icons.play_arrow, color: _iro, size: 18),
-              const SizedBox(width: 2),
-              Text(on ? '停止' : '再生', style: const TextStyle(color: _iro, fontSize: 13)),
+              if (mae != null) Icon(mae, color: iro, size: 18),
+              if (mae != null) const SizedBox(width: 2),
+              Text(moji, style: TextStyle(color: iro, fontSize: 13)),
+              if (ato != null) const SizedBox(width: 2),
+              if (ato != null) Icon(ato, color: iro, size: 18),
             ],
           ),
         ),
@@ -3419,7 +3479,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView>
         // 説明の文は短くする(おまかせと集団の説明は、説明書に書く)
         if (r.suii) ...[
           // 推移(2.1.1。つないだ動きだと分かるように。地点は出さない)
-          const Text('中継所ごとの位置関係を、なめらかにつないだ動きです。', style: setsumei),
+          const Text('中継所ごとの位置関係を、区間を5つに分けてつないだコマ送りです。', style: setsumei),
           if (r.kk == 0)
             const Text('1区は、飛び出した選手と集団の記録をもとにした演出です。', style: setsumei),
           const Text('水色の枠: 焦点の大学(大学の四角を押すと、その大学を追います)。', style: setsumei),
@@ -3528,32 +3588,17 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView>
                             child: Text(g.byou!, style: _chiisai, softWrap: false),
                           ),
                         ),
-                    // 大学の四角(推移は、四角が別の行や集団に移るときに短くすべらせる。大学ごとに印を付けて、
-                    // 同じ大学の四角として動かす。2.1.1)
+                    // 大学の四角(推移もすべらせず、コマごとに切り替える。2.1.1の開発中は短くすべらせていたが、
+                    // 電池を使うのでやめた)
                     for (final _Gyou g in h.gyou)
                       for (final _Hako hk in g.hako)
-                        if (r.suii)
-                          AnimatedPositioned(
-                            key: ValueKey<int>(_daigakuKagi(r.narabi[hk.i])),
-                            duration: const Duration(milliseconds: 150),
-                            left: hk.x,
-                            top: g.y + (g.h - hk.h) / 2,
-                            // 幅と高さはすべらせず、すぐに変える(1区から2区に変わると順位の変化の欄が増えて四角が広がる。
-                            // 幅もすべらせると、途中のこまで中身が四角からはみ出していた。2.1.1の開発中)
-                            child: SizedBox(
-                              width: hk.w,
-                              height: hk.h,
-                              child: _hakoWidget(b, r, hk, scaler),
-                            ),
-                          )
-                        else
-                          Positioned(
-                            left: hk.x,
-                            top: g.y + (g.h - hk.h) / 2,
-                            width: hk.w,
-                            height: hk.h,
-                            child: _hakoWidget(b, r, hk, scaler),
-                          ),
+                        Positioned(
+                          left: hk.x,
+                          top: g.y + (g.h - hk.h) / 2,
+                          width: hk.w,
+                          height: hk.h,
+                          child: _hakoWidget(b, r, hk, scaler),
+                        ),
                   ],
                 ),
               ),

@@ -579,7 +579,8 @@ Kiji? _kukanJikkyou(
           kai('飛び出しは、決まればタイムが縮み、外れれば後半に跳ね返ってきます。今日は${tSeikou ? '前者' : '後者'}でした');
         }
       case KishaKata.joukei:
-        if (ti.isNotEmpty && ti.first.ten >= 45) {
+        if (ti.isNotEmpty && ti.first.ten >= 45 && w.nobiKotobaTsukaeru(ti.first.kotoba)) {
+          w.nobiKotobaTsukatta(ti.first.kotoba);
           kai('${myouji(ts.name)}、${ti.first.kotoba}。その思いが、スタート直後の一歩に出ましたね');
         } else if (tSeikou && th.kiwaYoi != null) {
           kai('${myouji(ts.name)}は${th.kiwaYoi}が、この区間の選手の中で際立っていました。前に出る勇気を、力が支えましたね');
@@ -653,7 +654,8 @@ Kiji? _kukanJikkyou(
   if (kk > 0 && shuiMae != null && shuiMae.u.id != shui.u.id && shui.s != null) {
     final List<Innen> si = senshuInnen(k, shui.s!, kk, kj: shui.kukanJuni, kekka: owatta);
     final _Hashiri sh = _hashiriYomu(shui.s!, kk);
-    if (si.isNotEmpty && si.first.ten >= 45) {
+    if (si.isNotEmpty && si.first.ten >= 45 && w.nobiKotobaTsukaeru(si.first.kotoba)) {
+      w.nobiKotobaTsukatta(si.first.kotoba);
       kai('${myouji(shui.s!.name)}、${si.first.kotoba}、という思いがあったはずです。それを形にしましたね');
     } else if (sh.kiwaYoi != null) {
       kai('${myouji(shui.s!.name)}は${sh.kiwaYoi}が、この区間の選手の中で際立っていました。${saMoji(saMae12)}差を埋めたのは、そこです');
@@ -775,7 +777,8 @@ Kiji? _kukanJikkyou(
         final SenshuData? js = jx.s;
         final List<Innen> ji = js == null ? [] : senshuInnen(k, js, kk, kj: jx.kukanJuni, kekka: owatta);
         final _Hashiri? jh = js == null ? null : _hashiriYomu(js, kk);
-        if (js != null && ji.isNotEmpty && ji.first.ten >= 45) {
+        if (js != null && ji.isNotEmpty && ji.first.ten >= 45 && (!nkGyakuten || w.nobiKotobaTsukaeru(ji.first.kotoba))) {
+          if (nkGyakuten) w.nobiKotobaTsukatta(ji.first.kotoba);
           kai(
             nkGyakuten
                 ? '${myouji(js.name)}、${ji.first.kotoba}。その思いが、最後の1枠を引き寄せましたね'
@@ -1145,7 +1148,8 @@ Kiji? _kukanJikkyou(
       kai('${myouji(s.name)}は${h.kiwaYoi}が、この区間の選手の中で際立っていましたね。それが順位に出ました');
     } else if (warui && h.kiwaWarui != null) {
       kai('${myouji(s.name)}は${h.kiwaWarui}で差をつけられました。この区間との相性が出てしまいましたね');
-    } else if (mi.isNotEmpty && mi.first.ten >= 45) {
+    } else if (mi.isNotEmpty && mi.first.ten >= 45 && (!yoi || w.nobiKotobaTsukaeru(mi.first.kotoba))) {
+      if (yoi) w.nobiKotobaTsukatta(mi.first.kotoba);
       kai(yoi ? '${myouji(s.name)}、${mi.first.kotoba}、という走りでしたね' : '${myouji(s.name)}は${mi.first.bun.replaceAll('。', '')}。今日は苦しみましたが、この経験は次につながります');
     } else if (kata == KishaKata.karakuchi && warui && mokuhyouAri && my.tuuka > mokuhyou) {
       kai('区間${juniMoji(my.kukanJuni)}は厳しいですね。目標の${juniMoji(mokuhyou)}まで、残りの区間で取り返せる差かどうか');
@@ -1979,7 +1983,10 @@ void _sanshouToInterview(
   }
   // 3問目: 応援してくれた人へ(因縁があれば、その思いを添える)
   w.danraku('――最後に、応援してくれた人たちへ。');
-  w.comment('$hy「${hi.isNotEmpty && hi.first.ten >= 45 ? '${hi.first.kotoba}。' : ''}${tsugiKotoba(w)}」');
+  // 入学時からの伸びの言葉は、1つの記事で1人まで(2.1.0)
+  final bool hiIreru = hi.isNotEmpty && hi.first.ten >= 45 && w.nobiKotobaTsukaeru(hi.first.kotoba);
+  if (hiIreru) w.nobiKotobaTsukatta(hi.first.kotoba);
+  w.comment('$hy「${hiIreru ? '${hi.first.kotoba}。' : ''}${tsugiKotoba(w)}」');
 
   // ---- 自分の大学の受賞者にも(殊勲賞なら上のインタビューがその選手) ----
   if (myShou != null && myShou.x.s!.id != hs.id) {

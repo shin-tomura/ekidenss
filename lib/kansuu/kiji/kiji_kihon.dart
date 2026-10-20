@@ -366,6 +366,38 @@ class Innen {
   const Innen(this.shurui, this.ten, this.bun, this.kotoba, [this.midashiKu = '']);
 }
 
+/// 入学時の記録からの伸びの因縁(2.1.0。nyuugakuNobiInnen)
+/// ・地の文(bun)は候補の1つ。選手を並べる記事では、同じ型を重ねないように innenBunErabu で選び直す
+/// ・話し言葉(kotoba)は、選手・大会・学年で1つに決まる。コメントに使うのは1つの記事で1人まで
+///   (KijiKakite.nobiKotobaTsukaeru。選手を並べる記事では KijiKakite.nobiKimeru で伸びが一番大きい選手)
+class NobiInnen extends Innen {
+  /// 地の文の候補(数字だけが選手ごとに違う。並びの番号が型)
+  final List<String> bunKouho;
+
+  /// 入学時の記録から縮めた秒
+  final int nobiByou;
+
+  const NobiInnen(
+    int ten,
+    String bun,
+    String kotoba,
+    String midashiKu,
+    this.bunKouho,
+    this.nobiByou,
+  ) : super(InnenShurui.nyuugakuNobi, ten, bun, kotoba, midashiKu);
+}
+
+/// 作った入学時からの伸びの話し言葉(コメントの事実の中から見分けるため。2.1.0)
+final Set<String> _nobiKotobaZenbu = <String>{};
+
+/// 因縁の地の文(入学時からの伸びは、同じ記事で同じ型を重ねないように選ぶ。2.1.0)
+String innenBunErabu(KijiKakite w, Innen i) {
+  if (i is NobiInnen && i.bunKouho.isNotEmpty) {
+    return i.bunKouho[w.erabuBangou('nyuugakuNobi', i.bunKouho.length)];
+  }
+  return i.bun;
+}
+
 /// 年度の中の大会の順(11月駅伝予選・10月駅伝・正月駅伝予選・11月駅伝・正月駅伝・カスタム駅伝)
 const List<int> _innenRaceJun = [3, 0, 4, 1, 2, 5];
 
@@ -586,7 +618,7 @@ List<Innen> senshuInnen(
     );
   }
   // 入学時の記録からの伸び(5000m。留学生は除く)
-  final Innen? nobi = nyuugakuNobiInnen(k, s);
+  final Innen? nobi = nyuugakuNobiInnen(k, s, kekka: kekka);
   if (nobi != null) list.add(nobi);
   // 高校時代の実績や経歴(1.9.5)
   final Innen? kou = koukouInnen(k, s, kj: kj, kekka: kekka);
@@ -665,7 +697,11 @@ String koukouJidaiBun(KijiKankyou k, SenshuData s, KijiRand r, String yobi) {
 }
 
 /// 入学時の5000mの記録からの伸びの因縁(留学生と1年生は除く。伸びていなければnull)
-Innen? nyuugakuNobiInnen(KijiKankyou k, SenshuData s) {
+/// ・分台が1つ以上下がり、30秒以上縮めたときだけ(14分05秒が13分59秒になったような、
+///   わずかな伸びは因縁にしない。2.1.0)
+/// ・言い回しは、伸びの大きさ・学年・大会の前か後か([kekka])で変える(2.1.0。同じ言葉ばかりに
+///   ならないように)。話し言葉は選手・大会・学年で1つに決め、地の文は候補も持つ(NobiInnen)
+Innen? nyuugakuNobiInnen(KijiKankyou k, SenshuData s, {bool kekka = true}) {
   if (s.hirou == 1 || s.gakunen < 2) return null;
   final double ny = s.kiroku_nyuugakuji_5000;
   final double best = k.jikoBest(s, 0);
@@ -673,12 +709,40 @@ Innen? nyuugakuNobiInnen(KijiKankyou k, SenshuData s) {
   final int nyFun = byou(ny) ~/ 60;
   final int bestFun = byou(best) ~/ 60;
   if (nyFun - bestFun < 1) return null;
-  return Innen(
-    InnenShurui.nyuugakuNobi,
-    35 + (nyFun - bestFun >= 2 ? 15 : 0),
-    '入学時の5000mは$nyFun分台。今は${jikanMoji(best)}まで記録を伸ばしてきた。',
-    '入学したときは5000mが$nyFun分台の選手だった。ここまで来られたのは、積み上げてきた練習のおかげ',
+  final int nobiByou = saByou(ny, best);
+  if (nobiByou < 30) return null;
+  final bool ookii = nyFun - bestFun >= 2;
+  final String bestMoji = jikanMoji(best);
+  final List<String> bunKouho = [
+    '入学時の5000mは$nyFun分台。今は$bestMojiまで記録を伸ばしてきた。',
+    '$nyFun分台で入学してから、5000mの自己ベストを$bestMojiまで縮めてきた。',
+    '入学したときは5000mが$nyFun分台だった。それが今は$bestMojiだ。',
+    '5000mの自己ベストは$bestMoji。入学時の$nyFun分台から、着実に力をつけてきた。',
+    '入学時に$nyFun分台だった5000mの記録を、$bestMojiまで縮めている。',
+  ];
+  final List<String> kotobaKouho = [
+    if (ookii) ...[
+      '入学したときは5000mが$nyFun分台の選手だった。ここまで来られたのは、積み上げてきた練習のおかげ',
+      '$nyFun分台で入ってきた自分が、この舞台にいる。それが一番の自信です',
+    ] else ...[
+      '入学したときは5000mが$nyFun分台。$bestFun分台で走る自分は、想像していなかった',
+      '入学したときの5000mは$nyFun分台だった。毎日の練習が、少しずつ形になってきた',
+    ],
+    '入学したときの5000mは$nyFun分台。あのころの自分に、今の自分を見せてあげたい',
+    if (s.gakunen == 4) '4年間で、$nyFun分台から$bestFun分台まで来られた。続けてきてよかった',
+    if (!kekka) '入学したときは5000mが$nyFun分台。今の自分の力を、この舞台で試したい',
+  ];
+  // 選手・大会・学年で決める(同じ大会なら、どの記事でも同じ言葉)
+  final int ban = (s.id + k.race * 3 + s.gakunen * 5).abs();
+  final String kotoba = kotobaKouho[ban % kotobaKouho.length];
+  _nobiKotobaZenbu.add(kotoba);
+  return NobiInnen(
+    35 + (ookii ? 15 : 0),
+    bunKouho[ban % bunKouho.length],
+    kotoba,
     '入学時$nyFun分台からの',
+    bunKouho,
+    nobiByou,
   );
 }
 
@@ -829,7 +893,7 @@ List<Innen> yosenInnen(
             ),
     );
   }
-  final Innen? nobi = nyuugakuNobiInnen(k, s);
+  final Innen? nobi = nyuugakuNobiInnen(k, s, kekka: kekka);
   if (nobi != null) list.add(nobi);
   list.sort((a, b) => b.ten.compareTo(a.ten));
   return list;
@@ -2020,7 +2084,7 @@ List<Innen> taikousenInnen(KijiKankyou k, SenshuData s, {int? juni, bool kekka =
       ),
     );
   }
-  final Innen? nobi = nyuugakuNobiInnen(k, s);
+  final Innen? nobi = nyuugakuNobiInnen(k, s, kekka: kekka);
   if (nobi != null) list.add(nobi);
   list.sort((a, b) => b.ten.compareTo(a.ten));
   return list;
@@ -2239,6 +2303,15 @@ class KijiKakite {
   // 使った言い回し(同じ記事で重ねない)
   final Set<String> _tsukatta = {};
 
+  // 型ごとに使った候補の番号(数字の入る言い回しは選手ごとに文字が違うので、番号で重ねない。2.1.0)
+  final Map<String, Set<int>> _tsukattaBangou = {};
+
+  // 入学時からの伸びの話し言葉を、コメントに使ったか(1つの記事で1人まで。2.1.0)
+  bool _nobiTsukatta = false;
+
+  // 入学時からの伸びの話し言葉のうち、この記事で使ってよい言葉(nobiKimeru で決める。nullなら最初に使った選手)
+  String? _nobiYurusu;
+
   // 直前の2つの段落の文末の種類(文のリズム。1.9.4)
   final List<int> _bunmatsu = [];
 
@@ -2350,6 +2423,42 @@ class KijiKakite {
     final String e = r.erabu(mada);
     _tsukatta.add(e);
     return e;
+  }
+
+  /// 型[kata]の候補[kazu]個から、この記事でまだ使っていない番号を選ぶ(全部使ったら最初から。2.1.0)
+  int erabuBangou(String kata, int kazu) {
+    final Set<int> t = _tsukattaBangou.putIfAbsent(kata, () => <int>{});
+    if (t.length >= kazu) t.clear();
+    final List<int> mada = [
+      for (int i = 0; i < kazu; i++)
+        if (!t.contains(i)) i,
+    ];
+    final int e = r.erabu(mada);
+    t.add(e);
+    return e;
+  }
+
+  /// 選手を並べる記事で、入学時からの伸びの話し言葉をコメントに使う選手を、伸びが一番大きい選手に決める(2.1.0)
+  /// [list] 並べる選手それぞれの、コメントの事実に使う因縁(なければnull)
+  void nobiKimeru(Iterable<Innen?> list) {
+    NobiInnen? saidai;
+    for (final Innen? i in list) {
+      if (i is NobiInnen && (saidai == null || i.nobiByou > saidai.nobiByou)) saidai = i;
+    }
+    _nobiYurusu = saidai?.kotoba;
+  }
+
+  /// 事実の話し言葉[x]を、この記事のコメントに使ってよいか
+  /// (入学時からの伸びの言葉は1つの記事で1人まで。ほかの言葉はいつもtrue。2.1.0)
+  bool nobiKotobaTsukaeru(String x) {
+    if (!_nobiKotobaZenbu.contains(x)) return true;
+    if (_nobiTsukatta) return false;
+    return _nobiYurusu == null || _nobiYurusu == x;
+  }
+
+  /// 事実の話し言葉[x]をコメントに使った(入学時からの伸びの言葉なら、この記事ではもう使わない。2.1.0)
+  void nobiKotobaTsukatta(String x) {
+    if (_nobiKotobaZenbu.contains(x)) _nobiTsukatta = true;
   }
 
   void danraku(String bun) {

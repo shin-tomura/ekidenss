@@ -389,7 +389,7 @@ Innen? _shoukai(
   sb.write(_maeNoShussouBun(k, s, kk, yobi));
   // 因縁(昨年当日変更で外れた・昨年は補欠・入学時の記録からの伸び。1.9.4)
   final Innen? innen = _innenHosoku(k, s, kk, kekka: false);
-  if (innen != null) sb.write(innen.bun);
+  if (innen != null) sb.write(innenBunErabu(w, innen));
   if (s.gakunen == 4) {
     sb.write(
       k.race == 2 ? '最後の正月駅伝に挑む。' : '4年生にとっては、これが最後の${k.raceMei}だ。',
@@ -757,6 +757,11 @@ Kiji _kekkaZenin(EkidenKekka e, EkidenUnivKekka m, String site) {
     if (m.kukanJuni[kk] < teamBestJ) teamBestJ = m.kukanJuni[kk];
     if (m.kukanJuni[kk] < 9) hitoketaSuu++;
   }
+  // 入学時からの伸びをコメントで語るのは、伸びが一番大きい選手だけ(1つの記事で1人まで。2.1.0)
+  w.nobiKimeru([
+    for (int kk = 0; kk < ks; kk++)
+      if (m.senshu[kk] != null) _innenHosoku(k, m.senshu[kk]!, kk, kekka: true, kj: m.kukanJuni[kk]),
+  ]);
 
   for (int kk = 0; kk < ks; kk++) {
     final SenshuData? s = m.senshu[kk];
@@ -833,7 +838,7 @@ Kiji _kekkaZenin(EkidenKekka e, EkidenUnivKekka m, String site) {
     }
     // 因縁(昨年当日変更で外れた・昨年は補欠・入学時の記録からの伸び・通算の区間賞。1.9.4)
     final Innen? innen = _innenHosoku(k, s, kk, kekka: true, kj: kj);
-    if (innen != null) sb.write(innen.bun);
+    if (innen != null) sb.write(innenBunErabu(w, innen));
     if (s.gakunen == 4) {
       sb.write(race == 2 ? 'これが最後の正月駅伝だった。' : '4年生として最後の${k.raceMei}だった。');
     }
@@ -1021,6 +1026,11 @@ Kiji _meikan(
     );
     ikkuAi = pace?.aishou(ikkuSenshu.id);
   }
+  // 入学時からの伸びをコメントで語るのは、伸びが一番大きい選手だけ(1つの記事で1人まで。2.1.0)
+  w.nobiKimeru([
+    for (int kk = 0; kk < ks; kk++)
+      if (hashiru[kk] != null) _innenHosoku(k, hashiru[kk]!, kk, kekka: false),
+  ]);
   for (int kk = 0; kk < ks; kk++) {
     final SenshuData? s = hashiru[kk];
     if (s == null) continue;
@@ -1432,7 +1442,7 @@ Kiji? _fukuro(KijiKankyou k, String site, UnivData u) {
       '${kukanYobikata(k.gh, k.race, kk, ks)}は$yobi。'
       '${mochi == null ? '' : '持ちタイムは$mochi。'}'
       '${_maeNoShussouBun(k, s, kk, myouji(s.name))}'
-      '${innen == null ? '' : innen.bun}'
+      '${innen == null ? '' : innenBunErabu(w, innen)}'
       '${s.gakunen == 4 ? '最後の正月駅伝を走る。' : ''}',
     );
   }
@@ -1981,6 +1991,11 @@ Kiji _yosenZenin(YosenKekka e, YosenUnivKekka m, String site) {
   final String lead =
       '${k.taikaiMei}を走った$n人の走りを、${kumiAri ? '1組から順に' : 'チームの中の順に'}振り返る。';
 
+  // 入学時からの伸びをコメントで語るのは、伸びが一番大きい選手だけ(1つの記事で1人まで。2.1.0)
+  w.nobiKimeru([
+    for (final YosenSenshuKekka y in list)
+      ...yosenInnen(k, y.s, juni: y.juni, time: y.time).take(1),
+  ]);
   final List<List<String>> gyou = [];
   for (final YosenSenshuKekka y in list) {
     final SenshuData s = y.s;
@@ -2021,7 +2036,7 @@ Kiji _yosenZenin(YosenKekka e, YosenUnivKekka m, String site) {
     }
     // 入学時の記録からの伸び(1.9.4)
     final Innen? nobi = nyuugakuNobiInnen(k, s);
-    if (nobi != null) sb.write(nobi.bun);
+    if (nobi != null) sb.write(innenBunErabu(w, nobi));
     if (s.gakunen == 4) {
       if (kumiAri) {
         sb.write('4年生として最後の11月駅伝予選だった。');
@@ -2137,6 +2152,10 @@ Kiji _yosenMeikan(
   // 駅伝男・平常心の持ち味(1.9.7。11月駅伝予選は飛び出し、正月駅伝予選はフリー走と集団走)
   final KimochiKaki kc = KimochiKaki(w, kata: _gakunaiKata(k, site, no));
   final int tokuhitsuSuu = hashiru.where((x) => x.konjou >= kimochiTokuhitsu).length;
+  // 入学時からの伸びをコメントで語るのは、伸びが一番大きい選手だけ(1つの記事で1人まで。2.1.0)
+  w.nobiKimeru([
+    for (final SenshuData s in hashiru) ...yosenInnen(k, s, kekka: false).take(1),
+  ]);
   for (final SenshuData s in hashiru) {
     final int kk = k.entry(s);
     w.koMidashi(kumiAri ? '${kk + 1}組　${w.senshu(s)}' : w.senshu(s));
@@ -2164,7 +2183,7 @@ Kiji _yosenMeikan(
     if (honsenKai > 0) sb.write(kaketeiru ? '駅伝の本戦も走っている。' : '駅伝の本戦も$honsenKai度走っている。');
     // 入学時の記録からの伸び(1.9.4)
     final Innen? nobi = nyuugakuNobiInnen(k, s);
-    if (nobi != null) sb.write(nobi.bun);
+    if (nobi != null) sb.write(innenBunErabu(w, nobi));
     if (s.gakunen == 4) {
       sb.write(
         kumiAri ? '4年生にとっては、これが最後の11月駅伝予選だ。' : '最後の正月駅伝予選。本戦へのラストチャンスに挑む。',
@@ -2473,6 +2492,11 @@ Kiji _taikousenShumokuKiji(
         : 'ここまでの総合は${juniMoji(m.juni)}につけている。',
   );
 
+  // 入学時からの伸びをコメントで語るのは、伸びが一番大きい選手だけ(1つの記事で1人まで。2.1.0)
+  w.nobiKimeru([
+    for (final TaikousenSenshuKekka x in [...shoukai, if (nobi != null && nobiBetsu) nobi])
+      ...taikousenInnen(k, x.s, juni: x.juni).take(1),
+  ]);
   // 本文: 紹介する選手(全体の順位の順)
   for (int i = 0; i < shoukai.length; i++) {
     final TaikousenSenshuKekka x = shoukai[i];
@@ -2604,7 +2628,7 @@ void _taikousenSenshuKaku(
   }
   // 入学時の記録からの伸び(2年生以上。1年生は上で5000mだけ比べている。1.9.4)
   final Innen? nobi = nyuugakuNobiInnen(k, s);
-  if (nobi != null) sb.write(nobi.bun);
+  if (nobi != null) sb.write(innenBunErabu(w, nobi));
   // 駅伝の本戦の出走歴(1.9.4)
   // 前の学年の記録が欠けている選手は、回数が少なく出るので数を書かない(1.9.7)
   final ({int kaisuu, int kukanshou}) reki = ekidenShussouKaisuu(k, s);

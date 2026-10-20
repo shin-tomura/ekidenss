@@ -1317,7 +1317,7 @@ Kiji? _jibunKiji(EkidenKekka e) {
   String innenBun(int kk) {
     if (kk < 0 || innen[kk].isEmpty || innenKaita.contains(kk)) return '';
     innenKaita.add(kk);
-    return innen[kk].first.bun;
+    return innenBunErabu(w, innen[kk].first);
   }
   final bool shuyakuYoi =
       shuyaku >= 0 &&

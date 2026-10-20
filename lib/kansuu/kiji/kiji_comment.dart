@@ -571,9 +571,10 @@ String senshuCommentJijitsu(
   bool kuyashii = false,
   bool yonensei = false,
 }) {
+  // 入学時からの伸びの言葉は、1つの記事で1人まで(2.1.0。KijiKakite.nobiKotobaTsukaeru)
   final List<String> j = [
     for (final String x in jijitsu)
-      if (x.trim().isNotEmpty) x.trim(),
+      if (x.trim().isNotEmpty && w.nobiKotobaTsukaeru(x.trim())) x.trim(),
   ];
   if (j.isEmpty) {
     return senshuComment(w, bamen, yobi, kuyashii: kuyashii, yonensei: yonensei);
@@ -582,6 +583,9 @@ String senshuCommentJijitsu(
   final String kimochi = w.erabu(kouho);
   // 気持ちの言葉が2文なら事実は1つ、1文なら2つまで(長くなりすぎないように)
   final List<String> tsukau = j.take(kimochi.contains('。') ? 1 : 2).toList();
+  for (final String x in tsukau) {
+    w.nobiKotobaTsukatta(x);
+  }
   final List<String> bu = [];
   if (w.r.kakuritsu(50)) {
     bu.addAll(tsukau);

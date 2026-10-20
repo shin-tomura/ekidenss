@@ -1226,6 +1226,9 @@ List<String> _kakutokuMeiseiGyou(bool setsumeisho) {
     '・対校戦で得られる名声は次のとおりです(目標順位と関係ありません)。',
     '　・総合: ${_juniRetsu(_meiseiTaikousenSougou)}',
     '　・種目(5000m・10000m・ハーフ)ごとの個人: ${_juniRetsu(_meiseiTaikousenKojin)}',
+    // 入賞のお知らせ(説明書だけ。2.1.0。taikousen_nyuushou_oshirase.dart)
+    if (setsumeisho)
+      '　・自分の大学の選手が個人8位以内に入ると、その種目の結果画面の一番上で知らせます。',
     '・駅伝予選の順位では、名声は得られません。',
   ]);
   return gyou;

@@ -37,6 +37,7 @@ import 'package:ekiden/screens/Modal_senshu_race_bunseki.dart'
 import 'package:ekiden/screens/kiji_hyou_view.dart'; // 金特訓・銀特訓の記録の一覧表(1.9.9)
 import 'package:ekiden/kansuu/kingin_kiroku.dart'; // 金銀の記録(1.9.9)
 import 'package:ekiden/screens/koukou_taikai_oshirase.dart'; // 高校の大会の結果が出た日のお知らせ(2.0.4)
+import 'package:ekiden/screens/taikousen_nyuushou_oshirase.dart'; // 対校戦の入賞のお知らせ(2.1.0)
 import 'package:ekiden/screens/Modal_yosenTimeBunpu.dart'; // 正月駅伝予選のチーム内のタイム分布(2.0.5)
 import 'package:ekiden/screens/Modal_ichiKankei.dart'
     show KukanBunsekiCard; // 区間ごとのタイム分布(2.0.5)と区間終了時点の位置関係(2.0.6)のカード
@@ -1297,6 +1298,11 @@ class _Mode0700ContentState extends State<Mode0700Content> {
                                             _buildRaceTitle(
                                               currentGhensuu.hyojiracebangou,
                                             ),
+                                            // 自分の大学の選手が個人8位以内に入ったときのお知らせ(2.1.0)
+                                            TaikousenNyuushouOshirase(
+                                              gh: currentGhensuu,
+                                              senshu: idJunSenshuData,
+                                            ),
                                             // ニュース記事(箱庭スポーツ。対校戦の種目ごとの結果の記事。1.9.2)
                                             KijiLinkCard(
                                               key: ValueKey(
@@ -1320,6 +1326,7 @@ class _Mode0700ContentState extends State<Mode0700Content> {
                                               currentGhensuu,
                                               idJunUnivData,
                                               limit: 8,
+                                              jibunIro: true, // 自分の大学の選手をオレンジにする(2.1.0)
                                             ), // 上位8名表示
                                             // 説明文(1.9.3。ポイントは8位までではなく、走った全員の順位で入るので、
                                             // そのことが分かるように直した。名声の量は KirokuKousin.dart と同じ)
@@ -2474,6 +2481,8 @@ class _Mode0700ContentState extends State<Mode0700Content> {
     Ghensuu currentGhensuu,
     List<UnivData> idJunUnivData, {
     int? limit,
+    // 自分の大学の選手の行をオレンジにするか(2.1.0。対校戦の結果画面だけ)
+    bool jibunIro = false,
   }) {
     final displayLimit = limit ?? 10; // デフォルトは上位10名
 
@@ -2503,6 +2512,11 @@ class _Mode0700ContentState extends State<Mode0700Content> {
         final univName = (senshu.univid < idJunUnivData.length)
             ? idJunUnivData[senshu.univid].name
             : "不明な大学";
+        // 自分の大学の選手の行の色(2.1.0)
+        final Color iro =
+            (jibunIro && senshu.univid == currentGhensuu.MYunivid)
+                ? taikousenJibunIro
+                : HENSUU.textcolor;
 
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 2.0),
@@ -2510,21 +2524,21 @@ class _Mode0700ContentState extends State<Mode0700Content> {
             children: [
               Text(
                 "${senshu.kukanjuni_race[currentGhensuu.hyojiracebangou][senshu.gakunen - 1] + 1}位 ",
-                style: TextStyle(color: HENSUU.textcolor),
+                style: TextStyle(color: iro),
               ),
-              Text(senshu.name, style: TextStyle(color: HENSUU.textcolor)),
+              Text(senshu.name, style: TextStyle(color: iro)),
               Text(
                 "(${senshu.gakunen}年${shushouShirushi(senshu)})",
-                style: TextStyle(color: HENSUU.textcolor),
+                style: TextStyle(color: iro),
               ),
-              Text("$univName ", style: TextStyle(color: HENSUU.textcolor)),
+              Text("$univName ", style: TextStyle(color: iro)),
               /*if (currentGhensuu.hyojiracebangou==17)
               Text(
                 TimeDate.timeToJikanFunByouString(
                   senshu.kukantime_race[currentGhensuu
                       .hyojiracebangou][senshu.gakunen - 1],
                 ),
-                style: TextStyle(color: HENSUU.textcolor),
+                style: TextStyle(color: iro),
               ),
               else
               Text(
@@ -2532,7 +2546,7 @@ class _Mode0700ContentState extends State<Mode0700Content> {
                   senshu.kukantime_race[currentGhensuu
                       .hyojiracebangou][senshu.gakunen - 1],
                 ),
-                style: TextStyle(color: HENSUU.textcolor),
+                style: TextStyle(color: iro),
               ),*/
               currentGhensuu.hyojiracebangou == 17
                   ? Text(
@@ -2540,14 +2554,14 @@ class _Mode0700ContentState extends State<Mode0700Content> {
                         senshu.kukantime_race[currentGhensuu
                             .hyojiracebangou][senshu.gakunen - 1],
                       ),
-                      style: TextStyle(color: HENSUU.textcolor),
+                      style: TextStyle(color: iro),
                     )
                   : Text(
                       TimeDate.timeToFunByouString(
                         senshu.kukantime_race[currentGhensuu
                             .hyojiracebangou][senshu.gakunen - 1],
                       ),
-                      style: TextStyle(color: HENSUU.textcolor),
+                      style: TextStyle(color: iro),
                     ),
               if ((currentGhensuu.hyojiracebangou >= 6 &&
                       currentGhensuu.hyojiracebangou <= 8 &&
@@ -2559,7 +2573,7 @@ class _Mode0700ContentState extends State<Mode0700Content> {
                   Text(
                     " 歴代新",
                     style: TextStyle(
-                      color: HENSUU.textcolor,
+                      color: iro,
                       //fontWeight: FontWeight.bold,
                     ),
                   ),

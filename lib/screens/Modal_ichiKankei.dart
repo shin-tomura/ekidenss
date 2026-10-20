@@ -118,6 +118,7 @@
 
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kDebugMode; // 大学名の欄の幅の試しのボタン(開発中のビルドだけ。2.1.0)
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ekiden/constants.dart';
 import 'package:ekiden/ghensuu.dart';
@@ -193,7 +194,9 @@ const double _hakoYoko = 6;
 const double _hakoTate = 3;
 
 /// 四角の中の大学名の欄の文字数(どの四角も同じ幅にする。長い名前は横に縮める。2.1.0。
-/// 開発中に3文字分で作ったが、四角を狭くするため2文字分にした)
+/// 開発中に3文字分で作ったが、四角を狭くするため2文字分にした。
+/// 4文字の名前が読みにくいので、2.1.0の開発中に、開発中のビルドだけ「大学名の幅(試し)」のボタンで
+/// 2・2.5・3文字分を切り替えて試している(_meiHabaMoji)。決まったら、ここにその値を入れて、ボタンは消す)
 const int _meiMojisuu = 2;
 
 /// 大学名を横に縮める下限(これより縮めないと入らないときは、最後を「…」で省く。2.1.0。
@@ -1131,6 +1134,10 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
   /// 測った、上に固定する部分の高さ(測る前はnull。2.1.0)
   double? _koteiTakasa;
 
+  /// 四角の中の大学名の欄の幅(何文字分か。2.1.0の開発中に、開発中のビルドだけ2・2.5・3を切り替えて試す。
+  /// 覚えない(開くたびに _meiMojisuu)。決まったら _meiMojisuu に入れて、この切り替えは消す)
+  double _meiHabaMoji = _meiMojisuu.toDouble();
+
   /// 表示の倍率の段階(_bairitsu の番号。おまかせのときは使わない)
   int _dan = 2;
 
@@ -1456,7 +1463,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
   /// 順位の欄はその区間の一番広い順位(学連選抜の「OP」も)、大学名の欄は2文字分(_meiMojisuu)、
   /// 順位の変化の欄はその区間の一番広い変化(1区とスタートは変化がないので0)
   _HakoHaba _hakoHaba(_IchiKukan r, TextScaler scaler) {
-    final String kagi = '${r.kk}:${scaler.scale(100).toStringAsFixed(2)}';
+    final String kagi = '${r.kk}:${scaler.scale(100).toStringAsFixed(2)}:$_meiHabaMoji';
     final _HakoHaba? kioku = _hakoHabaKioku[kagi];
     if (kioku != null) return kioku;
     double juni = 0;
@@ -1476,12 +1483,10 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
         takasa = math.max(takasa, z.height);
       }
     }
-    final Size mei = _ookisa(
-      TextSpan(text: '国' * _meiMojisuu, style: _meiStyle),
-      scaler,
-    );
+    // 大学名の欄は「国」1文字の幅の _meiHabaMoji 倍(2.5文字分も試せるように。2.1.0の開発中)
+    final Size mei = _ookisa(const TextSpan(text: '国', style: _meiStyle), scaler);
     takasa = math.max(takasa, mei.height);
-    final _HakoHaba h = _HakoHaba(juni, mei.width, hendou, takasa);
+    final _HakoHaba h = _HakoHaba(juni, mei.width * _meiHabaMoji, hendou, takasa);
     _hakoHabaKioku[kagi] = h;
     return h;
   }
@@ -1601,7 +1606,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
   /// (1校でも入らなければ1校にして、横にスクロールする)。区間を切り替えるたびに数が変わらないように、
   /// パネルで見られる全部の区間(スタートと終わった区間)の、一番広い四角・一番長い差の文・一番長い「+○秒」で決める
   int _gyouSuuKimeru(_IchiKankei b, double w, TextScaler scaler) {
-    final String kagi = '${w.toStringAsFixed(1)}:${scaler.scale(100).toStringAsFixed(2)}';
+    final String kagi = '${w.toStringAsFixed(1)}:${scaler.scale(100).toStringAsFixed(2)}:$_meiHabaMoji';
     final int? kioku = _gyouSuuKioku[kagi];
     if (kioku != null) return kioku;
     double hako = 0;
@@ -2438,6 +2443,28 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
             _shukushaku(_bairitsu[dan]),
           ],
         ),
+          // 大学名の欄の幅の試し(開発中のビルドだけ。2.1.0の開発中。決まったら消す)
+          if (kDebugMode) ...[
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                const Text('大学名の幅(試し)', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                for (final double m in const [2.0, 2.5, 3.0])
+                  _komaBotan(
+                    m == m.roundToDouble() ? '${m.toInt()}' : '$m',
+                    _meiHabaMoji == m,
+                    () => setState(() {
+                      _meiHabaMoji = m;
+                      _hakoHabaKioku.clear();
+                      _gyouSuuKioku.clear();
+                    }),
+                  ),
+              ],
+            ),
+          ],
         ],
       ],
     );

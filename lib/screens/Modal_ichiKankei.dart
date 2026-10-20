@@ -16,9 +16,9 @@
 //   大学を選ぶ欄(「‹」「›」は端まで行くと反対の端に回る。一覧は出場校のID順で、学連選抜がいる年は最後に学連選抜)に
 //   入れ替わる。最初は自分の大学(学連選抜の監督の年は学連選抜。自分の大学が出ていない年は、ID順の最初の大学)で、
 //   画面を閉じるまで選んだ大学を覚える。大学名は1行に収め、入りきらないところは「…」で省く。
-// ・2.0.8から、おまかせのときに「おまかせ」をもう一度押すと「おまかせ ↔」(幅に合わせる)になり、道が横幅に収まるように、
-//   道の上の文字(四角の中・右の差・シード権ライン)を小さくする(6割まで。それでも入らなければ
-//   横にスクロールする)。縦の縮尺は変えない。もう一度押すと戻り、「−」「＋」を押すと、おまかせと一緒に外れる。覚えない。
+// ・2.0.8〜2.0.9は、おまかせのときに「おまかせ」をもう一度押すと「おまかせ ↔」(幅に合わせる)になり、道が横幅に
+//   収まるように道の上の文字を6割まで小さくしていた。2.1.0で、集団の1行に画面の幅に入るだけ並べるようになり、
+//   横にはみ出すのは四角1つと右の差だけで画面の幅を超えるときだけになったので、なくした(そのときは横にスクロールする)。
 // レースの途中の区間ごとの画面(mode 350)と、結果画面(10月駅伝・11月駅伝・正月駅伝・カスタム駅伝)の、
 // 区間ごとのタイム分布と1枚にまとめたカード(KukanBunsekiCard。右半分の「位置関係」)から開く。
 // ・幅のある道の帯に、大学名を四角で囲んで並べ、1位からの距離を縮尺どおりの間隔で出す。
@@ -159,9 +159,6 @@ const double _omakaseGamen = 2.0;
 /// おまかせの倍率の下限(_bairitsu の番号。4は×4。四角どうしの一番小さい間隔が約24mになり、
 /// 数十mの差が見分けられる。2.1.0。開発中は3(×2)だった)
 const int _omakaseSaitei = 4;
-
-/// 幅に合わせる(おまかせ ↔)ときに、道の上の文字を小さくする下限(今の文字の大きさに対する割合。2.0.8)
-const double _habaSaishou = 0.6;
 
 /// 詰めたところの高さ(px)
 const double _tsumePx = 52;
@@ -1136,9 +1133,6 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
 
   /// 倍率がおまかせか(「−」「＋」を押すと外れる。覚えない)
   bool _omakase = true;
-
-  /// おまかせのときに、道が横幅に収まるように文字を小さくするか(おまかせ ↔。覚えない。2.0.8)
-  bool _habaAwase = false;
 
   /// 表示(0: 位置、1: 通過順位速報、2: 個人順位速報、3: 配置(区間配置確認。2.0.9)。覚えない。2.0.8)
   int _hyouji = 0;
@@ -2378,7 +2372,6 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
               dan > 0
                   ? () => setState(() {
                       _omakase = false;
-                      _habaAwase = false;
                       _dan = dan - 1;
                     })
                   : null,
@@ -2397,22 +2390,15 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
               dan < _bairitsu.length - 1
                   ? () => setState(() {
                       _omakase = false;
-                      _habaAwase = false;
                       _dan = dan + 1;
                     })
                   : null,
             ),
-            // おまかせのときに押すと、幅に合わせる(おまかせ ↔)と入れ替わる(2.0.8)
+            // おまかせに戻す(2.0.8〜2.0.9は、おまかせのときに押すと「おまかせ ↔」と入れ替わった。2.1.0でなくした)
             _komaBotan(
-              _omakase && _habaAwase ? 'おまかせ ↔' : 'おまかせ',
+              'おまかせ',
               _omakase,
-              () => setState(() {
-                if (_omakase) {
-                  _habaAwase = !_habaAwase;
-                } else {
-                  _omakase = true;
-                }
-              }),
+              () => setState(() => _omakase = true),
             ),
             _shukushaku(_bairitsu[dan]),
           ],
@@ -2637,29 +2623,13 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
                     : '大学の四角を押すと下に差が、もう一度押すと走った選手の説明文が出ます。'),
           style: setsumei,
         ),
-        if (_omakase && _habaAwase)
-          const Text('道が横幅に収まるように、道の上の文字を小さくします(おまかせ ↔)。', style: setsumei),
         const SizedBox(height: 12),
         LayoutBuilder(
           builder: (context, constraints) {
             final double w = constraints.maxWidth;
-            TextScaler scaler = MediaQuery.textScalerOf(context);
-            final bool habaAwase = _omakase && _habaAwase;
-            final double kihon = scaler.scale(13) / 13;
+            final TextScaler scaler = MediaQuery.textScalerOf(context);
             // 集団の1行には、画面の幅に入るだけ並べる(2.1.0。_haichi の中で行ごとに決める)
-            _Haichi h = _haichi(b, r, w, scaler, px, gamenTakasa);
-            // 幅に合わせる(おまかせ ↔)ときは、横幅に収まるまで道の上の文字を小さくして並べ直す
-            // (文字の幅で四角の幅と右の文の幅が決まるので、何回か測り直す。6割まで。2.0.8)
-            bool chiisaku = false;
-            if (habaAwase && h.haba > w) {
-              double k = 1;
-              for (int n = 0; n < 4 && h.haba > w + 0.5 && k > _habaSaishou; n++) {
-                k = math.max(_habaSaishou, k * w / h.haba);
-                scaler = TextScaler.linear(kihon * k);
-                h = _haichi(b, r, w, scaler, px, gamenTakasa);
-              }
-              chiisaku = true;
-            }
+            final _Haichi h = _haichi(b, r, w, scaler, px, gamenTakasa);
             // 道と四角と差の部分は、画面より広いときは横にもスクロールする(文は折り返さない)
             final Widget michi = SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -2732,12 +2702,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
                 ),
               ),
             );
-            // 文字を小さくしたときは、測ったときと同じ大きさで道の上の文字を出す
-            if (!chiisaku) return michi;
-            return MediaQuery(
-              data: MediaQuery.of(context).copyWith(textScaler: scaler),
-              child: michi,
-            );
+            return michi;
           },
         ),
       ],

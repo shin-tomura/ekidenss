@@ -145,7 +145,18 @@ List<_Shussou> _shussouReki(
 /// 学連選抜(オープン参加)で走った正月駅伝の文(古い順。なければ空。1.9.5)
 /// 「1年の正月駅伝では、学連選抜に選ばれて7区を走った(区間5位相当)。」
 /// 大学のチームの出走とは分けて書く(回数・駅伝デビュー・区間賞には入れない)
-String _gakurenBun(List<_Shussou> gakuren) {
+/// [matomeru] 同じ大会を2回以上走っていれば1文にまとめる(「1年と2年の正月駅伝では、学連選抜に選ばれて、
+/// 9区(区間4位相当)と3区(区間3位相当)を走った。」。卒業生特集で、大学のチームでの走りより目立たないように。2.1.2)
+String _gakurenBun(List<_Shussou> gakuren, {bool matomeru = false}) {
+  if (matomeru && gakuren.length >= 2 && gakuren.every((x) => x.race == gakuren.first.race)) {
+    final String tsunagi = gakuren.length == 2 ? 'と' : '、';
+    final String gakunen = gakuren.map((x) => '${x.gakunen}年').join(tsunagi);
+    final String kukan = gakuren.map((x) {
+      final int? j = x.juni;
+      return '${x.kukan + 1}区${j == null ? '' : '(区間${j + 1}位相当)'}';
+    }).join(tsunagi);
+    return '${gakunen}の${courseRaceTitle(gakuren.first.race)}では、学連選抜に選ばれて、${kukan}を走った。';
+  }
   final StringBuffer sb = StringBuffer();
   for (final _Shussou x in gakuren) {
     final int? j = x.juni;
@@ -169,6 +180,54 @@ String _shussouMoji(_Shussou x) {
     return '$mei${x.kukan + 1}組${j == null ? '' : '(組${j + 1}位)'}';
   }
   return '$mei${x.kukan + 1}区${j == null ? '' : '(区間${j + 1}位)'}';
+}
+
+/// 出走の古い順のキー(学年と、年度の中の大会の順。2.1.2)
+int _shussouJunKagi(_Shussou x) => x.gakunen * 10 + _raceJun.indexOf(x.race);
+
+/// [l] を古い順に並べ替えた写し(2.1.2)
+List<_Shussou> _furuiJun(List<_Shussou> l) =>
+    [...l]..sort((a, b) => _shussouJunKagi(a).compareTo(_shussouJunKagi(b)));
+
+/// 好走を選ぶときの大会の順(同じ区間順位なら、正月→11月→10月→カスタムの順に先にする。2.1.2)
+int _koussouRaceJun(int race) => race == 2
+    ? 0
+    : race == 1
+    ? 1
+    : race == 0
+    ? 2
+    : 3;
+
+/// 卒業生特集で取り上げる好走(大学のチームで走った本戦[reki]のうち、区間3位以内の走りを、良い順に2つまで。
+/// 同じ区間順位なら正月→11月→10月→カスタムの順、さらに新しい方を先にする。区間賞も入る。2.1.2)
+List<_Shussou> _koussouErabu(List<_Shussou> reki) {
+  final List<_Shussou> l = [
+    for (final _Shussou x in reki)
+      if (x.juni != null && x.juni! <= 2) x,
+  ];
+  l.sort((a, b) {
+    final int c = a.juni!.compareTo(b.juni!);
+    if (c != 0) return c;
+    final int d = _koussouRaceJun(a.race).compareTo(_koussouRaceJun(b.race));
+    if (d != 0) return d;
+    return _shussouJunKagi(b).compareTo(_shussouJunKagi(a));
+  });
+  return l.take(2).toList();
+}
+
+/// 好走の述語(「区間賞を獲得した」「区間2位と好走した」。[demo] は「〜でも」に続くときで、「区間3位に入った」。2.1.2)
+String _koussouJutsugo(int juni, {bool demo = false}) {
+  if (juni == 0) return '区間賞を獲得した';
+  return demo ? '区間${juni + 1}位に入った' : '区間${juni + 1}位と好走した';
+}
+
+/// 好走1つの文(「3年の正月駅伝では、2区で区間2位と好走した。」「4年の正月駅伝でも、3区で区間3位に入った。」)。
+/// [mae] は直前に好走として書いた出走(同じ大会なら「でも」でつなぐ)。[saigo] は最後の駅伝のとき(2.1.2)
+String _koussouBun(_Shussou x, _Shussou? mae, {bool saigo = false}) {
+  final bool demo = mae != null && mae.race == x.race;
+  final String mei = '${x.gakunen}年の${courseRaceTitle(x.race)}';
+  return '${saigo ? '最後の駅伝となった' : ''}$mei${demo ? 'でも' : 'では'}、'
+      '${x.kukan + 1}区で${_koussouJutsugo(x.juni ?? 0, demo: demo)}。';
 }
 
 /// 予選の出走の回数の一言(「予選も2度走っている。」。なければ空)
@@ -1584,18 +1643,37 @@ List<Kiji> gakunaiSotsugyouKiji(KijiKankyou k) {
       for (final _Shussou x in zenbu)
         if (!_honsen(x.race)) x,
     ];
-    // 学連選抜(オープン参加)で走った正月駅伝は、大学のチームの出走とは分けて書く(1.9.5)
-    final String gakurenBun = _gakurenBun(
-      _shussouReki(k, s, imaNozoku: false, gakurenDake: true),
-    );
+    // 学連選抜(オープン参加)で走った正月駅伝は、大学のチームの出走とは分けて書く(1.9.5)。
+    // 2回以上は1文にまとめる(大学のチームでの走りより目立たないように。2.1.2)
+    final List<_Shussou> gakuren = _shussouReki(k, s, imaNozoku: false, gakurenDake: true);
+    final String gakurenBun = _gakurenBun(gakuren, matomeru: true);
+    // 大学のチームで区間3位以内に入った走り(良い順に2つまで。デビュー・最後の駅伝の文に入れるか、別の文にする。2.1.2)
+    final List<_Shussou> koussou = _koussouErabu(reki);
+    // 区間賞の数と、そのうち文に書いた数(好走として書いたものと、最後の駅伝の順位として書いたもの)。
+    // 書ききれない区間賞があるときだけ、区間賞の数の文を足す(2.1.2)
+    final int kukanshou = reki.where((x) => x.juni == 0).length;
+    int kakitaKukanshou = koussou.where((x) => x.juni == 0).length;
+    if (reki.isNotEmpty && !koussou.contains(reki.last) && reki.last.juni == 0) kakitaKukanshou++;
     // 前の学年の記録が欠けている選手(ゲームを始めた年の4年生など)は、4年間の歩みを言い切れないので、
     // 「かなわなかった」「駅伝デビュー」と回数を書かず、残っている記録の事実だけを書く(1.9.7)
     final bool kaketeiru = kirokuKaketeiru(s);
     if (kaketeiru) {
       final StringBuffer sr = StringBuffer();
       if (reki.isNotEmpty) {
-        sr.write('最後の駅伝は、${_shussouMoji(reki.last)}だった。');
-        if (reki.any((x) => x.juni == 0)) sr.write('区間賞も獲得した。');
+        // 最後の駅伝のほかの好走(古い順)と、最後の駅伝(好走なら、その順位も。2.1.2)
+        final _Shussou saigo = reki.last;
+        _Shussou? mae;
+        for (final _Shussou x in _furuiJun(koussou)) {
+          if (identical(x, saigo)) continue;
+          sr.write(_koussouBun(x, mae));
+          mae = x;
+        }
+        sr.write(
+          koussou.contains(saigo)
+              ? _koussouBun(saigo, mae, saigo: true)
+              : '最後の駅伝は、${_shussouMoji(saigo)}だった。',
+        );
+        if (kukanshou > kakitaKukanshou) sr.write('区間賞はほかにも獲得した。');
         sr.write(gakurenBun);
         if (yosen.isNotEmpty) sr.write('駅伝予選も走った。');
       } else if (gakurenBun.isNotEmpty || yosen.isNotEmpty) {
@@ -1629,17 +1707,46 @@ List<Kiji> gakunaiSotsugyouKiji(KijiKankyou k) {
       final StringBuffer sr = StringBuffer();
       final _Shussou hajime = reki.first;
       final _Shussou saigo = reki.last;
+      // 学連選抜でも走った選手は、「大学のチームで」の回数と書く(2.1.2)
+      final bool gakurenAri = gakuren.isNotEmpty;
       if (reki.length == 1) {
-        sr.write('4年間でただ一度の駅伝は、${_shussouMoji(hajime)}だった。');
+        final String tadaIchido = gakurenAri ? '大学のチームでただ一度の駅伝' : '4年間でただ一度の駅伝';
+        if (hajime.juni == 0) {
+          sr.write(
+            '${tadaIchido}となった${hajime.gakunen}年の${courseRaceTitle(hajime.race)}で、'
+            '${hajime.kukan + 1}区を走って区間賞を獲得した。',
+          );
+        } else {
+          sr.write('${tadaIchido}は、${_shussouMoji(hajime)}だった。');
+        }
       } else {
+        // デビュー(学連選抜で先に走っていれば「大学のチームでの駅伝デビュー」。好走なら、その順位も。2.1.2)
+        final bool gakurenMae = gakuren.any((x) => _shussouJunKagi(x) < _shussouJunKagi(hajime));
         sr.write(
-          '${hajime.gakunen}年の${courseRaceTitle(hajime.race)}で、${hajime.kukan + 1}区を走って駅伝デビュー。',
+          '${hajime.gakunen}年の${courseRaceTitle(hajime.race)}で、${hajime.kukan + 1}区を走って'
+          '${gakurenMae ? '大学のチームでの' : ''}駅伝デビュー。',
         );
-        sr.write('4年間で駅伝を${reki.length}度走った。');
-        sr.write('最後の駅伝は、${_shussouMoji(saigo)}だった。');
+        _Shussou? mae;
+        if (koussou.contains(hajime)) {
+          sr.write('いきなり${_koussouJutsugo(hajime.juni ?? 0)}。');
+          mae = hajime;
+        }
+        // デビューと最後の駅伝のほかの好走(古い順。2.1.2)
+        for (final _Shussou x in _furuiJun(koussou)) {
+          if (identical(x, hajime) || identical(x, saigo)) continue;
+          sr.write(_koussouBun(x, mae));
+          mae = x;
+        }
+        sr.write(
+          gakurenAri ? '大学のチームで駅伝を${reki.length}度走った。' : '4年間で駅伝を${reki.length}度走った。',
+        );
+        sr.write(
+          koussou.contains(saigo)
+              ? _koussouBun(saigo, mae, saigo: true)
+              : '最後の駅伝は、${_shussouMoji(saigo)}だった。',
+        );
       }
-      final int kukanshou = reki.where((x) => x.juni == 0).length;
-      if (kukanshou > 0) sr.write('区間賞は$kukanshou度獲得した。');
+      if (kukanshou > kakitaKukanshou) sr.write('区間賞は通算${kukanshou}度獲得した。');
       sr.write(gakurenBun);
       if (yosen.isNotEmpty) sr.write('駅伝予選も${yosen.length}度走った。');
       w.danraku(sr.toString());

@@ -116,6 +116,45 @@ String kinginTaikaiMei(int bangou) {
   }
 }
 
+/// 目標順位クリアの行の内容(「正月駅伝 目標順位クリア(目標3位・結果2位)」。量の違いが分かるように、
+/// 目標と結果を添える)。[bangou] 0〜5: 駅伝・予選の番号、9: 対校戦。[mokuhyou]・[kekka] は0が1位。
+/// 量の決まりと同じく、駅伝は目標1位で優勝すると「優勝で2倍」、対校戦は優勝すると「優勝で増量」を添える
+/// (KirokuKousin.dart の自分の大学の分・goldsilver_com.dart の _mokuhyouTasseiRyou と同じ決まり)
+String kinginMokuhyouNaiyou(int bangou, int mokuhyou, int kekka) {
+  final bool ekiden = (bangou >= 0 && bangou <= 2) || bangou == 5;
+  final List<String> soe = [
+    '目標${mokuhyou + 1}位',
+    if (ekiden && mokuhyou == 0 && kekka == 0) '優勝で2倍' else '結果${kekka + 1}位',
+    if (bangou == 9 && kekka == 0) '優勝で増量',
+  ];
+  return '${kinginTaikaiMei(bangou)} 目標順位クリア(${soe.join('・')})';
+}
+
+/// 春の大学理事会からの支援の行の内容(量を決めた昨年度の成績の区分を添える。
+/// 決め方は goldsilverTeikiKakutoku.dart・goldsilver_com.dart の _teikiKakutokusuu と同じで、
+/// 言い方は説明書の金銀の一覧(shiyou_text.dart)と同じ)
+String kinginTeikiNaiyou(UnivData univ) {
+  final List<List<int>> j = univ.juni_race;
+  if (j.length < 10) return '大学理事会からの支援';
+  final String kubun;
+  if (j[0][0] == 0 && j[1][0] == 0 && j[2][0] == 0) {
+    kubun = '三冠';
+  } else if (j[0][0] == 0 || j[1][0] == 0 || j[2][0] == 0 || j[9][0] == 0) {
+    kubun = '駅伝か対校戦で優勝';
+  } else if (j[0][0] < 3 && j[1][0] < 3 && j[2][0] < 3) {
+    kubun = '駅伝すべてで3位以内';
+  } else if (j[0][0] < 3 || j[1][0] < 3 || j[2][0] < 3 || j[9][0] < 3) {
+    kubun = '駅伝か対校戦のどれかで3位以内';
+  } else if (j[0][0] < 5 || j[1][0] < 8 || j[2][0] < 10 || j[9][0] < 8) {
+    kubun = '対校戦8位以内・10月駅伝5位以内・11月駅伝8位以内・正月駅伝10位以内のどれか';
+  } else if (j[3][0] < 7 || j[4][0] < 10) {
+    kubun = '11月駅伝予選突破か正月駅伝予選突破';
+  } else {
+    kubun = 'どれも達成していない・最低額';
+  }
+  return '大学理事会からの支援(昨年度の成績:$kubun)';
+}
+
 /// 今年度の金銀の内訳に、[gyou]をまとめて足して保存する(保存は1回だけ)
 Future<void> kinginRirekiTsuika(List<KinginRirekiGyou> gyou) async {
   if (gyou.isEmpty) return;

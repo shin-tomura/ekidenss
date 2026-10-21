@@ -217,6 +217,6 @@ Future<void> goldsilverTeikiKakutoku(
     maeKin: maeKin,
     maeGin: maeGin,
     shurui: kinginUketotta,
-    naiyou: '大学理事会からの支援',
+    naiyou: kinginTeikiNaiyou(myUniv),
   );
 }

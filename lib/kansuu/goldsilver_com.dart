@@ -395,7 +395,7 @@ Future<void> comGoldSilverTeiki({
       ryou: ryou,
       random: random,
       rireki: rireki,
-      rirekiNaiyou: '大学理事会からの支援',
+      rirekiNaiyou: kinginTeikiNaiyou(univ),
     );
   }
   await kantoku.save();
@@ -456,7 +456,11 @@ Future<void> comGoldSilverMokuhyouTassei({
       ryou: ryou,
       random: random,
       rireki: rireki,
-      rirekiNaiyou: '目標順位クリア(${kinginTaikaiMei(mokuhyouBangou)})',
+      rirekiNaiyou: kinginMokuhyouNaiyou(
+        mokuhyouBangou,
+        univ.mokuhyojuni[mokuhyouBangou],
+        univ.juni_race[mokuhyouBangou][0],
+      ),
     );
   }
   await kantoku.save();

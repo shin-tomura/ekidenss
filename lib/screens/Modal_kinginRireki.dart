@@ -5,7 +5,8 @@ import 'package:ekiden/ghensuu.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/kansuu/kingin_rireki.dart';
-import 'package:ekiden/kansuu/goldsilver_com.dart' show comKinHoyuu, comGinHoyuu;
+import 'package:ekiden/kansuu/goldsilver_com.dart'
+    show comKinHoyuu, comGinHoyuu, comGoldSilverLevel, comGoldSilverLevelHyouji, isComGoldSilverOn;
 
 // ------------------------------------------------------------
 // 金銀の内訳(2.1.1。記録は lib/kansuu/kingin_rireki.dart)
@@ -134,6 +135,15 @@ class _ModalKinginRirekiState extends State<ModalKinginRireki> {
       const Text('・受け取った金銀、特訓で使った金銀、交換を、年度ごとに記録しています(この版より前の分はありません)。', style: _chuui),
       const Text('・自分の大学の特訓は日ごとにまとめています。コンピュータの大学は、夏合宿でまとめて使います。', style: _chuui),
       const Text('・「記録のない増減」は、記録を始める前の分などです。', style: _chuui),
+      const Text('・量は、難易度と金銀支給量の倍率でも変わります。', style: _chuui),
+      // コンピュータの大学は、量が大学ごとの支給レベルで決まる(過去の年度の支給レベルは残っていない)
+      if (gh != null && univId != gh.MYunivid && kantoku != null)
+        Text(
+          isComGoldSilverOn(kantoku)
+              ? '・今の支給レベル:${comGoldSilverLevelHyouji(comGoldSilverLevel(kantoku, univId), gh.kazeflag)}(過去の年度の支給レベルは残っていません)。'
+              : '・今は、コンピュータの大学の金銀の使用がオフです。',
+          style: _chuui,
+        ),
       const SizedBox(height: 8),
       Wrap(
         spacing: 6,

@@ -713,7 +713,11 @@ Future<void> kirokuKousin({
             maeKin: maeKin,
             maeGin: maeGin,
             shurui: kinginUketotta,
-            naiyou: '目標順位クリア(${kinginTaikaiMei(racebangou)})',
+            naiyou: kinginMokuhyouNaiyou(
+              racebangou,
+              sortedunivdata[gh[0].MYunivid].mokuhyojuni[racebangou],
+              sortedunivdata[gh[0].MYunivid].juni_race[racebangou][0],
+            ),
           );
         }
       }
@@ -2218,7 +2222,11 @@ Future<void> kirokuKousin({
               maeKin: maeKin,
               maeGin: maeGin,
               shurui: kinginUketotta,
-              naiyou: '目標順位クリア(${kinginTaikaiMei(9)})',
+              naiyou: kinginMokuhyouNaiyou(
+                9,
+                sortedunivdata[gh[0].MYunivid].mokuhyojuni[9],
+                sortedunivdata[gh[0].MYunivid].juni_race[9][0],
+              ),
             );
           }
         }
@@ -2674,7 +2682,7 @@ Future<void> _gakurenMokuhyouHoushuu({
     maeKin: maeKin,
     maeGin: maeGin,
     shurui: kinginUketotta,
-    naiyou: '学連選抜の目標順位クリア',
+    naiyou: '学連選抜 目標順位クリア(目標${mokuhyou + 1}位・結果${saigo.tuukaJuni + 1}位相当)',
   );
 }
 

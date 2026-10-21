@@ -56,6 +56,16 @@
 //     ・yajirushi: 矢印だけ「↑」「↓」(2.1.1の開発中の形)
 //     どの形も、変わらなければ何も出さず、1区の演出のあいだは出さない。位置は今まで通り「↑2」「↓3」「→」
 //   ・推移から位置に切り替えると、推移で見ていた区間を出す。覚えない(開いたときは「位置」)
+//   ・描き方は定数 suiiTen で切り替える(どちらのコードも残してある。説明書の文はこの値に合わせて変わる)。
+//     ・true(今の形): 大学を点にして、トップから最後尾までを1つの画面に収め、全体の動きを見る(_buildTen・_tenHaichi・
+//       _TenPainter)。縮尺は区間ごとに固定(その区間の6つの図(0〜5コマ目)で一番広がったときに、トップから最後尾まで
+//       入る縮尺。_tenHaba)。区間の中では、差が開く・詰まるのが点の動きで見える。ほぼ同じ位置の点は横の列にずらして
+//       並べる(集団が横に広がった塊に見える)。焦点の大学はオレンジの大きめの点で、右に名前とそのコマの時点の順位と
+//       順位の変化(suiiHendouKata の形)を出す。自分の大学(焦点でないとき)は水色の点、学連選抜は点線の丸、ほかは白い点。
+//       点を押すと、その大学に焦点を移す。目盛りの線(6本まで)とシード権ラインの点線(順位の境で前後の点の位置が
+//       違うときだけ)を出す。道をスクロールしないので、焦点を追って道を動かす処理(_suiiOu・_suiiSakiniOu)は働かず、
+//       倍率の「−」「＋」も出さない
+//     ・false: 大学の四角を道に並べ、焦点の大学に合わせて道を動かす(2.1.1の開発中の形。下の説明はこの形のもの)
 // ・2.0.8〜2.0.9は、おまかせのときに「おまかせ」をもう一度押すと「おまかせ ↔」(幅に合わせる)になり、道が横幅に
 //   収まるように道の上の文字を6割まで小さくしていた。2.1.0で、集団の1行に画面の幅に入るだけ並べるようになり、
 //   横にはみ出すのは四角1つと右の差だけで画面の幅を超えるときだけになったので、なくした(そのときは横にスクロールする)。
@@ -225,6 +235,12 @@ enum SuiiHendouKata {
 
 /// 今の推移の順位の変化の出し方
 const SuiiHendouKata suiiHendouKata = SuiiHendouKata.nukisuu;
+
+/// 推移(2.1.1)の描き方(開発者が切り替える。プレイヤーの設定ではない。説明書の文(setsumeisho_text.dart)は
+/// この値に合わせて変わる。切り替えるときは変更履歴を直す)
+/// true: 大学を点にして、トップから最後尾までを1つの画面に収め、全体の動きを見る(今の形。縮尺は区間ごとに固定)
+/// false: 大学の四角を道に並べ、焦点の大学に合わせて道を動かす(2.1.1の開発中に作った形)
+const bool suiiTen = true;
 
 /// 推移の1区の演出(2.1.1): 集団がばらけ始めるところ(区間の最後の4分の1)
 const double _ikkuBarakeIchi = 0.75;
@@ -799,6 +815,170 @@ class _IchiKankei {
 
   /// 学連選抜が走っている区間があるか
   bool get opAri => kukan.any((r) => r.narabi.any((x) => x.op));
+}
+
+/// 推移の点の表示(suiiTen。2.1.1)の、点1つ([i] は図の並び(narabi)の番号)
+class _Ten {
+  final int i;
+  final double x;
+  final double y;
+  final double hankei;
+  final Color iro;
+
+  /// 学連選抜(点線の丸。焦点のときは塗る)
+  final bool tensen;
+
+  const _Ten(this.i, this.x, this.y, this.hankei, this.iro, this.tensen);
+}
+
+/// 推移の点の表示の配置(描く前に計算し、押したところの点を探すのにも使う)
+class _TenZu {
+  final List<_Ten> ten;
+
+  /// 目盛り(高さと「500m」などの文。「トップ」も)
+  final List<({double y, String moji})> memori;
+
+  /// シード権ラインの高さ(出さないときはnull)
+  final double? seedY;
+
+  /// 道の帯の左右(点の1列目の真ん中が帯の真ん中)と、上下
+  final double obiHidari;
+  final double obiMigi;
+  final double ue;
+  final double shita;
+
+  /// 焦点の大学の点(ten の番号。いなければ-1)と、右に出す文と、文の左端
+  final int shoten;
+  final String shotenMoji;
+  final double shotenMojiX;
+
+  const _TenZu({
+    required this.ten,
+    required this.memori,
+    required this.seedY,
+    required this.obiHidari,
+    required this.obiMigi,
+    required this.ue,
+    required this.shita,
+    required this.shoten,
+    required this.shotenMoji,
+    required this.shotenMojiX,
+  });
+}
+
+/// 推移の点の表示を描く(道の帯・目盛り・シード権ライン・点・焦点の大学の名前)
+class _TenPainter extends CustomPainter {
+  final _TenZu zu;
+  final TextScaler scaler;
+
+  _TenPainter(this.zu, this.scaler);
+
+  static const TextStyle _memoriStyle = TextStyle(color: Colors.white38, fontSize: 10);
+  static const TextStyle _seedStyle = TextStyle(color: Colors.amberAccent, fontSize: 10);
+  static const TextStyle _shotenStyle = TextStyle(
+    color: _jibunIro,
+    fontSize: 13,
+    fontWeight: FontWeight.bold,
+  );
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // 道の帯
+    canvas.drawRRect(
+      RRect.fromLTRBR(zu.obiHidari, zu.ue - 10, zu.obiMigi, zu.shita + 10, const Radius.circular(8)),
+      Paint()..color = _michiIro,
+    );
+    // 目盛り(線は道の帯の左から右端まで、文は帯の左に右寄せ)
+    final Paint senPaint = Paint()
+      ..color = Colors.white12
+      ..strokeWidth = 1;
+    for (final ({double y, String moji}) m in zu.memori) {
+      canvas.drawLine(Offset(zu.obiHidari - 2, m.y), Offset(size.width, m.y), senPaint);
+      final TextPainter tp = TextPainter(
+        text: TextSpan(text: m.moji, style: _memoriStyle),
+        textDirection: TextDirection.ltr,
+        textScaler: scaler,
+      )..layout();
+      tp.paint(canvas, Offset(math.max(0, zu.obiHidari - 6 - tp.width), m.y - tp.height / 2));
+    }
+    // シード権ライン(点線と、右端の上に小さく「シード権ライン」)
+    final double? seedY = zu.seedY;
+    if (seedY != null) {
+      final Paint p = Paint()
+        ..color = Colors.amberAccent
+        ..strokeWidth = 1;
+      _tensenDeHiku(
+        canvas,
+        Path()
+          ..moveTo(zu.obiHidari - 2, seedY)
+          ..lineTo(size.width, seedY),
+        p,
+      );
+      final TextPainter tp = TextPainter(
+        text: const TextSpan(text: 'シード権ライン', style: _seedStyle),
+        textDirection: TextDirection.ltr,
+        textScaler: scaler,
+      )..layout();
+      tp.paint(canvas, Offset(math.max(0, size.width - tp.width), seedY - tp.height - 1));
+    }
+    // 点(焦点の大学は最後に描いて、上に重ねる)
+    for (int k = 0; k < zu.ten.length; k++) {
+      if (k != zu.shoten) _tenHiku(canvas, zu.ten[k], false);
+    }
+    if (zu.shoten >= 0 && zu.shoten < zu.ten.length) {
+      final _Ten t = zu.ten[zu.shoten];
+      _tenHiku(canvas, t, true);
+      // 焦点の大学の名前・順位(点から文まで細い線でつなぐ)
+      if (zu.shotenMoji.isNotEmpty) {
+        final double haba = math.max(40.0, size.width - zu.shotenMojiX);
+        final TextPainter tp = TextPainter(
+          text: TextSpan(text: zu.shotenMoji, style: _shotenStyle),
+          textDirection: TextDirection.ltr,
+          textScaler: scaler,
+          maxLines: 1,
+          ellipsis: '…',
+        )..layout(maxWidth: haba);
+        if (zu.shotenMojiX - 4 > t.x + t.hankei) {
+          canvas.drawLine(
+            Offset(t.x + t.hankei, t.y),
+            Offset(zu.shotenMojiX - 4, t.y),
+            Paint()
+              ..color = _jibunIro.withOpacity(0.6)
+              ..strokeWidth = 1,
+          );
+        }
+        tp.paint(canvas, Offset(zu.shotenMojiX, t.y - tp.height / 2));
+      }
+    }
+  }
+
+  /// 点1つ(学連選抜は点線の丸。焦点のときは塗る)
+  void _tenHiku(Canvas canvas, _Ten t, bool shoten) {
+    final Offset c = Offset(t.x, t.y);
+    if (t.tensen && !shoten) {
+      final Paint p = Paint()
+        ..color = t.iro
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5;
+      _tensenDeHiku(canvas, Path()..addOval(Rect.fromCircle(center: c, radius: t.hankei)), p);
+      return;
+    }
+    canvas.drawCircle(c, t.hankei, Paint()..color = t.iro);
+    if (shoten) {
+      // 焦点は黒い縁で、ほかの点と重なっても見分けられるように
+      canvas.drawCircle(
+        c,
+        t.hankei,
+        Paint()
+          ..color = Colors.black
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.5,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _TenPainter old) => !identical(old.zu, zu) || old.scaler != scaler;
 }
 
 /// 区間をまたいで同じ大学を見分ける印(大学id。学連選抜は-1。推移で使う。2.1.1)
@@ -1581,6 +1761,9 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
   /// 次に描いたあとに、焦点の大学まで道を動かすか(コマ・焦点・区間・倍率を変えたときと、推移を開いたとき)
   bool _suiiOuYoyaku = false;
 
+  /// 推移の点の表示(suiiTen)の、区間(並びの番号)ごとの縮尺を決める広がり(m。_tenHaba で一度だけ計算する)
+  final Map<int, double> _tenHabaHikae = {};
+
   /// 直前に描いた推移の道の、並べ方に使った幅・文字の大きさ・倍率と、道の部分の中の道の上端の高さ
   /// (コマを変えたときに、次のコマの焦点の大学の高さを先に計算して道を先に動かすため。_suiiSakiniOu。2.1.1)
   double? _suiiMaeHaba;
@@ -1885,6 +2068,220 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
       return -1;
     }
     return r.narabi.indexWhere((x) => _daigakuKagi(x) == _shotenKagi);
+  }
+
+  /// 推移の点の表示(suiiTen)で、区間[i](並びの番号)の縮尺を決める広がり(m)。その区間の6つの図(0〜5コマ目)の
+  /// 先頭から最後尾までの距離の一番大きいもの(学連選抜も入れる。小さすぎるときは50m)
+  double _tenHaba(_IchiKankei b, int i) {
+    return _tenHabaHikae.putIfAbsent(i, () {
+      double saidai = 0;
+      for (int k = 0; k <= _suiiKomaSuu; k++) {
+        final _IchiKukan r = _suiiZu(b, i, k / _suiiKomaSuu);
+        if (r.narabi.isEmpty) continue;
+        double hayai = r.narabi.first.ruikei;
+        double osoi = r.narabi.first.ruikei;
+        for (final _IchiDaigaku x in r.narabi) {
+          hayai = math.min(hayai, x.ruikei);
+          osoi = math.max(osoi, x.ruikei);
+        }
+        saidai = math.max(saidai, (osoi - hayai) * r.hayasa);
+      }
+      return math.max(50.0, saidai);
+    });
+  }
+
+  /// 推移の点の表示の配置([w]・[h] は描く広さ、[haba] は区間の縮尺を決める広がり(m))
+  _TenZu _tenHaichi(_IchiKankei b, _IchiKukan r, double w, double h, TextScaler scaler, double haba) {
+    const double ue = 16; // 一番上の点の高さ(焦点の大きめの点と文が切れないように)
+    const double shitaYohaku = 16;
+    const double hankei = 6;
+    const double shotenHankei = 9;
+    const double kankaku = 15; // 横の列の間隔(点どうしが重ならない)
+    final double shita = math.max(ue + 1, h - shitaYohaku);
+    final double pxM = (shita - ue) / haba;
+    // 目盛りの間隔(6本以内になる、きりの良い距離)
+    double step = 10000;
+    for (final double s in const [50.0, 100.0, 200.0, 500.0, 1000.0, 2000.0, 5000.0, 10000.0]) {
+      if (haba / s <= 6) {
+        step = s;
+        break;
+      }
+    }
+    final List<({double y, String moji})> memori = [
+      (y: ue, moji: 'トップ'),
+      for (double m = step; m <= haba + 0.5; m += step) (y: ue + m * pxM, moji: _kyoriMoji(m)),
+    ];
+    // 道の帯は、目盛りの文の右
+    double mojiHaba = 0;
+    for (final ({double y, String moji}) m in memori) {
+      final TextPainter tp = TextPainter(
+        text: TextSpan(text: m.moji, style: _TenPainter._memoriStyle),
+        textDirection: TextDirection.ltr,
+        textScaler: scaler,
+      )..layout();
+      mojiHaba = math.max(mojiHaba, tp.width);
+    }
+    final double obiHidari = mojiHaba + 10;
+    final double retsu0 = obiHidari + 4 + shotenHankei;
+    // 点(先頭から順に置き、上の点と重なるときは右の列へ)
+    final double kijun = r.narabi.isEmpty
+        ? 0
+        : r.narabi.map((x) => x.ruikei).reduce((a, c) => math.min(a, c));
+    // 横に並べられる列の数(画面の6割まで。焦点の大学の文の場所を残す)。それより多く重なるときは(1区のスタートなど)、
+    // 次の段に折り返す(少し下にずらして並べる)
+    final int retsuMax = math.max(1, ((w * 0.6 - retsu0) / kankaku).floor() + 1);
+    final List<({double y, int retsu})> oita = [];
+    final List<_Ten> ten = [];
+    int shoten = -1;
+    for (int i = 0; i < r.narabi.length; i++) {
+      final _IchiDaigaku x = r.narabi[i];
+      final double y = math.min(shita, ue + (x.ruikei - kijun) * r.hayasa * pxM);
+      int retsu = 0;
+      while (oita.any((o) => o.retsu == retsu && (o.y - y).abs() < kankaku - 1)) {
+        retsu++;
+      }
+      oita.add((y: y, retsu: retsu));
+      final bool kore = i == _suiiShotenI;
+      if (kore) shoten = ten.length;
+      final bool jibun = x.jibun || (b.gakurenJibun && x.op);
+      ten.add(
+        _Ten(
+          i,
+          retsu0 + (retsu % retsuMax) * kankaku,
+          math.min(shita, y + (retsu ~/ retsuMax) * (kankaku - 2)),
+          kore ? shotenHankei : hankei,
+          kore ? _jibunIro : (jibun ? _iro : const Color(0xFFE8E8E8)),
+          x.op,
+        ),
+      );
+    }
+    // 焦点の大学の文は、一番右の列の右に出す(点と重ならないように。広すぎるときは画面の6割まで)
+    final int retsuSaidai = math.min(retsuMax - 1, oita.fold(0, (int m, o) => math.max(m, o.retsu)));
+    final double obiMigi = retsu0 + retsuSaidai * kankaku + shotenHankei + 4;
+    final double shotenMojiX = math.min(obiMigi + 12, w * 0.6);
+    String shotenMoji = '';
+    if (shoten >= 0) {
+      final _IchiDaigaku x = r.narabi[ten[shoten].i];
+      final String juni = x.op ? '${(x.soutouJuni ?? 0) + 1}位相当' : '${x.juni + 1}位';
+      final String hendou = _suiiHendouBubun(x).map((h) => h.moji).join();
+      shotenMoji = '${x.op ? '学連選抜' : x.mei} $juni${hendou.isEmpty ? '' : ' $hendou'}';
+    }
+    // シード権ライン(シード権の最後の順位の大学と、次の大学の点の位置が違うときだけ。同じ位置なら引かない)
+    double? seedY;
+    final int? seed = b.seed;
+    if (seed != null && seed >= 1) {
+      // 大学だけの順(ten と oita の番号)。前後の位置は、横の列を折り返す前の高さで比べる(同じタイムの集団を分けない)
+      final List<int> daigaku = [
+        for (int k = 0; k < ten.length; k++)
+          if (!r.narabi[ten[k].i].op) k,
+      ];
+      if (daigaku.length > seed) {
+        final int a = daigaku[seed - 1];
+        final int c = daigaku[seed];
+        if (oita[c].y - oita[a].y >= 1) seedY = (ten[a].y + ten[c].y) / 2;
+      }
+    }
+    return _TenZu(
+      ten: ten,
+      memori: memori,
+      seedY: seedY,
+      obiHidari: obiHidari,
+      obiMigi: obiMigi,
+      ue: ue,
+      shita: shita,
+      shoten: shoten,
+      shotenMoji: shotenMoji,
+      shotenMojiX: shotenMojiX,
+    );
+  }
+
+  /// 推移の点の表示(suiiTen。2.1.1)。トップから最後尾までを、区間ごとに決めた縮尺で1つの画面に収める
+  /// (道はスクロールしない。文字を大きくしたときは、上の説明の文が増えたぶん図が低くなる)
+  Widget _buildTen(BuildContext context, _IchiKankei b, _IchiKukan r) {
+    const TextStyle setsumei = TextStyle(color: Colors.white70, fontSize: 12, height: 1.5);
+    final double haba = _tenHaba(b, _suiiKukan);
+    // トップから最後尾まで(学連選抜は除く)
+    final List<_IchiDaigaku> daigaku = [
+      for (final _IchiDaigaku x in r.narabi)
+        if (!x.op) x,
+    ];
+    String hirogari = '';
+    if (daigaku.length >= 2) {
+      final int s = saByou(daigaku.last.ruikei, daigaku.first.ruikei);
+      final double m = (daigaku.last.ruikei - daigaku.first.ruikei) * r.hayasa;
+      hirogari = s <= 0
+          ? 'トップから最後尾まで 並走'
+          : 'トップから最後尾まで ${_kyoriMoji(m)}(${saMoji(s)})';
+    }
+    // 焦点でない自分の大学がいれば、水色の説明を出す
+    bool jibunHoka = false;
+    for (int i = 0; i < r.narabi.length; i++) {
+      final _IchiDaigaku x = r.narabi[i];
+      if ((x.jibun || (b.gakurenJibun && x.op)) && i != _suiiShotenI) jibunHoka = true;
+    }
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('中継所ごとの位置関係を、区間を5つに分けてつないだコマ送りです。', style: setsumei),
+          if (r.kk == 0)
+            const Text('1区は、飛び出した選手と集団の記録をもとにした演出です。', style: setsumei),
+          Text(
+            'オレンジ: 焦点(点を押すと、その大学を追います)'
+            '${jibunHoka ? '　水色: あなたの大学' : ''}'
+            '${b.opAri ? '　点線の丸: 学連選抜' : ''}',
+            style: setsumei,
+          ),
+          if (hirogari.isNotEmpty)
+            Text(
+              hirogari,
+              style: const TextStyle(
+                color: HENSUU.textcolor,
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          const SizedBox(height: 6),
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final TextScaler scaler = MediaQuery.textScalerOf(context);
+                final _TenZu zu = _tenHaichi(
+                  b,
+                  r,
+                  constraints.maxWidth,
+                  constraints.maxHeight,
+                  scaler,
+                  haba,
+                );
+                return GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  // 押したところに一番近い点(22px以内)の大学に焦点を移す(点は小さいので、押せる範囲を広めにする)
+                  onTapUp: (TapUpDetails d) {
+                    _Ten? chikai;
+                    double kyori = 22;
+                    for (final _Ten t in zu.ten) {
+                      final double k = (Offset(t.x, t.y) - d.localPosition).distance;
+                      if (k <= kyori) {
+                        kyori = k;
+                        chikai = t;
+                      }
+                    }
+                    final _Ten? t = chikai;
+                    if (t != null) _suiiShotenErabu(r.narabi[t.i]);
+                  },
+                  child: CustomPaint(
+                    size: Size(constraints.maxWidth, constraints.maxHeight),
+                    painter: _TenPainter(zu, scaler),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   /// コマ・焦点・区間を変えたあと(setState のあと)に、次に描く図の焦点の大学の高さを先に計算して、
@@ -2841,6 +3238,9 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
                       // 通過順位速報・個人順位速報(2.0.8)。推移(2.1.1)は位置と同じく道を出す
                       if (_hyouji != 0 && _hyouji != 4)
                         Expanded(child: _buildSokuhou(r0))
+                      // 推移を点で見る形(suiiTen。2.1.1)は、道をスクロールせず、1つの画面に収める
+                      else if (suii && suiiTen)
+                        Expanded(child: _buildTen(context, b, r0))
                       else ...[
                         // 縦が長くなるので、右端につまんで動かせるスクロールバーを出す(2.1.0。
                         // デスクトップで自動のスクロールバーと二重にならないように、自動のほうは止める。
@@ -3278,36 +3678,39 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
                 () => setState(() => _suiiHayasaBan = (_suiiHayasaBan + 1) % _suiiKomaMs.length),
               ),
               _suiiShotenBotan(b, sr),
-              _komaBotan(
-                '−',
-                false,
-                dan > 0
-                    ? () => setState(() {
-                        _omakase = false;
-                        _dan = dan - 1;
-                        _suiiOuYoyaku = true;
-                      })
-                    : null,
-              ),
-              Text(
-                _bairitsuMei[dan],
-                style: const TextStyle(
-                  color: HENSUU.textcolor,
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
+              // 倍率(点の表示(suiiTen)は、区間ごとに縮尺を決めるので出さない)
+              if (!suiiTen) ...[
+                _komaBotan(
+                  '−',
+                  false,
+                  dan > 0
+                      ? () => setState(() {
+                          _omakase = false;
+                          _dan = dan - 1;
+                          _suiiOuYoyaku = true;
+                        })
+                      : null,
                 ),
-              ),
-              _komaBotan(
-                '＋',
-                false,
-                dan < _bairitsu.length - 1
-                    ? () => setState(() {
-                        _omakase = false;
-                        _dan = dan + 1;
-                        _suiiOuYoyaku = true;
-                      })
-                    : null,
-              ),
+                Text(
+                  _bairitsuMei[dan],
+                  style: const TextStyle(
+                    color: HENSUU.textcolor,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                _komaBotan(
+                  '＋',
+                  false,
+                  dan < _bairitsu.length - 1
+                      ? () => setState(() {
+                          _omakase = false;
+                          _dan = dan + 1;
+                          _suiiOuYoyaku = true;
+                        })
+                      : null,
+                ),
+              ],
             ],
           ),
           const SizedBox(height: 8),

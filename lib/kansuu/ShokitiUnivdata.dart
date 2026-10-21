@@ -3,6 +3,7 @@ import 'package:ekiden/constants.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/kansuu/meisei_rireki.dart'; // 名声の履歴(1.8.8)
+import 'package:ekiden/kansuu/kingin_rireki.dart'; // 金銀の内訳(2.1.1)
 import 'package:ekiden/kansuu/rekidai_kiroku.dart'; // 歴代10位までの記録(1.8.8)
 import 'package:ekiden/kansuu/koukou.dart'; // 高校の大会の記録と優勝回数(1.9.5)
 
@@ -53,6 +54,9 @@ Future<void> ShokitiUnivdata(
   if (meiseiNokosu == false) {
     await meiseiRirekiZenbuKesu();
   }
+  // 金銀の内訳は、名声の履歴を残すときも金銀の行だけ消し、年度初めを0として書く
+  // (金銀はどちらのリセットでも0に戻るため。2.1.1。kingin_rireki.dart)
+  await kinginRirekiReset();
   // 高校の大会の記録と優勝回数は、どちらの新しいゲームでも消す(選手と年を作り直すため。1.9.5)
   await koukouKirokuZenbuKesu();
   for (final entry in univBox.toMap().entries) {

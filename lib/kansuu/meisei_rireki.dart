@@ -20,6 +20,8 @@ import 'package:ekiden/senshu_data.dart';
 // ・新規ゲーム開始時は消す。名声と育成力を維持したリセットのときは、名声と一緒に残す
 // ・年度の初めに全大学に入る1など、ここに記録しない分は、表示のときに
 //   その年の名声(meisei_yeargoto)との差として出す(Modal_meiseiRireki.dart)
+// ・2.1.1から、同じ文字に金銀の内訳の行(頭が「金銀」。kingin_rireki.dart)も置く。
+//   名声の履歴を読むところは、頭が数字の行だけを読むので混ざらない
 // ------------------------------------------------------------
 
 /// 名声の履歴を置く大学idの先頭(ここから名声の保存年数ぶん使う)
@@ -45,6 +47,13 @@ UnivData? _slot(int nenmae) {
   }
   return null;
 }
+
+/// [nenmae]年前(0が今年度)の履歴の置き場所(金銀の内訳も同じ文字に置く。2.1.1。kingin_rireki.dart)
+UnivData? rirekiOkiba(int nenmae) => _slot(nenmae);
+
+/// 履歴の置き場所[s]の文字(見出しのない文字列(初期値の「短縮」など)は、見出しだけにしたもの。2.1.1)
+String rirekiMoji(UnivData s) =>
+    s.name_tanshuku.startsWith(_midashi) ? s.name_tanshuku : '$_midashi\n';
 
 /// 今年度の名声の履歴に1件足して保存する
 /// ([naiyou]のタブと改行は空白にする)

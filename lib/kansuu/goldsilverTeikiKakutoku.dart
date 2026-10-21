@@ -4,6 +4,7 @@ import 'package:ekiden/univ_data.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/kansuu/kingin_wariai.dart'; // 難易度ごとの金銀支給量の割合(1.9.1)
+import 'package:ekiden/kansuu/kingin_rireki.dart'; // 金銀の内訳(2.1.1)
 // import 'dart:math'; // Int.random の代わりに Math.Random を使う場合、必要になるかもしれません。
 
 /// 大学のレース成績と風フラグに基づいて、金ボールまたは銀ボールの獲得数を計算し更新します。
@@ -189,6 +190,9 @@ Future<void> goldsilverTeikiKakutoku(
   kakutokusuu = kinginWariaiKakeru(kakutokusuu, kantoku!, kazeflag);
   kakutokusuu *= kantoku.yobiint2[12];
 
+  // 金銀の内訳に書くため、支給の前の保有を控える(2.1.1)
+  final int maeKin = ghensuu.goldenballsuu;
+  final int maeGin = ghensuu.silverballsuu;
   // 10%の確率で金ボール、90%の確率で銀ボール
   // DartのRandom().nextInt(100) は0から99の整数を返す
   final random = Random();
@@ -208,4 +212,11 @@ Future<void> goldsilverTeikiKakutoku(
   }
   // Ghensuuオブジェクトの変更をHiveに保存
   await ghensuu.save();
+  await kinginRirekiJibun(
+    ghensuu,
+    maeKin: maeKin,
+    maeGin: maeGin,
+    shurui: kinginUketotta,
+    naiyou: '大学理事会からの支援',
+  );
 }

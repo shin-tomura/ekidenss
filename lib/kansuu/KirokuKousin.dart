@@ -19,6 +19,7 @@ import 'package:ekiden/kansuu/goldsilver_com.dart';
 import 'package:ekiden/kansuu/gakuren_kantoku.dart'; // 学連選抜の監督・目標順位(1.8.4)
 import 'package:ekiden/kansuu/gakuren_text.dart'; // 学連選抜の結果(順位相当。1.8.4)
 import 'package:ekiden/kansuu/meisei_rireki.dart'; // 名声の履歴(1.8.8)
+import 'package:ekiden/kansuu/kingin_rireki.dart'; // 金銀の内訳(2.1.1)
 import 'package:ekiden/kansuu/meisei_kotei.dart'
     show meiseiGoukeiNokosu; // コンピュータの大学の名声の固定(2.0.3)
 import 'package:ekiden/kansuu/rekidai_kiroku.dart'; // 歴代10位までの記録(1.8.8)
@@ -670,6 +671,9 @@ Future<void> kirokuKousin({
           // 難易度ごとの割合(1.9.1。kingin_wariai.dart)。優勝の2倍と金銀支給量倍率はこのあと掛ける
           r = kinginWariaiKakeru(r, kantoku, gh[0].kazeflag);
 
+          // 金銀の内訳に書くため、支給の前の保有を控える(2.1.1)
+          final int maeKin = gh[0].goldenballsuu;
+          final int maeGin = gh[0].silverballsuu;
           // Dartでは `Random()` を使用
           //final random = Random();
           if (random.nextInt(100) < 10) {
@@ -704,6 +708,13 @@ Future<void> kirokuKousin({
             gh[0].silverballsuu = 9999;
           }
           await gh[0].save(); // gh[0] の変更を保存
+          await kinginRirekiJibun(
+            gh[0],
+            maeKin: maeKin,
+            maeGin: maeGin,
+            shurui: kinginUketotta,
+            naiyou: '目標順位クリア(${kinginTaikaiMei(racebangou)})',
+          );
         }
       }
     } else if (racebangou == 2) {
@@ -1518,6 +1529,9 @@ Future<void> kirokuKousin({
           sortedunivdata[gh[0].MYunivid].taikaientryflag[2] == 0 &&
           sortedunivdata[gh[0].MYunivid].juni_race[3][0] >= 15 &&
           sortedunivdata[gh[0].MYunivid].juni_race[4][0] >= 15) {
+        // 金銀の内訳に書くため、支援の前の保有を控える(2.1.1。受け取ったときの画面と同じ呼び方で書く)
+        final int maeKin = gh[0].goldenballsuu;
+        final int maeGin = gh[0].silverballsuu;
         if (Random().nextInt(100) < 100) {
           gh[0].last_goldenballkakutokusuu = 9;
           // gh[0].goldenballsuu += 0; // 0 を加算する意味がないため削除
@@ -1525,6 +1539,13 @@ Future<void> kirokuKousin({
           gh[0].silverballsuu += 20 * kantoku.yobiint2[12];
         }
         await gh[0].save(); // gh[0] の変更を保存
+        await kinginRirekiJibun(
+          gh[0],
+          maeKin: maeKin,
+          maeGin: maeGin,
+          shurui: kinginUketotta,
+          naiyou: '大学当局からの支援',
+        );
       }
     }
   }
@@ -2155,6 +2176,9 @@ Future<void> kirokuKousin({
             r = kinginWariaiKakeru(r, kantoku, gh[0].kazeflag);
             rYuushou = kinginWariaiKakeru(rYuushou, kantoku, gh[0].kazeflag);
 
+            // 金銀の内訳に書くため、支給の前の保有を控える(2.1.1)
+            final int maeKin = gh[0].goldenballsuu;
+            final int maeGin = gh[0].silverballsuu;
             if (random.nextInt(100) < 10) {
               // 20%の確率
               if (random.nextInt(100) < 0) {
@@ -2189,6 +2213,13 @@ Future<void> kirokuKousin({
               gh[0].silverballsuu = 9999;
             }
             await gh[0].save(); // Hiveに保存
+            await kinginRirekiJibun(
+              gh[0],
+              maeKin: maeKin,
+              maeGin: maeGin,
+              shurui: kinginUketotta,
+              naiyou: '目標順位クリア(${kinginTaikaiMei(9)})',
+            );
           }
         }
       }
@@ -2625,6 +2656,9 @@ Future<void> _gakurenMokuhyouHoushuu({
   // 予選突破と同じく、難易度ごとの割合(1.9.1。kingin_wariai.dart)を掛ける
   final int ryou =
       kinginWariaiKakeru(10, kantoku, gh.kazeflag) * kantoku.yobiint2[12];
+  // 金銀の内訳に書くため、支給の前の保有を控える(2.1.1)
+  final int maeKin = gh.goldenballsuu;
+  final int maeGin = gh.silverballsuu;
   if (random.nextInt(100) < 10) {
     gh.last_goldenballkakutokusuu = ryou;
     gh.goldenballsuu += ryou;
@@ -2635,6 +2669,13 @@ Future<void> _gakurenMokuhyouHoushuu({
   if (gh.goldenballsuu > 9999) gh.goldenballsuu = 9999;
   if (gh.silverballsuu > 9999) gh.silverballsuu = 9999;
   await gh.save();
+  await kinginRirekiJibun(
+    gh,
+    maeKin: maeKin,
+    maeGin: maeGin,
+    shurui: kinginUketotta,
+    naiyou: '学連選抜の目標順位クリア',
+  );
 }
 
 // SenshuDataのリストをtime_taikai_totalでソートするための拡張メソッド

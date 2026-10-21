@@ -31,6 +31,7 @@ import 'package:ekiden/screens/kiji_hyou_view.dart'; // 表の部品(1.9.8)
 import 'package:ekiden/screens/Modal_nameedit.dart'
     show ModalSenshuNameHenkou_modalsenshugamen; // 他大学の選手の名前の変更(箱庭モード。1.9.9)
 import 'package:ekiden/kansuu/shushou.dart'; // 主将(2.0.1)
+import 'package:ekiden/kansuu/kingin_rireki.dart'; // 金銀の内訳(2.1.1)
 import 'package:ekiden/screens/setsumei_mado.dart'; // 主将の説明のリンク(2.0.1)
 
 String _getCombinedDifficultyText(KantokuData kantoku, Ghensuu currentGhensuu) {
@@ -239,12 +240,22 @@ class _ModalBallExchangeState extends State<ModalBallExchange> {
                                 _goldErrorText = '所持金ボールが不足しています';
                               });
                             } else {
+                              // 金銀の内訳に書くため、交換の前の保有を控える(2.1.1)
+                              final int maeKin = currentGhensuu.goldenballsuu;
+                              final int maeGin = currentGhensuu.silverballsuu;
                               setState(() {
                                 _goldErrorText = '';
                                 currentGhensuu.goldenballsuu -= amount;
                                 currentGhensuu.silverballsuu += amount * 2;
                               });
                               await currentGhensuu.save();
+                              await kinginRirekiJibun(
+                                currentGhensuu,
+                                maeKin: maeKin,
+                                maeGin: maeGin,
+                                shurui: kinginKoukan,
+                                naiyou: '金を銀に交換',
+                              );
                             }
                           },
                           style: ElevatedButton.styleFrom(
@@ -325,12 +336,22 @@ class _ModalBallExchangeState extends State<ModalBallExchange> {
                                 _silverErrorText = '10の倍数を入力してください';
                               });
                             } else {
+                              // 金銀の内訳に書くため、交換の前の保有を控える(2.1.1)
+                              final int maeKin = currentGhensuu.goldenballsuu;
+                              final int maeGin = currentGhensuu.silverballsuu;
                               setState(() {
                                 _silverErrorText = '';
                                 currentGhensuu.silverballsuu -= amount;
                                 currentGhensuu.goldenballsuu += amount ~/ 10;
                               });
                               await currentGhensuu.save();
+                              await kinginRirekiJibun(
+                                currentGhensuu,
+                                maeKin: maeKin,
+                                maeGin: maeGin,
+                                shurui: kinginKoukan,
+                                naiyou: '銀を金に交換',
+                              );
                             }
                           },
                           style: ElevatedButton.styleFrom(

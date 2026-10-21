@@ -508,7 +508,7 @@ List<ResetKoumoku> resetIchiran() {
     ], yomikomiNokosu: true, qr: ResetQr.imanomama),
     // ---- ゲームの進み具合 ----
     ResetKoumoku('選手・OB(アルバム)・理事・監督とコーチ・主将', 'ゲームの進み具合', ResetBunrui.susumi, [], qr: ResetQr.imanomama),
-    ResetKoumoku('大会・大学・学内の記録、年月日、金銀', 'ゲームの進み具合', ResetBunrui.susumi, [], qr: ResetQr.imanomama),
+    ResetKoumoku('大会・大学・学内の記録、年月日、金銀・金銀の内訳', 'ゲームの進み具合', ResetBunrui.susumi, [], qr: ResetQr.imanomama),
     ResetKoumoku('強化プロジェクトの実行中・スカウトの記録など', 'ゲームの進み具合', ResetBunrui.susumi, [], qr: ResetQr.imanomama),
     ResetKoumoku('高校の大会の記録と回数', 'ゲームの進み具合', ResetBunrui.susumi, [],
         // 今の高校3年生の世代の回(2.0.4。7月下旬に計算し、次の4月の新入生はこの世代から作る。koukou.dart)

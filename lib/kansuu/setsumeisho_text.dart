@@ -104,6 +104,7 @@ List<SetsumeishoGroup> setsumeishoGroupList() {
       SetsumeishoKoumoku(_panel(), youten: _youtenPanel),
       const SetsumeishoKoumoku(_konkiMemo),
       const SetsumeishoKoumoku(_kukanTekisei),
+      const SetsumeishoKoumoku(_kinginUchiwake),
       const SetsumeishoKoumoku(_gakunaiKiroku, youten: _youtenGakunaiKiroku),
     ]),
     // 遊ぶのに知らなくてもよい読み物(2.1.1)
@@ -383,6 +384,15 @@ const ShiyouSetsu _kukanTekisei = ShiyouSetsu('区間適性の見立て', [
   '・「区間ごと」は区間の距離に合う種目の持ちタイム順に、「選手ごと」は区間の順に並べます。',
   '・記録から見た目安なので、実際の走りは調子などでも変わります。',
   '・言葉はコーチや監督が言いますが、誰が言っても見立ては同じです。',
+]);
+
+// 金銀の内訳(2.1.1。Modal_kinginRireki.dart・kingin_rireki.dart)
+const ShiyouSetsu _kinginUchiwake = ShiyouSetsu('金銀の内訳', [
+  '・大学画面の「金銀の内訳」で、表示している大学の金銀の出入りを、年度ごとに過去10年分見られます。',
+  '・受け取った金銀、特訓で使った金銀、交換と、年度初めの保有を出します。',
+  '　・自分の大学の特訓は、日ごと・金銀ごとにまとめて出します。',
+  '　・コンピュータの大学は、夏合宿でまとめて使った分を出します。',
+  '・記録を始める前の分などは、「記録のない増減」として出します。',
 ]);
 
 const ShiyouSetsu _seiseiAI = ShiyouSetsu('生成AIと遊ぶ(テキストのコピー)', [

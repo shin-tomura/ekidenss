@@ -48,6 +48,7 @@ import 'package:ekiden/screens/Modal_reset_IkuseiryokuMeiseiIji.dart'
 import 'package:ekiden/screens/meisei_yokonarabi_settei.dart'
     show meiseiYokonarabiSetteiHiraku; // 名声の横並び設定を開く(2.0.3。入学時名声影響度設定の画面の案内から)
 import 'package:ekiden/screens/setsumei_mado.dart'; // 主将・母校パイプの説明のリンク(2.0.1)
+import 'package:ekiden/screens/Modal_kinginRireki.dart'; // 金銀の内訳(2.1.1)
 import 'package:ekiden/kansuu/mokuhyou_kimekata.dart'
     show
         mokuhyouKimekataKoujoushin,
@@ -4741,6 +4742,19 @@ class _UnivScreenState extends State<UnivScreen> {
                             "全大学名声一覧",
                             style: TextStyle(
                               color: const Color.fromARGB(255, 0, 255, 0),
+                              decoration: TextDecoration.underline,
+                              decorationColor: HENSUU.textcolor,
+                            ),
+                          ),
+                        ),
+                        // 金銀の内訳(2.1.1。表示している大学の分。Modal_kinginRireki.dart)
+                        // (上の「金○ 銀○」はヘッダーの中で横に余裕がないので、リンクの列に1行で置く)
+                        TextButton(
+                          onPressed: () => kinginRirekiHiraku(context, currentUnivData.id),
+                          child: const Text(
+                            "金銀の内訳",
+                            style: TextStyle(
+                              color: Color.fromARGB(255, 0, 255, 0),
                               decoration: TextDecoration.underline,
                               decorationColor: HENSUU.textcolor,
                             ),

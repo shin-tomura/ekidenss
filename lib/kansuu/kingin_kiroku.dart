@@ -1,6 +1,7 @@
 import 'package:ekiden/senshu_data.dart';
 import 'package:ekiden/kansuu/kiji/kiji_kihon.dart' show KijiHyou; // 選手画面などの表
 import 'package:ekiden/kansuu/konki_memo.dart'; // 同じ欄に入れる今季タイム一覧表のメモ(2.1.0)
+import 'package:ekiden/kansuu/kingin_rireki.dart' show kinginRirekiTokkun; // 金銀の内訳(2.1.1)
 
 // ------------------------------------------------------------
 // 金銀の記録(1.9.9)
@@ -141,7 +142,12 @@ String _kaku(Map<int, Map<int, int>> kiroku) {
 
 /// 選手[s]の今の学年に、能力[bangou]を金銀で[kaisuu]回(1回+10)上げたことを記録する
 /// (選手の保存は呼び出し側で行う。学年が1〜4でなければ記録しない)
-void kinginKirokuTsuika(SenshuData s, int bangou, {int kaisuu = 1}) {
+/// [rireki] 自分の大学の特訓として、金銀の内訳にも書くか(2.1.1。プレイヤーの金特訓・銀特訓は
+/// どれもここを通るので、ここで書く。コンピュータの大学(kinginKirokuSabun)は夏合宿でまとめて書くのでfalse)
+void kinginKirokuTsuika(SenshuData s, int bangou, {int kaisuu = 1, bool rireki = true}) {
+  if (kaisuu > 0 && rireki && kinginNouryokuMei(bangou).isNotEmpty) {
+    kinginRirekiTokkun(kin: kinginKinNouryoku(bangou), kaisuu: kaisuu);
+  }
   if (s.gakunen < 1 || s.gakunen > 4 || kaisuu <= 0) return;
   if (kinginNouryokuMei(bangou).isEmpty) return;
   final Map<int, Map<int, int>> kiroku = kinginKirokuYomu(s.name_tanshuku);
@@ -157,7 +163,7 @@ void kinginKirokuSabun(SenshuData s, List<int> mae) {
   final List<int> ato = kinginNouryokuAtai(s);
   for (int b = 0; b < ato.length && b < mae.length; b++) {
     final int kaisuu = (ato[b] - mae[b]) ~/ 10;
-    if (kaisuu > 0) kinginKirokuTsuika(s, b, kaisuu: kaisuu);
+    if (kaisuu > 0) kinginKirokuTsuika(s, b, kaisuu: kaisuu, rireki: false);
   }
 }
 

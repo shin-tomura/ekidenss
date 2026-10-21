@@ -7,6 +7,7 @@ import 'package:ekiden/senshu_data.dart';
 import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/kansuu/kingin_wariai.dart'; // 難易度ごとの金銀支給量の割合(1.9.1)
 import 'package:ekiden/kansuu/kingin_kiroku.dart'; // 金銀の記録(1.9.9)
+import 'package:ekiden/kansuu/kingin_rireki.dart'; // 金銀の内訳(2.1.1)
 import 'package:hive_flutter/hive_flutter.dart';
 
 // ------------------------------------------------------------
@@ -53,6 +54,8 @@ import 'package:hive_flutter/hive_flutter.dart';
 //   メニュー外の能力(カリスマ・安定感を除く7つのうち上限でないもの)から
 //   ランダムに1つずつ上げる
 // ・それでも使い切れない分は捨てる。銀の10未満の端数は翌年に持ち越す
+// ・金銀の内訳(2.1.1。kingin_rireki.dart)に、支給(支給がなかったときは書かない)と、夏合宿の使い道
+//   (大学ごとのまとめ)を書く。処理ごとに全大学の行をまとめて、保存は1回にする
 // ------------------------------------------------------------
 
 /// KantokuData.yobiint2 の使用番号: コンピュータ大学の金銀使用フラグ(0=ON(初期値)、1=OFF)
@@ -365,6 +368,7 @@ Future<void> comGoldSilverTeiki({
     return;
   }
   final random = Random();
+  final List<KinginRirekiGyou> rireki = []; // 金銀の内訳(2.1.1)
   for (final univ in sortedUnivData) {
     if (univ.id == gh[0].MYunivid) continue;
     final int level = comGoldSilverLevel(kantoku, univ.id);
@@ -390,9 +394,12 @@ Future<void> comGoldSilverTeiki({
       eventLabel: '春の定期支給',
       ryou: ryou,
       random: random,
+      rireki: rireki,
+      rirekiNaiyou: '大学理事会からの支援',
     );
   }
   await kantoku.save();
+  await kinginRirekiTsuika(rireki);
 }
 
 /// 目標順位達成分(KirokuKousinから呼ぶ)
@@ -410,6 +417,7 @@ Future<void> comGoldSilverMokuhyouTassei({
     return;
   }
   final random = Random();
+  final List<KinginRirekiGyou> rireki = []; // 金銀の内訳(2.1.1)
   for (final univ in sortedUnivData) {
     if (univ.id == gh[0].MYunivid) continue;
     if (mokuhyouBangou != 9 &&
@@ -447,13 +455,17 @@ Future<void> comGoldSilverMokuhyouTassei({
       eventLabel: '目標達成(${_taikaiMei(mokuhyouBangou)})',
       ryou: ryou,
       random: random,
+      rireki: rireki,
+      rirekiNaiyou: '目標順位クリア(${kinginTaikaiMei(mokuhyouBangou)})',
     );
   }
   await kantoku.save();
+  await kinginRirekiTsuika(rireki);
 }
 
 /// 1大学分の金銀の獲得(10%で金、90%で銀)
 /// すぐには使わず、保有量に加える(保存は呼び出し側で行う)
+/// [rireki] 金銀の内訳の行を足す並び(2.1.1。書くのは呼び出し側でまとめて)、[rirekiNaiyou] その行の内容
 void _comKinGinKakutoku({
   required KantokuData kantoku,
   required int univid,
@@ -461,9 +473,20 @@ void _comKinGinKakutoku({
   required String eventLabel, // デバッグログ用
   required int ryou,
   required Random random,
+  required List<KinginRirekiGyou> rireki,
+  required String rirekiNaiyou,
 }) {
   if (ryou <= 0) return;
   final bool kin = random.nextInt(100) < 10;
+  rireki.add(
+    kinginRirekiKyou(
+      univid: univid,
+      shurui: kinginUketotta,
+      kin: kin ? ryou : 0,
+      gin: kin ? 0 : ryou,
+      naiyou: rirekiNaiyou,
+    ),
+  );
   if (kin) {
     _kinHoyuuSettei(
       kantoku.yobiint2,
@@ -500,6 +523,7 @@ Future<void> comGoldSilverNatsuGasshuku({
   if (kantoku == null) return;
   final bool on = isComGoldSilverOn(kantoku);
   final random = Random();
+  final List<KinginRirekiGyou> rireki = []; // 金銀の内訳(2.1.1)
   for (final univ in sortedUnivData) {
     final int kin = comKinHoyuu(kantoku, univ.id);
     final int gin = comGinHoyuu(kantoku, univ.id);
@@ -507,6 +531,18 @@ Future<void> comGoldSilverNatsuGasshuku({
     if (!on || univ.id == gh[0].MYunivid) {
       _kinHoyuuSettei(kantoku.yobiint2, univ.id, 0);
       _ginHoyuuSettei(kantoku.yobiint2, univ.id, 0);
+      // 金銀の内訳には、オフで0にした分だけ書く(プレイヤーの大学の内訳はプレイヤーの金銀なので書かない)
+      if (!on && univ.id != gh[0].MYunivid) {
+        rireki.add(
+          kinginRirekiKyou(
+            univid: univ.id,
+            shurui: kinginSonohoka,
+            kin: -kin,
+            gin: -gin,
+            naiyou: 'コンピュータの大学の金銀の使用がオフのため、使わずに0にした',
+          ),
+        );
+      }
       if (kDebugMode) {
         print(
           '[COM金銀] 夏合宿 ${univ.name} 保有 金$kin 銀$gin → '
@@ -526,11 +562,13 @@ Future<void> comGoldSilverNatsuGasshuku({
       ginHoushin: comGinHoushin(kantoku, univ.id),
       sortedSenshuData: sortedSenshuData,
       random: random,
+      rireki: rireki,
     );
     _kinHoyuuSettei(kantoku.yobiint2, univ.id, mochikoshi[0]);
     _ginHoyuuSettei(kantoku.yobiint2, univ.id, mochikoshi[1]);
   }
   await kantoku.save();
+  await kinginRirekiTsuika(rireki);
 }
 
 /// デバッグログ用の大会名
@@ -711,6 +749,7 @@ Future<List<int>> _comKinGinShiyou({
   required int ginHoushin, // 銀の使い道(0個人の練習メニュー通り、1〜5大学方針)
   required List<SenshuData> sortedSenshuData,
   required Random random,
+  required List<KinginRirekiGyou> rireki, // 金銀の内訳の行を足す並び(2.1.1)
 }) async {
   final int kinKaisuu = kinRyou ~/ 10;
   final int kinHasuu = kinRyou % 10; // 金の10未満の端数は金のまま持ち越す
@@ -795,6 +834,52 @@ Future<List<int>> _comKinGinShiyou({
   }
   for (final s in henkouari) {
     await s.save();
+  }
+
+  // 金銀の内訳(2.1.1)。大学ごとのまとめ(誰のどの能力に使ったかは金銀の記録(kingin_kiroku.dart)にある)
+  // 金: 保有 − 金特訓 − 交換 = 端数、銀: 保有 + 交換で得た分 − 銀特訓 − 使い切れなかった分 = 端数
+  if (kinTsukatta > 0) {
+    rireki.add(
+      kinginRirekiKyou(
+        univid: univid,
+        shurui: kinginTsukatta,
+        kin: -10 * kinTsukatta,
+        naiyou: '夏合宿 金特訓 $kinTsukatta回',
+      ),
+    );
+  }
+  if (koukanKin > 0) {
+    rireki.add(
+      kinginRirekiKyou(
+        univid: univid,
+        shurui: kinginKoukan,
+        kin: -koukanKin,
+        gin: koukanKin * 2,
+        naiyou: '使い切れなかった金を銀に交換',
+      ),
+    );
+  }
+  final int ginShiyou = ginTsukatta + menugaiTsukatta;
+  if (ginShiyou > 0) {
+    rireki.add(
+      kinginRirekiKyou(
+        univid: univid,
+        shurui: kinginTsukatta,
+        gin: -10 * ginShiyou,
+        naiyou: '夏合宿 銀特訓 $ginShiyou回${menugaiTsukatta > 0 ? '(うちメニュー外$menugaiTsukatta回)' : ''}',
+      ),
+    );
+  }
+  final int sute = (ginKaisuu - ginShiyou) * 10;
+  if (sute > 0) {
+    rireki.add(
+      kinginRirekiKyou(
+        univid: univid,
+        shurui: kinginSonohoka,
+        gin: -sute,
+        naiyou: '使い切れなかった銀',
+      ),
+    );
   }
 
   // デバッグ実行時のみ、VS Codeのデバッグコンソールに使用結果を出す

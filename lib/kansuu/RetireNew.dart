@@ -12,6 +12,7 @@ import 'package:ekiden/kansuu/GakunenZurasi.dart';
 import 'package:ekiden/kansuu/ShozokusakiKettei_By_Univmeisei.dart';
 import 'package:ekiden/kansuu/SenshuShokiti.dart';
 import 'package:ekiden/kansuu/meisei_rireki.dart'; // 名声の履歴(1.8.8)
+import 'package:ekiden/kansuu/kingin_rireki.dart'; // 金銀の内訳(2.1.1)
 import 'package:ekiden/kansuu/meisei_kotei.dart'
     show meiseiGoukeiNokosu; // コンピュータの大学の名声の固定(2.0.3)
 import 'package:ekiden/kansuu/koukou.dart'; // 出身校と高校時代の実績(1.9.5)
@@ -789,6 +790,9 @@ Future<void> RetireNew({
   }
   // 名声の履歴も、年ごとの名声と同じように1年ずつずらす(1.8.8)
   await meiseiRirekiNenKawari();
+  // 金銀の内訳の年度初めの保有(2.1.1。名声の履歴と同じ文字に書くので、ずらしたあと。
+  // 春の支援はこのあとなので、支援の前の保有になる)
+  await kinginRirekiNendoHajime();
 
   // --- 名声順位更新 ---
   // sortedByは新しいリストを返すため、元のリストを直接変更する前にコピーを作成

@@ -20,6 +20,7 @@ import 'package:ekiden/kansuu/ShoriGuard.dart';
 import 'package:ekiden/screens/ai_copy_matome.dart'; // 生成AIに渡すテキスト(1.8.3)
 import 'package:ekiden/kansuu/ikku_pace.dart'; // 1区の集団のペース(1.9.2)
 import 'package:ekiden/screens/ikku_pace_box.dart'; // 1区のペース予想の枠(1.9.2)
+import 'package:ekiden/screens/Modal_kukanTekisei.dart'; // 区間適性の見立て(2.1.1)
 
 // --- 当日変更画面ウィジェット ---
 
@@ -138,6 +139,27 @@ class _ToujitsuHenkouScreenState extends State<ToujitsuHenkouScreen> {
       changeMap = {};
       debugPrint('データの初期化中にエラーが発生しました: $e');
     }
+  }
+
+  /// 区間適性の見立てに渡すもの(2.1.1。変えられる区間と、走る予定の選手・補欠だけ。
+  /// 画面で選んでいる変更を「出走予定」に入れる)
+  KukanTekiseiNaiyou _kukanTekiseiNaiyou() {
+    final int race = currentGhensuu.hyojiracebangou;
+    final Map<int, List<int>> kukanOf = {};
+    final Set<int> kukanSet = {};
+    for (final SenshuData e in myTeamSenshu) {
+      final int kk = e.entrykukan_race[race][e.gakunen - 1];
+      kukanSet.add(kk);
+      kukanOf.putIfAbsent(changeMap[e.id] ?? e.id, () => <int>[]).add(kk);
+    }
+    return KukanTekiseiNaiyou(
+      race: race,
+      senshu: [...myTeamSenshu, ...hokenSenshu],
+      kukanOf: kukanOf,
+      kukanList: kukanSet.toList()..sort(),
+      kukanKotoba: '出走予定',
+      hoketsuHyouji: true,
+    );
   }
 
   // ドロップダウンリストの変更時の処理 (変更なし)
@@ -761,6 +783,10 @@ class _ToujitsuHenkouScreenState extends State<ToujitsuHenkouScreen> {
                       ),
                     ),
                   ),
+                  // 区間適性の見立て(2.1.1。Modal_kukanTekisei.dart。予選は出さない)
+                  if (currentGhensuu.hyojiracebangou <= 2 ||
+                      currentGhensuu.hyojiracebangou == 5)
+                    KukanTekiseiLink(naiyou: _kukanTekiseiNaiyou),
 
                   TextButton(
                     onPressed: () {

@@ -28,6 +28,7 @@ import 'package:ekiden/screens/Modal_matrix3.dart';
 import 'package:ekiden/kansuu/custom_seigen.dart'; // カスタム駅伝の出場制限(1.9.1)
 import 'package:ekiden/screens/custom_seigen_parts.dart';
 import 'package:ekiden/screens/All0300.dart';
+import 'package:ekiden/screens/Modal_kukanTekisei.dart'; // 区間適性の見立て(2.1.1)
 import 'package:ekiden/screens/Modal_Taichoufuryou.dart';
 import 'package:ekiden/kansuu/ShoriGuard.dart';
 import 'package:ekiden/screens/kukan_haiti_button.dart'; // 今季タイム一覧表を開くボタン(1.9.9)
@@ -1212,6 +1213,29 @@ class _Mode0300ContentState extends State<Mode0300Content> {
 
       return gakunenComparison; // gakunen が異なる場合はその比較結果を返す
     });
+  }
+
+  /// 区間適性の見立てに渡すもの(2.1.1。画面で選んでいる区間を「エントリー中」として出す)
+  KukanTekiseiNaiyou _kukanTekiseiNaiyou(Ghensuu gh) {
+    final int race = gh.hyojiracebangou;
+    final List<SenshuData> narabi = _getGakunenJunUnivFilteredSenshuData(
+      _getUnivFilteredSenshuData(_senshuBox.values.toList(), gh.MYunivid),
+    );
+    final int kukansuu = gh.kukansuu_taikaigoto[race];
+    final Map<int, List<int>> kukanOf = {};
+    for (int kk = 0; kk < kukansuu && kk < gh.SenshuSelectedOption.length; kk++) {
+      final int ban = gh.SenshuSelectedOption[kk];
+      if (ban >= 0 && ban < narabi.length) {
+        kukanOf.putIfAbsent(narabi[ban].id, () => <int>[]).add(kk);
+      }
+    }
+    return KukanTekiseiNaiyou(
+      race: race,
+      senshu: narabi,
+      kukanOf: kukanOf,
+      kukanList: [for (int kk = 0; kk < kukansuu; kk++) kk],
+      kukanKotoba: 'エントリー中',
+    );
   }
 
   // MARK: - メインロジック関数
@@ -3168,6 +3192,9 @@ class _Mode0300ContentState extends State<Mode0300Content> {
             ),
           ),
         ),
+        // 区間適性の見立て(2.1.1。記録から見た区間の向き不向き。Modal_kukanTekisei.dart)
+        if (raceBangou <= 2 || raceBangou == 5)
+          KukanTekiseiLink(naiyou: () => _kukanTekiseiNaiyou(currentGhensuu)),
         if (raceBangou <= 2 || raceBangou == 5)
           TextButton(
             onPressed: () {

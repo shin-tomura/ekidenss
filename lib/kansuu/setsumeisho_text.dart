@@ -103,6 +103,7 @@ List<SetsumeishoGroup> setsumeishoGroupList() {
       const SetsumeishoKoumoku(_kekkaOshirase),
       SetsumeishoKoumoku(_panel(), youten: _youtenPanel),
       const SetsumeishoKoumoku(_konkiMemo),
+      const SetsumeishoKoumoku(_kukanTekisei),
       const SetsumeishoKoumoku(_gakunaiKiroku, youten: _youtenGakunaiKiroku),
     ]),
     // 遊ぶのに知らなくてもよい読み物(2.1.1)
@@ -370,6 +371,17 @@ const ShiyouSetsu _konkiMemo = ShiyouSetsu('今季タイム一覧表のメモ', 
   '・今季タイム一覧表の名前の右の「メモ」の欄に、✓・○・△・×や1〜10を付けて、配置を考えるメモにできます。',
   '　・区間配置とは連動しません。メモは選手ごとに残り、画像・テキストのコピー・CSVには入りません。',
   '　・見出しの「メモ」を押すと、その表のメモを全部消せます。「列を選ぶ」で隠すこともできます。',
+]);
+
+// 区間適性の見立て(2.1.1。Modal_kukanTekisei.dart・kukan_tekisei.dart)
+const ShiyouSetsu _kukanTekisei = ShiyouSetsu('区間適性の見立て', [
+  '・区間エントリーと当日変更の画面の「区間適性の見立て」で、選手と区間の合い具合の目安を見られます。',
+  '　・学連選抜の監督をしている年は、学連選抜編成の画面でも見られます。',
+  '・持ちタイムの学生全体での順位と、区間の距離・起伏から見ます。ほかの大学の区間配置とは比べません。',
+  '・距離・型(1区向き・後半向きなど)・坂の合い具合を◎○△で示し、同じ区間を走った経験と一言を添えます。',
+  '・「区間ごと」は区間の距離に合う種目の持ちタイム順に、「選手ごと」は区間の順に並べます。',
+  '・記録から見た目安なので、実際の走りは調子などでも変わります。',
+  '・言葉はコーチや監督が言いますが、誰が言っても見立ては同じです。',
 ]);
 
 const ShiyouSetsu _seiseiAI = ShiyouSetsu('生成AIと遊ぶ(テキストのコピー)', [

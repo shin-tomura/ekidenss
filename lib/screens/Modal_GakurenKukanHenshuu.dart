@@ -10,6 +10,7 @@ import 'package:ekiden/kansuu/time_date.dart';
 import 'package:ekiden/kansuu/TrialTime.dart';
 import 'package:ekiden/screens/Modal_senshu.dart';
 import 'package:ekiden/screens/gakuren_copy_button.dart';
+import 'package:ekiden/screens/Modal_kukanTekisei.dart'; // 区間適性の見立て(2.1.1)
 
 /// 学連選抜の区間配置を決める部分(1.8.2。2.1.0から学連選抜編成の画面(mode0290.dart)に直接並べる)
 /// プレイヤーの大学が正月駅伝に出場できない年に、学連選抜の監督として区間配置を決める
@@ -78,6 +79,22 @@ class GakurenKukanHenshuuState extends State<GakurenKukanHenshuu> {
     for (int k = 0; k < _sentaku.length; k++)
       if (_sentaku[k] == id) k,
   ];
+
+  /// 区間適性の見立てに渡すもの(2.1.1。選んでいる区間を「配置中」として出す)
+  KukanTekiseiNaiyou _kukanTekiseiNaiyou() {
+    final Map<int, List<int>> kukanOf = {};
+    for (int kk = 0; kk < _sentaku.length; kk++) {
+      final int? id = _sentaku[kk];
+      if (id != null) kukanOf.putIfAbsent(id, () => <int>[]).add(kk);
+    }
+    return KukanTekiseiNaiyou(
+      race: _raceIndex,
+      gakuren: _senshuNarabi(),
+      kukanOf: kukanOf,
+      kukanList: [for (int kk = 0; kk < _sentaku.length; kk++) kk],
+      kukanKotoba: '配置中',
+    );
+  }
 
   /// 区間の重なりか、空いた区間があるか(あれば保存せず、進ませない)
   /// 空いた区間は、区間の数だけ選手がいるのに選んでいない区間(選手が区間の数より少ないときは数えない)
@@ -247,12 +264,14 @@ class GakurenKukanHenshuuState extends State<GakurenKukanHenshuu> {
             fontSize: HENSUU.fontsize_honbun - 2,
           ),
         ),
-        // 区間配置と選手の詳しい情報をコピーする(生成AIとの相談用)と、今季タイム一覧表
-        const Wrap(
+        // 区間配置と選手の詳しい情報をコピーする(生成AIとの相談用)と、今季タイム一覧表と、
+        // 区間適性の見立て(2.1.1。Modal_kukanTekisei.dart)
+        Wrap(
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            GakurenCopyButton(kukanHaiti: true),
-            GakurenKonkiTimeLink(),
+            const GakurenCopyButton(kukanHaiti: true),
+            const GakurenKonkiTimeLink(),
+            KukanTekiseiLink(naiyou: _kukanTekiseiNaiyou),
           ],
         ),
         if (mondai)

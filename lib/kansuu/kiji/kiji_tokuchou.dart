@@ -58,6 +58,69 @@ bool _updownKaru(Ghensuu gh, int race, int kk) =>
     kukanTokuchou(gh, race, kk) == KukanTokuchou.heitan &&
     gh.noborikudarikirikaekaisuu_taikai_kukangoto[race][kk] >= updownKaruKaisuu;
 
+// ---- 区間適性の見立て(2.1.1。kukan_tekisei.dart)でも使う見方 ----
+// 選手の特徴の文と同じ決め方にするため、ここに置いて両方から使う
+
+/// 平坦だがアップダウンが細かく続く区間か(区間適性の見立てで使う)
+bool updownKaru(Ghensuu gh, int race, int kk) => _updownKaru(gh, race, kk);
+
+/// 順位[r](1始まり)が[n]人の中でどの段か(0: 上位3分の1、1: 中ほど、2: 下位3分の1。区間適性の見立てで使う)
+int sanbunDan(int r, int n) => _dan(r, n);
+
+/// A 距離適性の型(5000m・1万m・ハーフの学生全体の順位で一番良い種目[best](0〜2)と、
+/// 2番目の種目との差が小さいか[anteishita]。[z]は3種目の学生全体の順位(記録がなければ0)。
+/// 記録のある種目が2つ未満ならnull)
+({int best, bool anteishita, List<int> z})? kyoriKata(MochiHyou hyou, List<double> t) {
+  final List<int> z = [for (int idx = 0; idx < 3; idx++) hyou.zentai(t[idx], idx)];
+  final List<int> ari = [for (int idx = 0; idx < 3; idx++) if (z[idx] > 0) idx];
+  if (ari.length < 2) return null;
+  int best = ari.first;
+  for (final int idx in ari) {
+    if (z[idx] < z[best]) best = idx;
+  }
+  int niban = -1;
+  for (final int idx in ari) {
+    if (idx != best && (niban < 0 || z[idx] < z[niban])) niban = idx;
+  }
+  final bool anteishita = niban >= 0 && z[niban] - z[best] < hyou.sa(best);
+  return (best: best, anteishita: anteishita, z: z);
+}
+
+/// B 区間の型(トラックの1万mとロード1万の学生全体の順位を比べる。[muki] 0: 1区向き、1: 2・3区向き、2: 後半向き。
+/// どちらかの記録がなければnull)
+({int muki, int zTrack, int zRoad})? kukanMuki(MochiHyou hyou, List<double> t) {
+  final int zTrack = hyou.zentai(t[1], 1);
+  final int zRoad = hyou.zentai(t[6], 6);
+  if (zTrack <= 0 || zRoad <= 0) return null;
+  final int sa = zRoad - zTrack; // 正ならトラックのほうが良い
+  final int margin = hyou.sa(1);
+  final int muki = sa >= margin ? 0 : (-sa >= margin ? 2 : 1);
+  return (muki: muki, zTrack: zTrack, zRoad: zRoad);
+}
+
+/// 区間[kk]の型(0: 1区、1: 2・3区、2: 4区以降)
+int kukanIma(int kk) => kk == 0 ? 0 : (kk <= 2 ? 1 : 2);
+
+/// 区間[kk]が、大会[race]の区間の中で長めか短めか(1: 長め、-1: 短め、0: どちらでもない・比べない。1.9.7)
+/// 距離の順に3つに分けた上と下の区間で、真ん中の距離から2%以上離れているときだけ長め・短めにする。
+/// 大会の最長と最短の差が8%未満なら比べない(ほぼ同じ距離の区間を無理に分けないため)
+int taikaiNoNagasa(Ghensuu gh, int race, int kk) {
+  final int ks = gh.kukansuu_taikaigoto[race];
+  final List<double> kyori = gh.kyori_taikai_kukangoto[race];
+  if (ks < 3 || kyori.length < ks || kk < 0 || kk >= ks) return 0;
+  final List<double> l = [for (int i = 0; i < ks; i++) kyori[i]]..sort();
+  if (l.first <= 0 || l.last < l.first * 1.08) return 0;
+  final double naka = ks.isOdd ? l[ks ~/ 2] : (l[ks ~/ 2 - 1] + l[ks ~/ 2]) / 2.0;
+  final double d = kyori[kk];
+  if ((d - naka).abs() < naka * 0.02) return 0;
+  final int sanbun = ks ~/ 3;
+  final int nagai = l.where((x) => x > d).length;
+  final int mijikai = l.where((x) => x < d).length;
+  if (nagai < sanbun) return 1;
+  if (mijikai < sanbun) return -1;
+  return 0;
+}
+
 /// 区間内順位を書いてよい場面か(区間エントリーが公開されたあと。学連選抜編成(290)と
 /// 区間エントリー(300)の画面では、ほかの大学の区間配置を伏せているので書かない)
 bool kukannaiKoukai(Ghensuu gh) => const {280, 330, 340, 343, 350, 700}.contains(gh.mode);
@@ -113,6 +176,12 @@ class MochiHyou {
 
   /// 種目[idx]の記録を持つ選手の数(学生全体)
   int zentaiSuu(int idx) => _zentai[idx].length;
+
+  /// 種目[idx]で「順位に差がある」とみなす差(記録を持つ人数の1割。3より小さければ3)
+  int sa(int idx) {
+    final int n = zentaiSuu(idx);
+    return n ~/ 10 < 3 ? 3 : n ~/ 10;
+  }
 
   /// タイム[t]の、学生全体の中での順位(1始まり。自分より速い人の数+1。記録がなければ0)
   int zentai(double t, int idx) {
@@ -380,25 +449,16 @@ class TokuchouKaki {
   // ---- 観点 ----
 
   /// 全体順位の比べで「はっきり良い」と言える差
-  int _sa(int idx) {
-    final int n = hyou.zentaiSuu(idx);
-    return n ~/ 10 < 3 ? 3 : n ~/ 10;
-  }
+  int _sa(int idx) => hyou.sa(idx);
 
   /// A 距離適性(5000m・1万m・ハーフの全体順位を比べる)
   _Kansatsu? _kyori(List<double> t, int kk) {
-    final List<int> z = [for (int idx = 0; idx < 3; idx++) hyou.zentai(t[idx], idx)];
-    final List<int> ari = [for (int idx = 0; idx < 3; idx++) if (z[idx] > 0) idx];
-    if (ari.length < 2) return null;
-    int best = ari.first;
-    for (final int idx in ari) {
-      if (z[idx] < z[best]) best = idx;
-    }
-    int niban = -1;
-    for (final int idx in ari) {
-      if (idx != best && (niban < 0 || z[idx] < z[niban])) niban = idx;
-    }
-    final bool anteishita = niban >= 0 && z[niban] - z[best] < _sa(best);
+    // 型の決め方は区間適性の見立てと同じ(kyoriKata。2.1.1)
+    final ({int best, bool anteishita, List<int> z})? kata0 = kyoriKata(hyou, t);
+    if (kata0 == null) return null;
+    final List<int> z = kata0.z;
+    final int best = kata0.best;
+    final bool anteishita = kata0.anteishita;
     final int kihon = kukanKihonShumoku(k.gh, k.race, kk);
     final String kyoriMoji = kmMoji(k.gh.kyori_taikai_kukangoto[k.race][kk]);
     // 型の言い方
@@ -502,36 +562,19 @@ class TokuchouKaki {
     return _Kansatsu(0, '$kataだ。$ai');
   }
 
-  /// 区間[kk]が、この大会の区間の中で長めか短めか(1: 長め、-1: 短め、0: どちらでもない・比べない。1.9.7)
-  /// 距離の順に3つに分けた上と下の区間で、真ん中の距離から2%以上離れているときだけ長め・短めにする。
-  /// 大会の最長と最短の差が8%未満なら比べない(ほぼ同じ距離の区間を無理に分けないため)
-  int _taikaiNoNagasa(int kk) {
-    final int ks = k.kukansuu;
-    final List<double> kyori = k.gh.kyori_taikai_kukangoto[k.race];
-    if (ks < 3 || kyori.length < ks || kk < 0 || kk >= ks) return 0;
-    final List<double> l = [for (int i = 0; i < ks; i++) kyori[i]]..sort();
-    if (l.first <= 0 || l.last < l.first * 1.08) return 0;
-    final double naka = ks.isOdd ? l[ks ~/ 2] : (l[ks ~/ 2 - 1] + l[ks ~/ 2]) / 2.0;
-    final double d = kyori[kk];
-    if ((d - naka).abs() < naka * 0.02) return 0;
-    final int sanbun = ks ~/ 3;
-    final int nagai = l.where((x) => x > d).length;
-    final int mijikai = l.where((x) => x < d).length;
-    if (nagai < sanbun) return 1;
-    if (mijikai < sanbun) return -1;
-    return 0;
-  }
+  /// 区間[kk]が、この大会の区間の中で長めか短めか(taikaiNoNagasa。2.1.1から区間適性の見立てと共通)
+  int _taikaiNoNagasa(int kk) => taikaiNoNagasa(k.gh, k.race, kk);
 
   /// B 区間の型(1万m(トラック)とロード1万の全体順位を比べる)
   _Kansatsu? _kukanKata(List<double> t, int kk) {
-    final int zTrack = hyou.zentai(t[1], 1);
-    final int zRoad = hyou.zentai(t[6], 6);
-    if (zTrack <= 0 || zRoad <= 0) return null;
-    final int sa = zRoad - zTrack; // 正ならトラックのほうが良い
-    final int margin = _sa(1);
+    // 型の決め方は区間適性の見立てと同じ(kukanMuki・kukanIma。2.1.1)
+    final ({int muki, int zTrack, int zRoad})? m = kukanMuki(hyou, t);
+    if (m == null) return null;
+    final int zTrack = m.zTrack;
+    final int zRoad = m.zRoad;
     // 0: 1区向き、1: 2・3区向き、2: 後半向き
-    final int muki = sa >= margin ? 0 : (-sa >= margin ? 2 : 1);
-    final int ima = kk == 0 ? 0 : (kk <= 2 ? 1 : 2);
+    final int muki = m.muki;
+    final int ima = kukanIma(kk);
     final String hikaku;
     if (muki == 0) {
       hikaku = w.erabu([

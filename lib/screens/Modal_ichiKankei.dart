@@ -62,8 +62,8 @@
 //       入る縮尺。_tenHaba)。区間の中では、差が開く・詰まるのが点の動きで見える。ほぼ同じ位置の点は横の列にずらして
 //       並べる(集団が横に広がった塊に見える)。焦点の大学はオレンジの大きめの点(色だけで示し、名前や順位の変化は
 //       出さない)。自分の大学(焦点でないとき)は水色の点、学連選抜は点線の丸、ほかは白い点。
-//       点を押すと、その大学に焦点を移す。目盛りの線(6本まで)とシード権ラインの点線(文字は出さない。順位の境で
-//       前後の点の位置が違うときだけ)を出す。道の帯・目盛りの文の欄・右の一覧の幅・上の行の高さは、どのコマでも
+//       点を押すと、その大学に焦点を移す。目盛りの線(6本まで)とシード権ラインの点線(文字は出さない。どのコマでも
+//       道の帯の幅いっぱいに引き、点はその上に描く)を出す。道の帯・目盛りの文の欄・右の一覧の幅・上の行の高さは、どのコマでも
 //       同じにする(画面の幅と文字の大きさだけで決める。コマごとに変わると、ちらついて見にくいため)。道をスクロールしないので、焦点を追って道を動かす処理(_suiiOu・_suiiSakiniOu)は働かず、
 //       倍率の「−」「＋」も出さない。右には、そのコマの時点の順位の順で全大学の名前を並べる(学連選抜もタイムの順の
 //       位置に「OP」で入れる。名前を押すと焦点を移す。_tenIchiran)。図の上は広がりの文と「説明」だけにし、
@@ -865,7 +865,7 @@ class _TenZu {
   });
 }
 
-/// 推移の点の表示を描く(道の帯・目盛り・シード権ライン・点・焦点の大学の名前)
+/// 推移の点の表示を描く(道の帯・目盛り・シード権ライン・点)
 class _TenPainter extends CustomPainter {
   final _TenZu zu;
   final TextScaler scaler;
@@ -894,7 +894,8 @@ class _TenPainter extends CustomPainter {
       )..layout();
       tp.paint(canvas, Offset(math.max(0, zu.obiHidari - 6 - tp.width), m.y - tp.height / 2));
     }
-    // シード権ライン(点線だけ。文字は出さない)
+    // シード権ライン(点線だけ。文字は出さない。道の帯の左端から右端まで、帯の幅いっぱいに引く。
+    // 点はこのあとに描くので、境の大学が集団の中にいて線が点を貫くときも、点が上に見える)
     final double? seedY = zu.seedY;
     if (seedY != null) {
       final Paint p = Paint()
@@ -903,8 +904,8 @@ class _TenPainter extends CustomPainter {
       _tensenDeHiku(
         canvas,
         Path()
-          ..moveTo(zu.obiHidari - 2, seedY)
-          ..lineTo(size.width, seedY),
+          ..moveTo(zu.obiHidari, seedY)
+          ..lineTo(zu.obiMigi, seedY),
         p,
       );
     }
@@ -2123,11 +2124,12 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
         ),
       );
     }
-    // シード権ライン(シード権の最後の順位の大学と、次の大学の点の位置が違うときだけ。同じ位置なら引かない)
+    // シード権ライン(シード権のある大会では、どのコマでも引く。高さは、シード権の最後の順位の大学と次の大学の
+    // 点の真ん中。2校が同じ位置(1区の集団や同じタイム)なら、その点の高さになり、線が点を貫く)
     double? seedY;
     final int? seed = b.seed;
     if (seed != null && seed >= 1) {
-      // 大学だけの順(ten と oita の番号)。前後の位置は、横の列を折り返す前の高さで比べる(同じタイムの集団を分けない)
+      // 大学だけの順(ten の番号)
       final List<int> daigaku = [
         for (int k = 0; k < ten.length; k++)
           if (!r.narabi[ten[k].i].op) k,
@@ -2135,7 +2137,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
       if (daigaku.length > seed) {
         final int a = daigaku[seed - 1];
         final int c = daigaku[seed];
-        if (oita[c].y - oita[a].y >= 1) seedY = (ten[a].y + ten[c].y) / 2;
+        seedY = (ten[a].y + ten[c].y) / 2;
       }
     }
     return _TenZu(
@@ -2253,7 +2255,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
                     Expanded(
                       child: SizedBox(
                         height: constraints.maxHeight,
-                        child: _tenIchiran(b, r, ichiranHaba.juni, zu.seedY != null),
+                        child: _tenIchiran(b, r, ichiranHaba.juni),
                       ),
                     ),
                   ],
@@ -2300,13 +2302,14 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
 
   /// 右の一覧(そのコマの時点の順位の順。学連選抜もタイムの順の位置に「OP」で入れる)。
   /// 焦点の大学はオレンジの太字、自分の大学(学連選抜の監督の年は学連選抜)は水色。名前を押すと焦点を移す。
-  /// シード権の境には、図と同じ点線を引く(図に引くときだけ。学連選抜が境の2校の間にいるときは、図と同じく
-  /// 境の2校の真ん中のタイムより前か後ろかで、点線の上か下に置く)。画面の高さに入らないときは、一覧だけスクロールする
-  Widget _tenIchiran(_IchiKankei b, _IchiKukan r, double juniHaba, bool seedAri) {
-    // 点線を引く位置(このタイムより後ろの最初の行の前)
+  /// シード権の境には、図と同じ点線をいつも引く(シード権の最後の順位の大学の行のすぐ下。同じ順位が並んでいても、
+  /// 一覧の並びで区切る。学連選抜が境の2校の間にいるときは、図と同じく境の2校の真ん中のタイムより前なら点線の上、
+  /// それ以外は下に置く)。画面の高さに入らないときは、一覧だけスクロールする
+  Widget _tenIchiran(_IchiKankei b, _IchiKukan r, double juniHaba) {
+    // 境の2校の真ん中のタイム(引かないときはnull)
     double? seedKijun;
     final int? seed = b.seed;
-    if (seedAri && seed != null && seed >= 1) {
+    if (seed != null && seed >= 1) {
       final List<_IchiDaigaku> daigaku = [
         for (final _IchiDaigaku x in r.narabi)
           if (!x.op) x,
@@ -2317,13 +2320,16 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     }
     final List<Widget> gyou = [];
     bool hiita = false;
+    int daigakuSuu = 0; // ここまでに並べた大学の数(学連選抜は数えない)
     for (int i = 0; i < r.narabi.length; i++) {
       final _IchiDaigaku x = r.narabi[i];
       final double? k = seedKijun;
-      if (!hiita && k != null && x.ruikei > k) {
+      // シード権の最後の順位の大学まで並べたあと、次の大学の前か、真ん中のタイムより後ろの学連選抜の前に引く
+      if (!hiita && k != null && seed != null && daigakuSuu >= seed && (!x.op || x.ruikei >= k)) {
         hiita = true;
         gyou.add(SizedBox(height: 6, child: CustomPaint(painter: _TensenPainter())));
       }
+      if (!x.op) daigakuSuu++;
       final bool shoten = i == _suiiShotenI;
       final bool jibun = x.jibun || (b.gakurenJibun && x.op);
       final Color iro = shoten

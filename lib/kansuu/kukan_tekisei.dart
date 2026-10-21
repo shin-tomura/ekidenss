@@ -134,8 +134,10 @@ const List<String> tekiseiShumokuMei = ['トラック5000m', 'トラック1万m'
 
 /// 見立ての「区間ごと」の並びに使う持ちタイムの種目(time_bestkiroku の番号。2.1.1)
 /// 区間の見出し(kukanKifukuMei)と同じ線(kukanTokuchou)で、山登りは登り1万、山下りは下り1万、
-/// アップダウンはクロカン1万。それ以外は距離の種目(kukanKihonShumoku)で、4区以降で1万mになる区間
-/// (7.5km超〜15km)はロード1万(後半区間は、単独でロードを押す力が問われるため。区間の型の印とも合う)。
+/// アップダウンはクロカン1万。それ以外は距離の種目(kukanKihonShumoku)で、4区以降の15km以下の区間
+/// (5000mや1万mになる区間)はロード1万(4区以降は距離にかかわらず単独走でロード適性がまるごと効くため
+/// (RaceCalc.dart)。区間の型の印とも合う。短い区間のスピードの合い具合は、距離の印で見る)。
+/// 15km超はハーフのまま(ハーフはロードの大会の記録で、ロード適性がもう入っている)。
 /// 上り基調・下り基調は、平らなところを走る分が大きいので距離の種目のまま(坂の合い具合は札で見る)
 int tekiseiNarabiShumoku(Ghensuu gh, int race, int kk) {
   switch (kukanTokuchou(gh, race, kk)) {
@@ -151,7 +153,7 @@ int tekiseiNarabiShumoku(Ghensuu gh, int race, int kk) {
       break;
   }
   final int kihon = kukanKihonShumoku(gh, race, kk);
-  if (kihon == 1 && kukanIma(kk) == 2) return 6;
+  if (kihon <= 1 && kukanIma(kk) == 2) return 6;
   return kihon;
 }
 

@@ -15,6 +15,7 @@ import 'package:ekiden/kansuu/custom_seigen.dart'; // カスタム駅伝の出�
 import 'package:ekiden/screens/custom_seigen_parts.dart';
 import 'package:ekiden/screens/kukan_haiti_button.dart'; // 今季タイム一覧表を開くボタン(1.9.9)
 import 'package:ekiden/kansuu/shushou.dart' show shushouShirushi; // 主将の印(2.0.1)
+import 'package:ekiden/screens/Modal_kukanTekisei.dart'; // 区間適性の見立て(2.1.1)
 
 class Mode0150Content extends StatefulWidget {
   final Ghensuu ghensuu;
@@ -493,6 +494,29 @@ class _Mode0150ContentState extends State<Mode0150Content> {
                                   ),
                                 ),
                               ),
+                              // 区間適性の見立て(2.1.1。チームの全員を見立て、一次エントリーで選んでいる選手に
+                              // 「一次エントリー中」と出す。この画面では体調・調子を見られないので、体調不良の印は出さない)
+                              if (raceIndex <= 2 || raceIndex == 5)
+                                KukanTekiseiLink(
+                                  naiyou: () => KukanTekiseiNaiyou(
+                                    race: raceIndex,
+                                    senshu: myTeamSenshu,
+                                    kukanOf: const <int, List<int>>{},
+                                    kukanList: [
+                                      for (int kk = 0; kk < currentGhensuu.kukansuu_taikaigoto[raceIndex]; kk++) kk,
+                                    ],
+                                    kukanKotoba: '',
+                                    ichijiEntry: {
+                                      for (final SenshuData s in myTeamSenshu)
+                                        if (raceIndex < s.entrykukan_race.length &&
+                                            s.gakunen - 1 >= 0 &&
+                                            s.gakunen - 1 < s.entrykukan_race[raceIndex].length &&
+                                            s.entrykukan_race[raceIndex][s.gakunen - 1] == -1)
+                                          s.id,
+                                    },
+                                    taichouHyouji: false,
+                                  ),
+                                ),
 
                               TextButton(
                                 onPressed: () {

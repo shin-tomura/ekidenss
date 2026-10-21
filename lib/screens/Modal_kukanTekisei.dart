@@ -12,11 +12,13 @@ import 'package:ekiden/kansuu/kukan_tekisei.dart';
 
 // ------------------------------------------------------------
 // 区間適性の見立て(2.1.1。中身は kukan_tekisei.dart)
-// 区間エントリー・当日変更・学連選抜編成(監督をしている年)の画面の緑のリンクから開く。
+// 一次エントリー・区間エントリー・当日変更・学連選抜編成(監督をしている年)の画面の緑のリンクから開く。
 // ・区間ごと: 区間を選ぶと、出せる選手を区間の距離に合う種目の持ちタイム順に並べ、印と一言を出す
 //   (合う度合いの順にすると、遅い選手が上に来てしまうため)
 // ・選手ごと: 選手を選ぶと、出す区間ごとの印と一言を出す
 // ・名前の横に、画面で選んでいる区間(「1区にエントリー中」「1区に出走予定」)・補欠・体調不良の印を出す
+//   (一次エントリーの画面からは、「一次エントリー中」の印を出し、体調不良の印は出さない。一次エントリーの画面では
+//   体調・調子を見られないようにしているため。見立ての計算は、もともと体調・調子を使わない)
 // ・言葉は自分の大学のコーチ(長距離)→コーチ(トラック)→監督の順に、いる人が言う(計算には影響しない)
 // ------------------------------------------------------------
 
@@ -43,6 +45,12 @@ class KukanTekiseiNaiyou {
   /// 区間を選んでいない選手に「補欠」と出すか(当日変更)
   final bool hoketsuHyouji;
 
+  /// 一次エントリーで選んでいる選手のid(「一次エントリー中」と出す。一次エントリーの画面だけ)
+  final Set<int> ichijiEntry;
+
+  /// 体調不良の印を出すか(一次エントリーの画面は出さない。体調・調子を見られないようにしているため)
+  final bool taichouHyouji;
+
   const KukanTekiseiNaiyou({
     required this.race,
     this.senshu = const [],
@@ -51,6 +59,8 @@ class KukanTekiseiNaiyou {
     required this.kukanList,
     required this.kukanKotoba,
     this.hoketsuHyouji = false,
+    this.ichijiEntry = const <int>{},
+    this.taichouHyouji = true,
   });
 }
 
@@ -291,7 +301,7 @@ class _ModalKukanTekiseiState extends State<ModalKukanTekisei> {
             DropdownMenuItem<int>(
               value: x.id,
               child: Text(
-                '${x.taichouFuryou ? '【体調不良】' : ''}${x.hyoujiMei}',
+                '${x.taichouFuryou && widget.naiyou.taichouHyouji ? '【体調不良】' : ''}${x.hyoujiMei}',
                 style: const TextStyle(color: HENSUU.LinkColor, fontSize: HENSUU.fontsize_honbun),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
@@ -316,7 +326,7 @@ class _ModalKukanTekiseiState extends State<ModalKukanTekisei> {
   String _kukanMidashi(Ghensuu gh, int kk) =>
       '${kk + 1}区 ${kmMoji(gh.kyori_taikai_kukangoto[_race][kk])}・${kukanKifukuMei(gh, _race, kk)}';
 
-  /// 選手の名前の横の札(選んでいる区間・補欠・体調不良)
+  /// 選手の名前の横の札(選んでいる区間・補欠・一次エントリー中・体調不良)
   List<Widget> _senshuShirushi(TekiseiSenshu s) {
     final KukanTekiseiNaiyou n = widget.naiyou;
     final List<int> kukan = n.kukanOf[s.id] ?? const <int>[];
@@ -324,7 +334,8 @@ class _ModalKukanTekiseiState extends State<ModalKukanTekisei> {
       if (kukan.isNotEmpty)
         _fuda('${kukan.map((k) => '${k + 1}区').join('・')}に${n.kukanKotoba}', Colors.lightBlueAccent),
       if (kukan.isEmpty && n.hoketsuHyouji) _fuda('補欠', Colors.white70),
-      if (s.taichouFuryou) _fuda('体調不良', Colors.redAccent),
+      if (n.ichijiEntry.contains(s.id)) _fuda('一次エントリー中', Colors.lightBlueAccent),
+      if (s.taichouFuryou && n.taichouHyouji) _fuda('体調不良', Colors.redAccent),
     ];
   }
 

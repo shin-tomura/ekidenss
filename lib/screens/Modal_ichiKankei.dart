@@ -1581,6 +1581,13 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
   /// 次に描いたあとに、焦点の大学まで道を動かすか(コマ・焦点・区間・倍率を変えたときと、推移を開いたとき)
   bool _suiiOuYoyaku = false;
 
+  /// 直前に描いた推移の道の、並べ方に使った幅・文字の大きさ・倍率と、道の部分の中の道の上端の高さ
+  /// (コマを変えたときに、次のコマの焦点の大学の高さを先に計算して道を先に動かすため。_suiiSakiniOu。2.1.1)
+  double? _suiiMaeHaba;
+  TextScaler? _suiiMaeScaler;
+  double? _suiiMaePx;
+  double? _suiiMaeUe;
+
   /// 道の部分の中身と道の帯(焦点の大学まで道を動かすときに、道の上端の高さを測る)
   final GlobalKey _suiiNakaKey = GlobalKey();
   final GlobalKey _suiiMichiKey = GlobalKey();
@@ -1778,6 +1785,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
       // 一番最後のコマ(最後の区間の中継所)まで来たら止める
       if (_suiiSaigo(b)) _saisei = false;
     });
+    _suiiSakiniOu();
     _suiiTimerShikakeru();
   }
 
@@ -1797,6 +1805,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
       }
       _saisei = true;
     });
+    _suiiSakiniOu();
     _suiiTimerShikakeru();
   }
 
@@ -1812,6 +1821,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
       _suiiKomaBan = 0;
       _suiiOuYoyaku = true;
     });
+    _suiiSakiniOu();
     _suiiSaisei();
   }
 
@@ -1835,6 +1845,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
         _suiiModosu(b);
       }
     });
+    _suiiSakiniOu();
   }
 
   /// 推移の区間を選ぶ(その区間の始めに移る。再生しているかはそのまま)
@@ -1845,6 +1856,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
       _suiiKomaBan = 0;
       _suiiOuYoyaku = true;
     });
+    _suiiSakiniOu();
     _suiiTimerShikakeru();
   }
 
@@ -1855,6 +1867,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
       _shotenKagi = _daigakuKagi(x);
       _suiiOuYoyaku = true;
     });
+    _suiiSakiniOu();
   }
 
   /// 図[r]の中の、焦点の大学の番号(narabi の番号。いなければ-1)
@@ -1874,14 +1887,45 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     return r.narabi.indexWhere((x) => _daigakuKagi(x) == _shotenKagi);
   }
 
+  /// コマ・焦点・区間を変えたあと(setState のあと)に、次に描く図の焦点の大学の高さを先に計算して、
+  /// 道を先に動かす(2.1.1)。描いたあとに測って動かすだけだと、新しいコマが一瞬だけ動かす前の位置で
+  /// 描かれ、四角が残像のように見えていたので、コマの切り替えと道の移動を同じ描き直しで反映する。
+  /// 並べ方は描くときと同じ _haichi で、直前に描いたときの幅・文字の大きさ・倍率と道の上端の高さを使う
+  /// (分からなければ何もしない)。区間が変わって上の説明文の行数が変わったときや、道が長くなって
+  /// 動かせる範囲が足りないときのずれは、描いたあとの _suiiOu で直す(ずれがなければ _suiiOu は何もしない)
+  void _suiiSakiniOu() {
+    final _IchiKankei? b = _b;
+    final double? w = _suiiMaeHaba;
+    final TextScaler? scaler = _suiiMaeScaler;
+    final double? px = _suiiMaePx;
+    final double? ue = _suiiMaeUe;
+    if (!mounted || b == null || _hyouji != 4 || !_suiiOuYoyaku || !_michiScroll.hasClients) return;
+    if (w == null || scaler == null || px == null || ue == null) return;
+    if (!_suiiDekiru(b, _suiiKukan)) return;
+    final _IchiKukan r = _suiiZu(b, _suiiKukan, _suiiKomaBan / _suiiKomaSuu);
+    final int shoten = _suiiShotenBan(r);
+    if (shoten < 0) return;
+    final _Haichi h = _haichi(b, r, w, scaler, px, double.infinity);
+    double? y;
+    for (final _Gyou g in h.gyou) {
+      for (final _Hako hk in g.hako) {
+        if (hk.i == shoten) y = g.y + g.h / 2;
+      }
+    }
+    if (y == null) return;
+    final ScrollPosition pos = _michiScroll.position;
+    // 道の部分の上の余白(SingleChildScrollView の padding の上)8を足す(_suiiOu と同じ)
+    final double mokuhyou = (8 + ue + y - pos.viewportDimension * _suiiShotenTakasa)
+        .clamp(pos.minScrollExtent, pos.maxScrollExtent)
+        .toDouble();
+    if ((mokuhyou - pos.pixels).abs() >= 0.5) _michiScroll.jumpTo(mokuhyou);
+  }
+
   /// 焦点の大学が、道が見えている高さの上から3分の1に来るように、道を動かす(描いたあとに呼ぶ)。
   /// コマ・焦点・区間・倍率を変えたときと推移を開いたときだけ、一度に動かす(すべらせない。
   /// 指で動かした道を、コマが変わるまでは勝手に戻さないように)
   void _suiiOu() {
     if (!mounted || _hyouji != 4 || !_michiScroll.hasClients) return;
-    if (!_suiiOuYoyaku) return;
-    final double? y = _suiiShotenY;
-    if (y == null) return;
     final RenderObject? naka = _suiiNakaKey.currentContext?.findRenderObject();
     final RenderObject? michi = _suiiMichiKey.currentContext?.findRenderObject();
     if (naka is! RenderBox || michi is! RenderBox || !naka.hasSize || !michi.hasSize) return;
@@ -1891,6 +1935,11 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     } catch (_) {
       return;
     }
+    // 次のコマで道を先に動かすときに使う(_suiiSakiniOu。2.1.1)
+    _suiiMaeUe = ue;
+    if (!_suiiOuYoyaku) return;
+    final double? y = _suiiShotenY;
+    if (y == null) return;
     final ScrollPosition pos = _michiScroll.position;
     // 道の部分の上の余白(SingleChildScrollView の padding の上)8を足す
     final double mokuhyou = (8 + ue + y - pos.viewportDimension * _suiiShotenTakasa)
@@ -3416,16 +3465,20 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     return PopupMenuButton<String>(
       tooltip: '焦点を選ぶ',
       color: const Color(0xFF2A2A2A),
-      onSelected: (String v) => setState(() {
-        if (v.startsWith('j')) {
-          _shotenJuniMode = true;
-          _shotenJuni = int.tryParse(v.substring(1)) ?? 0;
-        } else {
-          _shotenJuniMode = false;
-          _shotenKagi = int.tryParse(v.substring(1)) ?? -2;
-        }
-        _suiiOuYoyaku = true;
-      }),
+      onSelected: (String v) {
+        setState(() {
+          if (v.startsWith('j')) {
+            _shotenJuniMode = true;
+            _shotenJuni = int.tryParse(v.substring(1)) ?? 0;
+          } else {
+            _shotenJuniMode = false;
+            _shotenKagi = int.tryParse(v.substring(1)) ?? -2;
+          }
+          _suiiOuYoyaku = true;
+        });
+        // 道を先に動かす(描いたあとに動かすと、一瞬だけ残像のように見えるため。2.1.1)
+        _suiiSakiniOu();
+      },
       itemBuilder: (context) => [
         const PopupMenuItem<String>(enabled: false, child: Text('順位で追う', style: midashi)),
         for (int j = 0; j < n; j++)
@@ -3693,6 +3746,10 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
             final _Haichi h = _haichi(b, r, w, scaler, px, r.suii ? double.infinity : gamenTakasa);
             // 推移は、焦点の大学の四角の真ん中の高さを覚え、描いたあとに道を動かす(2.1.1)
             if (r.suii) {
+              // 次のコマを先に計算するときに使う(_suiiSakiniOu)
+              _suiiMaeHaba = w;
+              _suiiMaeScaler = scaler;
+              _suiiMaePx = px;
               double? y;
               for (final _Gyou g in h.gyou) {
                 for (final _Hako hk in g.hako) {

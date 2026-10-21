@@ -761,7 +761,7 @@ Kiji? _yosenJibunKiji(YosenKekka e) {
         ],
       ),
     );
-    w.danraku(shusshinShumiBun(k, s, w.r, myouji(s.name)));
+    w.danraku(shusshinShumiBun(k, s, w, myouji(s.name)));
   }
   // 因縁のある選手(チームトップと別のとき)
   if (innenHito != null && innenNo != null && innenNo.ten >= 45 && (m.senshu.isEmpty || innenHito.s.id != m.senshu.first.s.id)) {
@@ -1241,7 +1241,7 @@ Kiji? _yosenKojinKiji(YosenKekka e) {
         ],
       ),
     );
-    w.danraku(shusshinShumiBun(k, mvp.s, w.r, mm));
+    w.danraku(shusshinShumiBun(k, mvp.s, w, mm));
     w.koMidashi('各組のトップ');
     for (int kk = 0; kk < ks; kk++) {
       if (kk == mvp.kumi) continue;
@@ -1352,7 +1352,7 @@ Kiji? _yosenKojinKiji(YosenKekka e) {
       ],
     ),
   );
-  w.danraku(shusshinShumiBun(k, t.s, w.r, myouji(t.s.name)));
+  w.danraku(shusshinShumiBun(k, t.s, w, myouji(t.s.name)));
   if (nihon != null) {
     w.comment(senshuComment(w, CommentBamen.yosenKojinTop, myouji(nihon.s.name)));
   }

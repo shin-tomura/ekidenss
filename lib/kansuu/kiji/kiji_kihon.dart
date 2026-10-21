@@ -2306,6 +2306,9 @@ class KijiKakite {
   // 型ごとに使った候補の番号(数字の入る言い回しは選手ごとに文字が違うので、番号で重ねない。2.1.0)
   final Map<String, Set<int>> _tsukattaBangou = {};
 
+  // 1つの記事に1回までの型のうち、この記事でもう使ったもの(2.1.1)
+  final Set<String> _ikkaiKata = {};
+
   // 入学時からの伸びの話し言葉を、コメントに使ったか(1つの記事で1人まで。2.1.0)
   bool _nobiTsukatta = false;
 
@@ -2425,6 +2428,9 @@ class KijiKakite {
     return e;
   }
 
+  /// 型[kata]をこの記事でまだ使っていなければ、使ったことにしてtrue(1つの記事に1回までの型。2.1.1)
+  bool ikkaiDake(String kata) => _ikkaiKata.add(kata);
+
   /// 型[kata]の候補[kazu]個から、この記事でまだ使っていない番号を選ぶ(全部使ったら最初から。2.1.0)
   int erabuBangou(String kata, int kazu) {
     final Set<int> t = _tsukattaBangou.putIfAbsent(kata, () => <int>{});
@@ -2493,31 +2499,84 @@ class KijiKakite {
 
 /// 出身地と趣味の一言(「福岡県出身。趣味は○○という」など。書けることがなければ空)
 /// 1.9.5から、出身校と高校時代の一言(koukouJidaiBun)を後ろに付ける
-String shusshinShumiBun(KijiKankyou k, SenshuData s, KijiRand r, String yobi) {
-  final String moto = _shusshinShumiBunMoto(k, s, r, yobi);
-  return '$moto${koukouJidaiBun(k, s, r, yobi)}';
+/// 2.1.1から、同じ記事で何人も紹介しても同じ形が続かないように、候補を番号で選ぶ([w]の記事ごと)。
+/// 高校の文は、ときどき出身地とつなげる(_koukouTsunagiBun)
+String shusshinShumiBun(KijiKankyou k, SenshuData s, KijiKakite w, String yobi) {
+  final String? tsunagi = _koukouTsunagiBun(k, s, w);
+  final String moto = _shusshinShumiBunMoto(k, s, w, yobi, jimotoKotobaAri: tsunagi == null);
+  return '$moto${tsunagi ?? koukouJidaiBun(k, s, w.r, yobi)}';
 }
 
+/// 出身地だけのときに添える「地元」の一言(2.1.1。1つの記事に1回まで。
+/// 大会の前の記事でも後の記事でも合う言い方にする)
+const List<String> _jimotoKotoba = [
+  '地元からの声援も届いているはずだ。',
+  'ふるさとの人たちも、その走りを見守っていることだろう。',
+  'ふるさとの期待も背負う一人だ。',
+  '故郷でも、その名を知る人が増えているという。',
+];
+
+/// 出身地だけのときに「地元」の一言を添える割合(%)
+const int _jimotoKotobaWariai = 30;
+
+/// 高校の文を出身地とつなげる割合(%)
+const int _koukouTsunagiWariai = 40;
+
 /// 出身地と趣味の一言(1.9.4までの shusshinShumiBun の中身)
-String _shusshinShumiBunMoto(KijiKankyou k, SenshuData s, KijiRand r, String yobi) {
+/// [jimotoKotobaAri] がfalseのときは「地元」の一言を添えない(高校の文を出身地とつなげたとき)
+String _shusshinShumiBunMoto(
+  KijiKankyou k,
+  SenshuData s,
+  KijiKakite w,
+  String yobi, {
+  required bool jimotoKotobaAri,
+}) {
   final String? ken = k.shusshin(s);
   final String? shumi = k.shumi(s);
   if (ken == null && shumi == null) return '';
   if (ken != null && shumi != null) {
-    return r.erabu([
+    final List<String> kouho = [
       '$ken出身の$yobiは、趣味が「$shumi」という一面も持つ。',
       '$yobiは$ken出身。オフの日は「$shumi」で気分を切り替えるという。',
       '$ken出身。趣味は「$shumi」と明かす$yobiの、もう一つの顔だ。',
-    ]);
+    ];
+    return kouho[w.erabuBangou('shusshinShumi', kouho.length)];
   }
   if (ken != null) {
-    return r.erabu([
+    final List<String> kouho = [
       '$yobiは$ken出身。',
-      '$yobiは$ken出身。地元からの声援も届いているはずだ。',
-    ]);
+      '$yobiは$kenの出身だ。',
+      '$ken出身の$yobi。',
+      '$yobiが生まれ育ったのは$ken。',
+    ];
+    final String bun = kouho[w.erabuBangou('shusshin', kouho.length)];
+    if (!jimotoKotobaAri || !w.r.kakuritsu(_jimotoKotobaWariai) || !w.ikkaiDake('jimoto')) return bun;
+    return '$bun${_jimotoKotoba[w.r.ikutsu(_jimotoKotoba.length)]}';
   }
-  return r.erabu([
+  final List<String> kouho = [
     '趣味は「$shumi」。$yobiの意外な素顔だ。',
     '$yobiはオフの日、「$shumi」で気分転換をしているという。',
-  ]);
+  ];
+  return kouho[w.erabuBangou('shumi', kouho.length)];
+}
+
+/// 出身地とつなげた高校の文(2.1.1。ときどきだけ。つなげないときはnull)
+/// ・高校も出身地と同じ都道府県なら「地元の雷鳥館高時代は、〜。」(「地元」の一言と合わせて1つの記事に1回まで)
+/// ・別の都道府県なら「高校は県外の雷鳥館高(長野)へ進んだ。〜。」
+String? _koukouTsunagiBun(KijiKankyou k, SenshuData s, KijiKakite w) {
+  final String? ken = k.shusshin(s);
+  if (ken == null) return null;
+  final KoukouJouhou? j = koukouHyoujiJouhou(s.samusataisei, s.hirou, k.kantoku);
+  if (j == null) return null;
+  final int kouKen = j.mei?.ken ?? -1;
+  if (kouKen < 0 || kouKen >= LocationDatabase.allPrefectures.length) return null;
+  if (!w.r.kakuritsu(_koukouTsunagiWariai)) return null;
+  final bool jimoto = LocationDatabase.allPrefectures[kouKen] == ken;
+  if (jimoto && !w.ikkaiDake('jimoto')) return null;
+  final String jisseki = koukouJissekiBun(j);
+  if (jimoto) {
+    return jisseki.isEmpty ? '高校は地元の${koukouMeiMoji(j)}。' : '地元の${koukouMeiMoji(j)}時代は、$jisseki。';
+  }
+  final String susunda = '高校は県外の${koukouMeiKenMoji(j)}へ進んだ。';
+  return jisseki.isEmpty ? susunda : '$susunda$jisseki。';
 }

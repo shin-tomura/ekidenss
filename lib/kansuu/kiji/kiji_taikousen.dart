@@ -506,7 +506,7 @@ Kiji? _kojinKiji(TaikousenKekka e) {
       ],
     ),
   );
-  w.danraku(shusshinShumiBun(k, a.s, w.r, myouji(a.s.name)));
+  w.danraku(shusshinShumiBun(k, a.s, w, myouji(a.s.name)));
 
   // 本文: 入賞と大学のポイント
   w.koMidashi('入賞と大学のポイント');
@@ -1045,7 +1045,7 @@ Kiji? _jibunKiji(TaikousenKekka e) {
         ],
       ),
     );
-    w.danraku(shusshinShumiBun(k, top.s, w.r, myouji(top.s.name)));
+    w.danraku(shusshinShumiBun(k, top.s, w, myouji(top.s.name)));
   }
 
   // 本文: 3種目を終えて(ハーフのあと)

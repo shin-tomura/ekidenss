@@ -2495,7 +2495,7 @@ Kiji? _jibunTenbou(Tenbou t, List<KijiYosouJin> yosou) {
       ),
     );
     if (a == null || chuumoku.id != a.id) {
-      w.danraku(shusshinShumiBun(k, chuumoku, w.r, myouji(chuumoku.name)));
+      w.danraku(shusshinShumiBun(k, chuumoku, w, myouji(chuumoku.name)));
     }
   }
   // エースのコメント(因縁と持ちタイムの事実入り。1.9.4)
@@ -2516,9 +2516,9 @@ Kiji? _jibunTenbou(Tenbou t, List<KijiYosouJin> yosou) {
         ],
       ),
     );
-    w.danraku(shusshinShumiBun(k, a, w.r, myouji(a.name)));
+    w.danraku(shusshinShumiBun(k, a, w, myouji(a.name)));
   } else if (a != null) {
-    w.danraku(shusshinShumiBun(k, a, w.r, myouji(a.name)));
+    w.danraku(shusshinShumiBun(k, a, w, myouji(a.name)));
   }
   final bool honmei = ts != null ? r < ts - 2 : (r <= 1 || ouja);
   w.comment(

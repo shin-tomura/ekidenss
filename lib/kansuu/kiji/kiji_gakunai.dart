@@ -406,7 +406,7 @@ Innen? _shoukai(
     w.danraku(toku);
     w.danraku(kb.bun);
   }
-  w.danraku(shusshinShumiBun(k, s, w.r, yobi));
+  w.danraku(shusshinShumiBun(k, s, w, yobi));
   return innen;
 }
 
@@ -859,7 +859,7 @@ Kiji _kekkaZenin(EkidenKekka e, EkidenUnivKekka m, String site) {
     w.danraku(sb.toString());
     // 見立てと結果の照合(1.9.7)
     w.danraku(fk.bun);
-    w.danraku(shusshinShumiBun(k, s, w.r, myouji(s.name)));
+    w.danraku(shusshinShumiBun(k, s, w, myouji(s.name)));
     // コメント
     CommentBamen bamen;
     bool kuyashii = false;
@@ -1647,7 +1647,7 @@ List<Kiji> gakunaiSotsugyouKiji(KijiKankyou k) {
     // 三大駅伝の成績の表(1.9.7。4年分)
     final KijiHyou? rh = sandaiSeisekiHyou(s);
     if (rh != null) w.hyou(rh);
-    w.danraku(shusshinShumiBun(k, s, w.r, yobi));
+    w.danraku(shusshinShumiBun(k, s, w, yobi));
     // (主将を務めた選手は、主将らしい言葉。2.0.2)
     w.comment(
       senshuComment(
@@ -2049,7 +2049,7 @@ Kiji _yosenZenin(YosenKekka e, YosenUnivKekka m, String site) {
       }
     }
     w.danraku(sb.toString());
-    w.danraku(shusshinShumiBun(k, s, w.r, myouji(s.name)));
+    w.danraku(shusshinShumiBun(k, s, w, myouji(s.name)));
     // コメント
     CommentBamen bamen;
     bool kuyashii = false;
@@ -2201,7 +2201,7 @@ Kiji _yosenMeikan(
     if (kb.tsuzukeru) sb.write(kb.bun);
     w.danraku(sb.toString());
     if (!kb.tsuzukeru) w.danraku(kb.bun);
-    w.danraku(shusshinShumiBun(k, s, w.r, yobi));
+    w.danraku(shusshinShumiBun(k, s, w, yobi));
     // 三大駅伝の成績の表(1.9.7。この予選の本戦の欄は「今回」。何も載らない選手は省く)
     final KijiHyou? rh = sandaiSeisekiHyou(s, imaRace: k.race, shouryaku: true);
     if (rh != null) w.hyou(rh);
@@ -2637,7 +2637,7 @@ void _taikousenSenshuKaku(
   }
   if (s.gakunen == 4) sb.write('4年生にとっては、これが最後の対校戦だ。');
   w.danraku(sb.toString());
-  w.danraku(shusshinShumiBun(k, s, w.r, w.senshu(s)));
+  w.danraku(shusshinShumiBun(k, s, w, w.senshu(s)));
   // コメント(因縁と、その日の順位の事実入り。1.9.4)
   final CommentBamen bamen = x.juni == 0
       ? CommentBamen.taikousenKojinYuushou

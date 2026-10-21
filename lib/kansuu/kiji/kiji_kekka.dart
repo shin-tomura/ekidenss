@@ -743,7 +743,7 @@ Kiji _topKiji(EkidenKekka e) {
           ],
         ),
       );
-      w.danraku(shusshinShumiBun(k, r0, w.r, myouji(r0.name)));
+      w.danraku(shusshinShumiBun(k, r0, w, myouji(r0.name)));
     }
   }
   final int koutai = e.shuiKoutai();
@@ -1689,7 +1689,7 @@ Kiji? _jibunKiji(EkidenKekka e) {
           ],
         ),
       );
-      w.danraku(shusshinShumiBun(k, s, w.r, myouji(s.name)));
+      w.danraku(shusshinShumiBun(k, s, w, myouji(s.name)));
       kaita.add(jouKukan);
     }
   }
@@ -2239,7 +2239,7 @@ Kiji? _kukanshouKiji(EkidenKekka e) {
       ],
     ),
   );
-  w.danraku(shusshinShumiBun(k, ms, w.r, myouji(ms.name)));
+  w.danraku(shusshinShumiBun(k, ms, w, myouji(ms.name)));
 
   // 本文: ほかの区間
   w.koMidashi('各区間');

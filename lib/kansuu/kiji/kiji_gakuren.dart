@@ -680,7 +680,7 @@ Kiji _tenbouMeikan(KijiKankyou k, List<_GSenshu> list) {
     }
     final SenshuData? s = x.s;
     if (s != null) {
-      w.danraku(shusshinShumiBun(k, s, w.r, myouji(s.name)));
+      w.danraku(shusshinShumiBun(k, s, w, myouji(s.name)));
       // 三大駅伝の成績の表(1.9.7。正月駅伝の欄は「今回」。何も載らない選手は省く)
       final KijiHyou? rh = sandaiSeisekiHyou(s, imaRace: _race, shouryaku: true);
       if (rh != null) w.hyou(rh);

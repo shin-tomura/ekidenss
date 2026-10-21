@@ -865,6 +865,11 @@ class _TenZu {
   });
 }
 
+/// 推移の点の表示のシード権ラインの太さと刻み(右の一覧の点線も同じ)
+const double _seedFutosa = 2;
+const double _seedHiku = 6;
+const double _seedAku = 4;
+
 /// 推移の点の表示を描く(道の帯・目盛り・シード権ライン・点)
 class _TenPainter extends CustomPainter {
   final _TenZu zu;
@@ -895,18 +900,22 @@ class _TenPainter extends CustomPainter {
       tp.paint(canvas, Offset(math.max(0, zu.obiHidari - 6 - tp.width), m.y - tp.height / 2));
     }
     // シード権ライン(点線だけ。文字は出さない。道の帯の左端から右端まで、帯の幅いっぱいに引く。
-    // 点はこのあとに描くので、境の大学が集団の中にいて線が点を貫くときも、点が上に見える)
+    // 点はこのあとに描くので、境の大学が集団の中にいて線が点を貫くときも、点が上に見える。
+    // 目盛りの線と見分けられるように、太さ2で、6引いて4空ける。右の一覧の点線も同じ)
     final double? seedY = zu.seedY;
     if (seedY != null) {
       final Paint p = Paint()
         ..color = Colors.amberAccent
-        ..strokeWidth = 1;
+        ..strokeWidth = _seedFutosa
+        ..style = PaintingStyle.stroke;
       _tensenDeHiku(
         canvas,
         Path()
           ..moveTo(zu.obiHidari, seedY)
           ..lineTo(zu.obiMigi, seedY),
         p,
+        hiku: _seedHiku,
+        aku: _seedAku,
       );
     }
     // 点(焦点の大学は最後に描いて、上に重ねる。焦点は色だけで示す)
@@ -2327,7 +2336,14 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
       // シード権の最後の順位の大学まで並べたあと、次の大学の前か、真ん中のタイムより後ろの学連選抜の前に引く
       if (!hiita && k != null && seed != null && daigakuSuu >= seed && (!x.op || x.ruikei >= k)) {
         hiita = true;
-        gyou.add(SizedBox(height: 6, child: CustomPaint(painter: _TensenPainter())));
+        gyou.add(
+          SizedBox(
+            height: 6,
+            child: CustomPaint(
+              painter: _TensenPainter(futosa: _seedFutosa, hiku: _seedHiku, aku: _seedAku),
+            ),
+          ),
+        );
       }
       if (!x.op) daigakuSuu++;
       final bool shoten = i == _suiiShotenI;
@@ -4418,13 +4434,14 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
   }
 }
 
-/// 点線で線を引く(パスに沿って、4px引いて3px空ける)
-void _tensenDeHiku(Canvas canvas, Path path, Paint p) {
+/// 点線で線を引く(パスに沿って、[hiku]px引いて[aku]px空ける。ふつうは4px引いて3px空ける)。
+/// [p] は PaintingStyle.stroke にする(塗りのままだと、まっすぐな線は何も描かれない)
+void _tensenDeHiku(Canvas canvas, Path path, Paint p, {double hiku = 4, double aku = 3}) {
   for (final metric in path.computeMetrics()) {
     double d = 0;
     while (d < metric.length) {
-      canvas.drawPath(metric.extractPath(d, math.min(d + 4, metric.length)), p);
-      d += 7;
+      canvas.drawPath(metric.extractPath(d, math.min(d + hiku, metric.length)), p);
+      d += hiku + aku;
     }
   }
 }
@@ -4537,19 +4554,25 @@ class _TensenWakuPainter extends CustomPainter {
   bool shouldRepaint(covariant _TensenWakuPainter old) => old.iro != iro;
 }
 
-/// シード権ラインの点線
+/// シード権ラインの点線([futosa] の太さで、[hiku]px引いて[aku]px空ける。ふつうは太さ1で4px引いて3px空ける)
 class _TensenPainter extends CustomPainter {
+  final double futosa;
+  final double hiku;
+  final double aku;
+
+  _TensenPainter({this.futosa = 1, this.hiku = 4, this.aku = 3});
+
   @override
   void paint(Canvas canvas, Size size) {
     final Paint p = Paint()
       ..color = Colors.amberAccent
-      ..strokeWidth = 1;
+      ..strokeWidth = futosa;
     final double y = size.height / 2;
-    for (double x = 0; x < size.width; x += 7) {
-      canvas.drawLine(Offset(x, y), Offset(math.min(x + 4, size.width), y), p);
+    for (double x = 0; x < size.width; x += hiku + aku) {
+      canvas.drawLine(Offset(x, y), Offset(math.min(x + hiku, size.width), y), p);
     }
   }
 
   @override
-  bool shouldRepaint(covariant _TensenPainter old) => false;
+  bool shouldRepaint(covariant _TensenPainter old) => old.futosa != futosa || old.hiku != hiku || old.aku != aku;
 }

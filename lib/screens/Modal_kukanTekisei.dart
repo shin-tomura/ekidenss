@@ -330,7 +330,6 @@ class _ModalKukanTekiseiState extends State<ModalKukanTekisei> {
 
   /// 1人分(または1区間分)の行(見出しと札、印、一言)
   Widget _gyou({required String midashi, required List<Widget> shirushi, required KukanTekisei t}) {
-    final TekiseiShirushi? saka = t.saka;
     final String keiken = t.keiken <= 0
         ? '経験 なし'
         : '経験 ${t.keiken}回${t.zenkai == null ? '' : '(前回${t.zenkai})'}';
@@ -366,7 +365,7 @@ class _ModalKukanTekiseiState extends State<ModalKukanTekisei> {
             children: [
               _shirushiFuda('距離', t.kyori, t.kyoriMei),
               _shirushiFuda('型', t.kata, t.kataMei),
-              if (saka != null) _shirushiFuda(t.sakaMei, saka, ''),
+              for (final ({String mei, TekiseiShirushi shirushi}) sk in t.saka) _shirushiFuda(sk.mei, sk.shirushi, ''),
               _fuda(keiken, Colors.white70),
             ],
           ),

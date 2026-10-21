@@ -61,9 +61,6 @@ bool _updownKaru(Ghensuu gh, int race, int kk) =>
 // ---- 区間適性の見立て(2.1.1。kukan_tekisei.dart)でも使う見方 ----
 // 選手の特徴の文と同じ決め方にするため、ここに置いて両方から使う
 
-/// 平坦だがアップダウンが細かく続く区間か(区間適性の見立てで使う)
-bool updownKaru(Ghensuu gh, int race, int kk) => _updownKaru(gh, race, kk);
-
 /// 順位[r](1始まり)が[n]人の中でどの段か(0: 上位3分の1、1: 中ほど、2: 下位3分の1。区間適性の見立てで使う)
 int sanbunDan(int r, int n) => _dan(r, n);
 

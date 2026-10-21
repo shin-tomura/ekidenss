@@ -83,7 +83,8 @@ class KonkiTimeIchiranButton extends StatelessWidget {
 }
 
 /// 枠とアイコン付きの丸いボタン(押すと[gamen]の画面を開く)
-/// 選手画面の夏合宿の金特訓・銀特訓・金銀交換のボタンでも使う(1.9.9)
+/// 選手画面の夏合宿の金特訓・銀特訓・金銀交換のボタンでも使う(1.9.9)。
+/// 区間適性の見立て(紫。Modal_kukanTekisei.dart の KukanTekiseiLink)でも使う(2.1.1)
 class MedatsuButton extends StatelessWidget {
   final String label;
   final IconData icon;

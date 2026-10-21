@@ -9,10 +9,11 @@ import 'package:ekiden/kansuu/shushou.dart' show shushouShirushi; // 主将の�
 import 'package:ekiden/kansuu/kiji/kiji_kihon.dart' show KijiKankyou, kmMoji, kukanKihonShumoku;
 import 'package:ekiden/kansuu/kiji/kiji_tokuchou.dart' show MochiHyou;
 import 'package:ekiden/kansuu/kukan_tekisei.dart';
+import 'package:ekiden/screens/kukan_haiti_button.dart' show MedatsuButton; // 目立つボタン(1.9.9)
 
 // ------------------------------------------------------------
 // 区間適性の見立て(2.1.1。中身は kukan_tekisei.dart)
-// 一次エントリー・区間エントリー・当日変更・学連選抜編成(監督をしている年)の画面の緑のリンクから開く。
+// 一次エントリー・区間エントリー・当日変更・学連選抜編成(監督をしている年)の画面の紫のボタンから開く(区間配置確認などと同じ目立つボタン。kukan_haiti_button.dart の MedatsuButton)。
 // ・区間ごと: 区間を選ぶと、出せる選手を区間の距離に合う種目の持ちタイム順に並べ、印と一言を出す
 //   (合う度合いの順にすると、遅い選手が上に来てしまうため)
 // ・選手ごと: 選手を選ぶと、出す区間ごとの印と一言を出す
@@ -82,7 +83,8 @@ void kukanTekiseiHiraku(BuildContext context, KukanTekiseiNaiyou naiyou) {
   );
 }
 
-/// 「区間適性の見立て」の緑の下線のリンク(ほかのリンクと同じ見た目)
+/// 「区間適性の見立て」を開くボタン(区間配置確認・今季タイム一覧表と同じ、枠とアイコン付きの丸いボタン。
+/// 色はほかの目立つボタンと重ならない紫、アイコンはチェックリスト。置き場所は、2.1.1で緑の下線のリンクだったときと同じ)
 /// [naiyou] 押したときに、見立てに渡すものを作る(画面で選んでいる区間を、押したときの状態で渡すため)
 class KukanTekiseiLink extends StatelessWidget {
   final KukanTekiseiNaiyou Function() naiyou;
@@ -91,15 +93,14 @@ class KukanTekiseiLink extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return TextButton(
-      onPressed: () => kukanTekiseiHiraku(context, naiyou()),
-      child: const Text(
-        "区間適性の見立て",
-        style: TextStyle(
-          color: Color.fromARGB(255, 0, 255, 0),
-          decoration: TextDecoration.underline,
-          decorationColor: HENSUU.textcolor,
-        ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: MedatsuButton(
+        label: '区間適性の見立て',
+        icon: Icons.checklist,
+        iro: Colors.purpleAccent,
+        barrierLabel: '区間適性の見立て',
+        gamen: () => ModalKukanTekisei(naiyou: naiyou()),
       ),
     );
   }

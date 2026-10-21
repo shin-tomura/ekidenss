@@ -12,10 +12,10 @@ import 'package:ekiden/kansuu/kiji/kiji_tokuchou.dart';
 // 見えている記録だけから見る(能力値は見ないので、能力を見抜く仕組みは変わらない)
 //  ・距離: 5000m・1万m・ハーフの学生全体の順位で一番良い種目と、区間の距離(大会の中で長めか短めかも)
 //  ・型: トラックの1万mとロード1万の学生全体の順位(1区向き・2区3区向き・後半向き)
-//  ・坂: 登り・下り・アップダウンの区間だけ。登り1万・下り1万・クロカン1万の学生全体の順位。
-//    レースでは登り・下り・切り替えの補正がどの区間でも同時にかかるので、山や上り・下り基調の区間でも、
-//    切り替えが30回以上なら起伏(クロカン1万)を並べて見る(初期のコースには、そういう区間はない)。
-//    アップダウンの区間(切り替え50回以上)は、登り・下りがあっても起伏だけを見る(今まで通り)
+//  ・坂: 登り1万・下り1万・クロカン1万の学生全体の順位。レースでは登り・下り・切り替えの補正がどの区間でも
+//    同時にかかるので、区間の特徴(kukanTokuchou)の種類にかかわらず、登り・下りは基調以上(指数30以上)、
+//    起伏は細かな起伏が続く(切り替え30回以上)なら札を出す。札の並びと一言で見る順は、レースの計算で
+//    効き方の大きい順(_noboriKiki など。係数は中で使うだけで、画面にも説明書にも出さない)
 //  ・経験: 同じ大会の同じ区間を前の学年までに走った回数と、前回の区間順位
 // ほかの大学の区間配置とは比べない(区間内順位は使わない)。どの画面でも同じ見立てになる。
 // 印は ◎(合う)・○(問題なし)・△(課題あり)・−(記録が足りない)
@@ -97,8 +97,7 @@ class KukanTekisei {
   final TekiseiShirushi kata;
   final String kataMei;
 
-  /// 坂の呼び方(「登り」「下り」「起伏」)と印(坂を見ない平坦な区間は空。
-  /// 山や上り・下り基調の区間で切り替えが多ければ、登り・下りのあとに起伏も)
+  /// 坂の呼び方(「登り」「下り」「起伏」)と印(区間にある坂を、効き方の大きい順に。坂のない平坦な区間は空)
   final List<({String mei, TekiseiShirushi shirushi})> saka;
 
   /// 前の学年までに同じ大会の同じ区間を走った回数と、前回の区間順位の文(「区間4位」。分からなければnull)
@@ -135,6 +134,19 @@ const List<String> tekiseiShumokuMei = ['5000m', '1万m', 'ハーフ', 'フル',
 /// 区間[kk]で切り替えが多いか(30回以上。平坦な区間で細かなアップダウンが続くとみなす回数と同じ)
 bool _kirikaeOoi(Ghensuu gh, int race, int kk) =>
     gh.noborikudarikirikaekaisuu_taikai_kukangoto[race][kk] >= updownKaruKaisuu;
+
+/// 登り・下りの札を出す指数(区間の特徴(kukanTokuchou)の上り・下り基調と同じ)
+const double _kichouShisuu = 30;
+
+/// 坂の効き方の目安(能力の差1あたりの、タイムの補正の大きさ)。RaceCalc.dart(RaceCalc_gakuren.dart も同じ)の
+/// 登り・下り・切り替えの補正の、能力にかかる項と同じ係数で、札の並びと一言で見る順を決めるのに使う。
+/// 補正の式を変えたら、ここも合わせる
+double _noboriKiki(Ghensuu gh, int race, int kk) =>
+    0.00017 * TEISUU.CHOUSEI_NOBORI * noboriShisuu(gh, race, kk) / 100.0;
+double _kudariKiki(Ghensuu gh, int race, int kk) =>
+    0.00018 * TEISUU.CHOUSEI_KUDARI * kudariShisuu(gh, race, kk) / 100.0;
+double _kirikaeKiki(Ghensuu gh, int race, int kk) =>
+    TEISUU.CHOUSEI_KIRIKAE * gh.noborikudarikirikaekaisuu_taikai_kukangoto[race][kk];
 
 /// 区間[kk]の起伏の呼び方(区間の見出しに使う。「山登り」「平坦」など。並べて見る坂も添える)
 String kukanKifukuMei(Ghensuu gh, int race, int kk) {
@@ -278,7 +290,7 @@ KukanTekisei kukanTekiseiMiru(Ghensuu gh, int race, MochiHyou hyou, TekiseiSensh
     bunList.add(_Bun(kata, bun, 2));
   }
 
-  // 坂(登り・下り・起伏。区間の特徴で一番に効くものと、山や上り・下り基調の区間で切り替えが多いときの起伏)
+  // 坂(登り・下り・起伏。上の説明のとおり、区間にあるものを効き方の大きい順に)
   final List<({String mei, TekiseiShirushi shirushi})> saka = [];
   // 種目[ev]の学生全体の順位で印を決め、一言の材料も足す([jun] 一言で見る順、[omoi] 記録がないときも必ず触れるか)
   void sakaMiru(int ev, String mei, String basho, {required int jun, required bool omoi}) {
@@ -299,21 +311,25 @@ KukanTekisei kukanTekiseiMiru(Ghensuu gh, int race, MochiHyou hyou, TekiseiSensh
   }
 
   final KukanTokuchou tok = kukanTokuchou(gh, race, kk);
-  // 山の区間とアップダウンが50回以上の区間は、坂を一番に見る(一言で距離・型より先に)
-  final bool omoi =
-      tok == KukanTokuchou.yamaNobori || tok == KukanTokuchou.yamaKudari || tok == KukanTokuchou.updown;
-  final int shuJun = omoi ? 0 : 3;
-  if (tok == KukanTokuchou.yamaNobori || tok == KukanTokuchou.nobori) {
-    sakaMiru(4, '登り', tok == KukanTokuchou.yamaNobori ? '山登り' : '登り', jun: shuJun, omoi: omoi);
-  } else if (tok == KukanTokuchou.yamaKudari || tok == KukanTokuchou.kudari) {
-    sakaMiru(5, '下り', tok == KukanTokuchou.yamaKudari ? '山下り' : '下り', jun: shuJun, omoi: omoi);
-  } else if (tok == KukanTokuchou.updown) {
-    sakaMiru(7, '起伏', 'アップダウン', jun: shuJun, omoi: omoi);
-  }
-  // 切り替えが30回以上なら起伏も(平坦な区間では起伏だけ。アップダウンの区間は上で見た)
-  if (tok != KukanTokuchou.updown && _kirikaeOoi(gh, race, kk)) {
-    final bool heitan = tok == KukanTokuchou.heitan;
-    sakaMiru(7, '起伏', heitan ? 'アップダウン' : '細かなアップダウン', jun: heitan ? 3 : 4, omoi: false);
+  final bool yama = tok == KukanTokuchou.yamaNobori || tok == KukanTokuchou.yamaKudari;
+  final List<({int ev, String mei, String basho, double kiki})> sakaKouho = [
+    if (noboriShisuu(gh, race, kk) >= _kichouShisuu)
+      (ev: 4, mei: '登り', basho: tok == KukanTokuchou.yamaNobori ? '山登り' : '登り', kiki: _noboriKiki(gh, race, kk)),
+    if (kudariShisuu(gh, race, kk) >= _kichouShisuu)
+      (ev: 5, mei: '下り', basho: tok == KukanTokuchou.yamaKudari ? '山下り' : '下り', kiki: _kudariKiki(gh, race, kk)),
+    if (_kirikaeOoi(gh, race, kk))
+      (
+        ev: 7,
+        mei: '起伏',
+        basho: (yama || tok == KukanTokuchou.nobori || tok == KukanTokuchou.kudari) ? '細かなアップダウン' : 'アップダウン',
+        kiki: _kirikaeKiki(gh, race, kk),
+      ),
+  ]..sort((a, b) => b.kiki.compareTo(a.kiki));
+  // 山の区間とアップダウンが50回以上の区間は、一番に効く坂を、一言で距離・型より先に見る(記録がなくても触れる)
+  final bool omoi = yama || tok == KukanTokuchou.updown;
+  for (int i = 0; i < sakaKouho.length; i++) {
+    final ({int ev, String mei, String basho, double kiki}) x = sakaKouho[i];
+    sakaMiru(x.ev, x.mei, x.basho, jun: i == 0 ? (omoi ? 0 : 3) : 3 + i, omoi: i == 0 && omoi);
   }
 
   final ({int kaisuu, String? zenkai}) kei = tekiseiKeiken(s, race, kk);

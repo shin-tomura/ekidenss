@@ -1069,17 +1069,8 @@ class TokuchouKaki {
       if (jijou.siji == 1 && jijou.seikou != null) {
         sb3.write(jijou.seikou! ? 'スタート直後の飛び出しが、狙いどおり決まった。' : 'スタート直後に飛び出したが、後半に代償を払った。');
       } else if (jijou.shuudan.isNotEmpty) {
-        if (jijou.shuudan.contains('速すぎた')) {
-          sb3.write('速い集団のペースについていき、後半に大きく失速した。');
-        } else if (jijou.shuudan.contains('遅かった')) {
-          sb3.write('集団のペースが遅く、持ち味を出し切れなかった。');
-        } else if (jijou.shuudan.contains('少しタイム得')) {
-          sb3.write('集団の流れにうまく乗った。');
-        } else if (jijou.shuudan.contains('免れた')) {
-          sb3.write('速い流れに最後まで食らいついた。');
-        } else if (jijou.shuudan.contains('自分で作った')) {
-          sb3.write('自ら集団を引っ張った。');
-        }
+        // 区間順位の評価(上位・下位)と食い違わない言い方にする(2.1.1。ikkuShuudanBun)
+        sb3.write(ikkuShuudanBun(jijou.shuudan, yoi ? 0 : (kurushii ? 2 : 1)));
       }
     } else if (jijou.siji == 1 && jijou.seikou != null) {
       sb3.write(jijou.seikou! ? '前半から突っ込む指示に、しっかり応えた。' : '前半から突っ込む指示だったが、後半に失速した。');

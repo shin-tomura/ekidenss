@@ -2161,17 +2161,8 @@ Kiji? _gakunaiSokuhou(
       final String mae = s.sijiflag == 1 ? '指示どおりスタート直後に飛び出し' : 'スタート直後に自ら飛び出し';
       sb.write(h.seikou! ? '$yは$mae、狙いどおりの展開に持ち込んだ。' : '$yは$maeたが、後半は苦しい走りになった。');
     } else if (h.shuudan.isNotEmpty) {
-      if (h.shuudan.contains('速すぎた')) {
-        sb.write('$yは速い集団のペースについていき、後半に大きく失速した。');
-      } else if (h.shuudan.contains('遅かった')) {
-        sb.write('$yにとって集団のペースは遅く、持ち味を出し切れなかった。');
-      } else if (h.shuudan.contains('少しタイム得')) {
-        sb.write('$yは集団の流れにうまく乗った。');
-      } else if (h.shuudan.contains('免れた')) {
-        sb.write('$yは速い流れに最後まで食らいついた。');
-      } else if (h.shuudan.contains('自分で作った')) {
-        sb.write('$yが自ら集団を引っ張った。');
-      }
+      // 見出しの評価(好走・苦しむ)と食い違わない言い方にする(2.1.1。ikkuShuudanBun)
+      sb.write(ikkuShuudanBun(h.shuudan, yoi ? 0 : (kurushii ? 2 : 1), shugo: y));
     }
   } else {
     if (h.siji == 1 && h.seikou != null) {

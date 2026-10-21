@@ -1619,7 +1619,9 @@ Kiji? _jibunKiji(EkidenKekka e) {
         );
       }
     }
-    final String pace = _jibunIkkuPace(k, s1);
+    // 集団のペースの一言は、上の文の評価(好発進・まずまず・出遅れ)に合わせる(2.1.1)
+    final int ikkuHyouka = (kj1 == 0 || m.tuuka[0] <= 2) ? 0 : (m.tuuka[0] >= (n * 2) ~/ 3 ? 2 : 1);
+    final String pace = _jibunIkkuPace(k, s1, ikkuHyouka);
     if (pace.isNotEmpty) sb.write(pace);
     // 1区の選手が主役なら、因縁とコメントも
     if (shuyaku == 0) sb.write(innenBun(0));
@@ -2111,16 +2113,19 @@ Kiji? _jibunKiji(EkidenKekka e) {
 }
 
 /// 自分の大学の1区の選手の、集団のペースとの関係の一言(説明文から作る。なければ空)
-String _jibunIkkuPace(KijiKankyou k, SenshuData s) {
-  // (「後半の大失速は免れた」の行もあるので、大失速は「速すぎた」で見分ける)
+/// [hyouka] 前の文で書いた走りの評価(0: 好発進、1: まずまず、2: 出遅れ。ikkuShuudanBun。2.1.1)
+String _jibunIkkuPace(KijiKankyou k, SenshuData s, int hyouka) {
+  // (「後半の大失速は免れた」の行もあるので、大失速は「速すぎた」で見分ける。ikkuShuudanBun)
   final List<String> gyou = ikkuSetsumeiGyou(s.string_racesetumei);
   for (final String g in gyou) {
-    if (g.contains('自分で作った')) return '自ら集団を引っ張った。';
-    if (g.contains('速すぎた')) return '速い集団のペースについていき、後半に失速した。';
-    if (g.contains('遅かった')) return '集団のペースが遅く、持ち味を出し切れなかった。';
-    if (g.contains('少しタイム得')) return '集団の流れにうまく乗った。';
-    if (g.contains('免れた')) return '速い流れにも最後まで食らいついた。';
-    if (g.contains('飛び出し')) return 'スタート直後から果敢に飛び出した。';
+    final String bun = ikkuShuudanBun(g, hyouka);
+    if (bun.isNotEmpty) return bun;
+    // 飛び出しは、決まったかどうかで書き分ける(2.1.1。実況・振り返りと同じ)
+    if (g.contains('飛び出し')) {
+      return s.startchokugotobidasiseikouflag == 1
+          ? 'スタート直後から果敢に飛び出し、狙いどおりの展開に持ち込んだ。'
+          : 'スタート直後に飛び出したが、後半は苦しい走りになった。';
+    }
   }
   return '';
 }

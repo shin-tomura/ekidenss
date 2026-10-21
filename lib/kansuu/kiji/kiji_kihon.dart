@@ -1186,6 +1186,29 @@ String juniMoji(int juni0) => '${juni0 + 1}位';
 /// 距離の文(「21.3km」)
 String kmMoji(double meter) => '${(meter / 1000.0).toStringAsFixed(1)}km';
 
+/// 1区の集団のペースとの関係の一言(2.1.1。結果の記事・実況・学内メディアの振り返りで共通)
+/// [shuudan] レースの説明の集団のペースの行、[hyouka] 前の文で書いた走りの評価(0: 上位、1: 中ほど、2: 下位)、
+/// [shugo] 文の頭に付ける呼び方(「山田は」の「山田」。空なら付けない)。当てはまる行でなければ空。
+/// 前の文の評価と食い違わないように言い方を変える(区間15位と出遅れたのに「集団の流れにうまく乗った」と
+/// 続けたり、区間賞なのに「持ち味を出し切れなかった」と続けたりしない)
+String ikkuShuudanBun(String shuudan, int hyouka, {String shugo = ''}) {
+  final String bun;
+  if (shuudan.contains('速すぎた')) {
+    bun = hyouka == 0 ? '速い集団のペースについて後半は苦しんだが、上位は守った。' : '速い集団のペースについていき、後半に大きく失速した。';
+  } else if (shuudan.contains('遅かった')) {
+    bun = hyouka == 0 ? '集団のペースが遅い展開でも、しっかり上位に入った。' : '集団のペースが遅く、持ち味を出し切れなかった。';
+  } else if (shuudan.contains('少しタイム得')) {
+    bun = hyouka == 2 ? '集団の流れに乗ってタイムは稼いだが、上位には届かなかった。' : '集団の流れにうまく乗った。';
+  } else if (shuudan.contains('免れた')) {
+    bun = hyouka == 2 ? '速い集団のペースに苦しみながらも、大崩れは免れた。' : '速い流れにも最後まで食らいついた。';
+  } else if (shuudan.contains('自分で作った')) {
+    bun = hyouka == 2 ? '自ら集団を引っ張ったが、終盤の争いで後れを取った。' : '自ら集団を引っ張った。';
+  } else {
+    return '';
+  }
+  return shugo.isEmpty ? bun : '$shugoは$bun';
+}
+
 /// 「2年連続5度目の」「3年ぶり4度目の」などの言い方(初めてのときは空。呼ぶ側で「初」を書く)
 /// [renzoku] 今回を含めた連続の年数、[buri] 前回から何年ぶりか(分からなければnull)、[kaisuu] 今回を含めた回数
 /// [hisabisa] 前回の年が分からないが、記録より前にあった(今までのセーブデータ。2.0.0。「久々となる5度目の」)

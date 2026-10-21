@@ -67,7 +67,10 @@
 //       道の帯の幅いっぱいに引き、点はその上に描く)を出す。道の帯・目盛りの文の欄・右の一覧の幅・上の行の高さは、どのコマでも
 //       同じにする(画面の幅と文字の大きさだけで決める。コマごとに変わると、ちらついて見にくいため)。道をスクロールしないので、焦点を追って道を動かす処理(_suiiOu・_suiiSakiniOu)は働かず、
 //       倍率の「−」「＋」も出さない。右には、そのコマの時点の順位の順で全大学の名前を並べる(学連選抜もタイムの順の
-//       位置に「OP」で入れる。名前を押すと焦点を移す。_tenIchiran)。図の上は広がりの文と「説明」だけにし、
+//       位置に「OP」で入れる。名前を押すと焦点を移す。_tenIchiran)。図の上は道の全長の文と「説明」だけにし、
+//       (道の全長は、区間ごとの縮尺で道の上端(トップ)から下端までが何mに当たるか。区間の中では変わらない。
+//       2.1.2から。2.1.1はそのコマのトップから最後尾までの距離と秒差を出していたが、コマごとに変わり、
+//       縮尺の目安にならなかったため)
 //       説明の文は「説明」を押すと小さな窓で出す(_tenSetsumeiHiraku)
 //     ・false: 大学の四角を道に並べ、焦点の大学に合わせて道を動かす(2.1.1の開発中の形。下の説明はこの形のもの)
 // ・2.0.8〜2.0.9は、おまかせのときに「おまかせ」をもう一度押すと「おまかせ ↔」(幅に合わせる)になり、道が横幅に
@@ -2164,28 +2167,17 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
 
   /// 推移の点の表示(suiiTen。2.1.1)。トップから最後尾までを、区間ごとに決めた縮尺で1つの画面に収め、
   /// 右にそのコマの時点の順位の順で全大学の名前を並べる(_tenIchiran)。説明の文は「説明」を押すと小さな窓で出す
-  /// (図の上に置くと図が低くなるため)。道はスクロールしない
+  /// (図の上に置くと図が低くなるため)。道はスクロールしない。図の上には、縮尺の目安として道の全長を出す(2.1.2)
   Widget _buildTen(BuildContext context, _IchiKankei b, _IchiKukan r) {
     final double haba = _tenHaba(b, _suiiKukan);
-    // トップから最後尾まで(学連選抜は除く)
-    final List<_IchiDaigaku> daigaku = [
-      for (final _IchiDaigaku x in r.narabi)
-        if (!x.op) x,
-    ];
-    String hirogari = '';
-    if (daigaku.length >= 2) {
-      final int s = saByou(daigaku.last.ruikei, daigaku.first.ruikei);
-      final double m = (daigaku.last.ruikei - daigaku.first.ruikei) * r.hayasa;
-      hirogari = s <= 0
-          ? 'トップから最後尾まで 並走'
-          : 'トップから最後尾まで ${_kyoriMoji(m)}(${saMoji(s)})';
-    }
+    // 道の全長(区間ごとの縮尺で、道の上端(トップ)から下端までが何mに当たるか。区間の中では変わらない。2.1.2)
+    final String zenchou = '道の全長 ${_kyoriMoji(haba)}';
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 広がりの文と「説明」。広がりの文は1行に固定し(入らなければ縮める)、「説明」は右端に置く
+          // 道の全長の文と「説明」。道の全長の文は1行に固定し(入らなければ縮める)、「説明」は右端に置く
           // (文の長さで行の数や「説明」の位置が変わると、図の高さ(縮尺)まで変わってちらつくため)
           Row(
             children: [
@@ -2194,7 +2186,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
                   fit: BoxFit.scaleDown,
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    hirogari,
+                    zenchou,
                     maxLines: 1,
                     softWrap: false,
                     style: const TextStyle(
@@ -2397,6 +2389,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
       '区間の中の動きは、つなぐための推定です。区間の終わりで「位置」の図と同じになります。',
       if (r.kk == 0) '1区は、飛び出した選手と集団の記録をもとにした演出です。',
       '縮尺は区間ごとに、その区間で一番広がったときに合わせています。',
+      '図の上の「道の全長」は、道の上端(トップ)から下端までが何mに当たるかの目安です。',
       'オレンジの点: 焦点の大学(右の一覧ではオレンジの太字。点か一覧の名前を押すと、その大学を追います)',
       if (b.gakurenJibun)
         '水色: あなたが監督の学連選抜'

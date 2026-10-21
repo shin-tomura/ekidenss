@@ -46,9 +46,15 @@
 //     上から3分の1に来るように、コマを変えるたびに道を動かす(指で道を動かすと再生を止める)。焦点の大学は水色の枠
 //   ・大学の四角を押すと、その大学に焦点を移す(下の帯は出さない)。倍率は「−」「＋」で、おまかせのときは×4。
 //     再生中は途中の省略(点線)をしない(省略が出たり消えたりして道が跳ねないように)
-//   ・四角の中の順位は、そのコマの時点の順位(その地点を通った順)。順位の変化は、数字を出さずに、前の中継所から
-//     順位を上げた大学に「↑」(緑)、下げた大学に「↓」(赤)だけを出す(変わらなければ何も出さない。勢いの向きが
-//     分かるように。1区の演出のあいだは出さない)。位置は今まで通り「↑2」「↓3」「→」
+//   ・四角の中の順位は、そのコマの時点の順位(その地点を通った順)。順位の変化の出し方は、定数 suiiHendouKata で
+//     切り替える(どの形のコードも残してある。四角の欄の幅と説明書の文は、この値に合わせて変わる)。
+//     ・nukisuu(今の形): 前の中継所からこれまでに抜いた大学の数「↑3」(緑)と抜かれた数「↓1」(赤)。両方あれば「↑3↓1」。
+//       区間の中は同じペースとみなすので、2校の前後が入れ替わるのは1つの区間で多くても1回で、数は増えるだけ
+//       (中継所での前後と今のコマの前後を比べて数える。同じタイムは数えない)。学連選抜は数えない(順位に数えないので、
+//       抜いただけのときは「↑の数=順位の上がった数」になる)。学連選抜の四角には、学連選抜が抜いた・抜かれた大学の数
+//     ・sashihiki: 前の中継所からの順位の変化の数「↑2」「↓3」(位置と同じ数え方)
+//     ・yajirushi: 矢印だけ「↑」「↓」(2.1.1の開発中の形)
+//     どの形も、変わらなければ何も出さず、1区の演出のあいだは出さない。位置は今まで通り「↑2」「↓3」「→」
 //   ・推移から位置に切り替えると、推移で見ていた区間を出す。覚えない(開いたときは「位置」)
 // ・2.0.8〜2.0.9は、おまかせのときに「おまかせ」をもう一度押すと「おまかせ ↔」(幅に合わせる)になり、道が横幅に
 //   収まるように道の上の文字を6割まで小さくしていた。2.1.0で、集団の1行に画面の幅に入るだけ並べるようになり、
@@ -203,6 +209,22 @@ const List<String> _suiiHayasaMei = ['ゆっくり', 'ふつう', 'はやい'];
 
 /// 推移で、焦点の大学を置く高さ(道が見えている高さの、上からこの割合のところ)
 const double _suiiShotenTakasa = 1 / 3;
+
+/// 推移(2.1.1)の、大学の四角の中の順位の変化の出し方(開発者が切り替える。プレイヤーの設定ではない。
+/// 四角の欄の幅と説明書の文(setsumeisho_text.dart)は、この値に合わせて変わる。切り替えるときは変更履歴を直す)
+enum SuiiHendouKata {
+  /// 前の中継所からこれまでに抜いた大学の数「↑3」と、抜かれた数「↓1」(両方あれば「↑3↓1」)
+  nukisuu,
+
+  /// 前の中継所からの順位の変化の数「↑2」「↓3」(位置と同じ数え方)
+  sashihiki,
+
+  /// 矢印だけ「↑」「↓」
+  yajirushi,
+}
+
+/// 今の推移の順位の変化の出し方
+const SuiiHendouKata suiiHendouKata = SuiiHendouKata.nukisuu;
 
 /// 推移の1区の演出(2.1.1): 集団がばらけ始めるところ(区間の最後の4分の1)
 const double _ikkuBarakeIchi = 0.75;
@@ -391,6 +413,8 @@ class _IchiDaigaku {
     this.tsugiGSenshu,
     this.mokuhyou,
     this.univId,
+    this.nuita,
+    this.nukareta,
   });
 
   /// 目標順位(0が1位。学連選抜は学連選抜の目標。分からなければnull。差の基準を目標順位にしたときに使う。2.0.7)
@@ -398,6 +422,32 @@ class _IchiDaigaku {
 
   /// 大学id(学連選抜はnull。推移で、区間をまたいで同じ大学を見分けるのに使う。2.1.1)
   final int? univId;
+
+  /// 推移で、前の中継所からこれまでに抜いた大学の数と、抜かれた大学の数(学連選抜は数えない。推移のほかはnull。2.1.1)
+  final int? nuita;
+  final int? nukareta;
+
+  /// 抜いた数と抜かれた数を付けたもの(ほかはそのまま。2.1.1)
+  _IchiDaigaku nukisuuTsuki(int nuitaKazu, int nukaretaKazu) => _IchiDaigaku(
+    mei,
+    ruikei,
+    juni,
+    jibun,
+    op,
+    hendou: hendou,
+    soutouJuni: soutouJuni,
+    senshu: senshu,
+    gSenshu: gSenshu,
+    shozoku: shozoku,
+    kukanJuni: kukanJuni,
+    kukanTime: kukanTime,
+    tsugiSenshu: tsugiSenshu,
+    tsugiGSenshu: tsugiGSenshu,
+    mokuhyou: mokuhyou,
+    univId: univId,
+    nuita: nuitaKazu,
+    nukareta: nukaretaKazu,
+  );
 
   /// 次の区間を走る選手がいるか
   bool get tsugiAri => tsugiSenshu != null || tsugiGSenshu != null;
@@ -437,7 +487,17 @@ class _IchiKukan {
   /// 推移(2.1.1)で、区間の途中を作ったものか(中継所の図ではない。_suiiKoma)
   final bool suii;
 
-  _IchiKukan(this.kk, this.hayasa, this.narabi, {this.suii = false});
+  /// 推移で、四角の中の順位の変化の欄の幅を決める文(その区間で出うる一番広い文。区間の途中で欄の幅が
+  /// 変わらないように。2.1.1)
+  final List<String> hendouHabaMoji;
+
+  _IchiKukan(
+    this.kk,
+    this.hayasa,
+    this.narabi, {
+    this.suii = false,
+    this.hendouHabaMoji = const [],
+  });
 
   /// 1位(学連選抜を除く)
   _IchiDaigaku get top => narabi.firstWhere((x) => !x.op, orElse: () => narabi.first);
@@ -876,7 +936,19 @@ _IchiKukan _suiiKomaIkku(_IchiKukan ato, double p, _IkkuEnshutsu e) {
 /// ・[p] が1なら、この区間の終了時点の図と同じ中身を、推移の描き方(途中を省略しないなど)で描く
 /// ・前の区間にいない大学(思わぬデータ)は、この区間の終了時点のタイムのまま
 _IchiKukan _suiiKoma(_IchiKukan mae, _IchiKukan ato, double p) {
-  if (p >= 1) return _IchiKukan(ato.kk, ato.hayasa, ato.narabi, suii: true);
+  // 前の中継所の累計タイム(抜いた数・抜かれた数を数えるため)と、この区間の終わりで出うる一番広い順位の変化の文
+  // (抜いた数・抜かれた数は増えるだけなので、区間の終わりの数で決まる)
+  final Map<int, double> maeT = {
+    for (final _IchiDaigaku x in mae.narabi) _daigakuKagi(x): x.ruikei,
+  };
+  final List<_IchiDaigaku> owari = _nukisuuTsukeru(ato.narabi, maeT);
+  final List<String> habaMoji = _suiiHendouHabaMoji(
+    owari,
+    ato.narabi.where((x) => !x.op).length,
+  );
+  if (p >= 1) {
+    return _IchiKukan(ato.kk, ato.hayasa, owari, suii: true, hendouHabaMoji: habaMoji);
+  }
   final double t = p < 0 ? 0.0 : p;
   final Map<int, _IchiDaigaku> maeMap = {
     for (final _IchiDaigaku x in mae.narabi) _daigakuKagi(x): x,
@@ -925,7 +997,74 @@ _IchiKukan _suiiKoma(_IchiKukan mae, _IchiKukan ato, double p) {
   final double hayasa = mae.hayasa > 0
       ? mae.hayasa + (ato.hayasa - mae.hayasa) * t
       : ato.hayasa;
-  return _IchiKukan(ato.kk, hayasa, narabi, suii: true);
+  return _IchiKukan(
+    ato.kk,
+    hayasa,
+    _nukisuuTsukeru(narabi, maeT),
+    suii: true,
+    hendouHabaMoji: habaMoji,
+  );
+}
+
+/// 推移の図[ima]の大学ごとに、前の中継所からこれまでに抜いた大学の数と抜かれた大学の数を付ける(2.1.1)。
+/// [maeT] は大学(_daigakuKagi)ごとの前の中継所の累計タイム。中継所で前にいて今は後ろにいる大学を「抜いた」、
+/// 中継所で後ろにいて今は前にいる大学を「抜かれた」と数える(同じタイムは数えない)。学連選抜は数えない
+/// (学連選抜の四角には、学連選抜が抜いた大学・抜かれた大学の数を付ける)。前の中継所にいない大学には付けない
+List<_IchiDaigaku> _nukisuuTsukeru(List<_IchiDaigaku> ima, Map<int, double> maeT) {
+  const double e = 1e-6;
+  final List<_IchiDaigaku> kekka = [];
+  for (final _IchiDaigaku a in ima) {
+    final double? am = maeT[_daigakuKagi(a)];
+    if (am == null) {
+      kekka.add(a);
+      continue;
+    }
+    int nuita = 0;
+    int nukareta = 0;
+    for (final _IchiDaigaku b in ima) {
+      if (identical(a, b) || b.op) continue;
+      final double? bm = maeT[_daigakuKagi(b)];
+      if (bm == null) continue;
+      if (bm < am - e && b.ruikei > a.ruikei + e) nuita++;
+      if (bm > am + e && b.ruikei < a.ruikei - e) nukareta++;
+    }
+    kekka.add(a.nukisuuTsuki(nuita, nukareta));
+  }
+  return kekka;
+}
+
+/// 推移の四角の中の順位の変化の、色を分ける部分(fugou がプラスなら緑、マイナスなら赤。suiiHendouKata の形。
+/// 変わっていなければ空。2.1.1)
+List<({String moji, int fugou})> _suiiHendouBubun(_IchiDaigaku x) {
+  final int h = x.hendou ?? 0;
+  final int a = x.nuita ?? 0;
+  final int c = x.nukareta ?? 0;
+  return switch (suiiHendouKata) {
+    SuiiHendouKata.nukisuu => [
+      if (a > 0) (moji: '↑$a', fugou: 1),
+      if (c > 0) (moji: '↓$c', fugou: -1),
+    ],
+    SuiiHendouKata.sashihiki => [
+      if (h > 0) (moji: '↑$h', fugou: 1),
+      if (h < 0) (moji: '↓${-h}', fugou: -1),
+    ],
+    SuiiHendouKata.yajirushi => [
+      if (h > 0) (moji: '↑', fugou: 1),
+      if (h < 0) (moji: '↓', fugou: -1),
+    ],
+  };
+}
+
+/// 推移の区間で出うる一番広い順位の変化の文([owari] は区間の終わりの図に抜いた数を付けたもの、[n] は大学の数。2.1.1)
+List<String> _suiiHendouHabaMoji(List<_IchiDaigaku> owari, int n) {
+  return switch (suiiHendouKata) {
+    SuiiHendouKata.nukisuu => {
+      for (final _IchiDaigaku x in owari)
+        _suiiHendouBubun(x).map((b) => b.moji).join(),
+    }.where((m) => m.isNotEmpty).toList(),
+    SuiiHendouKata.sashihiki => ['↑$n', '↓$n'],
+    SuiiHendouKata.yajirushi => ['↑', '↓'],
+  };
 }
 
 /// 位置関係の画面を開く
@@ -2044,14 +2183,15 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
       }
     }
     // 推移(2.1.1)は、地点ごとに順位と順位の変化が変わるので、出うる一番広い文でも測る
-    // (区間の途中で欄の幅が変わって、四角の大きさが揺れないように。順位の変化は矢印だけ)
+    // (区間の途中で欄の幅が変わって、四角の大きさが揺れないように。順位の変化は suiiHendouKata の形で、
+    // その区間の終わりまでに出うる一番広い文(_suiiHendouHabaMoji))
     if (r.suii) {
       final int n = r.narabi.where((x) => !x.op).length;
       final Size jz = _ookisa(TextSpan(text: '$n', style: _juniStyle), scaler);
       juni = math.max(juni, jz.width);
       takasa = math.max(takasa, jz.height);
       if (r.kk > 0) {
-        for (final String hm in ['↑', '↓']) {
+        for (final String hm in r.hendouHabaMoji) {
           final Size z = _ookisa(TextSpan(text: hm, style: _hendouStyle), scaler);
           hendou = math.max(hendou, z.width);
           takasa = math.max(takasa, z.height);
@@ -2070,7 +2210,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
   Widget _hakoNaka(_IchiKukan r, int i, TextScaler scaler) {
     final _HakoHaba h = _hakoHaba(r, scaler);
     final _IchiDaigaku x = r.narabi[i];
-    final String? hm = _hendouHyouji(r, x);
+    final List<({String moji, int fugou})> bubun = _hendouBubun(r, x);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -2095,11 +2235,19 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
           const SizedBox(width: _hendouSukima),
           SizedBox(
             width: h.hendou,
-            child: hm == null
+            // (推移の「↑3↓1」のように、上げた・下げたを色分けして並べる。2.1.1)
+            child: bubun.isEmpty
                 ? null
-                : Text(
-                    hm,
-                    style: _hendouStyle.copyWith(color: _hendouIro(x.hendou!)),
+                : Text.rich(
+                    TextSpan(
+                      children: [
+                        for (final ({String moji, int fugou}) bb in bubun)
+                          TextSpan(
+                            text: bb.moji,
+                            style: _hendouStyle.copyWith(color: _hendouIro(bb.fugou)),
+                          ),
+                      ],
+                    ),
                     maxLines: 1,
                     softWrap: false,
                   ),
@@ -2142,12 +2290,20 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     );
   }
 
-  /// 四角の中の順位の変化の文(位置は「↑2」「↓3」「→」。推移は矢印だけで、変わらなければなし。2.1.1)
-  String? _hendouHyouji(_IchiKukan r, _IchiDaigaku x) {
-    if (!r.suii) return x.hendouMoji;
+  /// 四角の中の順位の変化の、色を分ける部分(位置は「↑2」「↓3」「→」の1つ。推移は suiiHendouKata の形で、
+  /// 変わらなければなし。1区の演出のあいだはなし。2.1.1)
+  List<({String moji, int fugou})> _hendouBubun(_IchiKukan r, _IchiDaigaku x) {
+    if (r.suii) return r.kk <= 0 ? const [] : _suiiHendouBubun(x);
+    final String? m = x.hendouMoji;
     final int? h = x.hendou;
-    if (h == null || h == 0) return null;
-    return h > 0 ? '↑' : '↓';
+    if (m == null || h == null) return const [];
+    return [(moji: m, fugou: h)];
+  }
+
+  /// 四角の中の順位の変化の文(欄の幅を測るのに使う。なければnull)
+  String? _hendouHyouji(_IchiKukan r, _IchiDaigaku x) {
+    final List<({String moji, int fugou})> bubun = _hendouBubun(r, x);
+    return bubun.isEmpty ? null : bubun.map((b) => b.moji).join();
   }
 
   /// 順位の変化の色

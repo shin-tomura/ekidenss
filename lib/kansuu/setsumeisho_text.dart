@@ -1,4 +1,6 @@
 import 'package:ekiden/kansuu/shiyou_text.dart';
+import 'package:ekiden/screens/Modal_ichiKankei.dart'
+    show SuiiHendouKata, suiiHendouKata; // 推移の順位の変化の出し方(説明の文を合わせる。2.1.1)
 
 // ------------------------------------------------------------
 // 説明書タブの本文(1.8.4)
@@ -97,11 +99,11 @@ List<SetsumeishoGroup> setsumeishoGroupList() {
       ),
     ]),
     // 画面の操作(2.1.1。決まりの見出しから移した)
-    const SetsumeishoGroup('画面の使い方', [
-      SetsumeishoKoumoku(_kekkaOshirase),
-      SetsumeishoKoumoku(_panel, youten: _youtenPanel),
-      SetsumeishoKoumoku(_konkiMemo),
-      SetsumeishoKoumoku(_gakunaiKiroku, youten: _youtenGakunaiKiroku),
+    SetsumeishoGroup('画面の使い方', [
+      const SetsumeishoKoumoku(_kekkaOshirase),
+      SetsumeishoKoumoku(_panel(), youten: _youtenPanel),
+      const SetsumeishoKoumoku(_konkiMemo),
+      const SetsumeishoKoumoku(_gakunaiKiroku, youten: _youtenGakunaiKiroku),
     ]),
     // 遊ぶのに知らなくてもよい読み物(2.1.1)
     const SetsumeishoGroup('読み物', [
@@ -303,7 +305,8 @@ const ShiyouSetsu _kekkaOshirase = ShiyouSetsu('結果画面のお知らせ', [
 ]);
 
 // タイム分布と情報集約パネル(2.0.5〜2.1.0。Modal_kukanTimeBunpu.dart・Modal_yosenTimeBunpu.dart・Modal_ichiKankei.dart)
-const ShiyouSetsu _panel = ShiyouSetsu('タイム分布と情報集約パネル', [
+// (2.1.1から、推移の順位の変化の行を、出し方の切り替え(suiiHendouKata)に合わせるので、関数にした)
+ShiyouSetsu _panel() => ShiyouSetsu('タイム分布と情報集約パネル', [
   '・駅伝の結果画面のカードの「タイム分布」で、区間ごとの区間1位からの差の広がりをグラフで見られます。',
   '　・レースの途中も、区間が終わるたびの画面の同じカードで、終わった区間まで見られます。',
   '　・正月駅伝の、復路の目標順位を決める画面と復路の当日変更の画面にも、同じカードがあります。',
@@ -343,10 +346,24 @@ const ShiyouSetsu _panel = ShiyouSetsu('タイム分布と情報集約パネル'
   '　・「再生」で1コマずつ進み、中継所では少し長く止まります。速さは「ゆっくり」「ふつう」「はやい」から選べます。',
   '　・「1コマ」の左右の矢印で、止めたまま1コマずつ戻したり進めたりできます(区間をまたぎます)。',
   '　・四角の中の順位は、そのコマの時点の順位です。',
-  '　・前の中継所から順位を上げた大学に「↑」、下げた大学に「↓」を出します(何位かの数字は出しません)。',
+  ..._suiiHendouSetsumei(),
   '　・焦点は、大学か順位(シード権の最後の順位も)で選べ、焦点の大学に合わせて道が動きます。',
   '　・大学の四角を押すと、その大学に焦点を移します。指で道を動かすと、再生を止めます。',
 ]);
+
+// 推移の四角の中の順位の変化の説明(出し方の切り替え suiiHendouKata に合わせる。2.1.1。Modal_ichiKankei.dart)
+List<String> _suiiHendouSetsumei() => switch (suiiHendouKata) {
+  SuiiHendouKata.nukisuu => [
+    '　・「↑3」は前の中継所からこれまでに抜いた大学の数、「↓1」は抜かれた数で、両方あれば「↑3↓1」です。',
+    '　・抜いた数・抜かれた数には、学連選抜は数えません。',
+  ],
+  SuiiHendouKata.sashihiki => [
+    '　・前の中継所から順位を上げた大学に「↑2」、下げた大学に「↓3」のように、上下した数を出します。',
+  ],
+  SuiiHendouKata.yajirushi => [
+    '　・前の中継所から順位を上げた大学に「↑」、下げた大学に「↓」を出します(何位かの数字は出しません)。',
+  ],
+};
 
 // 今季タイム一覧表のメモ(2.1.0。konki_memo.dart)
 const ShiyouSetsu _konkiMemo = ShiyouSetsu('今季タイム一覧表のメモ', [

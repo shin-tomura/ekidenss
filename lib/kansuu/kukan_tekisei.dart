@@ -131,6 +131,29 @@ const List<String> _mukiMei = ['1区向き', '2・3区向き', '後半向き'];
 /// 持ちタイムの種目の呼び方(time_bestkiroku の0〜7。並びの説明に使う)
 const List<String> tekiseiShumokuMei = ['5000m', '1万m', 'ハーフ', 'フル', '登り1万', '下り1万', 'ロード1万', 'クロカン1万'];
 
+/// 見立ての「区間ごと」の並びに使う持ちタイムの種目(time_bestkiroku の番号。2.1.1)
+/// 区間の見出し(kukanKifukuMei)と同じ線(kukanTokuchou)で、山登りは登り1万、山下りは下り1万、
+/// アップダウンはクロカン1万。それ以外は距離の種目(kukanKihonShumoku)で、4区以降で1万mになる区間
+/// (7.5km超〜15km)はロード1万(後半区間は、単独でロードを押す力が問われるため。区間の型の印とも合う)。
+/// 上り基調・下り基調は、平らなところを走る分が大きいので距離の種目のまま(坂の合い具合は札で見る)
+int tekiseiNarabiShumoku(Ghensuu gh, int race, int kk) {
+  switch (kukanTokuchou(gh, race, kk)) {
+    case KukanTokuchou.yamaNobori:
+      return 4;
+    case KukanTokuchou.yamaKudari:
+      return 5;
+    case KukanTokuchou.updown:
+      return 7;
+    case KukanTokuchou.nobori:
+    case KukanTokuchou.kudari:
+    case KukanTokuchou.heitan:
+      break;
+  }
+  final int kihon = kukanKihonShumoku(gh, race, kk);
+  if (kihon == 1 && kukanIma(kk) == 2) return 6;
+  return kihon;
+}
+
 /// 区間[kk]で切り替えが多いか(30回以上。平坦な区間で細かなアップダウンが続くとみなす回数と同じ)
 bool _kirikaeOoi(Ghensuu gh, int race, int kk) =>
     gh.noborikudarikirikaekaisuu_taikai_kukangoto[race][kk] >= updownKaruKaisuu;

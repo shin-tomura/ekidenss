@@ -14,7 +14,9 @@ import 'package:ekiden/screens/kukan_haiti_button.dart' show MedatsuButton; // �
 // ------------------------------------------------------------
 // 区間適性の見立て(2.1.1。中身は kukan_tekisei.dart)
 // 一次エントリー・区間エントリー・当日変更・学連選抜編成(監督をしている年)の画面の紫のボタンから開く(区間配置確認などと同じ目立つボタン。kukan_haiti_button.dart の MedatsuButton)。
-// ・区間ごと: 区間を選ぶと、出せる選手を区間の距離に合う種目の持ちタイム順に並べ、印と一言を出す
+// ・区間ごと: 区間を選ぶと、出せる選手を区間に合う種目の持ちタイム順に並べ、印と一言を出す
+//   (種目は tekiseiNarabiShumoku。山登りは登り1万、山下りは下り1万、アップダウンはクロカン1万、4区以降で1万mになる
+//   区間はロード1万、ほかは距離の種目。その種目の記録がない選手は、後ろに距離の種目の順で並べる)
 //   (合う度合いの順にすると、遅い選手が上に来てしまうため)
 // ・選手ごと: 選手を選ぶと、出す区間ごとの印と一言を出す
 // ・名前の横に、画面で選んでいる区間(「1区にエントリー中」「1区に出走予定」)・補欠・体調不良の印を出す
@@ -254,13 +256,21 @@ class _ModalKukanTekiseiState extends State<ModalKukanTekisei> {
   List<Widget> _kukanGotoBubun(Ghensuu gh, MochiHyou hyou) {
     final int kk = _kukan;
     final int kihon = kukanKihonShumoku(gh, _race, kk);
-    // 区間の距離に合う種目の持ちタイム順(記録がなければ後ろ。同じなら元の並び)
+    // 区間に合う種目の持ちタイム順(2.1.1。tekiseiNarabiShumoku)。その種目の記録がない選手は、後ろに距離の種目の順
+    // (どちらもなければ一番後ろ。同じなら元の並び)
+    final int ev = tekiseiNarabiShumoku(gh, _race, kk);
+    bool ari(TekiseiSenshu s) => s.times[ev] < TEISUU.DEFAULTTIME;
     final Map<int, int> motoBan = {for (int i = 0; i < _senshu.length; i++) _senshu[i].id: i};
     final List<TekiseiSenshu> narabi = List<TekiseiSenshu>.of(_senshu)
       ..sort((a, b) {
-        final int c = a.times[kihon].compareTo(b.times[kihon]);
+        final bool aAri = ari(a);
+        final bool bAri = ari(b);
+        if (aAri != bAri) return aAri ? -1 : 1;
+        final int e = aAri ? ev : kihon;
+        final int c = a.times[e].compareTo(b.times[e]);
         return c != 0 ? c : (motoBan[a.id] ?? 0).compareTo(motoBan[b.id] ?? 0);
       });
+    final bool kirokuNashi = ev != kihon && _senshu.any((s) => !ari(s));
     return [
       Wrap(
         spacing: 6,
@@ -275,7 +285,8 @@ class _ModalKukanTekiseiState extends State<ModalKukanTekisei> {
         style: const TextStyle(color: Colors.white, fontSize: HENSUU.fontsize_honbun, fontWeight: FontWeight.bold),
       ),
       Text(
-        '並びは${tekiseiShumokuMei[kihon]}の持ちタイム順',
+        '並びは${tekiseiShumokuMei[ev]}の持ちタイム順'
+        '${kirokuNashi ? '(記録のない選手は、後ろに${tekiseiShumokuMei[kihon]}の順)' : ''}',
         style: const TextStyle(color: Colors.white70, fontSize: HENSUU.fontsize_honbun - 2),
       ),
       const SizedBox(height: 4),

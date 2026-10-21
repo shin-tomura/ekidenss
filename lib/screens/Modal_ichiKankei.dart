@@ -4,8 +4,9 @@
 //   大学の四角を押すと、帯に「大学名　目標○位」と1区を走る選手(区間配置確認のカードを開いたときと同じ中身)を
 //   出し、もう一度押すと閉じる。1区の指示の画面(mode 350の1区)にもカードを置き、そこではスタートだけを出す。
 // ・2.0.7から、区間は「‹」「›」で1つずつ、真ん中を押して出る一覧で好きな区間に切り替える(区間が多くても1行)。
-// ・2.0.8から、区間を選ぶ行の右の黄色のボタンを押すたびに、「位置」(道の位置関係)→「通過」(通過順位速報)→
-//   「個人」(個人順位速報)→「位置」と表示を切り替える。通過と個人は、今の速報の画面を、上のバーと下の「前・次」を
+// ・2.0.8から、区間を選ぶ行の右の黄色のボタンで、「位置」(道の位置関係)・「通過」(通過順位速報)・
+//   「個人」(個人順位速報)の表示を切り替える(2.1.1から、押すたびに順に切り替える形をやめ、「≡」のボタンを押して
+//   出る一覧から選ぶ形にした。_hyoujiBotan)。通過と個人は、今の速報の画面を、上のバーと下の「前・次」を
 //   外して入れたもの(Modal_tuukajuni.dart・Modal_kukanresult350.dart(レースの途中)・Modal_kukanresult.dart
 //   (結果画面)の umekomi)で、区間はパネルで選んだ区間。スタートでは、まだないことを出す。
 //   通過と個人のときは、倍率の行を隠し、押した大学の帯は閉じる。覚えない(開いたときは「位置」)。
@@ -4067,57 +4068,117 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     );
   }
 
-  /// 次の表示(位置 → 通過 → 個人 → 配置 → 推移 → 位置。スタートしかないときは、位置 → 配置 → 位置。2.0.9。
-  /// 推移は2.1.1。1区終了時点から再生するので、2区が終わるまでは入れない)
-  int _tsugiHyouji(_IchiKankei b) {
-    if (!b.kukan.any((x) => x.kk >= 0)) return _hyouji == 3 ? 0 : 3;
-    final int tsugi = (_hyouji + 1) % 5;
-    if (tsugi == 4 && _suiiKouho(b).isEmpty) return 0;
-    return tsugi;
+  /// 表示を[tsugi]に切り替える(0位置・1通過・2個人・3配置・4推移。推移を閉じるときは再生を止め、位置では推移で
+  /// 見ていた区間を出す。推移を開くときは区間と焦点を決める。押した大学の帯は閉じる。2.1.1)
+  void _hyoujiKaeru(_IchiKankei b, int tsugi) {
+    if (tsugi == _hyouji) return;
+    setState(() {
+      final int mae = _hyouji;
+      _hyouji = tsugi;
+      if (mae == 4 && _hyouji != 4) _suiiTojiru(b);
+      if (_hyouji == 4 && mae != 4) _suiiHiraku(b);
+      _oshita = -1;
+      _hiraki = 0;
+    });
   }
 
-  /// 表示を切り替えるボタン(押すたびに「位置」→「通過」→「個人」→「配置」→「位置」。今の表示の名前を出す。
-  /// 2.0.8。配置は2.0.9)
+  /// 表示を選ぶボタン(「≡ 位置」のように今の表示の名前を出す。押すと、位置・通過・個人・配置・推移を短い説明つきで
+  /// 並べた一覧が開き、選んだ表示に切り替える。今の表示は黄色で「✓」。まだ見られない表示は薄く出し、いつから
+  /// 見られるかを添える。2.0.8。配置は2.0.9。推移と一覧から選ぶ形は2.1.1(それまでは押すたびに順に切り替えていた))
+  /// 文字を大きくしても行からはみ出さないように、ボタンの幅に上限を付け、超えるときは中の文字を縮める
   Widget _hyoujiBotan(_IchiKankei b) {
     const List<String> mei = ['位置', '通過', '個人', '配置', '推移'];
+    const List<String> setsumei = [
+      '区間が終わった時点の各大学の位置',
+      '中継所の通過順位',
+      'その区間の個人順位',
+      '大学ごとの区間配置',
+      '位置関係の動きをコマ送りで見る',
+    ];
     const Color iro = Colors.amberAccent;
+    final bool hashitta = b.kukan.any((x) => x.kk >= 0);
+    final bool suiiAri = _suiiKouho(b).isNotEmpty;
+    // まだ見られない理由(見られるときはnull。スタートしかないときは、位置と配置だけ。推移は区間の途中の材料が
+    // そろってから)
+    String? riyuu(int h) {
+      if ((h == 1 || h == 2 || h == 4) && !hashitta) return '1区が終わると見られます';
+      if (h == 4 && !suiiAri) return '2区が終わると見られます';
+      return null;
+    }
+
+    final int ima = _hyouji.clamp(0, mei.length - 1);
     return Semantics(
       button: true,
       label: '表示の切り替え',
-      child: Material(
-        color: iro.withOpacity(0.15),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
-          side: const BorderSide(color: iro, width: 1.5),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: () => setState(() {
-            final int mae = _hyouji;
-            _hyouji = _tsugiHyouji(b);
-            // 推移を閉じるときは再生を止め、位置では推移で見ていた区間を出す。推移を開くときは区間と焦点を決める(2.1.1)
-            if (mae == 4 && _hyouji != 4) _suiiTojiru(b);
-            if (_hyouji == 4 && mae != 4) _suiiHiraku(b);
-            // 押した大学の帯は閉じる
-            _oshita = -1;
-            _hiraki = 0;
-          }),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  mei[_hyouji.clamp(0, mei.length - 1)],
-                  style: const TextStyle(
-                    color: iro,
-                    fontSize: 15,
-                    fontWeight: FontWeight.bold,
-                  ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 120),
+        child: PopupMenuButton<int>(
+          tooltip: '表示を選ぶ',
+          initialValue: ima,
+          color: const Color(0xFF2A2A2A),
+          onSelected: (int h) => _hyoujiKaeru(b, h),
+          itemBuilder: (context) => [
+            for (int h = 0; h < mei.length; h++)
+              PopupMenuItem<int>(
+                value: h,
+                enabled: riyuu(h) == null,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      h == ima ? '${mei[h]} ✓' : mei[h],
+                      style: TextStyle(
+                        color: riyuu(h) != null
+                            ? Colors.white38
+                            : (h == ima ? iro : HENSUU.textcolor),
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(
+                      setsumei[h],
+                      style: TextStyle(
+                        color: riyuu(h) != null ? Colors.white38 : Colors.white60,
+                        fontSize: 12,
+                      ),
+                    ),
+                    if (riyuu(h) != null)
+                      Text(
+                        riyuu(h)!,
+                        style: const TextStyle(color: Colors.white38, fontSize: 12),
+                      ),
+                  ],
                 ),
-                const SizedBox(width: 4),
-                const Icon(Icons.sync, color: iro, size: 18),
-              ],
+              ),
+          ],
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: iro.withOpacity(0.15),
+              border: Border.all(color: iro, width: 1.5),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.menu, color: iro, size: 18),
+                  const SizedBox(width: 4),
+                  Text(
+                    mei[ima],
+                    maxLines: 1,
+                    softWrap: false,
+                    style: const TextStyle(
+                      color: iro,
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

@@ -64,7 +64,9 @@
 //       順位の変化(suiiHendouKata の形)を出す。自分の大学(焦点でないとき)は水色の点、学連選抜は点線の丸、ほかは白い点。
 //       点を押すと、その大学に焦点を移す。目盛りの線(6本まで)とシード権ラインの点線(順位の境で前後の点の位置が
 //       違うときだけ)を出す。道をスクロールしないので、焦点を追って道を動かす処理(_suiiOu・_suiiSakiniOu)は働かず、
-//       倍率の「−」「＋」も出さない
+//       倍率の「−」「＋」も出さない。右には、そのコマの時点の順位の順で全大学の名前を並べる(学連選抜もタイムの順の
+//       位置に「OP」で入れる。名前を押すと焦点を移す。_tenIchiran)。図の上は広がりの文と「説明」だけにし、
+//       説明の文は「説明」を押すと小さな窓で出す(_tenSetsumeiHiraku)
 //     ・false: 大学の四角を道に並べ、焦点の大学に合わせて道を動かす(2.1.1の開発中の形。下の説明はこの形のもの)
 // ・2.0.8〜2.0.9は、おまかせのときに「おまかせ」をもう一度押すと「おまかせ ↔」(幅に合わせる)になり、道が横幅に
 //   収まるように道の上の文字を6割まで小さくしていた。2.1.0で、集団の1行に画面の幅に入るだけ並べるようになり、
@@ -2164,7 +2166,8 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
       final _IchiDaigaku x = r.narabi[ten[shoten].i];
       final String juni = x.op ? '${(x.soutouJuni ?? 0) + 1}位相当' : '${x.juni + 1}位';
       final String hendou = _suiiHendouBubun(x).map((h) => h.moji).join();
-      shotenMoji = '${x.op ? '学連選抜' : x.mei} $juni${hendou.isEmpty ? '' : ' $hendou'}';
+      // 名前は右の一覧と同じ短い名前(図の幅が狭いので)
+      shotenMoji = '${x.op ? '学連選抜' : _michiMei(x.mei)} $juni${hendou.isEmpty ? '' : ' $hendou'}';
     }
     // シード権ライン(シード権の最後の順位の大学と、次の大学の点の位置が違うときだけ。同じ位置なら引かない)
     double? seedY;
@@ -2195,10 +2198,10 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     );
   }
 
-  /// 推移の点の表示(suiiTen。2.1.1)。トップから最後尾までを、区間ごとに決めた縮尺で1つの画面に収める
-  /// (道はスクロールしない。文字を大きくしたときは、上の説明の文が増えたぶん図が低くなる)
+  /// 推移の点の表示(suiiTen。2.1.1)。トップから最後尾までを、区間ごとに決めた縮尺で1つの画面に収め、
+  /// 右にそのコマの時点の順位の順で全大学の名前を並べる(_tenIchiran)。説明の文は「説明」を押すと小さな窓で出す
+  /// (図の上に置くと図が低くなるため)。道はスクロールしない
   Widget _buildTen(BuildContext context, _IchiKankei b, _IchiKukan r) {
-    const TextStyle setsumei = TextStyle(color: Colors.white70, fontSize: 12, height: 1.5);
     final double haba = _tenHaba(b, _suiiKukan);
     // トップから最後尾まで(学連選抜は除く)
     final List<_IchiDaigaku> daigaku = [
@@ -2213,71 +2216,234 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
           ? 'トップから最後尾まで 並走'
           : 'トップから最後尾まで ${_kyoriMoji(m)}(${saMoji(s)})';
     }
-    // 焦点でない自分の大学がいれば、水色の説明を出す
-    bool jibunHoka = false;
-    for (int i = 0; i < r.narabi.length; i++) {
-      final _IchiDaigaku x = r.narabi[i];
-      if ((x.jibun || (b.gakurenJibun && x.op)) && i != _suiiShotenI) jibunHoka = true;
-    }
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('中継所ごとの位置関係を、区間を5つに分けてつないだコマ送りです。', style: setsumei),
-          if (r.kk == 0)
-            const Text('1区は、飛び出した選手と集団の記録をもとにした演出です。', style: setsumei),
-          Text(
-            'オレンジ: 焦点(点を押すと、その大学を追います)'
-            '${jibunHoka ? '　水色: あなたの大学' : ''}'
-            '${b.opAri ? '　点線の丸: 学連選抜' : ''}',
-            style: setsumei,
-          ),
-          if (hirogari.isNotEmpty)
-            Text(
-              hirogari,
-              style: const TextStyle(
-                color: HENSUU.textcolor,
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
+          // 広がりの文と「説明」(文字を大きくしたら折り返す)
+          Wrap(
+            spacing: 12,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              if (hirogari.isNotEmpty)
+                Text(
+                  hirogari,
+                  style: const TextStyle(
+                    color: HENSUU.textcolor,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => _tenSetsumeiHiraku(context, b, r),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 6),
+                  child: Text(
+                    '説明',
+                    style: TextStyle(
+                      color: HENSUU.LinkColor,
+                      fontSize: 13,
+                      decoration: TextDecoration.underline,
+                      decorationColor: HENSUU.LinkColor,
+                    ),
+                  ),
+                ),
               ),
-            ),
-          const SizedBox(height: 6),
+            ],
+          ),
+          const SizedBox(height: 4),
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final TextScaler scaler = MediaQuery.textScalerOf(context);
-                final _TenZu zu = _tenHaichi(
-                  b,
-                  r,
-                  constraints.maxWidth,
-                  constraints.maxHeight,
-                  scaler,
-                  haba,
-                );
-                return GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  // 押したところに一番近い点(22px以内)の大学に焦点を移す(点は小さいので、押せる範囲を広めにする)
-                  onTapUp: (TapUpDetails d) {
-                    _Ten? chikai;
-                    double kyori = 22;
-                    for (final _Ten t in zu.ten) {
-                      final double k = (Offset(t.x, t.y) - d.localPosition).distance;
-                      if (k <= kyori) {
-                        kyori = k;
-                        chikai = t;
-                      }
-                    }
-                    final _Ten? t = chikai;
-                    if (t != null) _suiiShotenErabu(r.narabi[t.i]);
-                  },
-                  child: CustomPaint(
-                    size: Size(constraints.maxWidth, constraints.maxHeight),
-                    painter: _TenPainter(zu, scaler),
-                  ),
+                // 右の一覧の幅(一番長い行に合わせ、画面の3分の1まで)
+                final ({double juni, double zentai}) ichiranHaba = _tenIchiranHaba(r, scaler, constraints.maxWidth / 3);
+                final double zuHaba = math.max(80.0, constraints.maxWidth - ichiranHaba.zentai - 8);
+                final _TenZu zu = _tenHaichi(b, r, zuHaba, constraints.maxHeight, scaler, haba);
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: zuHaba,
+                      height: constraints.maxHeight,
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        // 押したところに一番近い点(22px以内)の大学に焦点を移す(点は小さいので、押せる範囲を広めにする)
+                        onTapUp: (TapUpDetails d) {
+                          _Ten? chikai;
+                          double kyori = 22;
+                          for (final _Ten t in zu.ten) {
+                            final double k = (Offset(t.x, t.y) - d.localPosition).distance;
+                            if (k <= kyori) {
+                              kyori = k;
+                              chikai = t;
+                            }
+                          }
+                          final _Ten? t = chikai;
+                          if (t != null) _suiiShotenErabu(r.narabi[t.i]);
+                        },
+                        child: CustomPaint(
+                          size: Size(zuHaba, constraints.maxHeight),
+                          painter: _TenPainter(zu, scaler),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: SizedBox(
+                        height: constraints.maxHeight,
+                        child: _tenIchiran(b, r, ichiranHaba.juni, zu.seedY != null),
+                      ),
+                    ),
+                  ],
                 );
               },
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 右の一覧の1行の文字(順位の欄と名前。学連選抜は「OP」と「学連選抜」。名前は最後の「大」を省く)
+  static const TextStyle _ichiranStyle = TextStyle(color: HENSUU.textcolor, fontSize: 12);
+
+  String _tenIchiranJuni(_IchiDaigaku x) => x.op ? 'OP' : '${x.juni + 1}';
+  String _tenIchiranMei(_IchiDaigaku x) => x.op ? '学連選抜' : _michiMei(x.mei);
+
+  /// 右の一覧の、順位の欄の幅と、全体の幅(一番長い行に合わせ、[jougen]まで。少なくとも60)
+  ({double juni, double zentai}) _tenIchiranHaba(_IchiKukan r, TextScaler scaler, double jougen) {
+    double haba(String s, {bool futoi = false}) {
+      final TextPainter tp = TextPainter(
+        text: TextSpan(
+          text: s,
+          style: futoi ? _ichiranStyle.copyWith(fontWeight: FontWeight.bold) : _ichiranStyle,
+        ),
+        textDirection: TextDirection.ltr,
+        textScaler: scaler,
+      )..layout();
+      return tp.width;
+    }
+
+    double juni = 0;
+    double mei = 0;
+    for (final _IchiDaigaku x in r.narabi) {
+      juni = math.max(juni, haba(_tenIchiranJuni(x), futoi: true));
+      mei = math.max(mei, haba(_tenIchiranMei(x), futoi: true));
+    }
+    final double zentai = math.min(jougen, math.max(60.0, juni + 4 + mei + 2));
+    return (juni: juni, zentai: zentai);
+  }
+
+  /// 右の一覧(そのコマの時点の順位の順。学連選抜もタイムの順の位置に「OP」で入れる)。
+  /// 焦点の大学はオレンジの太字、自分の大学(学連選抜の監督の年は学連選抜)は水色。名前を押すと焦点を移す。
+  /// シード権の境には、図と同じ点線を引く(図に引くときだけ。学連選抜が境の2校の間にいるときは、図と同じく
+  /// 境の2校の真ん中のタイムより前か後ろかで、点線の上か下に置く)。画面の高さに入らないときは、一覧だけスクロールする
+  Widget _tenIchiran(_IchiKankei b, _IchiKukan r, double juniHaba, bool seedAri) {
+    // 点線を引く位置(このタイムより後ろの最初の行の前)
+    double? seedKijun;
+    final int? seed = b.seed;
+    if (seedAri && seed != null && seed >= 1) {
+      final List<_IchiDaigaku> daigaku = [
+        for (final _IchiDaigaku x in r.narabi)
+          if (!x.op) x,
+      ];
+      if (daigaku.length > seed) {
+        seedKijun = (daigaku[seed - 1].ruikei + daigaku[seed].ruikei) / 2;
+      }
+    }
+    final List<Widget> gyou = [];
+    bool hiita = false;
+    for (int i = 0; i < r.narabi.length; i++) {
+      final _IchiDaigaku x = r.narabi[i];
+      final double? k = seedKijun;
+      if (!hiita && k != null && x.ruikei > k) {
+        hiita = true;
+        gyou.add(SizedBox(height: 6, child: CustomPaint(painter: _TensenPainter())));
+      }
+      final bool shoten = i == _suiiShotenI;
+      final bool jibun = x.jibun || (b.gakurenJibun && x.op);
+      final Color iro = shoten
+          ? _jibunIro
+          : (jibun ? _iro : (x.op ? Colors.white70 : HENSUU.textcolor));
+      final TextStyle style = _ichiranStyle.copyWith(
+        color: iro,
+        fontWeight: shoten ? FontWeight.bold : FontWeight.normal,
+      );
+      gyou.add(
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => _suiiShotenErabu(x),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 2),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: juniHaba,
+                  child: Text(_tenIchiranJuni(x), style: style, textAlign: TextAlign.right, softWrap: false),
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    _tenIchiranMei(x),
+                    style: style,
+                    maxLines: 1,
+                    softWrap: false,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+    return SingleChildScrollView(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: gyou),
+    );
+  }
+
+  /// 推移の点の表示の説明(「説明」を押すと小さな窓で出す)
+  void _tenSetsumeiHiraku(BuildContext context, _IchiKankei b, _IchiKukan r) {
+    final bool jibunAri = r.narabi.any((x) => x.jibun);
+    final List<String> bun = [
+      '中継所ごとの位置関係を、区間を5つに分けてつないだコマ送りです。',
+      '区間の中の動きは、つなぐための推定です。区間の終わりで「位置」の図と同じになります。',
+      if (r.kk == 0) '1区は、飛び出した選手と集団の記録をもとにした演出です。',
+      '縮尺は区間ごとに、その区間で一番広がったときに合わせています。',
+      'オレンジ: 焦点の大学(点か右の一覧の名前を押すと、その大学を追います)',
+      if (b.gakurenJibun)
+        '水色: あなたが監督の学連選抜'
+      else if (jibunAri)
+        '水色: あなたの大学',
+      if (b.opAri) '点線の丸と「OP」: 学連選抜(順位に数えません)',
+      if (b.seed != null) '黄色の点線: シード権ライン',
+      '右の一覧は、そのコマの時点の順位の順です。',
+    ];
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        title: const Text('推移の見方', style: TextStyle(color: Colors.white, fontSize: 16)),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final String s in bun)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Text('・$s', style: const TextStyle(color: Colors.white70, fontSize: 13)),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('閉じる', style: TextStyle(color: HENSUU.LinkColor)),
           ),
         ],
       ),

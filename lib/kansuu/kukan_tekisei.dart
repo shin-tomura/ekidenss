@@ -128,8 +128,9 @@ const List<String> _kyoriShumokuMei = ['5000m', '1万m', 'ハーフ'];
 /// 区間の型の呼び方(0: 1区向き、1: 2・3区向き、2: 後半向き)
 const List<String> _mukiMei = ['1区向き', '2・3区向き', '後半向き'];
 
-/// 持ちタイムの種目の呼び方(time_bestkiroku の0〜7。並びの説明に使う)
-const List<String> tekiseiShumokuMei = ['5000m', '1万m', 'ハーフ', 'フル', '登り1万', '下り1万', 'ロード1万', 'クロカン1万'];
+/// 持ちタイムの種目の呼び方(time_bestkiroku の0〜7。並びの説明に使う。1万mは、ロード1万と見分けられるように
+/// 「トラック1万m」と呼ぶ)
+const List<String> tekiseiShumokuMei = ['5000m', 'トラック1万m', 'ハーフ', 'フル', '登り1万', '下り1万', 'ロード1万', 'クロカン1万'];
 
 /// 見立ての「区間ごと」の並びに使う持ちタイムの種目(time_bestkiroku の番号。2.1.1)
 /// 区間の見出し(kukanKifukuMei)と同じ線(kukanTokuchou)で、山登りは登り1万、山下りは下り1万、

@@ -10,6 +10,7 @@ import 'package:ekiden/kansuu/kiji/kiji_kihon.dart' show KijiKankyou, kmMoji, ku
 import 'package:ekiden/kansuu/kiji/kiji_tokuchou.dart' show MochiHyou;
 import 'package:ekiden/kansuu/kukan_tekisei.dart';
 import 'package:ekiden/screens/kukan_haiti_button.dart' show MedatsuButton; // 目立つボタン(1.9.9)
+import 'package:ekiden/screens/Modal_senshu.dart' show ModalSenshuDetailView; // 選手の詳細の小窓(2.1.2)
 
 // ------------------------------------------------------------
 // 区間適性の見立て(2.1.1。中身は kukan_tekisei.dart)
@@ -23,6 +24,10 @@ import 'package:ekiden/screens/kukan_haiti_button.dart' show MedatsuButton; // �
 //   (一次エントリーの画面からは、「一次エントリー中」の印を出し、体調不良の印は出さない。一次エントリーの画面では
 //   体調・調子を見られないようにしているため。見立ての計算は、もともと体調・調子を使わない)
 // ・言葉は自分の大学のコーチ(長距離)→コーチ(トラック)→監督の順に、いる人が言う(計算には影響しない)
+// ・名前の札の並びの最後(選手ごとは、選手を選ぶ欄の下の札の並び)の「詳細」で、選手の詳細の小窓を開く(2.1.2)。
+//   ほかのエントリーの画面の「詳細」と同じ小窓なので、一次エントリーの画面から開いても調子は出ない(小窓が調子を出すのは、
+//   駅伝の当日の、一次エントリーより後の場面だけ)。小窓で名前や能力を変えられるので、閉じたら選手の並びと見立てを
+//   作り直す(選んでいる区間・選手と、区間ごと・選手ごとの切り替えはそのまま)
 // ------------------------------------------------------------
 
 /// 見立てに渡すもの(開く画面で作る)
@@ -143,7 +148,17 @@ class _ModalKukanTekiseiState extends State<ModalKukanTekisei> {
   @override
   void initState() {
     super.initState();
+    _tsukuru();
+    if (_kukanList.isNotEmpty) _kukan = _kukanList.first;
+    if (_senshu.isNotEmpty) _senshuId = _senshu.first.id;
+  }
+
+  /// 選手の並びと見立ての材料を作る(開いたときと、選手の詳細の小窓を閉じたとき。2.1.2)
+  /// 小窓で名前や能力を変えられるので、閉じたら作り直して反映する(見立ての控えも捨てる)。
+  /// 選んでいる区間・選手と、区間ごと・選手ごとの切り替えはそのまま
+  void _tsukuru() {
     final KukanTekiseiNaiyou n = widget.naiyou;
+    _kekka.clear();
     final Ghensuu? gh = Hive.box<Ghensuu>('ghensuuBox').getAt(0);
     final KijiKankyou? k = KijiKankyou.yomuRace(n.race);
     if (gh == null || k == null) return;
@@ -163,8 +178,41 @@ class _ModalKukanTekiseiState extends State<ModalKukanTekisei> {
         if (kk >= 0 && kk < kukansuu && kk < kyoriSuu) kk,
     ];
     _kataribe = tekiseiKataribe(k, gh.MYunivid);
-    if (_kukanList.isNotEmpty) _kukan = _kukanList.first;
-    if (_senshu.isNotEmpty) _senshuId = _senshu.first.id;
+  }
+
+  /// 選手の詳細の小窓を開く(ほかのエントリーの画面の「詳細」と同じ開き方。閉じたら見立てを作り直す。2.1.2)
+  void _shousaiHiraku(int senshuId) {
+    showGeneralDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.8),
+      barrierDismissible: true,
+      barrierLabel: '詳細',
+      transitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (context, animation, secondaryAnimation) => ModalSenshuDetailView(senshuId: senshuId),
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        return FadeTransition(
+          opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+          child: child,
+        );
+      },
+    ).then((_) {
+      if (mounted) setState(_tsukuru);
+    });
+  }
+
+  /// 選手の詳細の小窓を開く「詳細」(札の並びの最後に置く。2.1.2)
+  Widget _shousaiBotan(int senshuId) {
+    return TextButton(
+      onPressed: () => _shousaiHiraku(senshuId),
+      style: TextButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        minimumSize: const Size(44, 32),
+      ),
+      child: const Text(
+        '詳細',
+        style: TextStyle(color: HENSUU.LinkColor, fontSize: HENSUU.fontsize_honbun - 1),
+      ),
+    );
   }
 
   /// 選手[s]が区間[kk]を走るときの見立て(一度見たものは控えておく)
@@ -291,7 +339,11 @@ class _ModalKukanTekiseiState extends State<ModalKukanTekisei> {
       ),
       const SizedBox(height: 4),
       for (final TekiseiSenshu s in narabi)
-        _gyou(midashi: s.hyoujiMei, shirushi: _senshuShirushi(s), t: _mitate(gh, hyou, s, kk)),
+        _gyou(
+          midashi: s.hyoujiMei,
+          shirushi: [..._senshuShirushi(s), _shousaiBotan(s.id)],
+          t: _mitate(gh, hyou, s, kk),
+        ),
     ];
   }
 
@@ -321,7 +373,12 @@ class _ModalKukanTekiseiState extends State<ModalKukanTekisei> {
             ),
         ],
       ),
-      Wrap(spacing: 6, runSpacing: 4, children: _senshuShirushi(s)),
+      Wrap(
+        spacing: 6,
+        runSpacing: 4,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [..._senshuShirushi(s), _shousaiBotan(s.id)],
+      ),
       const SizedBox(height: 4),
       for (final int kk in _kukanList)
         _gyou(

@@ -351,10 +351,15 @@ class ModalUnivSenshuMatrixView extends StatefulWidget {
 
   /// trueなら学連選抜のメンバーの表にする(targetUnivIdは使わない。1.8.2)
   final bool gakuren;
+
+  /// 区間エントリーの画面から開いたか(2.1.2。自分の大学を表示しているときは、見出しの「メモ」を押すと
+  /// 「メモどおり配置する」も選べる。konki_memo.dart の memoHaichiKeikaku)
+  final bool kukanEntry;
   const ModalUnivSenshuMatrixView({
     super.key,
     required this.targetUnivId,
     this.gakuren = false,
+    this.kukanEntry = false,
   });
 
   @override
@@ -1261,12 +1266,139 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
     if (mounted) setState(() {});
   }
 
-  /// メモの列の見出し(押すと、この表のメモを全部消すかを聞く)
+  /// メモの列の見出しを押したとき(2.1.2)。区間エントリーの画面から開いて自分の大学を表示しているときは、
+  /// 「メモどおり配置する」「メモを全部消す」から選ぶ。ほかは今まで通り、全部消すかを聞く
+  Future<void> _memoMidashiOsu() async {
+    final Ghensuu? gh = Hive.box<Ghensuu>('ghensuuBox').getAt(0);
+    if (!widget.kukanEntry || widget.gakuren || gh == null || _univId != gh.MYunivid) {
+      await _memoZenbuKesu();
+      return;
+    }
+    final int? erabi = await showDialog<int>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return SimpleDialog(
+          title: const Text('メモ', style: TextStyle(color: Colors.black)),
+          children: [
+            SimpleDialogOption(
+              onPressed: () => Navigator.of(dialogContext).pop(1),
+              child: const Text('メモどおり配置する', style: TextStyle(color: Colors.black)),
+            ),
+            SimpleDialogOption(
+              onPressed: () => Navigator.of(dialogContext).pop(2),
+              child: const Text('メモを全部消す', style: TextStyle(color: Colors.black)),
+            ),
+            SimpleDialogOption(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('キャンセル', style: TextStyle(color: Colors.black54)),
+            ),
+          ],
+        );
+      },
+    );
+    if (!mounted) return;
+    if (erabi == 1) {
+      await _memoDooriHaichi(gh);
+    } else if (erabi == 2) {
+      await _memoZenbuKesu();
+    }
+  }
+
+  /// メモどおり配置する(2.1.2。konki_memo.dart の memoHaichiKeikaku)。変わる区間などを確かめてから、
+  /// 区間エントリーの画面の選択(SenshuSelectedOption)を書き換えて保存し、表を閉じて区間エントリーの画面に戻る
+  /// (区間エントリーの画面は、保存すると書き換わる)
+  Future<void> _memoDooriHaichi(Ghensuu gh) async {
+    final int race = gh.hyojiracebangou;
+    // 区間エントリーの画面で選べる大会(10月・11月・正月・カスタム駅伝)だけ
+    if (!(race == 0 || race == 1 || race == 2 || race == 5) ||
+        race >= gh.kukansuu_taikaigoto.length) {
+      return;
+    }
+    final int kukansuu = gh.kukansuu_taikaigoto[race] < gh.SenshuSelectedOption.length
+        ? gh.kukansuu_taikaigoto[race]
+        : gh.SenshuSelectedOption.length;
+    final List<SenshuData> narabi = kukanEntryNarabi(
+      Hive.box<SenshuData>('senshuBox').values,
+      gh.MYunivid,
+      race,
+    );
+    final MemoHaichiKeikaku k = memoHaichiKeikaku(
+      narabi: narabi,
+      jibun: _sortedSenshu,
+      ima: gh.SenshuSelectedOption,
+      kukansuu: kukansuu,
+    );
+    if (k.henkou.isEmpty && k.sudeni.isEmpty && k.chuui.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('この表には、区間の番号のメモがありません')),
+      );
+      return;
+    }
+    final bool kaeru = k.henkou.isNotEmpty;
+    final bool? haichi = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: Text(
+            kaeru ? 'メモどおり配置しますか？' : '配置を変える区間はありません',
+            style: const TextStyle(color: Colors.black, fontSize: 17),
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (final String s in k.henkou)
+                  Text(s, style: const TextStyle(color: Colors.black)),
+                for (final String s in k.sudeni)
+                  Text(s, style: const TextStyle(color: Colors.black54)),
+                for (final String s in k.chuui)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(s, style: TextStyle(color: Colors.red.shade800)),
+                  ),
+                if (k.nashi.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(k.nashi, style: const TextStyle(color: Colors.black54)),
+                  ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: Text(kaeru ? 'キャンセル' : '閉じる'),
+            ),
+            if (kaeru)
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: const Text('配置する'),
+              ),
+          ],
+        );
+      },
+    );
+    if (haichi != true || !mounted) return;
+    for (int kk = 0; kk < kukansuu; kk++) {
+      gh.SenshuSelectedOption[kk] = k.atarashii[kk];
+    }
+    await gh.save();
+    if (!mounted) return;
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    Navigator.of(context).pop();
+    messenger.showSnackBar(
+      SnackBar(content: Text('メモどおり${k.henkou.length}区間を配置しました')),
+    );
+  }
+
+  /// メモの列の見出し(押すと、この表のメモを全部消すかを聞く。区間エントリーの画面から開いた自分の大学の表では、
+  /// 「メモどおり配置する」も選べる。2.1.2。_memoMidashiOsu)
   TableViewCell _buildMemoHeaderCell() {
     final bool migiSen = _migiSen(_memoRetsu);
     return TableViewCell(
       child: GestureDetector(
-        onTap: _isExporting ? null : _memoZenbuKesu,
+        onTap: _isExporting ? null : _memoMidashiOsu,
         child: Container(
           decoration: BoxDecoration(
             color: Colors.white24,

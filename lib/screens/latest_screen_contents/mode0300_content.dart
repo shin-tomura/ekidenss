@@ -2932,7 +2932,9 @@ class _Mode0300ContentState extends State<Mode0300Content> {
         if (seigenOshirase.isNotEmpty)
           CustomSeigenOshiraseBox(bun: seigenOshirase),
         // 今季タイム一覧表(1.9.9。よく使うので、目立つボタンにしてリンクの列の一番上に置いた。kukan_haiti_button.dart)
-        KakuninButtons(targetUnivid: currentGhensuu.MYunivid, kukanHaiti: false),
+        // (2.1.2から、表のメモから「メモどおり配置する」を選べる。konki_memo.dart の memoHaichiKeikaku。
+        //  この画面の選手の並びを変えるときは、konki_memo.dart の kukanEntryNarabi も直す)
+        KakuninButtons(targetUnivid: currentGhensuu.MYunivid, kukanHaiti: false, kukanEntry: true),
         // 生成AIに渡すテキストのまとめボタン(1.8.2)
         // 区間エントリーの画面では、ほかの大学の区間エントリーが分かってしまうものを出さない
         // (一次エントリーの画面と同じ一覧にする)

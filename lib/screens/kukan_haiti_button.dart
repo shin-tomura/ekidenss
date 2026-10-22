@@ -19,11 +19,15 @@ class KakuninButtons extends StatelessWidget {
   final int targetUnivid;
   final bool kukanHaiti;
   final bool konkiTime;
+
+  /// 区間エントリーの画面か(2.1.2。今季タイム一覧表のメモから「メモどおり配置する」を選べる)
+  final bool kukanEntry;
   const KakuninButtons({
     super.key,
     required this.targetUnivid,
     this.kukanHaiti = true,
     this.konkiTime = true,
+    this.kukanEntry = false,
   });
 
   @override
@@ -39,7 +43,7 @@ class KakuninButtons extends StatelessWidget {
         runSpacing: 4,
         children: [
           if (kukanHaiti) KukanHaitiKakuninButton(targetUnivid: targetUnivid),
-          if (konkiTime) KonkiTimeIchiranButton(targetUnivid: targetUnivid),
+          if (konkiTime) KonkiTimeIchiranButton(targetUnivid: targetUnivid, kukanEntry: kukanEntry),
         ],
       ),
     );
@@ -68,7 +72,10 @@ class KukanHaitiKakuninButton extends StatelessWidget {
 class KonkiTimeIchiranButton extends StatelessWidget {
   /// 最初に表示する大学
   final int targetUnivid;
-  const KonkiTimeIchiranButton({super.key, required this.targetUnivid});
+
+  /// 区間エントリーの画面か(2.1.2。今季タイム一覧表のメモから「メモどおり配置する」を選べる)
+  final bool kukanEntry;
+  const KonkiTimeIchiranButton({super.key, required this.targetUnivid, this.kukanEntry = false});
 
   @override
   Widget build(BuildContext context) {
@@ -77,7 +84,7 @@ class KonkiTimeIchiranButton extends StatelessWidget {
       icon: Icons.table_chart,
       iro: Colors.orangeAccent,
       barrierLabel: '今季タイム一覧表',
-      gamen: () => ModalUnivSenshuMatrixView(targetUnivId: targetUnivid),
+      gamen: () => ModalUnivSenshuMatrixView(targetUnivId: targetUnivid, kukanEntry: kukanEntry),
     );
   }
 }

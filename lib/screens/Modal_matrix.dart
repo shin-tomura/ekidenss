@@ -1266,11 +1266,15 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
     if (mounted) setState(() {});
   }
 
+  /// メモどおり配置できる表か(2.1.2。区間エントリーの画面から開いて、自分の大学を表示しているとき)
+  bool _memoHaichiDekiru(Ghensuu? gh) =>
+      widget.kukanEntry && !widget.gakuren && gh != null && _univId == gh.MYunivid;
+
   /// メモの列の見出しを押したとき(2.1.2)。区間エントリーの画面から開いて自分の大学を表示しているときは、
   /// 「メモどおり配置する」「メモを全部消す」から選ぶ。ほかは今まで通り、全部消すかを聞く
   Future<void> _memoMidashiOsu() async {
     final Ghensuu? gh = Hive.box<Ghensuu>('ghensuuBox').getAt(0);
-    if (!widget.kukanEntry || widget.gakuren || gh == null || _univId != gh.MYunivid) {
+    if (gh == null || !_memoHaichiDekiru(gh)) {
       await _memoZenbuKesu();
       return;
     }
@@ -1394,8 +1398,57 @@ class _ModalUnivSenshuMatrixViewState extends State<ModalUnivSenshuMatrixView> {
 
   /// メモの列の見出し(押すと、この表のメモを全部消すかを聞く。区間エントリーの画面から開いた自分の大学の表では、
   /// 「メモどおり配置する」も選べる。2.1.2。_memoMidashiOsu)
+  /// 配置できる表では、押したくなるように、メモの印と同じ黄色の枠と文字で「メモ/配置▾」の2行にする(2.1.2)。
+  /// 欄の幅(44)と見出しの行の高さ(55)は決まった数なので変わらない。文字を大きくしている人の画面でも
+  /// はみ出さないように、2行をまとめて欄に入る大きさまで縮める(FittedBox)
   TableViewCell _buildMemoHeaderCell() {
     final bool migiSen = _migiSen(_memoRetsu);
+    if (_memoHaichiDekiru(Hive.box<Ghensuu>('ghensuuBox').getAt(0))) {
+      final Color kiiro = Colors.amber.shade300;
+      final TextStyle style = TextStyle(
+        color: kiiro,
+        fontSize: 11,
+        fontWeight: FontWeight.bold,
+        height: 1.2,
+      );
+      return TableViewCell(
+        child: GestureDetector(
+          onTap: _isExporting ? null : _memoMidashiOsu,
+          child: Container(
+            decoration: BoxDecoration(
+              color: const Color(0xFF3D2F00),
+              border: migiSen
+                  ? Border(
+                      right: BorderSide(
+                        color: _seriesBorderColor,
+                        width: _seriesBorderWidth,
+                      ),
+                    )
+                  : null,
+            ),
+            padding: const EdgeInsets.all(3),
+            child: Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: kiiro, width: 1.5),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              padding: const EdgeInsets.all(2),
+              alignment: Alignment.center,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('メモ', style: style),
+                    Text('配置▾', style: style),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
     return TableViewCell(
       child: GestureDetector(
         onTap: _isExporting ? null : _memoMidashiOsu,

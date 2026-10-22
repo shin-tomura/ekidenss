@@ -19,7 +19,12 @@ import 'package:ekiden/kansuu/ToujituHenkou_com.dart' show senryakuEntryKakuritu
 //   設定タブの紹介文だけにする
 // ・札の選び方: 戦略的エントリー確率が0%(初期値)のあいだは、毎年1月中旬に戦略的エントリー確率設定を出す。
 //   ほかの日は、設定タブの見出しを1つずつ順に回した並び(_fudaJunban)から、年と日付で決まるものを出す
-//   (同じ日は何度開いても同じ。セーブデータは使わない)
+//   (同じ日は何度開いても同じ。セーブデータは使わない)。0%以外のときは、戦略的エントリー確率設定も
+//   ほかの設定と同じく並びに入る
+//   ・番号は、1月中旬〜2月中旬の4日(0%のあいだは1月中旬を除く3日)で1つずつ進める。2月下旬の札は
+//     カスタム駅伝を開催しない年だけなので、番号は進めず、並びの反対側から出す
+//     (どの設定も、並びの数÷1年の日数の年で、すき間なく一回りする。36個なら9年。2.1.3の開発中に、
+//      1年に5つずつ進めていたのを直した。2月下旬の分が毎年飛ばされ、出る間隔がばらついていたため)
 // ・「設定の説明を出す」は KantokuData.yobiint5[77](0=出す(初期値)、1=出さない)。表示の好みなので、
 //   リセットでもセーブデータの読み込みでも今の値を残し、QRコードには入れない(reset_ichiran.dart)
 // ------------------------------------------------------------
@@ -434,6 +439,12 @@ SetteiShoukai? setteiFudaKyou(Ghensuu gh, KantokuData? kantoku) {
   if (bangou == 0 && senryakuMada) return setteiShoukaiYomu(_senryakuMei);
   final List<SetteiShoukai> junban = _fudaJunban(nozoku: senryakuMada ? _senryakuMei : null);
   if (junban.isEmpty) return null;
-  final int n = gh.year * 5 + bangou;
+  // 1月中旬〜2月中旬の4日で番号を進める(0%のあいだは、1月中旬が戦略的エントリーなので3日)
+  final int hajime = senryakuMada ? 1 : 0;
+  final int nissuu = 4 - hajime;
+  final int n = bangou <= 3
+      ? gh.year * nissuu + (bangou - hajime)
+      // 2月下旬(カスタム駅伝を開催しない年だけ): 同じ年のほかの札と重ならないように、並びの反対側から出す
+      : gh.year * nissuu + junban.length ~/ 2;
   return junban[((n % junban.length) + junban.length) % junban.length];
 }

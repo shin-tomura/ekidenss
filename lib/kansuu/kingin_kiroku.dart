@@ -11,6 +11,7 @@ import 'package:ekiden/kansuu/kingin_rireki.dart' show kinginRirekiTokkun; // �
 // 選手画面・他大学の選手の詳細・卒業生の画面に学年ごと能力ごとの表(kinginKirokuHyou)で出し、
 // 夏合宿の日の結果画面(mode0700_content.dart)に、自分の大学の選手の一覧表(kinginIchiranHyou)で出す。
 // 大学画面(univ_screen.dart)の一番下にも、表示している大学の選手の一覧表を常に出す(2.0.0)。
+// そのすぐ上に、直近の夏合宿の分だけの一覧表(kinginNatsuHyou)も出す(2.1.3)。
 // (夏合宿の画面 9100Gashuku.dart の「これまで」の行は、その画面が今は使われていないので表示されない)
 //
 // ・保存場所は SenshuData.name_tanshuku(選手の短縮名)。選手を作ったときの「短縮」のままで、
@@ -269,3 +270,101 @@ KijiHyou? kinginIchiranHyou(Iterable<SenshuData> senshuList) {
 /// 一覧表の下の注記([jibun]は自分の大学の表か。ほかの大学の選手の内訳は、選手の詳細で見る)
 String kinginIchiranChuu({required bool jibun}) =>
     '能力ごとの合計です。学年ごとの内訳は、${jibun ? '選手画面' : '選手の詳細'}の「金銀で伸ばした能力」で見られます。';
+
+// ------------------------------------------------------------
+// 直近の夏合宿の分だけの一覧表(2.1.3。大学画面の通算の一覧表のすぐ上)
+//
+// ・金銀を使えるのは7月15日の夏合宿の日だけで(プレイヤーもコンピュータの大学も)、学年は4月5日の
+//   年度替わりで上がるので、記録の学年がどの夏合宿の分かが決まる
+//   ・7月15日〜12月25日: その年の夏合宿の分(今の学年の記録)
+//   ・1月5日〜3月25日: 前の年(同じ年度)の夏合宿の分(今の学年の記録)
+//   ・4月5日〜7月5日: 前の年の夏合宿の分(今の学年より1つ下の記録。卒業した選手は入らない。
+//     卒業生のデータは大学ごとに10人ほどしか残らないので、卒業生からは拾わない)
+// ・新しく保存するものはない(今の記録と日付を読むだけ)
+// ------------------------------------------------------------
+
+/// 直近の夏合宿の年([year][month][day]は今の日付。7月15日より前なら前の年)
+int kinginNatsuNen({required int year, required int month, required int day}) =>
+    (month > 7 || (month == 7 && day >= 15)) ? year : year - 1;
+
+/// 直近の夏合宿が前の年度の分か(4月5日〜7月5日。記録は今の学年より1つ下で、卒業した選手は入らない)
+bool kinginNatsuMaeNendo({required int month, required int day}) =>
+    month >= 4 && (month < 7 || (month == 7 && day < 15));
+
+/// 直近の夏合宿の一覧表([senshuList]は1つの大学の選手。[nen]は kinginNatsuNen、[maeNendo]は kinginNatsuMaeNendo)
+/// 通算の一覧表(kinginIchiranHyou)と同じ並び・同じ列の形で、その夏合宿に使った金・銀の量と
+/// 能力ごとの量を出し、一番下に合計の行を足す(列は、その夏合宿で誰かが上げた能力だけ)。
+/// 選手の学年は今の学年で出す。記録のある選手がいなければnull
+KijiHyou? kinginNatsuHyou(
+  Iterable<SenshuData> senshuList, {
+  required int nen,
+  required bool maeNendo,
+}) {
+  final List<SenshuData> narabi = senshuList.toList()
+    ..sort((a, b) {
+      final int g = b.gakunen.compareTo(a.gakunen);
+      return g != 0 ? g : a.id.compareTo(b.id);
+    });
+  final List<SenshuData> kirokuAri = [];
+  final List<Map<int, int>> natsuList = [];
+  final Map<int, int> goukei = {};
+  for (final SenshuData s in narabi) {
+    // その夏合宿のときの学年
+    final int natsuGakunen = maeNendo ? s.gakunen - 1 : s.gakunen;
+    if (natsuGakunen < 1 || natsuGakunen > 4) continue;
+    final Map<int, int>? m = kinginKirokuYomu(s.name_tanshuku)[natsuGakunen];
+    if (m == null) continue;
+    final Map<int, int> natsu = {
+      for (final MapEntry<int, int> e in m.entries)
+        if (e.value > 0 && kinginNouryokuMei(e.key).isNotEmpty) e.key: e.value,
+    };
+    if (natsu.isEmpty) continue;
+    kirokuAri.add(s);
+    natsuList.add(natsu);
+    natsu.forEach((b, k) => goukei[b] = (goukei[b] ?? 0) + k);
+  }
+  if (kirokuAri.isEmpty) return null;
+  final List<int> retsu = [
+    for (final int b in kinginNouryokuNarabi)
+      if (goukei.containsKey(b)) b,
+  ];
+  // 金・銀の量と能力ごとの量の1行([namae]は1つ目の欄)
+  List<String> ichiGyou(String namae, Map<int, int> m) {
+    int kin = 0;
+    int gin = 0;
+    m.forEach((b, k) {
+      if (kinginKinNouryoku(b)) {
+        kin += k;
+      } else {
+        gin += k;
+      }
+    });
+    return [
+      namae,
+      kin > 0 ? '${kin * 10}' : '-',
+      gin > 0 ? '${gin * 10}' : '-',
+      for (final int b in retsu) (m[b] ?? 0) > 0 ? '+${m[b]! * 10}' : '',
+    ];
+  }
+
+  final List<List<String>> gyou = [
+    for (int i = 0; i < kirokuAri.length; i++)
+      ichiGyou('${kirokuAri[i].name}(${kirokuAri[i].gakunen})', natsuList[i]),
+    ichiGyou('合計', goukei),
+  ];
+  return KijiHyou('夏合宿(${nen}年7月)の金特訓・銀特訓', [
+    '選手',
+    '金',
+    '銀',
+    for (final int b in retsu) kinginNouryokuMei(b),
+  ], gyou);
+}
+
+/// 直近の夏合宿の一覧表の下の注記
+String kinginNatsuChuu({required int nen, required bool maeNendo}) =>
+    '${nen}年7月の夏合宿で使った分です。${maeNendo ? '卒業した選手の分は入りません。' : ''}';
+
+/// 直近の夏合宿の記録のある選手がいないときの文
+String kinginNatsuNashi({required int nen, required bool maeNendo}) => maeNendo
+    ? '今いる選手には、${nen}年7月の夏合宿の金特訓・銀特訓の記録はありません(卒業した選手の分は入りません)。'
+    : '${nen}年7月の夏合宿では、金特訓・銀特訓をしていません。';

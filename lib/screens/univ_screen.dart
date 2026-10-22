@@ -55,7 +55,14 @@ import 'package:ekiden/kansuu/mokuhyou_kimekata.dart'
         mokuhyouKimekataTaikousen,
         mokuhyouKimekataKoujoushinKa; // 目標順位決め方設定の値(2.0.1)
 import 'package:ekiden/kansuu/kingin_kiroku.dart'
-    show kinginIchiranHyou, kinginIchiranChuu; // 金特訓・銀特訓の記録の一覧表(2.0.0)
+    show
+        kinginIchiranHyou,
+        kinginIchiranChuu,
+        kinginNatsuNen,
+        kinginNatsuMaeNendo,
+        kinginNatsuHyou,
+        kinginNatsuChuu,
+        kinginNatsuNashi; // 金特訓・銀特訓の記録の一覧表(2.0.0)と、直近の夏合宿の分(2.1.3)
 import 'package:ekiden/kansuu/taikai_chouki.dart'
     show
         ChoukiKiroku,
@@ -5029,15 +5036,34 @@ class _UnivScreenState extends State<UnivScreen> {
   // 金特訓・銀特訓の記録の一覧表(2.0.0。kingin_kiroku.dart)
   // 夏合宿の日の結果画面と同じ表を、表示している大学の選手で出す(コンピュータの大学が使った金銀も記録している)。
   // 記録のある選手がいなければ、1行だけ出す
+  // そのすぐ上に、直近の夏合宿の分だけの表を出す(2.1.3。kinginNatsuHyou。通算の記録がないときは出さない)
   Widget _buildKinginIchiran(Ghensuu ghensuu) {
     const TextStyle chuuStyle = TextStyle(
       color: HENSUU.textcolor,
       fontSize: HENSUU.fontsize_honbun - 2,
     );
     final int univid = ghensuu.hyojiunivnum;
-    final KijiHyou? hyou = kinginIchiranHyou(
-      _senshuBox.values.where((s) => s.univid == univid),
+    final List<SenshuData> univSenshu = _senshuBox.values
+        .where((s) => s.univid == univid)
+        .toList();
+    final KijiHyou? hyou = kinginIchiranHyou(univSenshu);
+    // 直近の夏合宿(2.1.3)
+    final int natsuNen = kinginNatsuNen(
+      year: ghensuu.year,
+      month: ghensuu.month,
+      day: ghensuu.day,
     );
+    final bool natsuMaeNendo = kinginNatsuMaeNendo(
+      month: ghensuu.month,
+      day: ghensuu.day,
+    );
+    final KijiHyou? natsuHyou = hyou == null
+        ? null
+        : kinginNatsuHyou(
+            univSenshu,
+            nen: natsuNen,
+            maeNendo: natsuMaeNendo,
+          );
     return SizedBox(
       width: double.infinity,
       child: Column(
@@ -5046,6 +5072,22 @@ class _UnivScreenState extends State<UnivScreen> {
           if (hyou == null)
             const Text('金特訓・銀特訓の記録はまだありません。', style: chuuStyle)
           else ...[
+            // 直近の夏合宿の分(2.1.3)
+            if (natsuHyou == null)
+              Text(
+                kinginNatsuNashi(nen: natsuNen, maeNendo: natsuMaeNendo),
+                style: chuuStyle,
+              )
+            else ...[
+              KijiHyouView(natsuHyou, ue: 0),
+              const SizedBox(height: 6),
+              Text(
+                kinginNatsuChuu(nen: natsuNen, maeNendo: natsuMaeNendo),
+                style: chuuStyle,
+              ),
+            ],
+            const SizedBox(height: 16),
+            // 通算の分
             KijiHyouView(hyou, ue: 0),
             const SizedBox(height: 6),
             Text(

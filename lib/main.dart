@@ -57,6 +57,7 @@ import 'package:ekiden/screens/record_screen.dart'; // 新しく作ったUnivScr
 import 'package:ekiden/screens/setting_screen.dart'; // 新しく作ったUnivScreenをインポート
 import 'package:ekiden/screens/error_screen.dart';
 import 'package:ekiden/toukei.dart';
+import 'package:ekiden/kansuu/toukei_ace.dart' show toukeiAceBun; // エース・準エースが走った区間(2.1.3)
 import 'package:ekiden/kansuu/toukei_text.dart';
 import 'package:ekiden/kansuu/toukei_joui.dart'; // 学年の上位に入った人数(2.0.0)
 import 'dart:math'; // Randomクラスを使用するため
@@ -3983,6 +3984,11 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
             sortedUnivsById[12].name_tanshuku +=
                 "\n\n(統計をとっている間、駅伝を留学生が走らなかったので、日本人だけの区間別タイム統計は上と同じです)\n";
           }
+          // エース・準エースが走った区間(2.1.3。kansuu/toukei_ace.dart)
+          sortedUnivsById[12].name_tanshuku += toukeiAceBun(
+            kukansuuTaikaigoto: ghensuu.kukansuu_taikaigoto,
+            customMei: sortedUnivsById[0].name_tanshuku,
+          );
           await sortedUnivsById[12].save();
           print("");
           print("最大seichoukaisuu_max= ${Chousa.seichoukaisuu_max}");

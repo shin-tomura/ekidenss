@@ -7,6 +7,7 @@ import 'package:ekiden/ghensuu.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/skip.dart';
 import 'package:ekiden/toukei.dart';
+import 'package:ekiden/kansuu/toukei_ace.dart' show toukeiAceReset; // エース・準エースが走った区間(2.1.3)
 import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/kansuu/toukei_joui.dart'; // 学年の上位に入った人数(2.0.0)
 
@@ -112,6 +113,7 @@ class _StatisticsSimulationScreenState
     try {
       EkidenStatistics.instance.resetAllStats();
       EkidenStatistics.instanceNihonjin.resetAllStats(); // 日本人だけの区間別統計(1.8.7)
+      toukeiAceReset(); // エース・準エースが走った区間(2.1.3)
       await WakelockPlus.enable();
 
       final Ghensuu ghensuu = _ghensuuBox.get('global_ghensuu')!;
@@ -308,7 +310,8 @@ class _StatisticsSimulationScreenState
                     const Divider(color: Colors.white24, height: 20),
                     _buildSectionTitle('この機能の目的'),
                     _buildDescriptionText(
-                      'コース編集や各種設定の下で、どの程度のタイムが出るのかを確認できるようにするために実装しました。スキップ後、この画面下部の統計データ欄にスキップ中に集計したデータが表示されます。',
+                      'コース編集や各種設定の下で、どの程度のタイムが出るのかを確認できるようにするために実装しました。スキップ後、この画面下部の統計データ欄にスキップ中に集計したデータが表示されます。'
+                      '各大学のエース・準エース(持ちタイムの学内順位の平均で決めた1番手・2番手)が、駅伝のどの区間を走ったかも集計します。',
                     ),
                     const Divider(color: Colors.white24, height: 20),
                     _buildSectionTitle('スキップ予約をしたら'),

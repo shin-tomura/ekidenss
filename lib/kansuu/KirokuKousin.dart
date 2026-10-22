@@ -13,6 +13,7 @@ import 'package:ekiden/senshu_gakuren_data.dart';
 import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/skip.dart';
 import 'package:ekiden/toukei.dart';
+import 'package:ekiden/kansuu/toukei_ace.dart' show toukeiAceAtsumeru; // エース・準エースが走った区間(2.1.3)
 import 'package:ekiden/kansuu/ChartPanelSenshu.dart';
 import 'package:ekiden/kansuu/ChartPanelUniv.dart';
 import 'package:ekiden/kansuu/goldsilver_com.dart';
@@ -2577,6 +2578,16 @@ Future<void> kirokuKousin({
         );
       }
     }
+  }
+
+  // スキップして統計データ取得の、エース・準エースが走った区間(2.1.3。toukei_ace.dart)
+  // (学連選抜は数えないので、学連選抜の選手の結果を大学の選手に写す前に数える)
+  if (skip.skipflag >= 2 && (racebangou <= 2 || racebangou == 5)) {
+    toukeiAceAtsumeru(
+      racebangou,
+      gh[0].kukansuu_taikaigoto[racebangou],
+      sortedsenshudata,
+    );
   }
 
   /////学連選抜の選手のデータ更新

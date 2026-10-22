@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:ekiden/screens/Modal_kukanhaiti2.dart';
 import 'package:ekiden/screens/Modal_matrix.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:ekiden/ghensuu.dart';
+import 'package:ekiden/screens/Modal_aceHaichi.dart'
+    show AceBamen, ModalAceHaichi, aceHaichiTaishou; // エースの配置(2.1.3)
 
 // ------------------------------------------------------------
 // よく使う画面を開く、目立つボタン(1.9.9)
 // ・区間配置確認(水色・一覧のアイコン)と、今季タイム一覧表(オレンジ・表のアイコン)
 // ・ほかの緑の下線のリンクより目立つ、枠とアイコン付きの丸いボタンにした
 // ・各画面のリンクの列の一番上に、KakuninButtons で2つを横に並べて置く(入りきらなければ折り返す)
+// ・2.1.3から、駅伝のレース前の画面(直前順位予想・当日変更・スタート前)では、エースの配置(ピンク・星のアイコン)も並べる
 //   区間配置確認: レース中・当日変更・目標順位の設定・直前順位予想・結果・他大学変更
 //   今季タイム一覧表: 上の画面と、大学画面・区間エントリー決定・出場メンバーを選ぶ画面と、
 //   箱庭モードの他大学のエントリーの画面
@@ -22,17 +27,22 @@ class KakuninButtons extends StatelessWidget {
 
   /// 区間エントリーの画面か(2.1.2。今季タイム一覧表のメモから「メモどおり配置する」を選べる)
   final bool kukanEntry;
+
+  /// エースの配置のボタンを出す画面(2.1.3。直前順位予想・当日変更・スタート前だけ。nullなら出さない。
+  /// 駅伝(10月・11月・正月・カスタム)のときだけ出る。Modal_aceHaichi.dart)
+  final AceBamen? aceBamen;
   const KakuninButtons({
     super.key,
     required this.targetUnivid,
     this.kukanHaiti = true,
     this.konkiTime = true,
     this.kukanEntry = false,
+    this.aceBamen,
   });
 
   @override
   Widget build(BuildContext context) {
-    if (!kukanHaiti && !konkiTime) return const SizedBox.shrink();
+    if (!kukanHaiti && !konkiTime && aceBamen == null) return const SizedBox.shrink();
     // ListViewの中では真ん中、Columnの中ではColumnの寄せ方に合わせて置かれる(ほかのリンクと同じ)
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -44,8 +54,30 @@ class KakuninButtons extends StatelessWidget {
         children: [
           if (kukanHaiti) KukanHaitiKakuninButton(targetUnivid: targetUnivid),
           if (konkiTime) KonkiTimeIchiranButton(targetUnivid: targetUnivid, kukanEntry: kukanEntry),
+          if (aceBamen != null) AceHaichiButton(bamen: aceBamen!),
         ],
       ),
+    );
+  }
+}
+
+/// エースの配置を開くボタン(2.1.3。駅伝のときだけ出す。Modal_aceHaichi.dart)
+class AceHaichiButton extends StatelessWidget {
+  final AceBamen bamen;
+  const AceHaichiButton({super.key, required this.bamen});
+
+  @override
+  Widget build(BuildContext context) {
+    final Ghensuu? gh = Hive.box<Ghensuu>('ghensuuBox').get('global_ghensuu');
+    if (gh == null || !aceHaichiTaishou(gh.hyojiracebangou)) {
+      return const SizedBox.shrink();
+    }
+    return MedatsuButton(
+      label: 'エースの配置',
+      icon: Icons.stars,
+      iro: Colors.pinkAccent,
+      barrierLabel: 'エースの配置',
+      gamen: () => ModalAceHaichi(bamen: bamen),
     );
   }
 }

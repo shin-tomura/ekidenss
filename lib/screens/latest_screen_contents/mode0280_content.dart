@@ -10,6 +10,7 @@ import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/screens/Modal_kukanentry.dart';
 //import 'package:ekiden/screens/Modal_senshu.dart';
 import 'package:ekiden/screens/kukan_haiti_button.dart'; // 区間配置確認を開くボタン(1.9.9)
+import 'package:ekiden/screens/Modal_aceHaichi.dart' show AceBamen; // エースの配置(2.1.3)
 import 'package:ekiden/screens/Modal_TodayChangeList.dart';
 import 'package:ekiden/screens/Modal_courseshoukai.dart';
 import 'package:ekiden/screens/Modal_kukanresult350.dart';
@@ -432,6 +433,8 @@ class _Mode0280Content extends State<Mode0280Content> {
                     KakuninButtons(
                       targetUnivid: widget.ghensuu.MYunivid,
                       kukanHaiti: widget.ghensuu.hyojiracebangou != 4,
+                      // エースの配置(2.1.3。当日変更のあとの配置。駅伝だけ)
+                      aceBamen: AceBamen.start,
                     ),
                     // 生成AIに渡すテキストのまとめボタン(目標順位の相談用。1.8.3。
                     // 当日変更のあとの画面なので、全大学の区間配置が分かるものも出してよい)

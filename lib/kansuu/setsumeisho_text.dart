@@ -104,6 +104,7 @@ List<SetsumeishoGroup> setsumeishoGroupList() {
       SetsumeishoKoumoku(_panel(), youten: _youtenPanel),
       const SetsumeishoKoumoku(_konkiMemo),
       const SetsumeishoKoumoku(_kukanTekisei),
+      const SetsumeishoKoumoku(_aceHaichi),
       const SetsumeishoKoumoku(_kinginUchiwake),
       const SetsumeishoKoumoku(_setteiShoukai),
       const SetsumeishoKoumoku(_gakunaiKiroku, youten: _youtenGakunaiKiroku),
@@ -427,6 +428,15 @@ const ShiyouSetsu _kinginUchiwake = ShiyouSetsu('金銀の内訳', [
   '　・自分の大学の特訓は、日ごと・金銀ごとにまとめて出します。',
   '　・コンピュータの大学は、夏合宿でまとめて使った分を出します。',
   '・記録を始める前の分などは、「記録のない増減」として出します。',
+]);
+
+// エースの配置(2.1.3。決め方は kansuu/ace_haichi.dart、画面は screens/Modal_aceHaichi.dart)
+const ShiyouSetsu _aceHaichi = ShiyouSetsu('エースの配置', [
+  '・駅伝の直前順位予想・当日変更・スタート前の画面に「エースの配置」があります。',
+  '・各大学のエース・準エースと全体の上位10人が、どの区間や補欠にいるかの人数を見られます。',
+  '・エース・準エースは、各大学の全選手を4種目の学内順位の平均で並べた1番手・2番手です。',
+  '　・4種目は5000m・1万m・ハーフ・ロード1万で、記録のない種目は近い種目から換算します。',
+  '・開いた時点の配置で数えます(当日変更の画面で選んでいる途中の変更は入りません)。',
 ]);
 
 // 設定の紹介(2.1.3。紹介文は kansuu/settei_shoukai.dart、札は screens/settei_shoukai_fuda.dart)

@@ -14,6 +14,7 @@ import 'package:ekiden/screens/Modal_matrix3.dart';
 import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/screens/AllToujitu.dart';
 import 'package:ekiden/screens/kukan_haiti_button.dart'; // 区間配置確認を開くボタン(1.9.9)
+import 'package:ekiden/screens/Modal_aceHaichi.dart' show AceBamen; // エースの配置(2.1.3)
 import 'package:ekiden/screens/Modal_Taichoufuryou.dart';
 import 'package:ekiden/kansuu/ToujituHenkou_com.dart';
 import 'package:ekiden/kansuu/ShoriGuard.dart';
@@ -587,7 +588,8 @@ class _ToujitsuHenkouScreenState extends State<ToujitsuHenkouScreen> {
                   ),
                   const SizedBox(height: 20),
                   // 区間配置確認と今季タイム一覧表(1.9.9。よく使うので、目立つボタンにしてリンクの列の一番上に置いた。kukan_haiti_button.dart)
-                  KakuninButtons(targetUnivid: currentGhensuu.MYunivid),
+                  // エースの配置(2.1.3。確定した区間エントリーの配置。この画面で選んでいる変更は入らない)
+                  KakuninButtons(targetUnivid: currentGhensuu.MYunivid, aceBamen: AceBamen.toujitsu),
                   // 生成AIに渡すテキストのまとめボタン(当日変更の相談用。1.8.3。
                   // コンピュータの大学の当日変更はプレイヤーの確定のあとなので、全大学の区間配置を出してよい)
                   const AiCopyMatomeButton(toujitsuGamen: true),

@@ -7,6 +7,7 @@ import 'package:ekiden/senshu_data.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ekiden/screens/ModalAverageTimeRankingView.dart';
 import 'package:ekiden/screens/kukan_haiti_button.dart'; // 区間配置確認を開くボタン(1.9.9)
+import 'package:ekiden/screens/Modal_aceHaichi.dart' show AceBamen; // エースの配置(2.1.3)
 import 'package:ekiden/kansuu/ikku_pace.dart'; // 1区の集団のペース(1.9.2)
 import 'package:ekiden/screens/ikku_pace_box.dart'; // 1区のペース予想の枠(1.9.2)
 import 'package:ekiden/kansuu/kiji/kiji.dart'; // 展望記事(1.9.2)
@@ -726,6 +727,8 @@ class Mode0330Content extends StatelessWidget {
                                 KakuninButtons(
                                   targetUnivid: currentGhensuu.MYunivid,
                                   kukanHaiti: currentGhensuu.hyojiracebangou != 4,
+                                  // エースの配置(2.1.3。区間エントリーの配置。駅伝だけ)
+                                  aceBamen: AceBamen.kukanEntry,
                                 ),
                                 // 展望記事(箱庭スポーツ。予想陣の3人の予想も記事に使う。1.9.2)
                                 // 目立つように、優勝争いの記事の見出しを予告するカードにして、一番上に置いた

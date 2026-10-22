@@ -15,6 +15,8 @@ import 'package:ekiden/kansuu/kyouka_project.dart'; // 強化プロジェクト(
 import 'package:ekiden/kansuu/taikai_chouki.dart' show choukiNendo; // 年度(2.0.1)
 import 'package:ekiden/kansuu/shushou.dart' show shushouKetteiBun; // 決まった主将(2.0.1)
 import 'package:ekiden/screens/koukou_taikai_oshirase.dart'; // 高校の大会の結果が出た日のお知らせ(2.0.4)
+import 'package:ekiden/kansuu/settei_shoukai.dart' show setteiFudaKyou; // 設定の紹介(2.1.3)
+import 'package:ekiden/screens/settei_shoukai_fuda.dart' show SetteiFuda; // 設定の紹介の札(2.1.3)
 // KANSUUクラスをインポートするか、必要な関数をここに直接定義
 // 仮で必要な関数をここに定義します。もし kansuu.dart があるならそちらをインポートしてください。
 // import 'package:ekiden/utils/kansuu.dart';
@@ -765,6 +767,13 @@ class Mode0100Content extends StatelessWidget {
                                     "今日は特に何もありませんでした",
                                     style: TextStyle(color: HENSUU.textcolor),
                                   ),
+                                  // 1月中旬〜2月の行事のない日は、設定を1つ紹介する(2.1.3。kansuu/settei_shoukai.dart)
+                                  if (currentGhensuu.mode == 100 &&
+                                      setteiFudaKyou(currentGhensuu, kantoku) != null)
+                                    SetteiFuda(
+                                      gh: currentGhensuu,
+                                      shoukai: setteiFudaKyou(currentGhensuu, kantoku)!,
+                                    ),
                                 ],
                               ],
                             ),

@@ -485,6 +485,8 @@ List<ResetKoumoku> resetIchiran() {
     ResetKoumoku('レーダーチャートのパネル(選手画面・大学画面)', '表示', ResetBunrui.tsukutta, [_kantoku(2, 20, 20)], yomikomiNokosu: true, qr: ResetQr.imanomama),
     ResetKoumoku('今季タイム一覧表で隠す列', '表示', ResetBunrui.tsukutta, [_kantoku(3, 74, 74)], yomikomiNokosu: true, qr: ResetQr.imanomama),
     ResetKoumoku('レース分析の選択・フリーメモの最初に開くメモ', '表示', ResetBunrui.tsukutta, [_kantoku(2, 23, 32)], yomikomiNokosu: true, qr: ResetQr.imanomama),
+    // 設定タブの「設定の説明を出す」(2.1.3。kansuu/settei_shoukai.dart)
+    ResetKoumoku('設定タブの設定の説明を出すか', '表示', ResetBunrui.tsukutta, [_kantoku(5, 77, 77)], yomikomiNokosu: true, qr: ResetQr.imanomama),
     // ---- 作ったもの(どのリセットでも触らない) ----
     ResetKoumoku('大学名', '作ったもの', ResetBunrui.tsukutta, [], qr: ResetQr.imanomama, qrHosoku: '個人情報に配慮して、入れていません。'),
     // フリーメモ(大学id 13〜17 の文字の欄)はアプリ全体で1つ。読み込んでも今のまま(2.0.3)。
@@ -541,7 +543,7 @@ const List<(int, int, int, String)> resetSusumiBangou = [
   (4, 79, 79, '空き'),
   (4, 80, 89, 'カスタム駅伝の大会記録の経過タイム'),
   (5, 61, 76, 'スキップして統計データ取得の人数'),
-  (5, 77, 79, '空き'),
+  (5, 78, 79, '空き'),
 ];
 
 /// 一覧にも resetSusumiBangou にも載っていない、監督データの予備の配列の番号(「yobiint2[19]」の形。開発用)

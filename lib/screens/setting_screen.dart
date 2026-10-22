@@ -30,6 +30,11 @@ import 'package:ekiden/screens/reset_ichiran_gamen.dart'
     show resetIchiranGamenHiraku; // リセット・ロード・QRで残るもの・変わるもの(2.0.3)
 import 'package:ekiden/screens/meisei_yokonarabi_settei.dart'
     show meiseiYokonarabiSetteiHiraku; // 名声の横並び設定(2.0.3)
+import 'package:ekiden/kantoku_data.dart'; // 設定の説明を出すか(2.1.3)
+import 'package:ekiden/kansuu/settei_shoukai.dart'
+    show setteiSetsumeiDasu, setteiSetsumeiSettei, setteiTabYoyaku; // 設定の紹介(2.1.3)
+import 'package:ekiden/screens/settei_shoukai_fuda.dart'
+    show setteiSetsumeiIreru; // 設定タブの紹介文(2.1.3)
 import 'package:ekiden/screens/Modal_TrainingEffect.dart';
 import 'package:ekiden/screens/Modal_TimeChousei.dart';
 import 'package:ekiden/settings_qr_page.dart';
@@ -93,6 +98,11 @@ class _SettingScreenState extends State<SettingScreen>
   @override
   void initState() {
     super.initState();
+    // ホームの画面の設定の紹介の札の「設定タブで見る」から来たときは、設定タブを開く(2.1.3。settei_shoukai.dart)
+    if (setteiTabYoyaku) {
+      _hirakiTabIndex = 0;
+      setteiTabYoyaku = false;
+    }
     _tabController = TabController(
       length: 2,
       vsync: this,
@@ -185,12 +195,18 @@ class _SettingScreenState extends State<SettingScreen>
 
   // 設定タブ(各種設定・データ・コースなどの画面へのボタン)
   // 慣れてからもよく使うので、折りたたまずに並べる(1.9.4から見出しで分けた)
+  // 2.1.3から、「設定の説明を出す」がオンなら、各ボタンのすぐ下に紹介文を出す
+  // (setteiSetsumeiIreru がボタンの文字で kansuu/settei_shoukai.dart の紹介文を引いて差し込む。
+  //  ボタンを足したら、settei_shoukai.dart の一覧にも紹介文を足す)
   Widget _setteiTab(BuildContext context, Ghensuu ghensuu) {
+    final KantokuData? kantoku = Hive.box<KantokuData>(
+      'kantokuBox',
+    ).get('KantokuData');
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0), // 全体にパディング
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start, // テキストを左寄せにする
-        children: [
+        children: setteiSetsumeiIreru(dasu: setteiSetsumeiDasu(kantoku), [
           // リセット・ロード(セーブデータの読み込み)・QRコードの読み込みで残るもの・変わるものの一覧(2.0.3。reset_ichiran_gamen.dart)
           TextButton(
             onPressed: () => resetIchiranGamenHiraku(context),
@@ -203,6 +219,8 @@ class _SettingScreenState extends State<SettingScreen>
               ),
             ),
           ),
+          // 設定の説明を出すか(2.1.3。紹介文は kansuu/settei_shoukai.dart)
+          _setteiSetsumeiSwitch(kantoku),
           // ボタンは見出しで分ける(大学画面の下のほうと同じ形。1.9.4)
           _setteiMidashi('メモとデータ'),
           TextButton(
@@ -2059,8 +2077,28 @@ class _SettingScreenState extends State<SettingScreen>
             ),
           ),
           const SizedBox(height: 60), // 下部の余白
-        ],
+        ]),
       ),
+    );
+  }
+
+  // 設定タブの上のほう(リセットの一覧のすぐ下)の「設定の説明を出す」(2.1.3。KantokuData.yobiint5[77]。表示の好みなので、
+  // リセットでもセーブデータの読み込みでも今の値を残す。kansuu/settei_shoukai.dart)
+  Widget _setteiSetsumeiSwitch(KantokuData? kantokuData) {
+    if (kantokuData == null) return const SizedBox.shrink();
+    final KantokuData kantoku = kantokuData;
+    return SwitchListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+      title: const Text(
+        '設定の説明を出す',
+        style: TextStyle(color: HENSUU.textcolor),
+      ),
+      value: setteiSetsumeiDasu(kantoku),
+      onChanged: (bool dasu) async {
+        setteiSetsumeiSettei(kantoku, dasu);
+        await kantoku.save();
+        if (mounted) setState(() {});
+      },
     );
   }
 

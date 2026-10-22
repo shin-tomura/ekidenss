@@ -105,6 +105,7 @@ List<SetsumeishoGroup> setsumeishoGroupList() {
       const SetsumeishoKoumoku(_konkiMemo),
       const SetsumeishoKoumoku(_kukanTekisei),
       const SetsumeishoKoumoku(_kinginUchiwake),
+      const SetsumeishoKoumoku(_setteiShoukai),
       const SetsumeishoKoumoku(_gakunaiKiroku, youten: _youtenGakunaiKiroku),
     ]),
     // 遊ぶのに知らなくてもよい読み物(2.1.1)
@@ -156,6 +157,7 @@ ShiyouSetsu _ichinenNagare() {
     '・11月:11月駅伝があります。',
     if (!kugatsu) '・11月〜12月:$kirokukai',
     '・1月:正月駅伝があります。',
+    '・1月中旬〜2月:行事のない日は、「最新」の画面で設定を1つずつ紹介します。',
     if (customMei != null) '・2月:カスタム駅伝($customMei)があります。',
     '・3月:フルマラソンがあります。',
     '・3月の終わり:4年生が卒業し、来年度の新入生をスカウトします。',
@@ -425,6 +427,14 @@ const ShiyouSetsu _kinginUchiwake = ShiyouSetsu('金銀の内訳', [
   '　・自分の大学の特訓は、日ごと・金銀ごとにまとめて出します。',
   '　・コンピュータの大学は、夏合宿でまとめて使った分を出します。',
   '・記録を始める前の分などは、「記録のない増減」として出します。',
+]);
+
+// 設定の紹介(2.1.3。紹介文は kansuu/settei_shoukai.dart、札は screens/settei_shoukai_fuda.dart)
+const ShiyouSetsu _setteiShoukai = ShiyouSetsu('設定の紹介', [
+  '・設定タブの「設定の説明を出す」をオンにすると、各ボタンの下に、できることの説明が出ます。',
+  '　・初期値はオンです。オフにすると、ボタンの名前だけが並びます。',
+  '・1月中旬〜2月の行事のない日は、「最新」の画面で設定を1つずつ紹介します。',
+  '　・「この設定を開く」でその場で変えられ、「設定タブで見る」で設定タブに移れます。',
 ]);
 
 const ShiyouSetsu _seiseiAI = ShiyouSetsu('生成AIと遊ぶ(テキストのコピー)', [

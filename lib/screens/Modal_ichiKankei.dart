@@ -33,7 +33,10 @@
 //     区間名と区間の距離と、数字のない進み具合の丸だけを出す
 //   ・コマ送り(2.1.1の開発中は、画面の書き換えに合わせてなめらかに動かしていたが、電池を使うのでやめた):
 //     区間を5つに分け、1コマずつ図を切り替える(すべらせない)。区間の始め(中継所)は0コマ目で、前の区間の
-//     5コマ目と同じ図なので、続けて再生するときと◀▶では1回にまとめ、中継所のコマは2倍止まる。
+//     5コマ目と同じ位置。点の表示(suiiTen)では、区間ごとに縮尺が変わるので、続けて再生するときも◀▶でも、
+//     中継所のコマ(前の区間の縮尺)の次に、始めのコマ(同じ位置を次の区間の縮尺で描く)を通り、中継所でわざと長く
+//     止めない(2.1.2。2.1.1は始めのコマを飛ばし、縮尺の切り替えと位置の動きが同じコマで起きていた。_suiiHajimeTooru)。
+//     四角の表示(suiiTen が false)では同じ図なので、今まで通り1回にまとめ、中継所のコマは2倍止まる。
 //     1コマはふつう1秒(ゆっくり2秒・はやい0.5秒。区間の距離には関係ない)。再生は1コマごとに1回だけ動くタイマーで進め、
 //     コマのあいだは何も計算・描画しない。◀▶(「1コマ」)は止めてから1コマ動かし、区間をまたぐ。
 //     進み具合は5つの丸(区間の始めは全部白、中継所は全部黒)。選んでいる区間から、終わった区間の最後まで続けて再生する。
@@ -220,7 +223,8 @@ const double _omakaseGamen = 2.0;
 /// 推移(2.1.1)の、1つの区間のコマの数(区間を5つに分ける。0コマ目が区間の始め、5コマ目が中継所)
 const int _suiiKomaSuu = 5;
 
-/// 推移の速さ(ゆっくり・ふつう・はやい)の、1コマの時間(ミリ秒)と名前。中継所のコマはこの2倍止まる
+/// 推移の速さ(ゆっくり・ふつう・はやい)の、1コマの時間(ミリ秒)と名前
+/// (四角の表示(suiiTen が false)では、中継所のコマはこの2倍止まる。点の表示は止めない。2.1.2)
 const List<int> _suiiKomaMs = [2000, 1000, 500];
 const List<String> _suiiHayasaMei = ['ゆっくり', 'ふつう', 'はやい'];
 
@@ -248,6 +252,11 @@ const SuiiHendouKata suiiHendouKata = SuiiHendouKata.nukisuu;
 /// true: 大学を点にして、トップから最後尾までを1つの画面に収め、全体の動きを見る(今の形。縮尺は区間ごとに固定)
 /// false: 大学の四角を道に並べ、焦点の大学に合わせて道を動かす(2.1.1の開発中に作った形)
 const bool suiiTen = true;
+
+/// 推移で区間をまたぐとき、次の区間の始め(0コマ目)を通るか(2.1.2)。点の表示(suiiTen)では区間ごとに縮尺が変わるので、
+/// 中継所のコマ(前の区間の縮尺)の次に、同じ位置を次の区間の縮尺で描いた始めのコマを挟み、中継所でわざと長く止めない。
+/// 四角の表示(suiiTen が false)では、区間の始めは中継所と同じ図なので、今まで通り飛ばし、中継所のコマは2倍止まる
+const bool _suiiHajimeTooru = suiiTen;
 
 /// 推移の1区の演出(2.1.1): 集団がばらけ始めるところ(区間の最後の4分の1)
 const double _ikkuBarakeIchi = 0.75;
@@ -1875,10 +1884,10 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     if (_suiiDekiru(b, _suiiKukan)) _erabu = _suiiKukan;
   }
 
-  /// 今のコマに止まる時間(中継所のコマは2倍)
+  /// 今のコマに止まる時間(四角の表示では、中継所のコマは2倍。点の表示は区間の始めのコマを挟むので、どのコマも同じ。2.1.2)
   Duration _suiiKomaJikan() {
     final int ms = _suiiKomaMs[_suiiHayasaBan.clamp(0, _suiiKomaMs.length - 1)];
-    return Duration(milliseconds: _suiiKomaBan >= _suiiKomaSuu ? ms * 2 : ms);
+    return Duration(milliseconds: !_suiiHajimeTooru && _suiiKomaBan >= _suiiKomaSuu ? ms * 2 : ms);
   }
 
   /// 次のコマに進めるタイマーを、今のコマに止まる時間で仕掛け直す(再生しているときだけ)
@@ -1900,8 +1909,8 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     return kouho.isEmpty || (_suiiKukan == kouho.first && _suiiKomaBan <= 0);
   }
 
-  /// 1コマ進める(setState の中で呼ぶ)。中継所の次は、次の区間の1コマ目(区間の始めは中継所と同じ図なので飛ばす)。
-  /// 一番最後のコマなら何もしない
+  /// 1コマ進める(setState の中で呼ぶ)。中継所の次は、点の表示では次の区間の始め(同じ位置を次の区間の縮尺で。2.1.2)、
+  /// 四角の表示では次の区間の1コマ目(区間の始めは中継所と同じ図なので飛ばす)。一番最後のコマなら何もしない
   void _suiiSusumeru(_IchiKankei b) {
     if (_suiiKomaBan < _suiiKomaSuu) {
       _suiiKomaBan++;
@@ -1910,22 +1919,23 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
       final int ki = kouho.indexOf(_suiiKukan);
       if (ki < 0 || ki + 1 >= kouho.length) return;
       _suiiKukan = kouho[ki + 1];
-      _suiiKomaBan = 1;
+      _suiiKomaBan = _suiiHajimeTooru ? 0 : 1;
     }
     _suiiOuYoyaku = true;
   }
 
-  /// 1コマ戻す(setState の中で呼ぶ)。区間の1コマ目の前は、前の区間の中継所(区間の始めと同じ図)。
-  /// 一番最初のコマなら何もしない
+  /// 1コマ戻す(setState の中で呼ぶ)。点の表示では、区間の始めの前は前の区間の中継所(2.1.2)。
+  /// 四角の表示では、区間の1コマ目の前は前の区間の中継所(区間の始めと同じ図)。一番最初のコマなら何もしない
   void _suiiModosu(_IchiKankei b) {
     final List<int> kouho = _suiiKouho(b);
     final int ki = kouho.indexOf(_suiiKukan);
     if (_suiiKomaBan <= 0) {
-      // 区間の始め(前の区間の中継所と同じ図)からは、前の区間の4コマ目へ
+      // 区間の始めからは、点の表示では前の区間の中継所へ(2.1.2)。四角の表示では、区間の始めは前の区間の
+      // 中継所と同じ図なので、前の区間の4コマ目へ
       if (ki <= 0) return;
       _suiiKukan = kouho[ki - 1];
-      _suiiKomaBan = _suiiKomaSuu - 1;
-    } else if (_suiiKomaBan == 1 && ki > 0) {
+      _suiiKomaBan = _suiiHajimeTooru ? _suiiKomaSuu : _suiiKomaSuu - 1;
+    } else if (!_suiiHajimeTooru && _suiiKomaBan == 1 && ki > 0) {
       _suiiKukan = kouho[ki - 1];
       _suiiKomaBan = _suiiKomaSuu;
     } else {

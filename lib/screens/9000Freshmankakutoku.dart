@@ -2052,6 +2052,15 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
         : filteredTargetFreshmen.length;
     final int ketteiSuu = filteredTargetFreshmen.length - miteiSuu;
     final bool kugiriAri = _comScoutOn && ketteiSuu > 0;
+    // フィルターのボタンに出す人数(2.1.3)。全はフィルターに合う全地区の新入生(自分の大学に決まった選手も含む)。
+    // 地区めぐりで地区を表示しているときは、その地区の出身で合う新入生の数も出す(地区の切り替えの「(12人)」と同じ数え方)
+    final List<SenshuData> filterZen = [
+      ..._myFreshmen.where(_meetsFilterCriteria),
+      ..._targetFreshmen.where(_meetsFilterCriteria),
+    ];
+    final int? filterChikuSuu = hyoujiChiku == null
+        ? null
+        : filterZen.where((s) => _chikuBetsu[s.id] == hyoujiChiku).length;
 
     return Scaffold(
       backgroundColor: HENSUU.backgroundcolor,
@@ -2109,7 +2118,10 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
           Container(
             padding: const EdgeInsets.symmetric(vertical: 4),
             color: Colors.grey[900],
-            child: _buildFilterAndSortButtons(),
+            child: _buildFilterAndSortButtons(
+              zenSuu: filterZen.length,
+              chikuSuu: filterChikuSuu,
+            ),
           ),
           // 地区めぐりの地区の切り替え(1.9.6)
           if (_chikuMeguri) _buildChikuPanel(),
@@ -2727,7 +2739,9 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
   }
 
   /// フィルターボタンと並び替えボタンを生成するウィジェット
-  Widget _buildFilterAndSortButtons() {
+  /// フィルターをかけているときは、合う新入生の人数をボタンに出す(2.1.3。[zenSuu]は全地区、
+  /// [chikuSuu]は地区めぐりで表示している地区の人数。地区を表示していなければnull)
+  Widget _buildFilterAndSortButtons({required int zenSuu, int? chikuSuu}) {
     bool isFilterActive =
         _abilityFilters.values.any((v) => v > 0) ||
         _timeFilterSeconds != TEISUU.DEFAULTTIME ||
@@ -2749,7 +2763,14 @@ class _FreshmanScoutViewState extends State<FreshmanScoutView> {
               ElevatedButton.icon(
                 onPressed: _showFilterDialog,
                 icon: const Icon(Icons.filter_list),
-                label: Text(isFilterActive ? 'フィルター設定 (適用中)' : 'フィルター設定'),
+                // 「フィルター設定 (適用中35人)」。地区めぐりで地区を表示しているときは「(当地区10/全45)」(2.1.3)
+                label: Text(
+                  !isFilterActive
+                      ? 'フィルター設定'
+                      : chikuSuu != null
+                      ? 'フィルター設定 (当地区$chikuSuu/全$zenSuu)'
+                      : 'フィルター設定 (適用中$zenSuu人)',
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: isFilterActive ? Colors.red[800] : Colors.orange,
                   foregroundColor: Colors.white,

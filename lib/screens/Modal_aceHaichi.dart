@@ -9,6 +9,7 @@ import 'package:ekiden/kansuu/ace_haichi.dart';
 import 'package:ekiden/kansuu/gakuren_text.dart' show gakurenKonnenAri;
 import 'package:ekiden/kansuu/kiji/kiji_kihon.dart' show KijiHyou, daigakuMei;
 import 'package:ekiden/screens/kiji_hyou_view.dart';
+import 'package:ekiden/screens/Modal_senshu.dart' show ModalSenshuDetailView; // 選手の詳細の小窓(2.1.3)
 
 // ------------------------------------------------------------
 // エースの配置(2.1.3。集計は kansuu/ace_haichi.dart)
@@ -20,6 +21,9 @@ import 'package:ekiden/screens/kiji_hyou_view.dart';
 //   カスタム駅伝だけ。予選では出さない)
 // ・エースの決め方は、スキップして統計データ取得の統計(toukei_ace.dart)と同じ。記事の「エース」(走る予定の
 //   選手のうち、区間の距離に合わせた持ちタイムが一番いい選手)とは違うことがあるので、そう添える
+// ・一番下に、出場した大学ごとのエース・準エースの区間の一覧を出す(大学のidの順。区間配置確認と同じ並び)
+// ・全体の上位10人と大学ごとの一覧の選手の名前のマスを押すと、選手の詳細の小窓を開く(区間適性の見立ての
+//   「詳細」と同じ開き方。小窓で名前や能力を変えられるので、閉じたら表を作り直す)
 // ------------------------------------------------------------
 
 /// どの画面から開いたか
@@ -46,9 +50,34 @@ const TextStyle _chuu = TextStyle(
   fontSize: HENSUU.fontsize_honbun - 3,
 );
 
-class ModalAceHaichi extends StatelessWidget {
+class ModalAceHaichi extends StatefulWidget {
   final AceBamen bamen;
   const ModalAceHaichi({super.key, required this.bamen});
+
+  @override
+  State<ModalAceHaichi> createState() => _ModalAceHaichiState();
+}
+
+class _ModalAceHaichiState extends State<ModalAceHaichi> {
+  /// 選手の詳細の小窓を開く(区間適性の見立ての「詳細」と同じ開き方。閉じたら表を作り直す)
+  void _shousaiHiraku(int senshuId) {
+    showGeneralDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.8),
+      barrierDismissible: true,
+      barrierLabel: '詳細',
+      transitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (context, animation, secondaryAnimation) => ModalSenshuDetailView(senshuId: senshuId),
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        return FadeTransition(
+          opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+          child: child,
+        );
+      },
+    ).then((_) {
+      if (mounted) setState(() {});
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -121,6 +150,7 @@ class ModalAceHaichi extends StatelessWidget {
     final bool fukuroStart = fukuroAri && gh.nowracecalckukan >= 5;
     final String bamenMei;
     final String bamenChuu;
+    final AceBamen bamen = widget.bamen;
     switch (bamen) {
       case AceBamen.kukanEntry:
         bamenMei = '区間エントリー';
@@ -175,6 +205,28 @@ class ModalAceHaichi extends StatelessWidget {
     String jibunMoji(AceSenshu s) =>
         '${s.name}(${s.gakunen}年)${aceBashoMoji(s.code, k.kukansuu)}';
 
+    // 上位10人の選手の名前のマスを押すと、選手の詳細(2.1.3)
+    final Map<(int, int), VoidCallback> jouiLink = {
+      for (int i = 0; i < k.joui.length; i++) (i, 1): () => _shousaiHiraku(k.joui[i].id),
+    };
+
+    // 大学ごとのエース・準エースの一覧(マスは「2区 山田 健太(4年)」。区間を先に書いて左にそろえる。2.1.3)
+    String aceMoji(AceSenshu s) =>
+        '${aceBashoMoji(s.code, k.kukansuu)} ${s.name}(${s.gakunen}年)';
+    final KijiHyou univHyou = KijiHyou('各大学のエース・準エース', ['大学', 'エース', '準エース'], [
+      for (final AceUniv u in k.univAce)
+        [
+          u.daigaku,
+          u.ace.isNotEmpty ? aceMoji(u.ace[0]) : '-',
+          u.ace.length >= 2 ? aceMoji(u.ace[1]) : '-',
+        ],
+    ]);
+    final Map<(int, int), VoidCallback> univLink = {
+      for (int r = 0; r < k.univAce.length; r++)
+        for (int j = 0; j < 2 && j < k.univAce[r].ace.length; j++)
+          (r, j + 1): () => _shousaiHiraku(k.univAce[r].ace[j].id),
+    };
+
     return [
       Text(
         '$raceMei・$bamenMei',
@@ -219,7 +271,13 @@ class ModalAceHaichi extends StatelessWidget {
           ),
         ),
       ],
-      if (k.joui.isNotEmpty) KijiHyouView(jouiHyou, ue: 16),
+      if (k.joui.isNotEmpty || k.univAce.isNotEmpty) ...[
+        const SizedBox(height: 12),
+        const Text('選手の名前(緑の下線)を押すと、選手の詳細を見られます。', style: _chuu),
+      ],
+      if (k.joui.isNotEmpty) KijiHyouView(jouiHyou, ue: 8, link: jouiLink),
+      // 大学ごとのエース・準エース(一番下。2.1.3)
+      if (k.univAce.isNotEmpty) KijiHyouView(univHyou, ue: 16, link: univLink),
     ];
   }
 }

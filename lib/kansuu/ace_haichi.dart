@@ -160,7 +160,20 @@ class AceSenshu {
   /// 区間の値
   final int code;
 
-  const AceSenshu(this.name, this.gakunen, this.daigaku, this.code);
+  /// 選手のid(選手の詳細の小窓を開くのに使う。学連選抜の選手も元の大学の選手と同じid)
+  final int id;
+
+  const AceSenshu(this.name, this.gakunen, this.daigaku, this.code, this.id);
+}
+
+/// 大学1つ分のエース・準エース(小窓の一番下の一覧。2.1.3)
+class AceUniv {
+  final String daigaku;
+
+  /// [0]エース・[1]準エース(選手が1人の大学は1人だけ)
+  final List<AceSenshu> ace;
+
+  const AceUniv(this.daigaku, this.ace);
 }
 
 /// 「エースの配置」の集計の結果
@@ -184,6 +197,9 @@ class AceHaichiKekka {
   /// 全体の上位10人(並びの順)
   final List<AceSenshu> joui;
 
+  /// 出場した大学ごとのエース・準エース(大学のidの順。区間配置確認と同じ並び)
+  final List<AceUniv> univAce;
+
   const AceHaichiKekka({
     required this.kukansuu,
     required this.univSuu,
@@ -193,6 +209,7 @@ class AceHaichiKekka {
     required this.entryGai,
     required this.jibun,
     required this.joui,
+    required this.univAce,
   });
 }
 
@@ -244,6 +261,7 @@ AceHaichiKekka aceHaichiKeisan({
 
   int univSuu = 0;
   List<AceSenshu> jibun = const [];
+  final List<AceUniv> univAce = [];
   // 全体の上位10人を選ぶ対象(区間エントリーされた全選手)
   final List<AceSenshu> taishou = [];
   final List<List<double?>> taishouTime = [];
@@ -260,13 +278,14 @@ AceHaichiKekka aceHaichiKeisan({
       final SenshuData s = narabi[i];
       final int code = _code(s.entrykukan_race, s.gakunen, race);
       kazoeru(i, code);
-      ace.add(AceSenshu(s.name, s.gakunen, mei, code));
+      ace.add(AceSenshu(s.name, s.gakunen, mei, code, s.id));
     }
     if (u == myUnivid) jibun = ace;
+    univAce.add(AceUniv(mei, ace));
     for (final SenshuData s in list) {
       final int code = _code(s.entrykukan_race, s.gakunen, race);
       if (aceBasho(code, ks) == AceBasho.entryGai) continue;
-      taishou.add(AceSenshu(s.name, s.gakunen, mei, code));
+      taishou.add(AceSenshu(s.name, s.gakunen, mei, code, s.id));
       taishouTime.add(aceMochiTimesSenshu(s));
       taishouId.add(s.id);
     }
@@ -276,7 +295,7 @@ AceHaichiKekka aceHaichiKeisan({
     if (aceBasho(code, ks) == AceBasho.entryGai) continue;
     final String moto = univMei[g.univid];
     taishou.add(
-      AceSenshu(g.name, g.gakunen, moto == null || moto.isEmpty ? '学連選抜' : '学連選抜($moto)', code),
+      AceSenshu(g.name, g.gakunen, moto == null || moto.isEmpty ? '学連選抜' : '学連選抜($moto)', code, g.id),
     );
     taishouTime.add(aceMochiTimesGakuren(g));
     taishouId.add(g.id);
@@ -297,5 +316,6 @@ AceHaichiKekka aceHaichiKeisan({
     entryGai: entryGai,
     jibun: jibun,
     joui: joui,
+    univAce: univAce,
   );
 }

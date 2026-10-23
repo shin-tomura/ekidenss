@@ -28,6 +28,8 @@ import 'package:ekiden/kansuu/koukou.dart'; // 出身校と高校時代の実績
 import 'package:ekiden/kansuu/shushou.dart'; // 主将(2.0.1)
 import 'package:ekiden/kansuu/taikai_chouki.dart'; // 大会の長い記録の移行処理(2.0.0)
 import 'package:ekiden/kansuu/mokuhyou_kimekata.dart'; // 目標順位の決め方の移行処理(2.0.1)
+import 'package:ekiden/kansuu/fushime.dart'
+    show zendaigakuGakunaiIkou; // 全大学で学内記録を付け始めた年度の移行処理(2.1.4)
 import 'package:ekiden/kansuu/reset_ichiran.dart'
     show ResetDougu, yomikomiMaeniToru, yomikomiAtoDeModosu; // 読み込んでも今の値を残すもの(2.0.3)
 //import 'dart:io';
@@ -907,6 +909,20 @@ class _SaveLoadScreenState extends State<SaveLoadScreen> {
         final ResetDougu? yomikomiAtoDougu = ResetDougu.yomu();
         if (yomikomiAtoDougu != null) {
           await yomikomiAtoDeModosu(yomikomiAtoDougu, yomikomiNokoshi);
+        }
+      }
+
+      // 全大学で学内記録を付け始めた年度を残す(2.1.4。mainの中の同じ処理の説明を参照)
+      //mainの中にもあるので、そちらも変更すること！
+      {
+        final checkversionValue = int.tryParse(sortedUnivData[7].name_tanshuku);
+        if (checkversionValue == null ||
+            checkversionValue < 22140 ||
+            checkversionValue > 999999999) {
+          final Ghensuu? gh = Hive.box<Ghensuu>('ghensuuBox').getAt(0);
+          if (gh != null) {
+            await zendaigakuGakunaiIkou(gh);
+          }
         }
       }
 

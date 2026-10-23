@@ -76,6 +76,8 @@ import 'package:ekiden/kansuu/taikai_chouki.dart'; // 大会の長い記録の�
 import 'package:ekiden/kansuu/mokuhyou_kimekata.dart'; // 目標順位の決め方の移行処理(2.0.1)
 import 'package:ekiden/kansuu/kyouka_project.dart'; // 強化プロジェクト(2.0.1)
 import 'package:ekiden/kansuu/shushou.dart'; // 主将(2.0.1)
+import 'package:ekiden/kansuu/fushime.dart'
+    show zendaigakuGakunaiIkou; // 全大学で学内記録を付け始めた年度の移行処理(2.1.4)
 import 'package:ekiden/kansuu/reset_ichiran.dart'
     show
         ResetDougu,
@@ -1097,6 +1099,21 @@ Future<void> main() async {
       final Ghensuu? gh = ghensuuBox.getAt(0);
       if (gh != null) {
         await mokuhyouKimekata201Ikou(gh);
+      }
+    }
+
+    // 全大学で学内記録を付け始めた年度を残す(2.1.4。2.1.3までは総監督をしている大学の学内記録しか付けていなかったので、
+    // ほかの大学の学内記録は、この年度から付き始める。KantokuData.yobiint5[78]。kansuu/fushime.dart)
+    //save_load_screenの中の _importFromSlot の中にもあるので、そちらも変更すること！
+    {
+      final checkversionValue = int.tryParse(sortedUnivData[7].name_tanshuku);
+      if (checkversionValue == null ||
+          checkversionValue < 22140 ||
+          checkversionValue > 999999999) {
+        final Ghensuu? gh = ghensuuBox.getAt(0);
+        if (gh != null) {
+          await zendaigakuGakunaiIkou(gh);
+        }
       }
     }
 

@@ -39,6 +39,8 @@ import 'package:ekiden/kansuu/kiji/kiji_kihon.dart'
 //     ならないように
 //   ・個人の種目の前の記録の持ち主が本人かは、その選手の今回より前の自己ベスト(同じ種目の大会の、学年ごとの
 //     タイム)で見る。学内の記録は、学内記録を付け始めた年度(大学を移ったとき)からの自己ベストだけで見る
+//     (2.1.4から学内記録の1位は全大学で付けるので、学内新と日本人学内新は、全大学で付け始めた年度と
+//     移った年度の早い方から見る。_gakunaiIchiiHajimeNendo)
 //   ・前の記録の持ち主は、名前・学年と、今から何年前か(「昨年」「3年前」)で書く(記録の年は年度ではなく、
 //     ゲームの年なので、「○年」とは書かない)
 // ・「初めて」「デビュー」「連続」は、前の学年の記録が欠けている選手(新しいゲームの2〜4年生など)には出さない
@@ -337,12 +339,49 @@ Future<void> gakunaiKirokuHajimeNendoKaku(Ghensuu gh) async {
 }
 
 /// 今の大学の学内記録を付け始めた年度(分からなければ0。今の年度より後の値は、前のゲームの残りとみなして0)
+/// (2.1.4から、学内記録の1位とチームの記録は全大学で付けるので、この年度で区切るのは区間記録・個人記録の2位以下だけ)
 int _gakunaiHajimeNendo(Ghensuu gh) {
   final KantokuData? kantoku = _kantoku();
   if (kantoku == null || kantoku.yobiint4.length <= gakunaiKirokuHajimeBangou) return 0;
   final int n = kantoku.yobiint4[gakunaiKirokuHajimeBangou];
   if (n <= 0 || n > _nendo(gh)) return 0;
   return n;
+}
+
+/// 全大学で学内記録を付け始めた年度を残す KantokuData.yobiint5 の番号(2.1.4)
+/// 2.1.3までは、学内記録を総監督をしている大学の分しか付けていなかった。2.1.4から、チームの記録(総合・往路・復路の
+/// 歴代10位まで)と、区間記録・個人記録の1位(すべて・日本人・留学生)を全大学で付ける。2.1.3までのセーブデータでは、
+/// ほかの大学の学内記録はこの年度から付き始める(0なら、ゲームの最初から全大学で付けている)
+const int zendaigakuGakunaiHajimeBangou = 78;
+
+/// 全大学で学内記録を付け始めた年度(ゲームの最初から付けていれば0。今の年度より後の値は、前のゲームの残りとみなして0)
+int zendaigakuGakunaiHajimeNendo(Ghensuu gh) {
+  final KantokuData? kantoku = _kantoku();
+  if (kantoku == null || kantoku.yobiint5.length <= zendaigakuGakunaiHajimeBangou) return 0;
+  final int n = kantoku.yobiint5[zendaigakuGakunaiHajimeBangou];
+  if (n <= 0 || n > _nendo(gh)) return 0;
+  return n;
+}
+
+/// 2.1.3までのセーブデータで、全大学で学内記録を付け始めた年度(今の年度)を残す
+/// (main.dart と save_load_screen.dart の移行処理から一度だけ呼ぶ。もう残してあれば何もしない。保存もする)
+Future<void> zendaigakuGakunaiIkou(Ghensuu gh) async {
+  final KantokuData? kantoku = _kantoku();
+  if (kantoku == null || kantoku.yobiint5.length <= zendaigakuGakunaiHajimeBangou) return;
+  if (kantoku.yobiint5[zendaigakuGakunaiHajimeBangou] > 0) return;
+  final int n = _nendo(gh);
+  kantoku.yobiint5[zendaigakuGakunaiHajimeBangou] = n < 1 ? 1 : n;
+  await kantoku.save();
+}
+
+/// 今の大学の学内記録の1位を付け始めた年度(0なら全部見る。2.1.4)
+/// 1位は全大学で付けるので、大学を移っていても、全大学で付け始めた年度と移った年度の早い方から載っている
+int _gakunaiIchiiHajimeNendo(Ghensuu gh) {
+  final int shuunin = _gakunaiHajimeNendo(gh);
+  if (shuunin <= 0) return 0;
+  final int zen = zendaigakuGakunaiHajimeNendo(gh);
+  if (zen <= 0) return 0;
+  return zen < shuunin ? zen : shuunin;
 }
 
 // ------------------------------------------------------------
@@ -937,7 +976,9 @@ List<_KojinKekka> _kojinBunseki(
     rekidaiUnivKojin(kiroku, false, u.id, k).yomu(),
   );
   // 学内記録を付け始めた年度(大学を移ったあと。それより前の自己ベストは学内記録に載っていない)
+  // 2.1.4から、1位は全大学で付けるので、学内新・日本人学内新は1位を付け始めた年度で見る
   final int hajime = _gakunaiHajimeNendo(gh);
+  final int hajimeIchii = _gakunaiIchiiHajimeNendo(gh);
 
   // 走った自分の大学の選手(速い順)
   final List<SenshuData> soushasha = [
@@ -958,6 +999,7 @@ List<_KojinKekka> _kojinBunseki(
     // 前の自己ベスト(全体の記録は全大学の分を残しているので全部、学内の記録は付け始めた年度から)
     final double? maeBestZentai = _maeBest(gh, s, k, race);
     final double? maeBest = _maeBest(gh, s, k, race, hajimeNendo: hajime);
+    final double? maeBestIchii = _maeBest(gh, s, k, race, hajimeNendo: hajimeIchii);
 
     // 全体の歴代
     final int zIchi = ichiDoko(zentai, s, t);
@@ -982,7 +1024,7 @@ List<_KojinKekka> _kojinBunseki(
     final int gIchi = ichiDoko(gakunai, s, t);
     if (gIchi == 0) {
       final ({RekidaiKiroku? mae, bool jishin, int sa})? mae =
-          _maeKojin(gh, gakunai, 0, s, t, maeBest, kondo);
+          _maeKojin(gh, gakunai, 0, s, t, maeBestIchii, kondo);
       if (mae != null) {
         x.gakunaiShin = KojinKoushin(
           s: s,
@@ -1000,7 +1042,7 @@ List<_KojinKekka> _kojinBunseki(
     // 日本人学内新(留学生が学内記録を持っているとき)
     if (s.hirou != 1 && gIchi != 0 && ichiDoko(nihonjin, s, t) == 0) {
       final ({RekidaiKiroku? mae, bool jishin, int sa})? mae =
-          _maeKojin(gh, nihonjin, 0, s, t, maeBest, kondo);
+          _maeKojin(gh, nihonjin, 0, s, t, maeBestIchii, kondo);
       if (mae != null) {
         x.nihonjinShin = KojinKoushin(
           s: s,

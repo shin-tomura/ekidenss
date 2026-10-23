@@ -246,6 +246,8 @@ Future<void> kirokuKousin({
         ? TEISUU.SUU_REKIDAIKIROKUJUNISUU
         : TEISUU.SUU_BESTKIROKUHOZONJUNISUU;
     bool kirokuHenkou = false; // Kirokuを書き換えたか(保存はまとめて1回にする)
+    // 学内区間記録の1位を書き換えた大学(2.1.4から全大学。保存は区間のループのあとにまとめて1回にする)
+    final Set<UnivData> gakunaiKukanHenkou = {};
     for (
       var iKukan = 0;
       iKukan < gh[0].kukansuu_taikaigoto[racebangou];
@@ -373,111 +375,108 @@ Future<void> kirokuKousin({
           }
         }
       }
-      // 学内区間記録
-      var univKukanFilteredSenshuData = kukanFilteredSenshuData
-          .where((s) => s.univid == gh[0].MYunivid)
-          .toList();
-      //日本人+留学生
-      for (
-        var iTimeJuni = 0;
-        iTimeJuni < univKukanFilteredSenshuData.length;
-        iTimeJuni++
-      ) {
-        if (sortedunivdata[gh[0].MYunivid]
-                .time_univkukankiroku[racebangou][iKukan][TEISUU
-                    .SUU_BESTKIROKUHOZONJUNISUU -
-                1] >
-            univKukanFilteredSenshuData[iTimeJuni].time_taikai_total) {
-          for (
-            var iHozonJuni = 0;
-            iHozonJuni < temp_kirokuhozonjunisuu;
-            iHozonJuni++
-          ) {
-            if (sortedunivdata[gh[0].MYunivid]
-                    .time_univkukankiroku[racebangou][iKukan][iHozonJuni] >
-                univKukanFilteredSenshuData[iTimeJuni].time_taikai_total) {
-              for (
-                var iZurasijuni = temp_kirokuhozonjunisuu - 1;
-                iZurasijuni > iHozonJuni;
-                iZurasijuni--
-              ) {
-                sortedunivdata[gh[0].MYunivid]
-                        .time_univkukankiroku[racebangou][iKukan][iZurasijuni] =
-                    sortedunivdata[gh[0].MYunivid]
-                        .time_univkukankiroku[racebangou][iKukan][iZurasijuni -
-                        1];
-                sortedunivdata[gh[0].MYunivid]
-                        .year_univkukankiroku[racebangou][iKukan][iZurasijuni] =
-                    sortedunivdata[gh[0].MYunivid]
-                        .year_univkukankiroku[racebangou][iKukan][iZurasijuni -
-                        1];
-                sortedunivdata[gh[0].MYunivid]
-                        .month_univkukankiroku[racebangou][iKukan][iZurasijuni] =
-                    sortedunivdata[gh[0].MYunivid]
-                        .month_univkukankiroku[racebangou][iKukan][iZurasijuni -
-                        1];
-                sortedunivdata[gh[0].MYunivid]
-                        .name_univkukankiroku[racebangou][iKukan][iZurasijuni] =
-                    sortedunivdata[gh[0].MYunivid]
-                        .name_univkukankiroku[racebangou][iKukan][iZurasijuni -
-                        1];
-                sortedunivdata[gh[0].MYunivid]
-                        .gakunen_univkukankiroku[racebangou][iKukan][iZurasijuni] =
-                    sortedunivdata[gh[0].MYunivid]
-                        .gakunen_univkukankiroku[racebangou][iKukan][iZurasijuni -
-                        1];
-              }
-              sortedunivdata[gh[0].MYunivid]
-                      .time_univkukankiroku[racebangou][iKukan][iHozonJuni] =
-                  univKukanFilteredSenshuData[iTimeJuni].time_taikai_total;
-              sortedunivdata[gh[0].MYunivid]
-                      .year_univkukankiroku[racebangou][iKukan][iHozonJuni] =
-                  gh[0].year;
-              sortedunivdata[gh[0].MYunivid]
-                      .month_univkukankiroku[racebangou][iKukan][iHozonJuni] =
-                  gh[0].month;
-              sortedunivdata[gh[0].MYunivid]
-                      .name_univkukankiroku[racebangou][iKukan][iHozonJuni] =
-                  univKukanFilteredSenshuData[iTimeJuni].name;
-              // 学年の欄には、2.1.4から選手の枠の番号も詰める(rekidaiGakunenAtai)
-              sortedunivdata[gh[0].MYunivid]
-                      .gakunen_univkukankiroku[racebangou][iKukan][iHozonJuni] =
-                  rekidaiGakunenAtai(
-                    univKukanFilteredSenshuData[iTimeJuni].id,
-                    univKukanFilteredSenshuData[iTimeJuni].gakunen,
-                  );
-              break;
-            }
-          }
-          await sortedunivdata[gh[0].MYunivid].save(); // UnivData の変更を保存
-        } else {
-          break;
+      // 学内区間記録(2.1.4から全大学。1位(日本人+留学生)は全大学で付け、日本人・留学生の並びは、
+      // 総監督をしている大学は歴代10位まで、ほかの大学は今の長さのまま(rekidaiGakunaiSaidai)。
+      // 大学ごとにタイム順の選手で見る(区間に同じ大学の選手が2人以上いる駅伝予選の組でも、速い順に入るように)。
+      // 区間新の印(chokuzentaikai_univkukansinflag)は、今までどおり総監督をしている大学の選手だけ(上で付ける)
+      for (final UnivData gu in sortedunivdata) {
+        final List<SenshuData> univKukanFilteredSenshuData =
+            timeJunSortedKukanFilteredSenshuData
+                .where((s) => s.univid == gu.id)
+                .toList();
+        if (univKukanFilteredSenshuData.isEmpty) continue;
+        if (gu.time_univkukankiroku.length <= racebangou ||
+            gu.time_univkukankiroku[racebangou].length <= iKukan) {
+          continue;
         }
-      } // 学内区間記録ループ終端
-      // 学内の留学生・日本人(歴代10位まで。保存は区間のループのあとにまとめて行う。1.8.8)
-      if (kiroku != null) {
-        for (final bool ryuugakusei in [true, false]) {
-          if (rekidaiKousin(
-            okiba: rekidaiUnivKukan(
+        //日本人+留学生
+        for (
+          var iTimeJuni = 0;
+          iTimeJuni < univKukanFilteredSenshuData.length;
+          iTimeJuni++
+        ) {
+          if (gu.time_univkukankiroku[racebangou][iKukan][TEISUU
+                      .SUU_BESTKIROKUHOZONJUNISUU -
+                  1] >
+              univKukanFilteredSenshuData[iTimeJuni].time_taikai_total) {
+            for (
+              var iHozonJuni = 0;
+              iHozonJuni < temp_kirokuhozonjunisuu;
+              iHozonJuni++
+            ) {
+              if (gu.time_univkukankiroku[racebangou][iKukan][iHozonJuni] >
+                  univKukanFilteredSenshuData[iTimeJuni].time_taikai_total) {
+                for (
+                  var iZurasijuni = temp_kirokuhozonjunisuu - 1;
+                  iZurasijuni > iHozonJuni;
+                  iZurasijuni--
+                ) {
+                  gu.time_univkukankiroku[racebangou][iKukan][iZurasijuni] =
+                      gu.time_univkukankiroku[racebangou][iKukan][iZurasijuni - 1];
+                  gu.year_univkukankiroku[racebangou][iKukan][iZurasijuni] =
+                      gu.year_univkukankiroku[racebangou][iKukan][iZurasijuni - 1];
+                  gu.month_univkukankiroku[racebangou][iKukan][iZurasijuni] =
+                      gu.month_univkukankiroku[racebangou][iKukan][iZurasijuni - 1];
+                  gu.name_univkukankiroku[racebangou][iKukan][iZurasijuni] =
+                      gu.name_univkukankiroku[racebangou][iKukan][iZurasijuni - 1];
+                  gu.gakunen_univkukankiroku[racebangou][iKukan][iZurasijuni] =
+                      gu.gakunen_univkukankiroku[racebangou][iKukan][iZurasijuni - 1];
+                }
+                gu.time_univkukankiroku[racebangou][iKukan][iHozonJuni] =
+                    univKukanFilteredSenshuData[iTimeJuni].time_taikai_total;
+                gu.year_univkukankiroku[racebangou][iKukan][iHozonJuni] =
+                    gh[0].year;
+                gu.month_univkukankiroku[racebangou][iKukan][iHozonJuni] =
+                    gh[0].month;
+                gu.name_univkukankiroku[racebangou][iKukan][iHozonJuni] =
+                    univKukanFilteredSenshuData[iTimeJuni].name;
+                // 学年の欄には、2.1.4から選手の枠の番号も詰める(rekidaiGakunenAtai)
+                gu.gakunen_univkukankiroku[racebangou][iKukan][iHozonJuni] =
+                    rekidaiGakunenAtai(
+                      univKukanFilteredSenshuData[iTimeJuni].id,
+                      univKukanFilteredSenshuData[iTimeJuni].gakunen,
+                    );
+                break;
+              }
+            }
+            gakunaiKukanHenkou.add(gu);
+          } else {
+            break;
+          }
+        } // 学内区間記録ループ終端
+        // 学内の留学生・日本人(保存は区間のループのあとにまとめて行う。1.8.8)
+        if (kiroku != null && gu.id >= 0 && gu.id < kiroku.time_univ_jap_kukankiroku.length) {
+          for (final bool ryuugakusei in [true, false]) {
+            final RekidaiOkiba okiba = rekidaiUnivKukan(
               kiroku,
               ryuugakusei,
-              gh[0].MYunivid,
+              gu.id,
               racebangou,
               iKukan,
-            ),
-            junban: univKukanFilteredSenshuData,
-            ryuugakusei: ryuugakusei,
-            saidai: rekidaiSaidai,
-            gh: gh[0],
-            sortedunivdata: sortedunivdata,
-          )) {
-            kirokuHenkou = true;
+            );
+            if (rekidaiKousin(
+              okiba: okiba,
+              junban: univKukanFilteredSenshuData,
+              ryuugakusei: ryuugakusei,
+              saidai: rekidaiGakunaiSaidai(
+                okiba,
+                gu.id == gh[0].MYunivid,
+                rekidaiSaidai,
+              ),
+              gh: gh[0],
+              sortedunivdata: sortedunivdata,
+            )) {
+              kirokuHenkou = true;
+            }
           }
         }
       }
     } // 個人区間記録i_kukanループ終端
     if (kirokuHenkou && kiroku != null) {
       await kiroku.save(); // 日本人・留学生の区間記録をまとめて保存
+    }
+    for (final UnivData gu in gakunaiKukanHenkou) {
+      await gu.save(); // 学内区間記録の1位を書き換えた大学をまとめて保存(2.1.4)
     }
 
     // 大会記録(記録画面に出す大会は歴代10位まで。1.8.8)
@@ -541,22 +540,26 @@ Future<void> kirokuKousin({
     } // 大会記録終端
 
     // 学内大会記録(記録画面に出す大会は歴代10位まで。1.8.8)
-    {
-      final UnivData myUniv = sortedunivdata[gh[0].MYunivid];
-      final RekidaiOkiba okiba = rekidaiUnivTaikai(myUniv, racebangou);
+    // 2.1.4から、総監督をしている大学だけでなく、走った全大学で付ける(どの大学も歴代10位まで)
+    for (final UnivData gu in sortedunivdata) {
+      if (gu.taikaientryflag.length <= racebangou ||
+          gu.taikaientryflag[racebangou] != 1 ||
+          gu.time_univtaikaikiroku.length <= racebangou) {
+        continue;
+      }
+      final RekidaiOkiba okiba = rekidaiUnivTaikai(gu, racebangou);
       final List<RekidaiKiroku> rekidai = okiba.yomu();
       if (rekidaiIreru(
         rekidai,
         RekidaiKiroku(
-          time: myUniv
-              .time_taikai_total[gh[0].kukansuu_taikaigoto[racebangou] - 1],
+          time: gu.time_taikai_total[gh[0].kukansuu_taikaigoto[racebangou] - 1],
           year: gh[0].year,
           month: gh[0].month,
         ),
         rekidaiSaidai,
       )) {
         okiba.kaku(rekidai);
-        await myUniv.save(); // UnivData の変更を保存
+        await gu.save(); // UnivData の変更を保存
       }
     } // 学内大会記録終端
 
@@ -1865,125 +1868,109 @@ Future<void> kirokuKousin({
     //debugPrint("KirokuKousin経過時間d: ${timeToFunByouString(timeInterval)}経過");
 
     // 学内記録更新
+    // 2.1.4から全大学で付ける。1位(日本人+留学生)は全大学、日本人・留学生の並びは、総監督をしている大学は
+    // 5000m・10000m・ハーフ・フルと夏のTTの4種目を歴代10位まで、ほかの大学は今の長さのまま(rekidaiGakunaiSaidai)。
+    // 大学ごとにタイム順の選手で見る。保存は、大学データは書き換えた大学ごとに1回、Kirokuはまとめて1回。
+    // 学内新の印(chokuzentaikai_kojinunivsinflag)は、今までどおり総監督をしている大学の選手だけ(上で付ける)
     if (racebangou != 3 && racebangou != 4) {
-      List<SenshuData> univEntryFilteredSenshuData = entryFilteredSenshuData
-          .where((senshu) => senshu.univid == gh[0].MYunivid)
-          .toList();
-
-      List<SenshuData> kirokujunUnivEntryFilteredSenshuData =
-          univEntryFilteredSenshuData.senshuSortByTime(); // 拡張メソッドでソート
-      //留学生+日本人
-      for (
-        int i_kirokujun = 0;
-        i_kirokujun < kirokujunUnivEntryFilteredSenshuData.length;
-        i_kirokujun++
-      ) {
-        final currentUnivId =
-            kirokujunUnivEntryFilteredSenshuData[i_kirokujun].univid;
-        if (currentUnivId >= sortedunivdata.length) {
-          print(
-            'Error: currentUnivId $currentUnivId out of bounds for sortedUnivData. Length: ${sortedunivdata.length}',
-          );
-          continue;
-        }
-
-        if (sortedunivdata[currentUnivId]
-                .time_univkojinkiroku[kirokubangou][TEISUU
-                    .SUU_BESTKIROKUHOZONJUNISUU -
-                1] >
-            kirokujunUnivEntryFilteredSenshuData[i_kirokujun]
-                .time_taikai_total) {
-          for (int i = 0; i < temp_kirokuhozonjunisuu; i++) {
-            if (sortedunivdata[currentUnivId]
-                    .time_univkojinkiroku[kirokubangou][i] >
-                kirokujunUnivEntryFilteredSenshuData[i_kirokujun]
-                    .time_taikai_total) {
-              // ずらす
-              if (i < temp_kirokuhozonjunisuu - 1) {
-                for (int ii = temp_kirokuhozonjunisuu - 1; ii > i; ii--) {
-                  sortedunivdata[currentUnivId]
-                          .time_univkojinkiroku[kirokubangou][ii] =
-                      sortedunivdata[currentUnivId]
-                          .time_univkojinkiroku[kirokubangou][ii - 1];
-                  sortedunivdata[currentUnivId]
-                          .year_univkojinkiroku[kirokubangou][ii] =
-                      sortedunivdata[currentUnivId]
-                          .year_univkojinkiroku[kirokubangou][ii - 1];
-                  sortedunivdata[currentUnivId]
-                          .month_univkojinkiroku[kirokubangou][ii] =
-                      sortedunivdata[currentUnivId]
-                          .month_univkojinkiroku[kirokubangou][ii - 1];
-                  sortedunivdata[currentUnivId]
-                          .name_univkojinkiroku[kirokubangou][ii] =
-                      sortedunivdata[currentUnivId]
-                          .name_univkojinkiroku[kirokubangou][ii - 1];
-                  sortedunivdata[currentUnivId]
-                          .gakunen_univkojinkiroku[kirokubangou][ii] =
-                      sortedunivdata[currentUnivId]
-                          .gakunen_univkojinkiroku[kirokubangou][ii - 1];
-                }
-              }
-              // 代入
-              sortedunivdata[currentUnivId]
-                      .time_univkojinkiroku[kirokubangou][i] =
+      bool kawatta = false; // Kirokuを書き換えたか
+      for (final UnivData gu in sortedunivdata) {
+        final List<SenshuData> kirokujunUnivEntryFilteredSenshuData =
+            kirokujunEntryFilteredSenshuData
+                .where((senshu) => senshu.univid == gu.id)
+                .toList();
+        if (kirokujunUnivEntryFilteredSenshuData.isEmpty) continue;
+        if (gu.time_univkojinkiroku.length <= kirokubangou) continue;
+        bool univKawatta = false; // この大学の学内記録の1位を書き換えたか
+        //留学生+日本人
+        for (
+          int i_kirokujun = 0;
+          i_kirokujun < kirokujunUnivEntryFilteredSenshuData.length;
+          i_kirokujun++
+        ) {
+          if (gu.time_univkojinkiroku[kirokubangou][TEISUU
+                      .SUU_BESTKIROKUHOZONJUNISUU -
+                  1] >
+              kirokujunUnivEntryFilteredSenshuData[i_kirokujun]
+                  .time_taikai_total) {
+            for (int i = 0; i < temp_kirokuhozonjunisuu; i++) {
+              if (gu.time_univkojinkiroku[kirokubangou][i] >
                   kirokujunUnivEntryFilteredSenshuData[i_kirokujun]
-                      .time_taikai_total;
-              sortedunivdata[currentUnivId]
-                      .year_univkojinkiroku[kirokubangou][i] =
-                  gh[0].year;
-              sortedunivdata[currentUnivId]
-                      .month_univkojinkiroku[kirokubangou][i] =
-                  gh[0].month;
-              sortedunivdata[currentUnivId]
-                      .name_univkojinkiroku[kirokubangou][i] =
-                  kirokujunUnivEntryFilteredSenshuData[i_kirokujun].name;
-              // 学年の欄には、2.1.4から選手の枠の番号も詰める(rekidaiGakunenAtai)
-              sortedunivdata[currentUnivId]
-                      .gakunen_univkojinkiroku[kirokubangou][i] =
-                  rekidaiGakunenAtai(
-                    kirokujunUnivEntryFilteredSenshuData[i_kirokujun].id,
-                    kirokujunUnivEntryFilteredSenshuData[i_kirokujun].gakunen,
-                  );
-              await sortedunivdata[currentUnivId].save(); // Hiveに保存
-              break;
+                      .time_taikai_total) {
+                // ずらす
+                if (i < temp_kirokuhozonjunisuu - 1) {
+                  for (int ii = temp_kirokuhozonjunisuu - 1; ii > i; ii--) {
+                    gu.time_univkojinkiroku[kirokubangou][ii] =
+                        gu.time_univkojinkiroku[kirokubangou][ii - 1];
+                    gu.year_univkojinkiroku[kirokubangou][ii] =
+                        gu.year_univkojinkiroku[kirokubangou][ii - 1];
+                    gu.month_univkojinkiroku[kirokubangou][ii] =
+                        gu.month_univkojinkiroku[kirokubangou][ii - 1];
+                    gu.name_univkojinkiroku[kirokubangou][ii] =
+                        gu.name_univkojinkiroku[kirokubangou][ii - 1];
+                    gu.gakunen_univkojinkiroku[kirokubangou][ii] =
+                        gu.gakunen_univkojinkiroku[kirokubangou][ii - 1];
+                  }
+                }
+                // 代入
+                gu.time_univkojinkiroku[kirokubangou][i] =
+                    kirokujunUnivEntryFilteredSenshuData[i_kirokujun]
+                        .time_taikai_total;
+                gu.year_univkojinkiroku[kirokubangou][i] = gh[0].year;
+                gu.month_univkojinkiroku[kirokubangou][i] = gh[0].month;
+                gu.name_univkojinkiroku[kirokubangou][i] =
+                    kirokujunUnivEntryFilteredSenshuData[i_kirokujun].name;
+                // 学年の欄には、2.1.4から選手の枠の番号も詰める(rekidaiGakunenAtai)
+                gu.gakunen_univkojinkiroku[kirokubangou][i] =
+                    rekidaiGakunenAtai(
+                      kirokujunUnivEntryFilteredSenshuData[i_kirokujun].id,
+                      kirokujunUnivEntryFilteredSenshuData[i_kirokujun].gakunen,
+                    );
+                univKawatta = true;
+                break;
+              }
             }
+          } else {
+            break;
           }
-        } else {
-          break;
         }
-      }
-      // 現在時刻と前回の休憩時刻を比較
-      {
-        final now = DateTime.now();
-        if (now.difference(Chousa.lastGapTime).inSeconds >= 1) {
-          // 3秒以上経過してたら
-          await Future.delayed(const Duration(milliseconds: 50)); // 休憩を入れる
-          Chousa.lastGapTime = DateTime.now();
-        }
-      }
-      // 学内の留学生・日本人(5000m・10000m・ハーフ・フルと夏のTTの4種目は歴代10位まで。一人1件。保存はまとめて1回。1.8.8)
-      if (kiroku != null) {
-        bool kawatta = false;
-        for (final bool ryuugakusei in [true, false]) {
-          if (rekidaiKousin(
-            okiba: rekidaiUnivKojin(
+        if (univKawatta) await gu.save(); // Hiveに保存
+        // 学内の留学生・日本人(一人1件。1.8.8)
+        if (kiroku != null && gu.id >= 0 && gu.id < kiroku.time_univ_jap_kojinkiroku.length) {
+          for (final bool ryuugakusei in [true, false]) {
+            final RekidaiOkiba okiba = rekidaiUnivKojin(
               kiroku,
               ryuugakusei,
-              gh[0].MYunivid,
+              gu.id,
               kirokubangou,
-            ),
-            junban: kirokujunUnivEntryFilteredSenshuData,
-            ryuugakusei: ryuugakusei,
-            saidai: kojinRekidaiSaidai,
-            hitoriIkken: true, // 個人記録は一人につき一番速い記録だけ
-            gh: gh[0],
-            sortedunivdata: sortedunivdata,
-          )) {
-            kawatta = true;
+            );
+            if (rekidaiKousin(
+              okiba: okiba,
+              junban: kirokujunUnivEntryFilteredSenshuData,
+              ryuugakusei: ryuugakusei,
+              saidai: rekidaiGakunaiSaidai(
+                okiba,
+                gu.id == gh[0].MYunivid,
+                kojinRekidaiSaidai,
+              ),
+              hitoriIkken: true, // 個人記録は一人につき一番速い記録だけ
+              gh: gh[0],
+              sortedunivdata: sortedunivdata,
+            )) {
+              kawatta = true;
+            }
           }
         }
-        if (kawatta) await kiroku.save(); // Hiveに保存
+        // 現在時刻と前回の休憩時刻を比較
+        {
+          final now = DateTime.now();
+          if (now.difference(Chousa.lastGapTime).inSeconds >= 1) {
+            await Future.delayed(const Duration(milliseconds: 50)); // 休憩を入れる
+            Chousa.lastGapTime = DateTime.now();
+          }
+        }
       }
+      if (kawatta && kiroku != null) await kiroku.save(); // Hiveに保存
     }
 
     //timeInterval = stopwatch.elapsed;

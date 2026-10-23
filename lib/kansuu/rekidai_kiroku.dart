@@ -411,6 +411,17 @@ bool rekidaiIreru(
   return true;
 }
 
+/// 学内の日本人・留学生の並び[okiba]に残す順位の数(2.1.4。学内記録を全大学で付けるようにしたので)
+/// ・総監督をしている大学([jibun])は[saidai]位まで(記録画面に出す大会・種目は歴代10位まで)
+/// ・ほかの大学は、今の並びの長さのまま(1位だけの大学は1位だけ。前に総監督をしていた大学は、
+///   そのときに伸びた長さのまま更新し続ける。縮めると、その大学の2位以下が消えるため)
+int rekidaiGakunaiSaidai(RekidaiOkiba okiba, bool jibun, int saidai) {
+  if (jibun) return saidai;
+  final int n = okiba.yomu().length;
+  if (n < 1) return 1;
+  return n > saidai ? saidai : n;
+}
+
 /// 選手[junban]のうち、[ryuugakusei](true:留学生、false:日本人)に合う選手の記録を、
 /// [okiba]の歴代([saidai]位まで)に入れる。変わったら true(保存は呼び出し側で行う)
 /// (タイム順に並んでいなくてもよい)

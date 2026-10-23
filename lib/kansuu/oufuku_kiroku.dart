@@ -258,18 +258,14 @@ int? oufukuJurai(KantokuData kantoku, int race) {
   return t;
 }
 
-/// 正月駅伝の結果を記録したあとに、往路記録・復路記録(全体と、総監督をしている大学の学内。
-/// 歴代10位まで)を更新する(KirokuKousin.dart。保存もする)
+/// 正月駅伝の結果を記録したあとに、往路記録・復路記録(全体と学内。歴代10位まで)を更新する
+/// (KirokuKousin.dart。保存もする。学内は、2.1.4から総監督をしている大学だけでなく、走った全大学で付ける)
 Future<void> oufukuTaikaiKirokuKousin(Ghensuu gh, List<UnivData> univs) async {
   if (gh.kukansuu_taikaigoto.length <= 2) return;
   final int ks = gh.kukansuu_taikaigoto[2];
   if (ks != shougatsuKukansuu) return;
-  UnivData? my;
-  for (final UnivData u in univs) {
-    if (u.id == gh.MYunivid) my = u;
-  }
   bool ghKawatta = false;
-  bool myKawatta = false;
+  final Set<UnivData> gakunaiKawatta = {};
   for (final int race in const [ouroRace, fukuroRace]) {
     double? time(UnivData u) =>
         race == ouroRace ? ouroTime(u) : fukuroTime(u, ks);
@@ -306,23 +302,25 @@ Future<void> oufukuTaikaiKirokuKousin(Ghensuu gh, List<UnivData> univs) async {
         ghKawatta = true;
       }
     }
-    // 学内(総監督をしている大学)
-    if (my != null && my.time_univtaikaikiroku.length > race) {
-      final double? t = time(my);
-      if (t != null && jun.contains(my)) {
-        final RekidaiOkiba okiba = rekidaiUnivTaikai(my, race);
-        final List<RekidaiKiroku> rekidai = okiba.yomu();
-        if (rekidaiIreru(
-          rekidai,
-          RekidaiKiroku(time: t, year: gh.year, month: gh.month),
-          TEISUU.SUU_REKIDAIKIROKUJUNISUU,
-        )) {
-          okiba.kaku(rekidai);
-          myKawatta = true;
-        }
+    // 学内(走った全大学。2.1.4)
+    for (final UnivData u in jun) {
+      if (u.time_univtaikaikiroku.length <= race) continue;
+      final double? t = time(u);
+      if (t == null) continue;
+      final RekidaiOkiba okiba = rekidaiUnivTaikai(u, race);
+      final List<RekidaiKiroku> rekidai = okiba.yomu();
+      if (rekidaiIreru(
+        rekidai,
+        RekidaiKiroku(time: t, year: gh.year, month: gh.month),
+        TEISUU.SUU_REKIDAIKIROKUJUNISUU,
+      )) {
+        okiba.kaku(rekidai);
+        gakunaiKawatta.add(u);
       }
     }
   }
   if (ghKawatta) await gh.save();
-  if (myKawatta) await my!.save();
+  for (final UnivData u in gakunaiKawatta) {
+    await u.save();
+  }
 }

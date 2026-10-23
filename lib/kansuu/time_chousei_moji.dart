@@ -89,13 +89,28 @@ int? _atai(String s) {
   return v;
 }
 
-/// 文[text]の中の「タイム調整(TC1)」の行を読む(読み取れなければnull)
+/// 行の印のあとを読む字数の上限(本物の行は一番長くても300字ほど。とても長い文を貼られても、
+/// 読むのに時間やメモリを使いすぎないように、ここまでしか見ない)
+const int _gyouSaidai = 500;
+
+/// 文[text]の中の「タイム調整(TC1)」の行を読む(読み取れなければnull。思わぬ失敗もnullにする)
 TimeChouseiYomi? timeChouseiYomu(String text) {
+  try {
+    return _yomu(text);
+  } catch (_) {
+    return null;
+  }
+}
+
+TimeChouseiYomi? _yomu(String text) {
   final int a = text.indexOf(timeChouseiAtama);
   if (a < 0) return null;
-  int b = text.indexOf('\n', a);
+  final int hajime = a + timeChouseiAtama.length;
+  int b = text.indexOf('\n', hajime);
   if (b < 0) b = text.length;
-  final String gyou = text.substring(a + timeChouseiAtama.length, b);
+  // 行の印のあとは、上限の字数までしか見ない
+  if (b > hajime + _gyouSaidai) b = hajime + _gyouSaidai;
+  final String gyou = text.substring(hajime, b);
 
   // 全体
   final RegExpMatch? z = RegExp(r'全体\s*([+\-]?\d+(?:\.\d+)?)').firstMatch(gyou);
@@ -112,11 +127,12 @@ TimeChouseiYomi? timeChouseiYomu(String text) {
     final List<int> l = [];
     for (final String t in g.group(1)!.split(',')) {
       if (t.trim().isEmpty) continue;
+      // 区間は10まで(11個目が出たら、その時点で読み取れないとする)
+      if (l.length >= 10) return null;
       final int? v = _atai(t);
       if (v == null) return null;
       l.add(v);
     }
-    if (l.length > 10) return null;
     race.add(l);
   }
 

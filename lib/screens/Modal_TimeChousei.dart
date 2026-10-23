@@ -130,8 +130,15 @@ class _ModalTimeAdjustmentSettingsState
 
   /// コピーしてきた文の中の行を読み、確かめてから設定する
   Future<void> _haritsukeru() async {
-    final ClipboardData? data = await Clipboard.getData(Clipboard.kTextPlain);
-    final TimeChouseiYomi? y = timeChouseiYomu(data?.text ?? '');
+    // クリップボードを読めなかったときも、読み取れなかったとして扱う
+    String text = '';
+    try {
+      final ClipboardData? data = await Clipboard.getData(Clipboard.kTextPlain);
+      text = data?.text ?? '';
+    } catch (_) {
+      text = '';
+    }
+    final TimeChouseiYomi? y = timeChouseiYomu(text);
     if (y == null) {
       _shiraseru('読み取れませんでした(「$timeChouseiAtama」の行がないか、値が範囲の外です)');
       return;

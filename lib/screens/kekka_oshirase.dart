@@ -5,6 +5,8 @@ import 'package:ekiden/ghensuu.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/skip.dart';
 import 'package:ekiden/kansuu/kiji/kiji_kihon.dart' show juniKaisuu, shutsujouKaisuu, saByou, saMoji;
+import 'package:ekiden/senshu_data.dart';
+import 'package:ekiden/kansuu/fushime.dart'; // 選手の節目と記録の更新(2.1.4)
 
 // ------------------------------------------------------------
 // 結果画面のお知らせの枠(2.1.0)
@@ -23,6 +25,8 @@ import 'package:ekiden/kansuu/kiji/kiji_kihon.dart' show juniKaisuu, shutsujouKa
 //     線の順位の大学との総合タイム(UnivData.time_race)の差も添える(差の書き方はニュース記事と同じ)
 // ・セーブ済みの順位と回数(UnivData の juni_race・taikaibetujunibetukaisuu など)から画面を描くたびに作る
 //   (セーブデータは増やさない)。自分の大学が走っていない大会と、スキップ中は出さない
+// ・お知らせの下に、自分の大学の選手の節目と記録の更新を数行で出す(2.1.4。FushimeOshirase。
+//   中身は kansuu/fushime.dart。駅伝・対校戦・記録会・夏のTT・フルマラソンの結果画面)
 // ------------------------------------------------------------
 
 /// お知らせの枠と見出しの色(情報集約パネルの自分の大学と同じ)
@@ -266,6 +270,75 @@ class KekkaHitokoto extends StatelessWidget {
         border: Border(bottom: BorderSide(color: Colors.white24)),
       ),
       child: Text(bun, style: oshiraseHonbun),
+    );
+  }
+}
+
+/// 結果画面の、自分の大学の選手の節目と記録の更新(2.1.4。中身は kansuu/fushime.dart)
+/// ・お知らせ(大学の結果)の下に、左にお知らせの色の線を引いて、3行まで出す。入りきらない分は
+///   「ほかに、駅伝デビュー2人。」とまとめる
+/// ・出すことがないときと、スキップ中は何も出さない
+class FushimeOshirase extends StatelessWidget {
+  const FushimeOshirase({
+    super.key,
+    required this.gh,
+    required this.univ,
+    required this.senshu,
+  });
+
+  final Ghensuu gh;
+
+  /// 大学(IDの順)
+  final List<UnivData> univ;
+
+  /// 全選手
+  final List<SenshuData> senshu;
+
+  @override
+  Widget build(BuildContext context) {
+    if (oshiraseSkipChuu()) return const SizedBox.shrink();
+    final List<Fushime> l = fushimeIchiran(gh, univ, senshu);
+    if (l.isEmpty) return const SizedBox.shrink();
+    final FushimeMatome m = fushimeMatome(l);
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 4, bottom: 12),
+      padding: const EdgeInsets.only(left: 10, top: 2, bottom: 2),
+      decoration: const BoxDecoration(
+        border: Border(left: BorderSide(color: oshiraseIro, width: 3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (final Fushime f in m.miseru)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text.rich(
+                TextSpan(
+                  children: [
+                    TextSpan(
+                      text: '${f.midashi}　',
+                      style: const TextStyle(
+                        color: oshiraseIro,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    TextSpan(text: f.bun),
+                  ],
+                ),
+                style: oshiraseHonbun,
+              ),
+            ),
+          if (m.nokori.isNotEmpty)
+            Text(
+              m.nokori,
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: HENSUU.fontsize_honbun,
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

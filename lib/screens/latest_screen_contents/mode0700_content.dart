@@ -1247,6 +1247,12 @@ class _Mode0700ContentState extends State<Mode0700Content> {
                                             _buildRaceTitle(
                                               currentGhensuu.hyojiracebangou,
                                             ),
+                                            // 自分の大学の選手の学内新など(2.1.4。kansuu/fushime.dart。記録会・夏のTT・フルマラソン)
+                                            FushimeOshirase(
+                                              gh: currentGhensuu,
+                                              univ: idJunUnivData,
+                                              senshu: idJunSenshuData,
+                                            ),
                                             // 夏のTTの最終日(8月25日のロード10km)は、箱庭スポーツの「夏のTT特集」と
                                             // 学内メディアの「学内TT特集」(2.0.0。kiji_tt.dart)。読めるのはこの日だけ
                                             if (currentGhensuu.hyojiracebangou ==
@@ -1307,6 +1313,12 @@ class _Mode0700ContentState extends State<Mode0700Content> {
                                               gh: currentGhensuu,
                                               senshu: idJunSenshuData,
                                               univ: idJunUnivData,
+                                            ),
+                                            // 自分の大学の選手の学内新など(2.1.4。kansuu/fushime.dart)
+                                            FushimeOshirase(
+                                              gh: currentGhensuu,
+                                              univ: idJunUnivData,
+                                              senshu: idJunSenshuData,
                                             ),
                                             // ニュース記事(箱庭スポーツ。対校戦の種目ごとの結果の記事。1.9.2)
                                             KijiLinkCard(
@@ -1436,6 +1448,12 @@ class _Mode0700ContentState extends State<Mode0700Content> {
                                             EkidenKekkaOshirase(
                                               gh: currentGhensuu,
                                               univ: idJunUnivData,
+                                            ),
+                                            // 自分の大学の選手の節目と記録の更新(2.1.4。kansuu/fushime.dart。駅伝予選では出さない)
+                                            FushimeOshirase(
+                                              gh: currentGhensuu,
+                                              univ: idJunUnivData,
+                                              senshu: idJunSenshuData,
                                             ),
 
                                             // 区間配置確認と今季タイム一覧表(1.9.9。よく使うので、目立つボタンにしてリンクの列の一番上に置いた。kukan_haiti_button.dart)

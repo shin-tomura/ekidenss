@@ -27,6 +27,8 @@ import 'package:ekiden/screens/kukan_haiti_button.dart'
     show MedatsuButton; // 夏合宿の金特訓・銀特訓・金銀交換のボタン(1.9.9)
 import 'package:ekiden/kansuu/kiji/kiji_kihon.dart'
     show KijiHyou, SeisekiKiroku, sandaiSeisekiHyouKiroku, taikousenSeisekiHyou, konkiKaisaiZumi; // 成績の表(1.9.8)
+import 'package:ekiden/screens/tsuusan_gyou.dart'; // 通算の行(2.1.4)
+import 'package:ekiden/kansuu/tsuusan.dart' show TsuusanSozai;
 import 'package:ekiden/screens/kiji_hyou_view.dart'; // 表の部品(1.9.8)
 import 'package:ekiden/screens/Modal_nameedit.dart'
     show ModalSenshuNameHenkou_modalsenshugamen; // 他大学の選手の名前の変更(箱庭モード。1.9.9)
@@ -2477,6 +2479,8 @@ class _SenshuScreenState extends State<SenshuScreen> {
                         _shushouBubun(ghensuu, currentSenshu, hokaUnivid == null),
 
                         const SizedBox(height: 16),
+                        // 通算の行(2.1.4。三大駅伝の出走・対校戦の入賞と、自分の大学の選手の学内歴代・学内区間記録)
+                        TsuusanGyou(TsuusanSozai.genneki(currentSenshu)),
                         // 三大駅伝と対校戦の成績の表(1.9.8)
                         if (sandaiHyou != null) KijiHyouView(sandaiHyou, ue: 0),
                         if (taikousenHyou != null) KijiHyouView(taikousenHyou, ue: 16),

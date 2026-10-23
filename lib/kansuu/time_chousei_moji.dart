@@ -14,6 +14,7 @@ import 'package:ekiden/kantoku_data.dart';
 //     読み取れないとして何も変えない
 //   ・区間の数が今の区間数と違う駅伝は、その駅伝だけ変えない(画面で知らせる)
 //   ・長距離抑制(オン・オフ)と抑制値は、なければその設定を変えない(Xに貼るときに手で削った行も読めるように)
+// ・画面の「作者のおすすめの値を入れる」は、貼り付けと同じ確かめ方で timeChouseiOsusume を入れる(2.1.4)
 // 保存場所: タイム調整は KantokuData.yobiint5([60]全体、[30〜39]10月・[40〜49]11月・[50〜59]正月・
 // [80〜89]カスタム。値は0.5%を1とする整数で−20〜20)、長距離タイム抑制は KantokuData.yobiint2[13](抑制値。
 // −18〜50)と大学データ[9]の略称の欄(「1」ならオン)
@@ -58,7 +59,7 @@ String timeChouseiMoji(KantokuData k, List<int> kukansuu, bool yokuseiOn) {
 
 /// 読み取った行
 class TimeChouseiYomi {
-  TimeChouseiYomi({
+  const TimeChouseiYomi({
     required this.zentai,
     required this.race,
     required this.yokuseiOn,
@@ -68,8 +69,8 @@ class TimeChouseiYomi {
   /// 全体タイム調整(0.5%を1とする整数)
   final int zentai;
 
-  /// 駅伝ごと(10月・11月・正月・カスタム)の区間の値
-  final List<List<int>> race;
+  /// 駅伝ごと(10月・11月・正月・カスタム)の区間の値(nullの駅伝は変えない。作者のおすすめの値のカスタム駅伝)
+  final List<List<int>?> race;
 
   /// 長距離タイム抑制補正のオン・オフ(行になければnull)
   final bool? yokuseiOn;
@@ -77,6 +78,28 @@ class TimeChouseiYomi {
   /// 長距離全体タイム抑制値(行になければnull)
   final int? yokuseiAtai;
 }
+
+/// 作者のおすすめの値(2.1.4。画面の「作者のおすすめの値を入れる」で入れる)
+/// ・初期のコースで30年スキップし(日本人選手で見る)、個人の種目の30年の最高記録と、駅伝の各区間の
+///   平均最速タイム(記録との比で区間記録の水準に直したもの)が、現実の日本人の大学生の最高記録・
+///   出雲駅伝・全日本大学駅伝・箱根駅伝の日本人の区間記録の水準(2026年時点)にそろうように、3回試して決めた
+///   (どれも±0.5%ほどに収まった。30年の平均最速は回ごとに±0.5%ほどぶれる)
+/// ・区間ごとの値は初期のコースの距離に合わせたもの。カスタム駅伝は試していないので変えない(null)
+/// ・長距離タイム抑制設定はオン・抑制値0(初期値)で試した
+/// ・値は0.5%を1とする整数(行の形では「タイム調整(TC1) 全体+2.0 10月+3.0,-0.5,+2.0,+1.5,+0.5,+3.0
+///   11月+3.0,+2.0,0.0,+1.0,+1.0,+4.0,+0.5,+4.0 正月-1.5,-3.0,-2.5,+0.5,-2.5,+4.0,-1.0,+4.5,+4.0,+4.0
+///   長距離抑制オン 抑制値0」)
+const TimeChouseiYomi timeChouseiOsusume = TimeChouseiYomi(
+  zentai: 4,
+  race: [
+    [6, -1, 4, 3, 1, 6],
+    [6, 4, 0, 2, 2, 8, 1, 8],
+    [-3, -6, -5, 1, -5, 8, -2, 9, 8, 8],
+    null,
+  ],
+  yokuseiOn: true,
+  yokuseiAtai: 0,
+);
 
 /// 「%」の文字を、0.5%を1とする整数にする(−10.0〜+10.0の0.5刻みでなければnull)
 int? _atai(String s) {
@@ -119,7 +142,7 @@ TimeChouseiYomi? _yomu(String text) {
   if (zentai == null) return null;
 
   // 駅伝ごと(「10月」と「11月」を取り違えないように、見出しのすぐ後ろの数字の並びを読む)
-  final List<List<int>> race = [];
+  final List<List<int>?> race = [];
   for (final String m in timeChouseiRaceMidashi) {
     // (区間が0の駅伝は数字がないこともあるので、空の並びも読む。区間の数は画面の側で今の区間数と比べる)
     final RegExpMatch? g = RegExp('${RegExp.escape(m)}\\s*([+\\-0-9.,]*)').firstMatch(gyou);

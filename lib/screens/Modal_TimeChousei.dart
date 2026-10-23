@@ -87,6 +87,7 @@ class _ModalTimeAdjustmentSettingsState
   // ・「今の調整値をコピー」: 全体・区間ごとタイム調整と長距離タイム抑制設定を1本の行で写す
   // ・「貼り付けて設定」: コピーしてきた文の中の行を読み、変わる値を確かめてから変える
   //   (区間の数が違う駅伝は変えない。読み取れなければ何も変えない。長距離タイム抑制は行にあるときだけ変える)
+  // ・「作者のおすすめの値を入れる」: 貼り付けと同じ確かめ方で、作者のおすすめの値を入れる(カスタム駅伝は変えない)
 
   /// 駅伝ごと(10月・11月・正月・カスタム)の今の区間数(画面と同じ。0〜10)
   List<int> _kukansuuIchiran() {
@@ -143,6 +144,37 @@ class _ModalTimeAdjustmentSettingsState
       _shiraseru('読み取れませんでした(「$timeChouseiAtama」の行がないか、値が範囲の外です)');
       return;
     }
+    await _kakuninShiteKaeru(
+      y,
+      motoMoji: '行',
+      toi: '貼り付けた値に変えますか？',
+      onajiMoji: '貼り付けた行と今の設定は同じなので、変わる値はありません',
+      kaetaMoji: '貼り付けた値に変えました',
+    );
+  }
+
+  /// 作者のおすすめの値(kansuu/time_chousei_moji.dart の timeChouseiOsusume)を、確かめてから入れる(2.1.4)
+  Future<void> _osusumeIreru() async {
+    await _kakuninShiteKaeru(
+      timeChouseiOsusume,
+      motoMoji: 'おすすめの値',
+      toi: '作者のおすすめの値に変えますか？',
+      onajiMoji: '今の設定は、作者のおすすめの値と同じです',
+      kaetaMoji: '作者のおすすめの値に変えました',
+      chuui: '区間ごとの値は、初期のコースの距離に合わせた値です(コースの距離を変えている駅伝には合わないことがあります)。カスタム駅伝の値は変えません。',
+    );
+  }
+
+  /// 読み取った値[y]と今の設定を比べ、変わる値を確かめてから変える(貼り付けと作者のおすすめの値で共通)
+  /// ([motoMoji] は区間の数が違うときの知らせの「行は6区間」の「行」。[chuui] は確認の窓に添える文)
+  Future<void> _kakuninShiteKaeru(
+    TimeChouseiYomi y, {
+    required String motoMoji,
+    required String toi,
+    required String onajiMoji,
+    required String kaetaMoji,
+    String? chuui,
+  }) async {
     final List<int> kukansuu = _kukansuuIchiran();
     final UnivData? u9 = _univ9();
     final bool imaOn = u9?.name_tanshuku == '1';
@@ -156,18 +188,24 @@ class _ModalTimeAdjustmentSettingsState
     } else {
       naiyou.add('全体: ${timeChouseiAtaiMoji(imaZentai)}%(変わりません)');
     }
-    // 駅伝ごと(区間の数が違う駅伝は変えない)
+    // 駅伝ごと(値のない駅伝と、区間の数が違う駅伝は変えない)
     final List<bool> kaeru = [];
     for (int r = 0; r < timeChouseiRaceMidashi.length; r++) {
       final String mei = _raceNames[r];
-      if (y.race[r].length != kukansuu[r]) {
+      final List<int>? l = r < y.race.length ? y.race[r] : null;
+      if (l == null) {
         kaeru.add(false);
-        naiyou.add('$mei: 区間の数が違うので変えません(行は${y.race[r].length}区間、今は${kukansuu[r]}区間)');
+        naiyou.add('$mei: 変えません');
+        continue;
+      }
+      if (l.length != kukansuu[r]) {
+        kaeru.add(false);
+        naiyou.add('$mei: 区間の数が違うので変えません($motoMojiは${l.length}区間、今は${kukansuu[r]}区間)');
         continue;
       }
       int n = 0;
       for (int i = 0; i < kukansuu[r]; i++) {
-        if (kantoku.yobiint5[timeChouseiRaceHajime[r] + i] != y.race[r][i]) n++;
+        if (kantoku.yobiint5[timeChouseiRaceHajime[r] + i] != l[i]) n++;
       }
       kaeru.add(n > 0);
       kawaruKazu += n;
@@ -191,7 +229,7 @@ class _ModalTimeAdjustmentSettingsState
       naiyou.add('長距離タイム抑制設定: 変わりません');
     }
     if (kawaruKazu == 0 && !yokuseiKawaru) {
-      _shiraseru('貼り付けた行と今の設定は同じなので、変わる値はありません');
+      _shiraseru(onajiMoji);
       return;
     }
     if (!mounted) return;
@@ -199,9 +237,9 @@ class _ModalTimeAdjustmentSettingsState
       context: context,
       builder: (BuildContext c) => AlertDialog(
         backgroundColor: HENSUU.backgroundcolor,
-        title: const Text(
-          '貼り付けた値に変えますか？',
-          style: TextStyle(color: Colors.white, fontSize: HENSUU.fontsize_honbun),
+        title: Text(
+          toi,
+          style: const TextStyle(color: Colors.white, fontSize: HENSUU.fontsize_honbun),
         ),
         content: SingleChildScrollView(
           child: Column(
@@ -224,6 +262,14 @@ class _ModalTimeAdjustmentSettingsState
                     style: TextStyle(color: Colors.orangeAccent, fontSize: HENSUU.fontsize_honbun - 2),
                   ),
                 ),
+              if (chuui != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    chuui,
+                    style: const TextStyle(color: Colors.white70, fontSize: HENSUU.fontsize_honbun - 2),
+                  ),
+                ),
             ],
           ),
         ),
@@ -243,9 +289,10 @@ class _ModalTimeAdjustmentSettingsState
     setState(() {
       kantoku.yobiint5[timeChouseiZentaiBangou] = y.zentai;
       for (int r = 0; r < timeChouseiRaceMidashi.length; r++) {
-        if (!kaeru[r]) continue;
+        final List<int>? l = r < y.race.length ? y.race[r] : null;
+        if (!kaeru[r] || l == null) continue;
         for (int i = 0; i < kukansuu[r]; i++) {
-          kantoku.yobiint5[timeChouseiRaceHajime[r] + i] = y.race[r][i];
+          kantoku.yobiint5[timeChouseiRaceHajime[r] + i] = l[i];
         }
       }
       if (atai != null) kantoku.yobiint2[13] = atai;
@@ -253,7 +300,7 @@ class _ModalTimeAdjustmentSettingsState
     });
     await kantoku.save();
     if (on != null && u9 != null) await u9.save();
-    _shiraseru('貼り付けた値に変えました');
+    _shiraseru(kaetaMoji);
   }
 
   /// タイム調整設定項目のスライダーウィジェットを生成
@@ -484,13 +531,21 @@ class _ModalTimeAdjustmentSettingsState
                             style: TextStyle(color: HENSUU.LinkColor, fontSize: HENSUU.fontsize_honbun - 2),
                           ),
                         ),
+                        TextButton.icon(
+                          onPressed: _osusumeIreru,
+                          icon: const Icon(Icons.star_border, size: 18, color: HENSUU.LinkColor),
+                          label: Text(
+                            '作者のおすすめの値を入れる',
+                            style: TextStyle(color: HENSUU.LinkColor, fontSize: HENSUU.fontsize_honbun - 2),
+                          ),
+                        ),
                       ],
                     ),
                   ),
                   Padding(
                     padding: const EdgeInsets.only(bottom: 24.0),
                     child: Text(
-                      '全体・区間ごとタイム調整と長距離タイム抑制設定を、1本の行で写せます。写した行(前後に文が付いていてもかまいません)をコピーしてから「貼り付けて設定」を押すと、確かめてから同じ設定にできます。区間の数が違う駅伝は変わりません。',
+                      '全体・区間ごとタイム調整と長距離タイム抑制設定を、1本の行で写せます。写した行(前後に文が付いていてもかまいません)をコピーしてから「貼り付けて設定」を押すと、確かめてから同じ設定にできます。区間の数が違う駅伝は変わりません。\n「作者のおすすめの値を入れる」を押すと、確かめてから、作者が初期のコースで30年進めて、個人の種目と各区間の最速タイムの水準を整えた値にできます(長距離タイム抑制設定も、オン・抑制値0にします)。カスタム駅伝の値は変わりません。',
                       style: TextStyle(color: HENSUU.textcolor, fontSize: HENSUU.fontsize_honbun - 2),
                     ),
                   ),

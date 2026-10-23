@@ -11,6 +11,10 @@ import 'package:ekiden/kansuu/shushou.dart' show shushouNendoRetsu; // 卒業生
 import 'package:ekiden/kansuu/kiji/kiji_shushou.dart'; // 主将のコメント(2.0.2)
 import 'package:ekiden/kansuu/taikai_chouki.dart' show choukiNendo;
 import 'package:ekiden/kansuu/kiji/kiji_kekka.dart' show EkidenKekka, EkidenUnivKekka;
+import 'package:ekiden/kansuu/rekidai_kiroku.dart' show RekidaiKiroku;
+// 学内記録の前の持ち主と、個人の種目の記録の更新(2.1.4。結果画面と同じ見方)
+import 'package:ekiden/kansuu/fushime.dart'
+    show fushimeGakunaiKukanMae, fushimeItsu, fushimeKojinKoushin, KojinKoushin, KojinKoushinShurui;
 import 'package:ekiden/kansuu/kiji/kiji_yosen.dart'
     show YosenKekka, YosenUnivKekka, YosenSenshuKekka;
 import 'package:ekiden/kansuu/kiji/kiji_taikousen.dart'
@@ -308,6 +312,40 @@ int? _juraiKiroku(KijiKankyou k, int i) {
   final int t = k.kantoku.yobiint4[i];
   if (t <= 0 || t >= 360000) return null;
   return t;
+}
+
+/// 個人の種目の記録の更新の文(2.1.4。学内メディアの対校戦の結果号と学内TT特集。なければ空)
+/// [l] は kansuu/fushime.dart の fushimeKojinKoushin(結果画面と同じ見方。前からの記録を抜いたときだけ)。
+/// 「自己ベストを更新した」とは書かない(学内の記録のことだけを書く)
+String gakunaiKirokuKoushinBun(KijiKankyou k, KijiKakite w, List<KojinKoushin> l) {
+  final StringBuffer sb = StringBuffer();
+  for (final KojinKoushin x in l) {
+    final String yobi = w.senshu(x.s);
+    final String t = jikanMoji(x.time);
+    final String koushin = '${_maeNoKirokuMoji(k, x)}を${x.sa > 0 ? '${saMoji(x.sa)}更新した' : 'わずかに上回った'}。';
+    switch (x.shurui) {
+      case KojinKoushinShurui.rekidaiShin:
+        sb.write('$yobiの$tは、全体の歴代記録を塗り替えるタイムだった。$koushin');
+      case KojinKoushinShurui.gakunaiShin:
+        sb.write('$yobiは$tで、学内記録を塗り替えた。$koushin');
+      case KojinKoushinShurui.nihonjinShin:
+        sb.write('$yobiの$tは、学内の日本人選手の最高記録となった。$koushin');
+      case KojinKoushinShurui.gakunaiJuni:
+        sb.write('$yobiの$tは、学内歴代${x.juni + 1}位に入る好記録だ。');
+    }
+  }
+  return sb.toString();
+}
+
+/// 記録の更新で抜いた、前の記録の言い方(「昨年に山本翔(当時4年)が出した記録」)
+String _maeNoKirokuMoji(KijiKankyou k, KojinKoushin x) {
+  if (x.jishin) return '自身が持っていた記録';
+  final RekidaiKiroku? mae = x.mae;
+  if (mae == null) return '前の記録';
+  final String daigaku = (x.shurui == KojinKoushinShurui.rekidaiShin && mae.univname.isNotEmpty)
+      ? '${daigakuMeiMoji(mae.univname)}の'
+      : '';
+  return '${fushimeItsu(k.gh, mae)}に$daigaku${fullMei(mae.name)}(当時${mae.gakunen}年)が出した記録';
 }
 
 /// 記者の名前(学生記者。年・大会・記事で決まる)
@@ -869,8 +907,23 @@ Kiji _kekkaZenin(EkidenKekka e, EkidenUnivKekka m, String site) {
           s.chokuzentaikai_zentaikukansinflag == 1 && _juraiKiroku(k, kk) != null;
       sb.write(shin ? '見事な区間賞で、区間新記録まで打ち立てた。' : '見事な区間賞だった。');
     }
-    if (s.chokuzentaikai_univkukansinflag == 1 && _juraiKiroku(k, kk + 10) != null) {
-      sb.write('学内の区間記録も塗り替えた。');
+    final int? juraiGakunai = _juraiKiroku(k, kk + 10);
+    if (s.chokuzentaikai_univkukansinflag == 1 && juraiGakunai != null) {
+      // 前の記録の持ち主と、縮めた秒も書く(2.1.4。結果画面と同じ見方。kansuu/fushime.dart)
+      final ({RekidaiKiroku mae, bool jishin})? mae =
+          fushimeGakunaiKukanMae(k.gh, m.u, s, race, kk, juraiGakunai);
+      final int sa = juraiGakunai - byou(m.kukanTime[kk]);
+      final String chijime = sa > 0 ? '${saMoji(sa)}縮めた' : 'わずかに上回った';
+      if (mae == null) {
+        sb.write('学内の区間記録も塗り替えた。');
+      } else if (mae.jishin) {
+        sb.write('${fushimeItsu(k.gh, mae.mae)}に自身が出した学内の区間記録も、$chijime。');
+      } else {
+        sb.write(
+          '${fushimeItsu(k.gh, mae.mae)}に${fullMei(mae.mae.name)}(当時${mae.mae.gakunen}年)が'
+          '持っていた学内の区間記録も塗り替え、$chijime。',
+        );
+      }
     }
     // 昨年の同じ大会との比べ
     final int maeE = k.entryMae(s, race, 1);
@@ -2627,6 +2680,16 @@ Kiji _taikousenShumokuKiji(
   if (nobi != null && nobiBetsu) {
     w.koMidashi('伸び盛り　${_koMidashiMei(w, nobi.s)}');
     _taikousenSenshuKaku(w, e, nobi, mine.indexOf(nobi), nobiSa: nobiSa);
+  }
+  // 本文: 記録の更新(学内新・学内歴代3位以内など。2.1.4。結果画面と同じ見方。kansuu/fushime.dart)
+  final String koushin = gakunaiKirokuKoushinBun(
+    k,
+    w,
+    fushimeKojinKoushin(k.gh, m.u, [for (final TaikousenSenshuKekka x in mine) x.s], k.race),
+  );
+  if (koushin.isNotEmpty) {
+    w.koMidashi('記録の更新');
+    w.danraku(koushin);
   }
 
   // 本文: 総合争い(5000m・1万mのあと)・チームのポイント(ハーフのあと)

@@ -3,7 +3,11 @@ import 'package:ekiden/senshu_data.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/screens/Modal_courseshoukai.dart'; // 大会の名前(courseRaceTitle)
 import 'package:ekiden/kansuu/kiji/kiji_kihon.dart';
-import 'package:ekiden/kansuu/kiji/kiji_gakunai.dart' show gakunaiSiteMeiJibun, gakunaiKishaMei;
+import 'package:ekiden/kansuu/kiji/kiji_gakunai.dart'
+    show gakunaiSiteMeiJibun, gakunaiKishaMei, gakunaiKirokuKoushinBun;
+import 'package:ekiden/kansuu/rekidai_kiroku.dart' show RekidaiKiroku;
+// 記録の更新(2.1.4。結果画面と同じ見方)
+import 'package:ekiden/kansuu/fushime.dart' show fushimeKojinKoushin, fushimeZentaiShin, fushimeItsu, KojinKoushin;
 
 // ------------------------------------------------------------
 // 夏のタイムトライアル特集(2.0.0。8月25日のロード10kmの結果画面のカードから。読めるのはその日だけ)
@@ -31,8 +35,11 @@ import 'package:ekiden/kansuu/kiji/kiji_gakunai.dart' show gakunaiSiteMeiJibun, 
 //  ・全体順位は、選ぶのと並べるのにだけ使い、記事の言葉には「1位」「全体○位」「最速」「トップ」を書かない。
 //    「目を引いたのは」「好タイム」のように、タイムで書く(表も順位の列を付けない)。
 //    学内メディアは結果画面に出ている学内順位なので「学内1位」と書いてよい
-//  ・TTの歴代記録と自己ベストは画面に出していないので書かない(TTは年に1度なので、自己ベストの更新も
-//    ほとんどの選手に付いてしまう)。昨夏との比べは、選手画面の学年ごとの成績で確かめられるので書いてよい
+//  ・自己ベストは書かない(TTは年に1度なので、自己ベストの更新もほとんどの選手に付いてしまう)。
+//    昨夏との比べは、選手画面の学年ごとの成績で確かめられるので書いてよい
+//  ・TTの歴代記録は、2.1.4から記録画面の「夏のTTの記録」に歴代10位まで出すので、記録の更新を書く
+//    (箱庭スポーツは全体の歴代記録、学内TT特集は学内新・学内歴代3位以内など。結果画面と同じ見方で、
+//    前からの記録を抜いたときだけ。kansuu/fushime.dart)。「1位」「全体○位」などは今までどおり書かない
 //  ・能力の名前(アップダウン対応力・安定感・粘りなど)や性質の言葉(勝負強いなど)は書かない。区間との関係は、
 //    仕様に書いてあること(クロカン1万は起伏に関係する)の範囲で「アップダウンの続く区間の候補」と書く
 //  ・総監督(プレイヤー)の言葉は作らない。箱庭スポーツでは、自分の大学の監督のコメントも出さない
@@ -66,6 +73,9 @@ const int _kurokan = 16;
 const int _nobori = 13;
 const int _kudari = 14;
 const List<int> _shumoku = [_road, _nobori, _kudari, _kurokan];
+
+/// 種目[race]の行われる月(クロカンは7月25日、ほかは8月。記録の年月から、今夏の記録を見分けるのに使う。2.1.4)
+int _tsuki(int race) => race == _kurokan ? 7 : 8;
 
 /// 種目の名前(結果画面・選手画面と同じ呼び方)
 String _mei(int race) {
@@ -570,6 +580,22 @@ class _Tt {
       '目を引いたのは$ysの${jikanMoji(d.t(s, race))}だ。',
       'ここで$ysが${jikanMoji(d.t(s, race))}をマークした。',
     ]));
+    // 全体の歴代記録の更新(2.1.4。記録画面の「夏のTTの記録」に出すようにしたので書く。前からの記録を抜いたときだけ)
+    final KojinKoushin? shin = fushimeZentaiShin(k.gh, k.univ, k.senshu, race, tsuki: _tsuki(race));
+    if (shin != null) {
+      final RekidaiKiroku? mae = shin.mae;
+      final String dare = shin.jishin
+          ? '自身が持っていた記録'
+          : mae == null
+          ? '前の記録'
+          : '${fushimeItsu(k.gh, mae)}に${daigakuMeiMoji(mae.univname)}の${fullMei(mae.name)}(当時${mae.gakunen}年)が出した記録';
+      final String sa = shin.sa > 0 ? '${saMoji(shin.sa)}更新した' : 'わずかに上回った';
+      b.write(
+        shin.s.id == s.id
+            ? 'この種目の歴代記録を塗り替えるタイムで、$dareを$sa。'
+            : '${yobu(shin.s)}の${jikanMoji(shin.time)}は、この種目の歴代記録を塗り替えた。$dareを$sa。',
+      );
+    }
     final String hoka = _narabe(race, race == _road ? 3 : 2, nozoku: {s.id});
     if (hoka.isNotEmpty) b.write('$hokaと好タイムが続いた。');
     // 上位が留学生なら、日本人の好タイムも書く
@@ -1074,6 +1100,13 @@ List<Kiji> ttGakunaiKiji(KijiKankyou k) {
     final int kugiri = l.where((s) => d.t(s, race) < d.kugiri(race) * 60).length;
     if (kugiri > 0) b.write('${d.kugiri(race)}分を切った部員は$kugiri人。');
     w.danraku(b.toString());
+    // 記録の更新(学内新・学内歴代3位以内など。2.1.4から、夏のTTの記録も記録画面に歴代10位まで出すので書く)
+    final String koushin = gakunaiKirokuKoushinBun(
+      k,
+      w,
+      fushimeKojinKoushin(k.gh, u, l, race, tsuki: _tsuki(race)),
+    );
+    if (koushin.isNotEmpty) w.danraku(koushin);
   }
 
   // 昨夏から一番縮めた部員

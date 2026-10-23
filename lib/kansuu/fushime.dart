@@ -32,7 +32,8 @@ import 'package:ekiden/kansuu/kiji/kiji_kihon.dart'
 //     ゲームの年なので、「○年」とは書かない)
 // ・「初めて」「デビュー」は、前の学年の記録が欠けている選手(新しいゲームの2〜4年生など)には出さない
 //   (記事と同じ kirokuKaketeiru)。学連選抜(オープン参加)での出走は、大学のチームの出走に数えない
-// ・セーブ済みの結果・記録・フラグ(chokuzentaikai_〜)から画面を描くたびに作る(セーブデータは増やさない)
+// ・セーブ済みの結果・記録から画面を描くたびに作る(セーブデータは増やさない)。駅伝は結果画面の印
+//   (chokuzentaikai_〜)も使い、個人の種目は記録の年月で見る(記事でも同じ判定を使うため)
 // ・思わぬデータに当たっても画面が止まらないよう、失敗したら何も出さない
 // ------------------------------------------------------------
 
@@ -222,7 +223,7 @@ List<Fushime> fushimeIchiran(Ghensuu gh, List<UnivData> univ, List<SenshuData> s
     final UnivData u = univ[gh.MYunivid];
     if (fushimeHonsen(race)) return _ekiden(gh, u, senshu, race);
     final int? k = fushimeKirokuBangou(race);
-    if (k != null) return _kojin(gh, u, senshu, race, k);
+    if (k != null) return _kojin(gh, u, senshu, race);
     return [];
   } catch (_) {
     return [];
@@ -350,6 +351,35 @@ List<Fushime> _ekiden(Ghensuu gh, UnivData u, List<SenshuData> senshu, int race)
   return l;
 }
 
+/// 駅伝の区間[kk]で学内区間新を出した、自分の大学[u]の選手[s]の、前の学内区間記録
+/// (今回より前の記録で一番速いもの。エントリーのときに控えた従来の記録[jurai](秒)と合わなければnull)。
+/// 前の記録の持ち主が本人なら jishin が true。結果画面と学内メディアの駅伝の結果号で使う
+({RekidaiKiroku mae, bool jishin})? fushimeGakunaiKukanMae(
+  Ghensuu gh,
+  UnivData u,
+  SenshuData s,
+  int race,
+  int kk,
+  int jurai,
+) {
+  try {
+    final Kiroku? kiroku = _kiroku();
+    if (kiroku == null) return null;
+    final RekidaiKiroku? mae = _maeIchiban(
+      gh,
+      rekidaiAwaseru(
+        ichii: ichiiUnivKukan(u, race, kk).yomu(),
+        nihonjin: rekidaiUnivKukan(kiroku, false, u.id, race, kk).yomu(),
+        ryuugakusei: rekidaiUnivKukan(kiroku, true, u.id, race, kk).yomu(),
+      ),
+    );
+    if (mae == null || (byou(mae.time) - jurai).abs() > 1) return null;
+    return (mae: mae, jishin: mae.senshuKagi == _senshuKagi(gh, s, ''));
+  } catch (_) {
+    return null;
+  }
+}
+
 /// 駅伝を走った選手[s]の節目(一番大きいものを1つ。なければnull)
 Fushime? _ekidenSenshu(
   Ghensuu gh,
@@ -397,20 +427,18 @@ Fushime? _ekidenSenshu(
   final int? juraiGakunai = _jurai(kantoku, kk + 10);
   if (s.chokuzentaikai_univkukansinflag == 1 && juraiGakunai != null) {
     String dare = '学内の区間記録';
-    if (kiroku != null) {
-      final RekidaiKiroku? maeK = _maeIchiban(
-        gh,
-        rekidaiAwaseru(
-          ichii: ichiiUnivKukan(u, race, kk).yomu(),
-          nihonjin: rekidaiUnivKukan(kiroku, false, u.id, race, kk).yomu(),
-          ryuugakusei: rekidaiUnivKukan(kiroku, true, u.id, race, kk).yomu(),
-        ),
-      );
-      if (maeK != null && (byou(maeK.time) - juraiGakunai).abs() <= 1) {
-        dare = maeK.senshuKagi == _senshuKagi(gh, s, '')
-            ? '${fushimeItsu(gh, maeK)}に自身が出した学内記録'
-            : '${fushimeItsu(gh, maeK)}に${maeK.name}(${maeK.gakunen}年)が出した学内記録';
-      }
+    final ({RekidaiKiroku mae, bool jishin})? maeK = fushimeGakunaiKukanMae(
+      gh,
+      u,
+      s,
+      race,
+      kk,
+      juraiGakunai,
+    );
+    if (maeK != null) {
+      dare = maeK.jishin
+          ? '${fushimeItsu(gh, maeK.mae)}に自身が出した学内記録'
+          : '${fushimeItsu(gh, maeK.mae)}に${maeK.mae.name}(${maeK.mae.gakunen}年)が出した学内記録';
     }
     return Fushime(
       midashi: '学内区間新',
@@ -484,153 +512,307 @@ Fushime? _ekidenSenshu(
 
 // ------------------------------------------------------------
 // 個人の種目(対校戦・記録会・夏のTT・フルマラソン)
+// 結果画面と記事(学内メディアの対校戦の結果号・学内TT特集、箱庭スポーツの夏のTT特集)で同じ判定を使う。
+// 結果画面の印(chokuzentaikai_〜)は一番新しい大会の分しか残らないので使わず、記録の並びの中の、
+// その大会の年月の記録で判定する(夏のTTの4種目は日が違うので、学内TT特集では種目ごとの月で見る)
 // ------------------------------------------------------------
 
-/// 前の記録の書き方と、更新した差(秒)。前の記録がなければnull
+/// 個人の種目の記録の更新の種類
+enum KojinKoushinShurui {
+  /// 全体の歴代1位(歴代新)
+  rekidaiShin,
+
+  /// 学内の歴代1位(学内新)
+  gakunaiShin,
+
+  /// 学内の日本人の歴代1位(留学生が学内記録を持っているとき)
+  nihonjinShin,
+
+  /// 学内歴代2位・3位
+  gakunaiJuni,
+}
+
+/// 個人の種目の記録の更新1つ
+class KojinKoushin {
+  const KojinKoushin({
+    required this.s,
+    required this.shurui,
+    required this.time,
+    this.mae,
+    this.jishin = false,
+    this.sa = 0,
+    this.juni = 0,
+  });
+
+  final SenshuData s;
+  final KojinKoushinShurui shurui;
+  final double time;
+
+  /// 前の記録(ほかの選手のもの。本人の前の記録なら null で [jishin] が true)
+  final RekidaiKiroku? mae;
+  final bool jishin;
+
+  /// 前の記録から縮めた秒(学内歴代2位・3位では0)
+  final int sa;
+
+  /// 学内歴代の順位(0が1位。学内歴代2位・3位のときの1か2)
+  final int juni;
+}
+
+/// 前の記録と、更新した差(秒)。前の記録がなければnull
 /// [l] 速い順の歴代(一人1件)、[ichi] その中の選手[s]の今回の記録の位置、[maeBest] 選手の前の自己ベスト
-/// [univname] 全体の記録なら選手の大学名(学内の記録なら空)
-({String dare, int sa})? _maeKojin(
+/// [kondo] 今回の大会の記録か、[univname] 全体の記録なら選手の大学名(学内の記録なら空)
+({RekidaiKiroku? mae, bool jishin, int sa})? _maeKojin(
   Ghensuu gh,
   List<RekidaiKiroku> l,
   int ichi,
   SenshuData s,
   double t,
   double? maeBest,
+  bool Function(RekidaiKiroku) kondo,
   String univname,
 ) {
   // 今回の記録より下の、前からの記録で一番速いもの(本人の前の記録は、一人1件なので並びにはない)
   RekidaiKiroku? hoka;
   for (int i = ichi + 1; i < l.length; i++) {
-    if (_kondo(gh, l[i])) continue;
+    if (kondo(l[i])) continue;
     if (l[i].senshuKagi == _senshuKagi(gh, s, univname)) continue;
     hoka = l[i];
     break;
   }
   if (maeBest != null && (hoka == null || maeBest < hoka.time)) {
     if (maeBest <= t) return null;
-    return (dare: '自身の記録', sa: byou(maeBest) - byou(t));
+    return (mae: null, jishin: true, sa: byou(maeBest) - byou(t));
   }
   if (hoka == null) return null;
-  final String daigaku = univname.isEmpty ? '' : '${hoka.univname}大学の';
-  return (
-    dare: '${fushimeItsu(gh, hoka)}に$daigaku${hoka.name}(${hoka.gakunen}年)が出した記録',
-    sa: byou(hoka.time) - byou(t),
-  );
+  return (mae: hoka, jishin: false, sa: byou(hoka.time) - byou(t));
 }
 
-List<Fushime> _kojin(Ghensuu gh, UnivData u, List<SenshuData> senshu, int race, int k) {
-  final Kiroku? kiroku = _kiroku();
-  if (kiroku == null) return [];
-  // 全体・学内の歴代(記録画面と同じ、日本人+留学生を合わせた一人1件の並び)と、学内の日本人の歴代
-  final List<RekidaiKiroku> zentai = rekidaiAwaseru(
-    ichii: ichiiZentaiKojin(gh, k).yomu(),
-    nihonjin: rekidaiHitoriIkken(rekidaiZentaiKojin(kiroku, false, k).yomu()),
-    ryuugakusei: rekidaiHitoriIkken(rekidaiZentaiKojin(kiroku, true, k).yomu()),
-    hitoriIkken: true,
-  );
-  final List<RekidaiKiroku> gakunai = rekidaiAwaseru(
-    ichii: ichiiUnivKojin(u, k).yomu(),
-    nihonjin: rekidaiHitoriIkken(rekidaiUnivKojin(kiroku, false, u.id, k).yomu()),
-    ryuugakusei: rekidaiHitoriIkken(rekidaiUnivKojin(kiroku, true, u.id, k).yomu()),
-    hitoriIkken: true,
-  );
-  final List<RekidaiKiroku> nihonjin = rekidaiHitoriIkken(
-    rekidaiUnivKojin(kiroku, false, u.id, k).yomu(),
-  );
+/// 全体の歴代(記録画面と同じ、日本人+留学生を合わせた一人1件の並び)
+List<RekidaiKiroku> _zentaiKojinRekidai(Ghensuu gh, Kiroku kiroku, int k) => rekidaiAwaseru(
+  ichii: ichiiZentaiKojin(gh, k).yomu(),
+  nihonjin: rekidaiHitoriIkken(rekidaiZentaiKojin(kiroku, false, k).yomu()),
+  ryuugakusei: rekidaiHitoriIkken(rekidaiZentaiKojin(kiroku, true, k).yomu()),
+  hitoriIkken: true,
+);
 
-  // 走った自分の大学の選手(速い順)
-  final List<SenshuData> soushasha = [
-    for (final SenshuData s in senshu)
-      if (s.univid == u.id && _entry(s, race, s.gakunen) >= 0 && _timeAri(_time(s, race, s.gakunen)))
-        s,
-  ]..sort((a, b) => _time(a, race, a.gakunen).compareTo(_time(b, race, b.gakunen)));
+/// 学内の歴代(同じく一人1件)
+List<RekidaiKiroku> _gakunaiKojinRekidai(UnivData u, Kiroku kiroku, int k) => rekidaiAwaseru(
+  ichii: ichiiUnivKojin(u, k).yomu(),
+  nihonjin: rekidaiHitoriIkken(rekidaiUnivKojin(kiroku, false, u.id, k).yomu()),
+  ryuugakusei: rekidaiHitoriIkken(rekidaiUnivKojin(kiroku, true, u.id, k).yomu()),
+  hitoriIkken: true,
+);
 
-  int ichiDoko(List<RekidaiKiroku> l, SenshuData s, double t) => l.indexWhere(
-    (x) => _kondo(gh, x) && x.name == s.name && (x.time - t).abs() < 0.05,
-  );
+/// 個人の種目の大会[race]での、自分の大学[u]の選手の記録の更新(1人に一番大きいもの1つ。速い順)
+/// [tsuki] 大会の月(今日の大会ならnull。学内TT特集では、夏のTTの種目ごとの月を渡す)
+List<KojinKoushin> fushimeKojinKoushin(
+  Ghensuu gh,
+  UnivData u,
+  List<SenshuData> senshu,
+  int race, {
+  int? tsuki,
+}) {
+  try {
+    final int? k = fushimeKirokuBangou(race);
+    final Kiroku? kiroku = _kiroku();
+    if (k == null || kiroku == null) return [];
+    final int m = tsuki ?? gh.month;
+    bool kondo(RekidaiKiroku x) => x.year == gh.year && x.month == m;
+    final List<RekidaiKiroku> zentai = _zentaiKojinRekidai(gh, kiroku, k);
+    final List<RekidaiKiroku> gakunai = _gakunaiKojinRekidai(u, kiroku, k);
+    final List<RekidaiKiroku> nihonjin = rekidaiHitoriIkken(
+      rekidaiUnivKojin(kiroku, false, u.id, k).yomu(),
+    );
 
-  final List<Fushime> l = [];
-  for (final SenshuData s in soushasha) {
-    final double t = _time(s, race, s.gakunen);
-    final double? maeBest = _maeBest(s, k, race);
-    final String naka = '${_namae(s)} ${jikanMoji(t)}。';
+    // 走った自分の大学の選手(速い順)
+    final List<SenshuData> soushasha = [
+      for (final SenshuData s in senshu)
+        if (s.univid == u.id && _entry(s, race, s.gakunen) >= 0 && _timeAri(_time(s, race, s.gakunen)))
+          s,
+    ]..sort((a, b) => _time(a, race, a.gakunen).compareTo(_time(b, race, b.gakunen)));
 
-    // 歴代新(全体の歴代1位)
-    if (s.chokuzentaikai_kojinrekidaisinflag == 1) {
-      final int zIchi = ichiDoko(zentai, s, t);
-      if (zIchi == 0) {
-        final ({String dare, int sa})? mae = _maeKojin(gh, zentai, zIchi, s, t, maeBest, u.name);
+    int ichiDoko(List<RekidaiKiroku> l, SenshuData s, double t) =>
+        l.indexWhere((x) => kondo(x) && x.name == s.name && (x.time - t).abs() < 0.05);
+
+    final List<KojinKoushin> l = [];
+    for (final SenshuData s in soushasha) {
+      final double t = _time(s, race, s.gakunen);
+      final double? maeBest = _maeBest(s, k, race);
+
+      // 歴代新(全体の歴代1位)
+      if (ichiDoko(zentai, s, t) == 0) {
+        final ({RekidaiKiroku? mae, bool jishin, int sa})? mae =
+            _maeKojin(gh, zentai, 0, s, t, maeBest, kondo, u.name);
         if (mae != null) {
           l.add(
-            Fushime(
-              midashi: '歴代新',
-              bun: '$naka${mae.dare}を${_koushinMoji(mae.sa)}。',
-              juuyou: 95,
-              matome: '歴代新',
+            KojinKoushin(
+              s: s,
+              shurui: KojinKoushinShurui.rekidaiShin,
+              time: t,
+              mae: mae.mae,
+              jishin: mae.jishin,
+              sa: mae.sa,
             ),
           );
           continue;
         }
       }
-    }
 
-    // 学内新・学内歴代2位と3位
-    final int ichi = ichiDoko(gakunai, s, t);
-    if (ichi == 0 && s.chokuzentaikai_kojinunivsinflag == 1) {
-      final ({String dare, int sa})? mae = _maeKojin(gh, gakunai, ichi, s, t, maeBest, '');
-      if (mae != null) {
+      // 学内新
+      final int ichi = ichiDoko(gakunai, s, t);
+      if (ichi == 0) {
+        final ({RekidaiKiroku? mae, bool jishin, int sa})? mae =
+            _maeKojin(gh, gakunai, 0, s, t, maeBest, kondo, '');
+        if (mae != null) {
+          l.add(
+            KojinKoushin(
+              s: s,
+              shurui: KojinKoushinShurui.gakunaiShin,
+              time: t,
+              mae: mae.mae,
+              jishin: mae.jishin,
+              sa: mae.sa,
+            ),
+          );
+          continue;
+        }
+      }
+
+      // 日本人学内新(留学生が学内記録を持っているとき)
+      if (s.hirou != 1 && ichi != 0 && ichiDoko(nihonjin, s, t) == 0) {
+        final ({RekidaiKiroku? mae, bool jishin, int sa})? mae =
+            _maeKojin(gh, nihonjin, 0, s, t, maeBest, kondo, '');
+        if (mae != null) {
+          l.add(
+            KojinKoushin(
+              s: s,
+              shurui: KojinKoushinShurui.nihonjinShin,
+              time: t,
+              mae: mae.mae,
+              jishin: mae.jishin,
+              sa: mae.sa,
+            ),
+          );
+          continue;
+        }
+      }
+
+      // 学内歴代2位・3位(前からの記録を抜いたとき。前の自己ベストより速かった記録は、抜いたことにしない)
+      if (ichi == 1 || ichi == 2) {
+        bool nuita = false;
+        for (int i = ichi + 1; i < gakunai.length; i++) {
+          final RekidaiKiroku x = gakunai[i];
+          if (kondo(x)) continue;
+          if (maeBest == null || x.time < maeBest) {
+            nuita = true;
+            break;
+          }
+        }
+        if (nuita) {
+          l.add(
+            KojinKoushin(s: s, shurui: KojinKoushinShurui.gakunaiJuni, time: t, juni: ichi),
+          );
+        }
+      }
+    }
+    return l;
+  } catch (_) {
+    return [];
+  }
+}
+
+/// 個人の種目の大会[race]で、全体の歴代記録を塗り替えた選手(どの大学でも。なければnull)
+/// [tsuki] 大会の月(今日の大会ならnull)。箱庭スポーツの夏のTT特集で使う
+KojinKoushin? fushimeZentaiShin(
+  Ghensuu gh,
+  List<UnivData> univ,
+  List<SenshuData> senshu,
+  int race, {
+  int? tsuki,
+}) {
+  try {
+    final int? k = fushimeKirokuBangou(race);
+    final Kiroku? kiroku = _kiroku();
+    if (k == null || kiroku == null) return null;
+    final int m = tsuki ?? gh.month;
+    bool kondo(RekidaiKiroku x) => x.year == gh.year && x.month == m;
+    final List<RekidaiKiroku> zentai = _zentaiKojinRekidai(gh, kiroku, k);
+    if (zentai.isEmpty || !kondo(zentai.first)) return null;
+    final RekidaiKiroku ichiban = zentai.first;
+    for (final SenshuData s in senshu) {
+      if (s.name != ichiban.name || _entry(s, race, s.gakunen) < 0) continue;
+      final double t = _time(s, race, s.gakunen);
+      if ((t - ichiban.time).abs() >= 0.05) continue;
+      if (s.univid < 0 || s.univid >= univ.length) continue;
+      final ({RekidaiKiroku? mae, bool jishin, int sa})? mae =
+          _maeKojin(gh, zentai, 0, s, t, _maeBest(s, k, race), kondo, univ[s.univid].name);
+      if (mae == null) return null;
+      return KojinKoushin(
+        s: s,
+        shurui: KojinKoushinShurui.rekidaiShin,
+        time: t,
+        mae: mae.mae,
+        jishin: mae.jishin,
+        sa: mae.sa,
+      );
+    }
+    return null;
+  } catch (_) {
+    return null;
+  }
+}
+
+/// 結果画面の行(個人の種目)
+List<Fushime> _kojin(Ghensuu gh, UnivData u, List<SenshuData> senshu, int race) {
+  final List<Fushime> l = [];
+  for (final KojinKoushin x in fushimeKojinKoushin(gh, u, senshu, race)) {
+    final String naka = '${_namae(x.s)} ${jikanMoji(x.time)}。';
+    final RekidaiKiroku? mae = x.mae;
+    final String dare = x.jishin
+        ? '自身の記録'
+        : mae == null
+        ? '前の記録'
+        : '${fushimeItsu(gh, mae)}に'
+              '${x.shurui == KojinKoushinShurui.rekidaiShin ? '${mae.univname}大学の' : ''}'
+              '${mae.name}(${mae.gakunen}年)が出した記録';
+    switch (x.shurui) {
+      case KojinKoushinShurui.rekidaiShin:
+        l.add(
+          Fushime(
+            midashi: '歴代新',
+            bun: '$naka$dareを${_koushinMoji(x.sa)}。',
+            juuyou: 95,
+            matome: '歴代新',
+          ),
+        );
+      case KojinKoushinShurui.gakunaiShin:
         l.add(
           Fushime(
             midashi: '学内新',
-            bun: '$naka${mae.dare}を${_koushinMoji(mae.sa)}。',
+            bun: '$naka$dareを${_koushinMoji(x.sa)}。',
             juuyou: 85,
             matome: '学内新',
           ),
         );
-        continue;
-      }
-    }
-
-    // 日本人学内新(留学生が学内記録を持っているとき)
-    if (s.hirou != 1 && ichi != 0) {
-      final int jIchi = ichiDoko(nihonjin, s, t);
-      if (jIchi == 0) {
-        final ({String dare, int sa})? mae = _maeKojin(gh, nihonjin, jIchi, s, t, maeBest, '');
-        if (mae != null) {
-          l.add(
-            Fushime(
-              midashi: '日本人学内新',
-              bun: '$naka${mae.dare}を${_koushinMoji(mae.sa)}。',
-              juuyou: 70,
-              matome: '日本人学内新',
-            ),
-          );
-          continue;
-        }
-      }
-    }
-
-    // 学内歴代2位・3位(前からの記録を抜いたとき。前の自己ベストより速かった記録を抜いても、抜いたことにはしない)
-    if (ichi == 1 || ichi == 2) {
-      bool nuita = false;
-      for (int i = ichi + 1; i < gakunai.length; i++) {
-        final RekidaiKiroku x = gakunai[i];
-        if (_kondo(gh, x)) continue;
-        if (maeBest == null || x.time < maeBest) {
-          nuita = true;
-          break;
-        }
-      }
-      if (nuita) {
+      case KojinKoushinShurui.nihonjinShin:
         l.add(
           Fushime(
-            midashi: '学内歴代${ichi + 1}位',
+            midashi: '日本人学内新',
+            bun: '$naka$dareを${_koushinMoji(x.sa)}。',
+            juuyou: 70,
+            matome: '日本人学内新',
+          ),
+        );
+      case KojinKoushinShurui.gakunaiJuni:
+        l.add(
+          Fushime(
+            midashi: '学内歴代${x.juni + 1}位',
             bun: naka,
-            juuyou: 60 - ichi,
+            juuyou: 60 - x.juni,
             matome: '学内歴代3位以内',
           ),
         );
-      }
     }
   }
   return l;

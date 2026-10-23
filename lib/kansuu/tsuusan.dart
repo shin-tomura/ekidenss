@@ -23,11 +23,15 @@ import 'package:ekiden/kansuu/kiji/kiji_kihon.dart' show gakurenShussouJuni, jik
 //  学内の記録は総監督をしている大学しか残していないので、学内の列は、自分の大学の選手と卒業生だけに出す
 //  (他大学の選手は全体の列だけ)
 //
-// 記録には選手の番号がない(番号は卒業後に使い回す)ので、記録の側で本人を探さず、選手の側に残っている
-// 本人のタイムを記録と比べる(名前は使わないので、選手名変更をしていても出せる)
-//  ・個人記録: 自己ベストのタイム(と、分かれば出した年月)と同じ記録が、並びの何番目にあるか。
-//    自己ベストと個人記録は同じ大会(駅伝予選を除く)から作るので、並びにあれば本人の記録
-//  ・区間記録: その選手が学年ごとに走った区間のタイムと学年が同じ記録が、並びの何番目にあるか
+// 記録と選手は、通算の番号(枠の番号+卒業する年×1000。rekidai_kiroku.dart の senshuTsuusanBangou)だけで
+// 結びつける(2.1.4)。記録に枠の番号を残すのは2.1.4からなので、それより前に出た記録は結びつけず、表に出さない。
+// 番号のない記録が記録の並びに残っているあいだは、表の下にそのことを1行で書く(押し出されれば自然に消える)
+//  ・個人記録: 選手の番号と同じ番号の記録が、並びの何番目にあるか(一人1件なので1件だけ)
+//  ・区間記録: その選手が学年ごとに走った区間で、選手の番号と学年が同じ記録が、並びの何番目にあるか
+//  ・現役の選手の番号は、今の年月と学年から出す。卒業生は、卒業のときに付いた番号(Senshu_R_Data.id)そのもの。
+//    アルバムに自分で足した選手(sijiseikouflag が100)は、番号が「枠の番号+足した年×1000」なので、
+//    足した年と学年から卒業する年を出す。足した月が分からず1年ずれることがあるので、2つの候補で見る
+//    (同じ枠の前後の選手は卒業する年が4年ずつ違うので、どちらかにしか当たらない)
 // セーブ済みのデータから画面を描くたびに作る(セーブデータは増やさない)。失敗したら何も出さない
 // (2.1.4の開発中は、学内歴代と、今の学内区間記録を持っている区間を1行ずつで出していたが、表にまとめた)
 // ------------------------------------------------------------
@@ -43,9 +47,43 @@ class TsuusanSozai {
     required this.best,
     required this.bestYear,
     required this.bestMonth,
+    required this.waku,
+    required this.motoGakunen,
+    this.sotsugyousei = false,
+    this.rid = 0,
+    this.sijiflag = 0,
+    this.jibunTsuika = false,
   });
 
   final int univid;
+
+  /// 枠の番号(現役の選手の SenshuData.id。卒業生は番号の1000の位より下)
+  final int waku;
+
+  /// 選手の今の学年(卒業生は卒業したときの学年。アルバムに自分で足した選手は足したときの学年)
+  final int motoGakunen;
+
+  /// 卒業生か(番号 [rid] を持っている)
+  final bool sotsugyousei;
+
+  /// 卒業生の番号(Senshu_R_Data.id)と、卒業した年(アルバムに自分で足した選手は足した年)
+  final int rid;
+  final int sijiflag;
+
+  /// アルバムに自分で足した選手か(sijiseikouflag が100)
+  final bool jibunTsuika;
+
+  /// 通算の番号の候補(現役の選手と卒業生は1つ。アルバムに自分で足した選手は2つ)
+  List<int> bangouKouho(Ghensuu gh) {
+    if (!sotsugyousei) {
+      return [tsuusanBangou(waku, sotsugyouNenKeisan(gh.year, gh.month, motoGakunen))];
+    }
+    if (!jibunTsuika) return [rid];
+    // 足した年が1月〜3月なら「足した年+(4−学年)」、4月〜12月なら「足した年+(5−学年)」に卒業する
+    final int a = tsuusanBangou(waku, sijiflag + 4 - motoGakunen);
+    final int b = tsuusanBangou(waku, sijiflag + 5 - motoGakunen);
+    return a == b ? [a] : [a, b];
+  }
 
   /// 今の学年(卒業生は4)
   final int gakunen;
@@ -69,6 +107,8 @@ class TsuusanSozai {
     best: s.time_bestkiroku,
     bestYear: s.year_bestkiroku,
     bestMonth: s.month_bestkiroku,
+    waku: s.id,
+    motoGakunen: s.gakunen,
   );
 
   /// 卒業生(卒業生は4年分がそろっているので、4年として見る。成績の表と同じ)
@@ -81,6 +121,12 @@ class TsuusanSozai {
     best: s.time_bestkiroku,
     bestYear: s.year_bestkiroku,
     bestMonth: s.month_bestkiroku,
+    waku: s.id % 1000,
+    motoGakunen: s.gakunen,
+    sotsugyousei: true,
+    rid: s.id,
+    sijiflag: s.sijiflag,
+    jibunTsuika: s.sijiseikouflag == 100,
   );
 
   int entryAt(int race, int g) {
@@ -157,94 +203,105 @@ String? _tsuusan(TsuusanSozai s) {
 /// 順位のマスの文字(0が1位。並びになければ「-」)
 String _juniMasu(int ichi) => ichi >= 0 ? '${ichi + 1}位' : '-';
 
-/// 歴代記録の表(全体か学内の歴代10位以内に入っている記録がなければnull)
-KijiHyou? rekidaiHyou(TsuusanSozai s) {
+/// 歴代記録の表(全体か学内の歴代10位以内に入っている記録がなければ hyou はnull)と、
+/// 番号のない記録(2.1.4より前に出た記録)が並びに残っているか(furuiAri。表の下に1行書く)
+({KijiHyou? hyou, bool furuiAri}) rekidaiHyou(TsuusanSozai s) {
   try {
     if (!Hive.isBoxOpen('ghensuuBox') || !Hive.isBoxOpen('univBox') || !Hive.isBoxOpen('kirokuBox')) {
-      return null;
+      return (hyou: null, furuiAri: false);
     }
     final Ghensuu? gh = Hive.box<Ghensuu>('ghensuuBox').get('global_ghensuu');
     final Kiroku? kiroku = Hive.box<Kiroku>('kirokuBox').get('KirokuData');
-    if (gh == null || kiroku == null) return null;
+    if (gh == null || kiroku == null) return (hyou: null, furuiAri: false);
     final Box<UnivData> univBox = Hive.box<UnivData>('univBox');
     // 学内の列は、自分の大学の選手と卒業生だけ
     final UnivData? u = s.univid == gh.MYunivid ? univBox.get(gh.MYunivid) : null;
+    final List<int> kouho = s.bangouKouho(gh);
+    bool furuiAri = false;
+    // 並びに番号のない選手の記録が残っているかも見る
+    void miru(List<RekidaiKiroku> l) {
+      if (!furuiAri && l.any((x) => x.bangou == null)) furuiAri = true;
+    }
+
     final List<List<String>> gyou = [];
 
-    // 個人記録(自己ベスト)
+    // 個人記録(番号が同じ記録。一人1件なので1件だけ)
     for (final int k in _rekidaiShumoku) {
-      if (s.best.length <= k) continue;
-      final double best = s.best[k];
-      if (!(best > 0 && best < TEISUU.DEFAULTTIME)) continue;
-      final int yb = s.bestYear.length > k ? s.bestYear[k] : 0;
-      final int mb = s.bestMonth.length > k ? s.bestMonth[k] : 0;
-      // 自己ベストと同じタイム(出した年月が分かれば年月も)の記録の位置
-      int ichi(List<RekidaiKiroku> l) => l.indexWhere(
-        (x) => (x.time - best).abs() < 0.05 && (yb == 0 || (x.year == yb && x.month == mb)),
+      final List<RekidaiKiroku> zentai = rekidaiAwaseru(
+        ichii: ichiiZentaiKojin(gh, k).yomu(),
+        nihonjin: rekidaiHitoriIkken(rekidaiZentaiKojin(kiroku, false, k).yomu()),
+        ryuugakusei: rekidaiHitoriIkken(rekidaiZentaiKojin(kiroku, true, k).yomu()),
+        hitoriIkken: true,
       );
-      final int z = ichi(
-        rekidaiAwaseru(
-          ichii: ichiiZentaiKojin(gh, k).yomu(),
-          nihonjin: rekidaiHitoriIkken(rekidaiZentaiKojin(kiroku, false, k).yomu()),
-          ryuugakusei: rekidaiHitoriIkken(rekidaiZentaiKojin(kiroku, true, k).yomu()),
-          hitoriIkken: true,
-        ),
-      );
-      final int g = u == null
-          ? -1
-          : ichi(
-              rekidaiAwaseru(
-                ichii: ichiiUnivKojin(u, k).yomu(),
-                nihonjin: rekidaiHitoriIkken(rekidaiUnivKojin(kiroku, false, u.id, k).yomu()),
-                ryuugakusei: rekidaiHitoriIkken(rekidaiUnivKojin(kiroku, true, u.id, k).yomu()),
-                hitoriIkken: true,
-              ),
+      final List<RekidaiKiroku> gakunai = u == null
+          ? const <RekidaiKiroku>[]
+          : rekidaiAwaseru(
+              ichii: ichiiUnivKojin(u, k).yomu(),
+              nihonjin: rekidaiHitoriIkken(rekidaiUnivKojin(kiroku, false, u.id, k).yomu()),
+              ryuugakusei: rekidaiHitoriIkken(rekidaiUnivKojin(kiroku, true, u.id, k).yomu()),
+              hitoriIkken: true,
             );
+      miru(zentai);
+      miru(gakunai);
+      int ichi(List<RekidaiKiroku> l) => l.indexWhere((x) {
+        final int? b = x.bangou;
+        return b != null && kouho.contains(b);
+      });
+      final int z = ichi(zentai);
+      final int g = ichi(gakunai);
       if (z < 0 && g < 0) continue;
-      gyou.add([_shumokuMei[k] ?? '', jikanMoji(best), _juniMasu(z), if (u != null) _juniMasu(g)]);
+      final RekidaiKiroku kiroku1 = z >= 0 ? zentai[z] : gakunai[g];
+      gyou.add([
+        _shumokuMei[k] ?? '',
+        jikanMoji(kiroku1.time),
+        _juniMasu(z),
+        if (u != null) _juniMasu(g),
+      ]);
     }
 
-    // 駅伝の区間記録(走った学年ごと)
+    // 駅伝の区間記録(番号と学年が同じ記録。走った学年ごと)
     final UnivData? custom = univBox.get(0);
     for (final int race in const [0, 1, 2, customRaceBangou]) {
-      for (int gk = 1; gk <= s.gakunen; gk++) {
-        final int kk = s.entryAt(race, gk);
-        if (kk < 0 || kk >= TEISUU.SUU_MAXKUKANSUU) continue;
-        if (gakurenShussouJuni(race, s.juniAt(race, gk))) continue;
-        final double t = s.timeAt(race, gk);
-        if (!(t > 0 && t < TEISUU.DEFAULTTIME)) continue;
-        // 区間のタイムと学年が同じ記録の位置
-        int ichi(List<RekidaiKiroku> l) =>
-            l.indexWhere((x) => (x.time - t).abs() < 0.05 && x.gakunen == gk);
-        final int z = ichi(
-          rekidaiAwaseru(
-            ichii: ichiiZentaiKukan(gh, race, kk).yomu(),
-            nihonjin: rekidaiZentaiKukan(kiroku, false, race, kk).yomu(),
-            ryuugakusei: rekidaiZentaiKukan(kiroku, true, race, kk).yomu(),
-          ),
+      for (int kk = 0; kk < TEISUU.SUU_MAXKUKANSUU; kk++) {
+        final List<RekidaiKiroku> zentai = rekidaiAwaseru(
+          ichii: ichiiZentaiKukan(gh, race, kk).yomu(),
+          nihonjin: rekidaiZentaiKukan(kiroku, false, race, kk).yomu(),
+          ryuugakusei: rekidaiZentaiKukan(kiroku, true, race, kk).yomu(),
         );
-        final int g = (u == null || u.time_univkukankiroku.length <= race)
-            ? -1
-            : ichi(
-                rekidaiAwaseru(
-                  ichii: ichiiUnivKukan(u, race, kk).yomu(),
-                  nihonjin: rekidaiUnivKukan(kiroku, false, u.id, race, kk).yomu(),
-                  ryuugakusei: rekidaiUnivKukan(kiroku, true, u.id, race, kk).yomu(),
-                ),
+        final List<RekidaiKiroku> gakunai = (u == null || u.time_univkukankiroku.length <= race)
+            ? const <RekidaiKiroku>[]
+            : rekidaiAwaseru(
+                ichii: ichiiUnivKukan(u, race, kk).yomu(),
+                nihonjin: rekidaiUnivKukan(kiroku, false, u.id, race, kk).yomu(),
+                ryuugakusei: rekidaiUnivKukan(kiroku, true, u.id, race, kk).yomu(),
               );
-        if (z < 0 && g < 0) continue;
-        gyou.add([
-          '${_raceMei(race, custom)}${kk + 1}区($gk年)',
-          jikanMoji(t),
-          _juniMasu(z),
-          if (u != null) _juniMasu(g),
-        ]);
+        miru(zentai);
+        miru(gakunai);
+        for (int gk = 1; gk <= 4; gk++) {
+          int ichi(List<RekidaiKiroku> l) => l.indexWhere((x) {
+            final int? b = x.bangou;
+            return b != null && kouho.contains(b) && x.gakunen == gk;
+          });
+          final int z = ichi(zentai);
+          final int g = ichi(gakunai);
+          if (z < 0 && g < 0) continue;
+          final RekidaiKiroku kiroku1 = z >= 0 ? zentai[z] : gakunai[g];
+          gyou.add([
+            '${_raceMei(race, custom)}${kk + 1}区($gk年)',
+            jikanMoji(kiroku1.time),
+            _juniMasu(z),
+            if (u != null) _juniMasu(g),
+          ]);
+        }
       }
     }
-    if (gyou.isEmpty) return null;
-    return KijiHyou('歴代記録(10位以内)', ['種目・区間', 'タイム', '全体', if (u != null) '学内'], gyou);
+    if (gyou.isEmpty) return (hyou: null, furuiAri: furuiAri);
+    return (
+      hyou: KijiHyou('歴代記録(10位以内)', ['種目・区間', 'タイム', '全体', if (u != null) '学内'], gyou),
+      furuiAri: furuiAri,
+    );
   } catch (_) {
-    return null;
+    return (hyou: null, furuiAri: false);
   }
 }
 

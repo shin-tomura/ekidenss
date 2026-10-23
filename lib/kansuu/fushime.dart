@@ -43,6 +43,9 @@ import 'package:ekiden/kansuu/kiji/kiji_kihon.dart'
 //     ゲームの年なので、「○年」とは書かない)
 // ・「初めて」「デビュー」「連続」は、前の学年の記録が欠けている選手(新しいゲームの2〜4年生など)には出さない
 //   (記事と同じ kirokuKaketeiru)。学連選抜(オープン参加)での出走は、大学のチームの出走に数えない
+// ・記録と選手は、通算の番号(2.1.4から記録に残す。rekidai_kiroku.dart の senshuTsuusanBangou)だけで結びつける。
+//   今回の記録が並びの何番目かを探すのも、前の記録の持ち主を「自身」と言うかも、番号で見る。番号のない記録
+//   (2.1.4より前に出た記録)は、前からの記録としては数え、持ち主の名前も書くが、「自身」とは言わない
 // ・セーブ済みの結果・記録から画面を描くたびに作る(セーブデータは増やさない)。駅伝の新記録は結果画面の印
 //   (chokuzentaikai_〜)も使い、個人の種目は記録の年月で見る(記事でも同じ判定を使うため)
 // ・記事(学内メディアの対校戦の結果号・学内TT特集)には、今までどおり、歴代新・学内新・日本人学内新・
@@ -162,15 +165,14 @@ String fushimeItsu(Ghensuu gh, RekidaiKiroku k) {
   return '$d年前';
 }
 
-/// 選手[s]が今回出した記録としての見分けの文字列(歴代の記録の senshuKagi と同じ形)
-String _senshuKagi(Ghensuu gh, SenshuData s, String univname) => RekidaiKiroku(
-  time: 0,
-  year: gh.year,
-  month: gh.month,
-  univname: univname,
-  name: s.name,
-  gakunen: s.gakunen,
-).senshuKagi;
+/// 選手[s]の通算の番号(2.1.4。記録と選手は、この番号だけで結びつける。rekidai_kiroku.dart)
+int _bangou(Ghensuu gh, SenshuData s) => senshuTsuusanBangou(gh, s);
+
+/// 記録[k]が選手[s]のものか(番号のない記録(2.1.4より前に出た記録)は、結びつけない)
+bool _honnin(Ghensuu gh, RekidaiKiroku k, SenshuData s) {
+  final int? b = k.bangou;
+  return b != null && b == _bangou(gh, s);
+}
 
 /// 選手の名前と学年(「田中 蓮(3年)」)
 String _namae(SenshuData s) => '${s.name}(${s.gakunen}年)';
@@ -558,7 +560,7 @@ List<_Koto> _ekiden(Ghensuu gh, UnivData u, List<SenshuData> senshu, int race) {
     if (kiroku == null) return null;
     final RekidaiKiroku? mae = _maeIchiban(gh, _gakunaiKukanRekidai(u, kiroku, race, kk));
     if (mae == null || (byou(mae.time) - jurai).abs() > 1) return null;
-    return (mae: mae, jishin: mae.senshuKagi == _senshuKagi(gh, s, ''));
+    return (mae: mae, jishin: _honnin(gh, mae, s));
   } catch (_) {
     return null;
   }
@@ -597,9 +599,7 @@ List<_Koto> _ekidenSenshu(
   final String basho = '${_namae(s)} ${kk + 1}区';
   final String naka = '$basho ${jikanMoji(t)}。';
   bool kondo(RekidaiKiroku x) => _kondo(gh, x);
-  int ichiDoko(List<RekidaiKiroku> rl) => rl.indexWhere(
-    (x) => kondo(x) && x.name == s.name && x.gakunen == g && (x.time - t).abs() < 0.05,
-  );
+  int ichiDoko(List<RekidaiKiroku> rl) => rl.indexWhere((x) => kondo(x) && _honnin(gh, x, s));
 
   // 区間新(全体)・区間の歴代2〜10位
   bool kukanShin = false;
@@ -611,7 +611,7 @@ List<_Koto> _ekidenSenshu(
     String dare = '区間記録';
     final RekidaiKiroku? maeK = _maeIchiban(gh, zentai);
     if (maeK != null && (byou(maeK.time) - juraiZentai).abs() <= 1) {
-      dare = maeK.senshuKagi == _senshuKagi(gh, s, u.name)
+      dare = _honnin(gh, maeK, s)
           ? '${fushimeItsu(gh, maeK)}に自身が出した区間記録'
           : '${fushimeItsu(gh, maeK)}に${maeK.univname}大学の${maeK.name}(${maeK.gakunen}年)が出した区間記録';
     }
@@ -808,7 +808,7 @@ class KojinKoushin {
 
 /// 前の記録と、更新した差(秒)。前の記録がなければnull
 /// [l] 速い順の歴代(一人1件)、[ichi] その中の選手[s]の今回の記録の位置、[maeBest] 選手の前の自己ベスト
-/// [kondo] 今回の大会の記録か、[univname] 全体の記録なら選手の大学名(学内の記録なら空)
+/// [kondo] 今回の大会の記録か
 ({RekidaiKiroku? mae, bool jishin, int sa})? _maeKojin(
   Ghensuu gh,
   List<RekidaiKiroku> l,
@@ -817,7 +817,6 @@ class KojinKoushin {
   double t,
   double? maeBest,
   bool Function(RekidaiKiroku) kondo,
-  String univname,
 ) {
   // 並びに前からの記録が1つもなければ(記録を付け始めたばかり・リセットした直後)、出さない
   if (!l.any((x) => !kondo(x))) return null;
@@ -825,7 +824,7 @@ class KojinKoushin {
   RekidaiKiroku? hoka;
   for (int i = ichi + 1; i < l.length; i++) {
     if (kondo(l[i])) continue;
-    if (l[i].senshuKagi == _senshuKagi(gh, s, univname)) continue;
+    if (_honnin(gh, l[i], s)) continue;
     hoka = l[i];
     break;
   }
@@ -904,8 +903,9 @@ List<_KojinKekka> _kojinBunseki(
         s,
   ]..sort((a, b) => _time(a, race, a.gakunen).compareTo(_time(b, race, b.gakunen)));
 
+  // 今回の記録の位置(番号で探す)
   int ichiDoko(List<RekidaiKiroku> l, SenshuData s, double t) =>
-      l.indexWhere((x) => kondo(x) && x.name == s.name && (x.time - t).abs() < 0.05);
+      l.indexWhere((x) => kondo(x) && _honnin(gh, x, s));
 
   final List<_KojinKekka> kekka = [];
   for (final SenshuData s in soushasha) {
@@ -920,7 +920,7 @@ List<_KojinKekka> _kojinBunseki(
     final int zIchi = ichiDoko(zentai, s, t);
     if (zIchi == 0) {
       final ({RekidaiKiroku? mae, bool jishin, int sa})? mae =
-          _maeKojin(gh, zentai, 0, s, t, maeBestZentai, kondo, u.name);
+          _maeKojin(gh, zentai, 0, s, t, maeBestZentai, kondo);
       if (mae != null) {
         x.rekidaiShin = KojinKoushin(
           s: s,
@@ -939,7 +939,7 @@ List<_KojinKekka> _kojinBunseki(
     final int gIchi = ichiDoko(gakunai, s, t);
     if (gIchi == 0) {
       final ({RekidaiKiroku? mae, bool jishin, int sa})? mae =
-          _maeKojin(gh, gakunai, 0, s, t, maeBest, kondo, '');
+          _maeKojin(gh, gakunai, 0, s, t, maeBest, kondo);
       if (mae != null) {
         x.gakunaiShin = KojinKoushin(
           s: s,
@@ -957,7 +957,7 @@ List<_KojinKekka> _kojinBunseki(
     // 日本人学内新(留学生が学内記録を持っているとき)
     if (s.hirou != 1 && gIchi != 0 && ichiDoko(nihonjin, s, t) == 0) {
       final ({RekidaiKiroku? mae, bool jishin, int sa})? mae =
-          _maeKojin(gh, nihonjin, 0, s, t, maeBest, kondo, '');
+          _maeKojin(gh, nihonjin, 0, s, t, maeBest, kondo);
       if (mae != null) {
         x.nihonjinShin = KojinKoushin(
           s: s,
@@ -1024,13 +1024,15 @@ KojinKoushin? fushimeZentaiShin(
     final List<RekidaiKiroku> zentai = _zentaiKojinRekidai(gh, kiroku, k);
     if (zentai.isEmpty || !kondo(zentai.first)) return null;
     final RekidaiKiroku ichiban = zentai.first;
+    if (ichiban.bangou == null) return null;
     for (final SenshuData s in senshu) {
-      if (s.name != ichiban.name || _entry(s, race, s.gakunen) < 0) continue;
+      // 番号で選手を探す
+      if (!_honnin(gh, ichiban, s) || _entry(s, race, s.gakunen) < 0) continue;
       final double t = _time(s, race, s.gakunen);
-      if ((t - ichiban.time).abs() >= 0.05) continue;
+      if (!_timeAri(t)) continue;
       if (s.univid < 0 || s.univid >= univ.length) continue;
       final ({RekidaiKiroku? mae, bool jishin, int sa})? mae =
-          _maeKojin(gh, zentai, 0, s, t, _maeBest(gh, s, k, race), kondo, univ[s.univid].name);
+          _maeKojin(gh, zentai, 0, s, t, _maeBest(gh, s, k, race), kondo);
       if (mae == null) return null;
       return KojinKoushin(
         s: s,

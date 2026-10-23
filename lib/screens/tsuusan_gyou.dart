@@ -9,6 +9,8 @@ import 'package:ekiden/screens/kiji_hyou_view.dart'; // 表(記事の表と同�
 // ・選手画面・選手の詳細の小窓・卒業生の画面の、三大駅伝と対校戦の成績の表のすぐ上に出す
 // ・通算は1行の Text にして、文字を大きくしていても折り返せるようにする(横に並べない)
 // ・歴代記録の表は、記事の表と同じ見た目(KijiHyouView。横にはみ出すときは横にスクロールする)
+// ・記録と選手は通算の番号で結びつける(2.1.4)。番号のない記録(2.1.4より前に出た記録)が並びに残っているあいだは、
+//   表の下(表がなければ通算の行の下)に、そのことを1行で書く
 // ・出すことがなければ何も出さない
 // ------------------------------------------------------------
 
@@ -20,8 +22,9 @@ class TsuusanGyou extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final List<String> gyou = tsuusanGyou(sozai);
-    final KijiHyou? hyou = rekidaiHyou(sozai);
-    if (gyou.isEmpty && hyou == null) return const SizedBox.shrink();
+    final ({KijiHyou? hyou, bool furuiAri}) r = rekidaiHyou(sozai);
+    final KijiHyou? hyou = r.hyou;
+    if (gyou.isEmpty && hyou == null && !r.furuiAri) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Column(
@@ -36,6 +39,14 @@ class TsuusanGyou extends StatelessWidget {
               ),
             ),
           if (hyou != null) KijiHyouView(hyou, ue: gyou.isEmpty ? 0 : 8),
+          if (r.furuiAri)
+            const Padding(
+              padding: EdgeInsets.only(top: 4),
+              child: Text(
+                '※2.1.4より前に出た記録は、選手と結びつけられないため、この表には出ません。',
+                style: TextStyle(color: Colors.white70, fontSize: 12),
+              ),
+            ),
         ],
       ),
     );

@@ -12,6 +12,7 @@ import 'package:ekiden/ghensuu.dart';
 import 'package:ekiden/kiroku.dart';
 import 'package:ekiden/kansuu/TrialTime.dart'; // 区間の見込みタイム(1.8.8)
 import 'package:ekiden/kansuu/chousi_keiken_hosei.dart'; // 区間の見込みタイムの調子補正(1.8.8)
+import 'package:ekiden/kansuu/rekidai_kiroku.dart' show rekidaiGakunen; // 記録の学年の欄に枠の番号も詰めてある(2.1.4)
 
 class SenshuEditView extends StatefulWidget {
   final int senshuId;
@@ -459,7 +460,7 @@ class _SenshuEditViewState extends State<SenshuEditView> {
       if (t > 0 && t < TEISUU.DEFAULTTIME) {
         kirokuTime = t;
         kirokuHito =
-            '${gh.name_zentaikukankiroku[race][kukan][0]}(${gh.univname_zentaikukankiroku[race][kukan][0]}大 ${gh.gakunen_zentaikukankiroku[race][kukan][0]}年)';
+            '${gh.name_zentaikukankiroku[race][kukan][0]}(${gh.univname_zentaikukankiroku[race][kukan][0]}大 ${rekidaiGakunen(gh.gakunen_zentaikukankiroku[race][kukan][0])}年)';
       }
     }
     double? japTime;
@@ -476,7 +477,7 @@ class _SenshuEditViewState extends State<SenshuEditView> {
           t > kirokuTime) {
         japTime = t;
         japHito =
-            '${kiroku.name_zentai_jap_kukankiroku[race][kukan][0]}(${kiroku.univname_zentai_jap_kukankiroku[race][kukan][0]}大 ${kiroku.gakunen_zentai_jap_kukankiroku[race][kukan][0]}年)';
+            '${kiroku.name_zentai_jap_kukankiroku[race][kukan][0]}(${kiroku.univname_zentai_jap_kukankiroku[race][kukan][0]}大 ${rekidaiGakunen(kiroku.gakunen_zentai_jap_kukankiroku[race][kukan][0])}年)';
       }
     }
 

@@ -344,8 +344,12 @@ Future<void> kirokuKousin({
                       .name;
               gh[0].name_zentaikukankiroku[racebangou][iKukan][iHozonJuni] =
                   timeJunSortedKukanFilteredSenshuData[iTimeJuni].name;
+              // 学年の欄には、2.1.4から選手の枠の番号も詰める(rekidai_kiroku.dart の rekidaiGakunenAtai)
               gh[0].gakunen_zentaikukankiroku[racebangou][iKukan][iHozonJuni] =
-                  timeJunSortedKukanFilteredSenshuData[iTimeJuni].gakunen;
+                  rekidaiGakunenAtai(
+                    timeJunSortedKukanFilteredSenshuData[iTimeJuni].id,
+                    timeJunSortedKukanFilteredSenshuData[iTimeJuni].gakunen,
+                  );
               break;
             }
           }
@@ -435,9 +439,13 @@ Future<void> kirokuKousin({
               sortedunivdata[gh[0].MYunivid]
                       .name_univkukankiroku[racebangou][iKukan][iHozonJuni] =
                   univKukanFilteredSenshuData[iTimeJuni].name;
+              // 学年の欄には、2.1.4から選手の枠の番号も詰める(rekidaiGakunenAtai)
               sortedunivdata[gh[0].MYunivid]
                       .gakunen_univkukankiroku[racebangou][iKukan][iHozonJuni] =
-                  univKukanFilteredSenshuData[iTimeJuni].gakunen;
+                  rekidaiGakunenAtai(
+                    univKukanFilteredSenshuData[iTimeJuni].id,
+                    univKukanFilteredSenshuData[iTimeJuni].gakunen,
+                  );
               break;
             }
           }
@@ -1802,8 +1810,12 @@ Future<void> kirokuKousin({
                       .name;
               gh[0].name_zentaikojinkiroku[kirokubangou][i] =
                   kirokujunEntryFilteredSenshuData[i_kirokujun].name;
+              // 学年の欄には、2.1.4から選手の枠の番号も詰める(rekidaiGakunenAtai)
               gh[0].gakunen_zentaikojinkiroku[kirokubangou][i] =
-                  kirokujunEntryFilteredSenshuData[i_kirokujun].gakunen;
+                  rekidaiGakunenAtai(
+                    kirokujunEntryFilteredSenshuData[i_kirokujun].id,
+                    kirokujunEntryFilteredSenshuData[i_kirokujun].gakunen,
+                  );
               await gh[0].save(); // Hiveに保存
               break;
             }
@@ -1925,9 +1937,13 @@ Future<void> kirokuKousin({
               sortedunivdata[currentUnivId]
                       .name_univkojinkiroku[kirokubangou][i] =
                   kirokujunUnivEntryFilteredSenshuData[i_kirokujun].name;
+              // 学年の欄には、2.1.4から選手の枠の番号も詰める(rekidaiGakunenAtai)
               sortedunivdata[currentUnivId]
                       .gakunen_univkojinkiroku[kirokubangou][i] =
-                  kirokujunUnivEntryFilteredSenshuData[i_kirokujun].gakunen;
+                  rekidaiGakunenAtai(
+                    kirokujunUnivEntryFilteredSenshuData[i_kirokujun].id,
+                    kirokujunUnivEntryFilteredSenshuData[i_kirokujun].gakunen,
+                  );
               await sortedunivdata[currentUnivId].save(); // Hiveに保存
               break;
             }

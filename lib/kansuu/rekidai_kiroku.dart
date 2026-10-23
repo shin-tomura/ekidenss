@@ -24,7 +24,42 @@ import 'package:ekiden/univ_data.dart';
 // ・区間記録と大会記録は、同じ選手・大学の記録も全部残す。
 //   個人記録は、同じ選手で埋まらないように、一人につき一番速い記録だけを残す(hitoriIkken)。
 //   記録には選手の番号がない(番号は卒業後に使い回す)ので、名前・大学名・入学年度で同じ選手とみなす(senshuKagi)。
+// ・2.1.4から、記録に選手の枠の番号(SenshuData.id。卒業すると新入生に使い回す)を残し、通算の番号
+//   (枠の番号+卒業する年×1000。卒業生の番号 Senshu_R_Data.id と同じ形)で選手と結びつける(senshuTsuusanBangou)。
+//   ・型も項目も増やさず、学年の欄に「(枠の番号+1)×10+学年」として詰める(yomu でほどき、kaku で詰める)。
+//     卒業する年は、記録の年月と学年から分かる(4月の年度替わりで卒業するので、4年生の年度の次の年)
+//   ・2.1.4より前の記録は学年の欄が1〜4のままで、枠の番号は分からない(waku が -1、bangou が null)。
+//     記録と選手を結びつけるところ(選手画面の歴代記録の表・結果画面と記事で前の記録を「自身」と言うか)は、
+//     番号のある記録だけで見る(番号のない記録は結びつけない)
+//   ・一人1件の整理(onajiHito)は、両方に番号があれば番号で、なければ今までどおり senshuKagi で見る
+//     (2.1.4をまたいで在学している選手の、古い記録と新しい記録が2件載らないように)
+//   ・枠は全部で600(TEISUU.SENSHUSUU_TOTAL)なので、1000の位より下に収まる。Hiveは整数を小数で保存するので
+//     2の53乗までなら確実に扱え、卒業する年が約9兆年を超えるまでは使える
 // ------------------------------------------------------------
+
+/// 選手の通算の番号(2.1.4)。枠の番号[waku](SenshuData.id)+卒業する年[sotsugyouNen]×1000
+/// (卒業生の番号 Senshu_R_Data.id と同じ形。RetireNew.dart)
+int tsuusanBangou(int waku, int sotsugyouNen) => waku + sotsugyouNen * 1000;
+
+/// 年[year]月[month]に学年[gakunen]だった選手が卒業する年
+/// (4月の年度替わりで卒業するので、4年生の年度の次の年。1月〜3月は前の年の年度)
+int sotsugyouNenKeisan(int year, int month, int gakunen) {
+  final int nendo = month >= 4 ? year : year - 1;
+  return nendo + (4 - gakunen) + 1;
+}
+
+/// 今の選手[s]の通算の番号
+int senshuTsuusanBangou(Ghensuu gh, SenshuData s) =>
+    tsuusanBangou(s.id, sotsugyouNenKeisan(gh.year, gh.month, s.gakunen));
+
+/// 記録の学年の欄に書く値(枠の番号[waku]が分からなければ(負なら)学年だけ)
+int rekidaiGakunenAtai(int waku, int gakunen) => waku >= 0 ? (waku + 1) * 10 + gakunen : gakunen;
+
+/// 記録の学年の欄の値から、学年を取り出す(2.1.4より前の記録はそのまま)
+int rekidaiGakunen(int atai) => atai >= 10 ? atai % 10 : atai;
+
+/// 記録の学年の欄の値から、枠の番号を取り出す(分からなければ -1)
+int rekidaiWaku(int atai) => atai >= 10 ? atai ~/ 10 - 1 : -1;
 
 /// 歴代の記録の1件
 class RekidaiKiroku {
@@ -35,6 +70,7 @@ class RekidaiKiroku {
     this.univname = '',
     this.name = '',
     this.gakunen = 0,
+    this.waku = -1,
   });
 
   final double time;
@@ -43,6 +79,23 @@ class RekidaiKiroku {
   final String univname; // 大学名(学内記録では空)
   final String name; // 選手名(大会記録では空)
   final int gakunen;
+
+  /// 記録を出した選手の枠の番号(2.1.4から。分からなければ -1。大会記録では -1)
+  final int waku;
+
+  /// 記録を出した選手の通算の番号(枠の番号が分からない記録と、大会記録ではnull)
+  int? get bangou => (waku >= 0 && gakunen >= 1 && gakunen <= 4)
+      ? tsuusanBangou(waku, sotsugyouNenKeisan(year, month, gakunen))
+      : null;
+
+  /// 同じ選手の記録か(一人1件の整理に使う)。両方に通算の番号があれば番号で、
+  /// どちらかになければ(2.1.4より前の記録)、今までどおり名前・大学名・入学年度で見る
+  bool onajiHito(RekidaiKiroku b) {
+    final int? x = bangou;
+    final int? y = b.bangou;
+    if (x != null && y != null) return x == y;
+    return senshuKagi == b.senshuKagi;
+  }
 
   /// 同じ記録か(保存のときの丸めの違いを見込んで、タイムは少しの差を許す)
   bool onaji(RekidaiKiroku b) =>
@@ -61,13 +114,14 @@ class RekidaiKiroku {
   }
 }
 
-/// 速い順の歴代[l]を、一人につき一番速い記録だけにする(先に出てくる方が速い)
+/// 速い順の歴代[l]を、一人につき一番速い記録だけにする(先に出てくる方が速い。同じ選手かは onajiHito)
 List<RekidaiKiroku> rekidaiHitoriIkken(List<RekidaiKiroku> l) {
-  final Set<String> zumi = <String>{};
-  return [
-    for (final RekidaiKiroku k in l)
-      if (zumi.add(k.senshuKagi)) k,
-  ];
+  final List<RekidaiKiroku> zumi = [];
+  for (final RekidaiKiroku k in l) {
+    if (zumi.any((x) => x.onajiHito(k))) continue;
+    zumi.add(k);
+  }
+  return zumi;
 }
 
 /// 記録があるか(リセット後や初期値は DEFAULTTIME)
@@ -116,6 +170,8 @@ class RekidaiOkiba {
     for (int r = 0; r < time[i].length; r++) {
       final double t = time[i][r];
       if (!rekidaiKirokuAri(t)) continue;
+      // 学年の欄には、2.1.4から枠の番号も詰めてある(rekidaiGakunenAtai)
+      final int gakunenAtai = _yomu1<int>(gakunen, i, r, 0);
       l.add(
         RekidaiKiroku(
           time: t,
@@ -123,7 +179,8 @@ class RekidaiOkiba {
           month: _yomu1<int>(month, i, r, 0),
           univname: _yomu1<String>(univname, i, r, ''),
           name: _yomu1<String>(name, i, r, ''),
-          gakunen: _yomu1<int>(gakunen, i, r, 0),
+          gakunen: rekidaiGakunen(gakunenAtai),
+          waku: rekidaiWaku(gakunenAtai),
         ),
       );
     }
@@ -146,7 +203,7 @@ class RekidaiOkiba {
     name?[i] = List<String>.generate(n, (r) => r < l.length ? l[r].name : '');
     gakunen?[i] = List<int>.generate(
       n,
-      (r) => r < l.length ? l[r].gakunen : 0,
+      (r) => r < l.length ? rekidaiGakunenAtai(l[r].waku, l[r].gakunen) : 0,
     );
   }
 }
@@ -335,8 +392,7 @@ bool rekidaiIreru(
 }) {
   if (!rekidaiKirokuAri(k.time)) return false;
   if (hitoriIkken) {
-    final String kagi = k.senshuKagi;
-    final int mae = l.indexWhere((x) => x.senshuKagi == kagi);
+    final int mae = l.indexWhere((x) => x.onajiHito(k));
     if (mae >= 0) {
       if (l[mae].time <= k.time) return false; // 自分の記録より速くない
       l.removeAt(mae); // 自分の前の記録と入れ替える
@@ -393,6 +449,7 @@ bool rekidaiKousin({
           : '',
       name: s.name,
       gakunen: s.gakunen,
+      waku: s.id, // 選手の枠の番号(2.1.4。通算の番号で選手と結びつけるため)
     );
     if (rekidaiIreru(l, k, saidai, hitoriIkken: hitoriIkken)) kawatta = true;
   }
@@ -443,7 +500,6 @@ List<RekidaiKiroku> rekidaiAwaseru({
     }
   }
   final List<RekidaiKiroku> l = [ichiban];
-  final Set<String> senshuZumi = {ichiban.senshuKagi}; // 一人1件のときに、もう入れた選手
   bool ichibanWoTobashita = false;
   for (final RekidaiKiroku k in awase) {
     if (l.length >= TEISUU.SUU_REKIDAIKIROKUJUNISUU) break;
@@ -452,7 +508,8 @@ List<RekidaiKiroku> rekidaiAwaseru({
       continue;
     }
     if (k.time < ichiban.time) continue;
-    if (hitoriIkken && !senshuZumi.add(k.senshuKagi)) continue;
+    // 一人1件のときは、もう入れた選手の記録は入れない(同じ選手かは onajiHito)
+    if (hitoriIkken && l.any((x) => x.onajiHito(k))) continue;
     l.add(k);
   }
   return l;

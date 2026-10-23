@@ -7,26 +7,29 @@ import 'package:ekiden/senshu_r_data.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/kansuu/rekidai_kiroku.dart'; // 歴代10位までの記録
 import 'package:ekiden/kansuu/custom_seigen.dart' show customRaceBangou;
-import 'package:ekiden/kansuu/kiji/kiji_kihon.dart' show gakurenShussouJuni;
+import 'package:ekiden/kansuu/kiji/kiji_kihon.dart' show gakurenShussouJuni, jikanMoji, KijiHyou;
 
 // ------------------------------------------------------------
-// 選手画面の「通算」の行(2.1.4)
+// 選手画面の「通算」の行と「歴代記録」の表(2.1.4)
 //
 // 選手画面(自分の大学・他大学)・選手の詳細の小窓・卒業生の画面の、三大駅伝と対校戦の成績の表のすぐ上に、
-// その選手のこれまでをまとめた行を出す。
-//  ・通算: 三大駅伝の出走回数(区間賞の回数)・学連選抜での出走回数・対校戦の入賞(8位以内)の回数
-//  ・学内歴代: 学内の歴代10位以内に入っている種目と順位(記録画面と同じ、日本人+留学生の一人1件の並び。
-//    夏のTTの4種目も)
-//  ・学内区間記録: 今の学内の区間記録(日本人+留学生の1位)を持っている駅伝の区間
-//  学内の記録は総監督をしている大学しか残していないので、学内歴代と学内区間記録は、自分の大学の選手と
-//  卒業生だけに出す(他大学の選手は通算だけ)
+// その選手のこれまでをまとめて出す。
+//  ・通算(1行): 三大駅伝の出走回数(区間賞の回数)・学連選抜での出走回数・対校戦の入賞(8位以内)の回数
+//  ・歴代記録(表): 記録画面に出ている範囲(全体・学内の歴代10位まで)に入っている記録と、その順位
+//    ・個人記録(5000m・1万m・ハーフ・フルと夏のTTの4種目): 自己ベストの、全体と学内の歴代の順位
+//      (記録画面の一番上の行と同じ、日本人+留学生を合わせた一人1件の並び)
+//    ・駅伝の区間記録(10月・11月・正月・カスタム): 走った学年ごとの、全体と学内の区間の歴代の順位
+//      (日本人+留学生を合わせた並び。区間記録は同じ選手の記録も何件も残る)
+//  学内の記録は総監督をしている大学しか残していないので、学内の列は、自分の大学の選手と卒業生だけに出す
+//  (他大学の選手は全体の列だけ)
 //
 // 記録には選手の番号がない(番号は卒業後に使い回す)ので、記録の側で本人を探さず、選手の側に残っている
 // 本人のタイムを記録と比べる(名前は使わないので、選手名変更をしていても出せる)
-//  ・学内歴代: 自己ベストのタイム(と、分かれば出した年月)と同じ記録が、並びの何番目にあるか。
-//    自己ベストと学内の個人記録は同じ大会(駅伝予選を除く)から作るので、並びにあれば本人の記録
-//  ・学内区間記録: その選手が学年ごとに走った区間のタイムと学年が、今の学内区間記録と同じか
+//  ・個人記録: 自己ベストのタイム(と、分かれば出した年月)と同じ記録が、並びの何番目にあるか。
+//    自己ベストと個人記録は同じ大会(駅伝予選を除く)から作るので、並びにあれば本人の記録
+//  ・区間記録: その選手が学年ごとに走った区間のタイムと学年が同じ記録が、並びの何番目にあるか
 // セーブ済みのデータから画面を描くたびに作る(セーブデータは増やさない)。失敗したら何も出さない
+// (2.1.4の開発中は、学内歴代と、今の学内区間記録を持っている区間を1行ずつで出していたが、表にまとめた)
 // ------------------------------------------------------------
 
 /// 通算の行を作る材料(現役の選手と卒業生の両方から作る)
@@ -96,10 +99,10 @@ class TsuusanSozai {
   }
 }
 
-/// 学内歴代に出す種目の番号と名前(記録画面の並び。個人記録のあとに夏のTT)
+/// 歴代記録の表に出す個人記録の番号と名前(記録画面の並び。個人記録のあとに夏のTT)
 const List<int> _rekidaiShumoku = [0, 1, 2, 3, 6, 4, 5, 7];
 const Map<int, String> _shumokuMei = {
-  0: '5千m',
+  0: '5000m',
   1: '1万m',
   2: 'ハーフ',
   3: 'フル',
@@ -109,36 +112,14 @@ const Map<int, String> _shumokuMei = {
   7: 'クロカン1万',
 };
 
-/// 通算の行(上から出す順。出すことがなければ空)
+/// 通算の行(出すことがなければ空)
 List<String> tsuusanGyou(TsuusanSozai s) {
-  final List<String> gyou = [];
-  // 思わぬデータに当たっても、ほかの行は出せるように、行ごとに作る
-  String? tsukuru(String? Function() f) {
-    try {
-      return f();
-    } catch (_) {
-      return null;
-    }
+  try {
+    final String? tsuusan = _tsuusan(s);
+    return tsuusan == null ? [] : [tsuusan];
+  } catch (_) {
+    return [];
   }
-
-  final String? tsuusan = tsukuru(() => _tsuusan(s));
-  if (tsuusan != null) gyou.add(tsuusan);
-  if (!Hive.isBoxOpen('ghensuuBox') || !Hive.isBoxOpen('univBox')) return gyou;
-  final Ghensuu? gh = Hive.box<Ghensuu>('ghensuuBox').get('global_ghensuu');
-  if (gh == null || s.univid != gh.MYunivid) return gyou;
-  final Box<UnivData> univBox = Hive.box<UnivData>('univBox');
-  final UnivData? u = univBox.get(gh.MYunivid);
-  if (u == null) return gyou;
-  final Kiroku? kiroku = Hive.isBoxOpen('kirokuBox')
-      ? Hive.box<Kiroku>('kirokuBox').get('KirokuData')
-      : null;
-  if (kiroku != null) {
-    final String? rekidai = tsukuru(() => _gakunaiRekidai(s, u, kiroku));
-    if (rekidai != null) gyou.add(rekidai);
-  }
-  final String? kukan = tsukuru(() => _gakunaiKukan(s, u, univBox.get(0)));
-  if (kukan != null) gyou.add(kukan);
-  return gyou;
 }
 
 /// 「通算: 三大駅伝7回出走(区間賞2)・対校戦入賞3回」(何もなければnull)
@@ -173,54 +154,98 @@ String? _tsuusan(TsuusanSozai s) {
   return '通算: ${bubun.join('・')}';
 }
 
-/// 「学内歴代: 1万m 2位・ハーフ 5位」(10位以内の種目がなければnull)
-String? _gakunaiRekidai(TsuusanSozai s, UnivData u, Kiroku kiroku) {
-  final List<String> bubun = [];
-  for (final int k in _rekidaiShumoku) {
-    if (s.best.length <= k) continue;
-    final double best = s.best[k];
-    if (!(best > 0 && best < TEISUU.DEFAULTTIME)) continue;
-    final int yb = s.bestYear.length > k ? s.bestYear[k] : 0;
-    final int mb = s.bestMonth.length > k ? s.bestMonth[k] : 0;
-    final List<RekidaiKiroku> l = rekidaiAwaseru(
-      ichii: ichiiUnivKojin(u, k).yomu(),
-      nihonjin: rekidaiHitoriIkken(rekidaiUnivKojin(kiroku, false, u.id, k).yomu()),
-      ryuugakusei: rekidaiHitoriIkken(rekidaiUnivKojin(kiroku, true, u.id, k).yomu()),
-      hitoriIkken: true,
-    );
-    // 自己ベストと同じタイム(出した年月が分かれば年月も)の記録の位置
-    final int ichi = l.indexWhere(
-      (x) =>
-          (x.time - best).abs() < 0.05 &&
-          (yb == 0 || (x.year == yb && x.month == mb)),
-    );
-    if (ichi >= 0) bubun.add('${_shumokuMei[k] ?? ''} ${ichi + 1}位');
-  }
-  if (bubun.isEmpty) return null;
-  return '学内歴代: ${bubun.join('・')}';
-}
+/// 順位のマスの文字(0が1位。並びになければ「-」)
+String _juniMasu(int ichi) => ichi >= 0 ? '${ichi + 1}位' : '-';
 
-/// 「学内区間記録: 正月駅伝5区」(今の学内区間記録を持っている区間がなければnull)
-/// [custom] カスタム駅伝の名前の入っている大学(id 0)
-String? _gakunaiKukan(TsuusanSozai s, UnivData u, UnivData? custom) {
-  final List<String> bubun = [];
-  for (final int race in const [0, 1, 2, customRaceBangou]) {
-    for (int g = 1; g <= s.gakunen; g++) {
-      final int kk = s.entryAt(race, g);
-      if (kk < 0) continue;
-      if (gakurenShussouJuni(race, s.juniAt(race, g))) continue;
-      final double t = s.timeAt(race, g);
-      if (!(t > 0 && t < TEISUU.DEFAULTTIME)) continue;
-      if (u.time_univkukankiroku.length <= race) continue;
-      final List<RekidaiKiroku> ichii = ichiiUnivKukan(u, race, kk).yomu();
-      if (ichii.isEmpty) continue;
-      if ((ichii.first.time - t).abs() >= 0.05 || ichii.first.gakunen != g) continue;
-      final String mei = '${_raceMei(race, custom)}${kk + 1}区';
-      if (!bubun.contains(mei)) bubun.add(mei);
+/// 歴代記録の表(全体か学内の歴代10位以内に入っている記録がなければnull)
+KijiHyou? rekidaiHyou(TsuusanSozai s) {
+  try {
+    if (!Hive.isBoxOpen('ghensuuBox') || !Hive.isBoxOpen('univBox') || !Hive.isBoxOpen('kirokuBox')) {
+      return null;
     }
+    final Ghensuu? gh = Hive.box<Ghensuu>('ghensuuBox').get('global_ghensuu');
+    final Kiroku? kiroku = Hive.box<Kiroku>('kirokuBox').get('KirokuData');
+    if (gh == null || kiroku == null) return null;
+    final Box<UnivData> univBox = Hive.box<UnivData>('univBox');
+    // 学内の列は、自分の大学の選手と卒業生だけ
+    final UnivData? u = s.univid == gh.MYunivid ? univBox.get(gh.MYunivid) : null;
+    final List<List<String>> gyou = [];
+
+    // 個人記録(自己ベスト)
+    for (final int k in _rekidaiShumoku) {
+      if (s.best.length <= k) continue;
+      final double best = s.best[k];
+      if (!(best > 0 && best < TEISUU.DEFAULTTIME)) continue;
+      final int yb = s.bestYear.length > k ? s.bestYear[k] : 0;
+      final int mb = s.bestMonth.length > k ? s.bestMonth[k] : 0;
+      // 自己ベストと同じタイム(出した年月が分かれば年月も)の記録の位置
+      int ichi(List<RekidaiKiroku> l) => l.indexWhere(
+        (x) => (x.time - best).abs() < 0.05 && (yb == 0 || (x.year == yb && x.month == mb)),
+      );
+      final int z = ichi(
+        rekidaiAwaseru(
+          ichii: ichiiZentaiKojin(gh, k).yomu(),
+          nihonjin: rekidaiHitoriIkken(rekidaiZentaiKojin(kiroku, false, k).yomu()),
+          ryuugakusei: rekidaiHitoriIkken(rekidaiZentaiKojin(kiroku, true, k).yomu()),
+          hitoriIkken: true,
+        ),
+      );
+      final int g = u == null
+          ? -1
+          : ichi(
+              rekidaiAwaseru(
+                ichii: ichiiUnivKojin(u, k).yomu(),
+                nihonjin: rekidaiHitoriIkken(rekidaiUnivKojin(kiroku, false, u.id, k).yomu()),
+                ryuugakusei: rekidaiHitoriIkken(rekidaiUnivKojin(kiroku, true, u.id, k).yomu()),
+                hitoriIkken: true,
+              ),
+            );
+      if (z < 0 && g < 0) continue;
+      gyou.add([_shumokuMei[k] ?? '', jikanMoji(best), _juniMasu(z), if (u != null) _juniMasu(g)]);
+    }
+
+    // 駅伝の区間記録(走った学年ごと)
+    final UnivData? custom = univBox.get(0);
+    for (final int race in const [0, 1, 2, customRaceBangou]) {
+      for (int gk = 1; gk <= s.gakunen; gk++) {
+        final int kk = s.entryAt(race, gk);
+        if (kk < 0 || kk >= TEISUU.SUU_MAXKUKANSUU) continue;
+        if (gakurenShussouJuni(race, s.juniAt(race, gk))) continue;
+        final double t = s.timeAt(race, gk);
+        if (!(t > 0 && t < TEISUU.DEFAULTTIME)) continue;
+        // 区間のタイムと学年が同じ記録の位置
+        int ichi(List<RekidaiKiroku> l) =>
+            l.indexWhere((x) => (x.time - t).abs() < 0.05 && x.gakunen == gk);
+        final int z = ichi(
+          rekidaiAwaseru(
+            ichii: ichiiZentaiKukan(gh, race, kk).yomu(),
+            nihonjin: rekidaiZentaiKukan(kiroku, false, race, kk).yomu(),
+            ryuugakusei: rekidaiZentaiKukan(kiroku, true, race, kk).yomu(),
+          ),
+        );
+        final int g = (u == null || u.time_univkukankiroku.length <= race)
+            ? -1
+            : ichi(
+                rekidaiAwaseru(
+                  ichii: ichiiUnivKukan(u, race, kk).yomu(),
+                  nihonjin: rekidaiUnivKukan(kiroku, false, u.id, race, kk).yomu(),
+                  ryuugakusei: rekidaiUnivKukan(kiroku, true, u.id, race, kk).yomu(),
+                ),
+              );
+        if (z < 0 && g < 0) continue;
+        gyou.add([
+          '${_raceMei(race, custom)}${kk + 1}区($gk年)',
+          jikanMoji(t),
+          _juniMasu(z),
+          if (u != null) _juniMasu(g),
+        ]);
+      }
+    }
+    if (gyou.isEmpty) return null;
+    return KijiHyou('歴代記録(10位以内)', ['種目・区間', 'タイム', '全体', if (u != null) '学内'], gyou);
+  } catch (_) {
+    return null;
   }
-  if (bubun.isEmpty) return null;
-  return '学内区間記録: ${bubun.join('・')}';
 }
 
 String _raceMei(int race, UnivData? custom) {

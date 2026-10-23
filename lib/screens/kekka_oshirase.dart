@@ -25,8 +25,9 @@ import 'package:ekiden/kansuu/fushime.dart'; // 選手の節目と記録の更�
 //     線の順位の大学との総合タイム(UnivData.time_race)の差も添える(差の書き方はニュース記事と同じ)
 // ・セーブ済みの順位と回数(UnivData の juni_race・taikaibetujunibetukaisuu など)から画面を描くたびに作る
 //   (セーブデータは増やさない)。自分の大学が走っていない大会と、スキップ中は出さない
-// ・お知らせの下に、自分の大学の選手の節目と記録の更新を数行で出す(2.1.4。FushimeOshirase。
-//   中身は kansuu/fushime.dart。駅伝・対校戦・記録会・夏のTT・フルマラソンの結果画面)
+// ・お知らせの下に、自分の大学の選手の節目と記録の更新を、1人1行で3行まで出す(2.1.4。FushimeOshirase。
+//   3行を超えるときは「すべて見る」で別窓に全部を出す。中身は kansuu/fushime.dart。
+//   駅伝・対校戦・記録会・夏のTT・フルマラソンの結果画面)
 // ------------------------------------------------------------
 
 /// お知らせの枠と見出しの色(情報集約パネルの自分の大学と同じ)
@@ -275,8 +276,9 @@ class KekkaHitokoto extends StatelessWidget {
 }
 
 /// 結果画面の、自分の大学の選手の節目と記録の更新(2.1.4。中身は kansuu/fushime.dart)
-/// ・お知らせ(大学の結果)の下に、左にお知らせの色の線を引いて、3行まで出す。入りきらない分は
-///   「ほかに、駅伝デビュー2人。」とまとめる
+/// ・お知らせ(大学の結果)の下に、左にお知らせの色の線を引いて、1人1行で、大きい順に3行まで出す
+/// ・3行を超えるときは「すべて見る(全○件)」を置き、押すと別窓で全部の行を同じ順で出す
+///   (長すぎると結果画面が読みにくくなるため)
 /// ・出すことがないときと、スキップ中は何も出さない
 class FushimeOshirase extends StatelessWidget {
   const FushimeOshirase({
@@ -299,7 +301,6 @@ class FushimeOshirase extends StatelessWidget {
     if (oshiraseSkipChuu()) return const SizedBox.shrink();
     final List<Fushime> l = fushimeIchiran(gh, univ, senshu);
     if (l.isEmpty) return const SizedBox.shrink();
-    final FushimeMatome m = fushimeMatome(l);
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(top: 4, bottom: 12),
@@ -310,34 +311,84 @@ class FushimeOshirase extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          for (final Fushime f in m.miseru)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 4),
-              child: Text.rich(
-                TextSpan(
-                  children: [
-                    TextSpan(
-                      text: '${f.midashi}　',
-                      style: const TextStyle(
-                        color: oshiraseIro,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    TextSpan(text: f.bun),
-                  ],
-                ),
-                style: oshiraseHonbun,
+          for (final Fushime f in l.take(fushimeGyousuu)) _FushimeGyou(f),
+          if (l.length > fushimeGyousuu)
+            TextButton(
+              style: TextButton.styleFrom(
+                padding: EdgeInsets.zero,
+                alignment: Alignment.centerLeft,
               ),
-            ),
-          if (m.nokori.isNotEmpty)
-            Text(
-              m.nokori,
-              style: const TextStyle(
-                color: Colors.white70,
-                fontSize: HENSUU.fontsize_honbun,
+              onPressed: () => _zenbuMiru(context, l),
+              child: Text(
+                'すべて見る(全${l.length}件)',
+                style: const TextStyle(
+                  color: HENSUU.LinkColor,
+                  fontSize: HENSUU.fontsize_honbun,
+                  decoration: TextDecoration.underline,
+                  decorationColor: HENSUU.LinkColor,
+                ),
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  /// 全部の行を別窓で出す
+  void _zenbuMiru(BuildContext context, List<Fushime> l) {
+    showDialog<void>(
+      context: context,
+      builder: (BuildContext c) => AlertDialog(
+        backgroundColor: HENSUU.backgroundcolor,
+        title: Text(
+          '記録と節目(全${l.length}件)',
+          style: const TextStyle(color: Colors.white, fontSize: HENSUU.fontsize_honbun),
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [for (final Fushime f in l) _FushimeGyou(f)],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(c).pop(),
+            child: const Text(
+              '閉じる',
+              style: TextStyle(color: HENSUU.LinkColor, fontSize: HENSUU.fontsize_honbun),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 節目・記録の更新の1行(頭の言葉をお知らせの色にする)
+class _FushimeGyou extends StatelessWidget {
+  const _FushimeGyou(this.f);
+
+  final Fushime f;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Text.rich(
+        TextSpan(
+          children: [
+            TextSpan(
+              text: '${f.midashi}　',
+              style: const TextStyle(color: oshiraseIro, fontWeight: FontWeight.bold),
+            ),
+            TextSpan(text: f.bun),
+          ],
+        ),
+        style: oshiraseHonbun,
       ),
     );
   }

@@ -2108,7 +2108,9 @@ class _RecordScreenState extends State<RecordScreen>
   // ・個人記録と区間記録は、枠の中を「すべて」(日本人と留学生を合わせた並び)・「日本人」・「留学生」の3行に分け、
   //   行の頭に札を付ける(_fudaGyou。学内記録の画面で「全体」と書くと全体記録と紛らわしいので「すべて」にした)
   // ・リセットは、目立ちすぎないように、1位の記録のタイムの横の小さな文字にした(押したあとの確かめ方は今までどおり)
-  // ・駅伝の記録は、上に総合・往路・復路・各区間の札(_tobuFuda)を並べ、押すとその枠まで移る
+  // ・選択肢のすぐ下(記録の並びのスクロールの外)に、種目(駅伝は総合・往路・復路・各区間)の札(_tobuFuda)を
+  //   1行で並べて上に残し、押すとその枠まで移る。札が入りきらないときは、札の行だけを横にスクロールする
+  //   (折り返すと、正月駅伝や文字を大きくしているときに上に残る部分が高くなり、記録を読む部分が狭くなるため)
 
   // 「すべて」「日本人」「留学生」の札の文字(_buildAwaseSections の行の順)
   static const List<String> _awaseFuda = ['すべて', '日本人', '留学生'];
@@ -2197,42 +2199,80 @@ class _RecordScreenState extends State<RecordScreen>
     );
   }
 
-  // 駅伝の記録の上に並べる札(押すと、その枠まで移る)。[l] は札の文字と、移る先の目印の名前
+  // 選択肢の下に残す札(押すと、その枠まで移る)。[l] は札の文字と、移る先の目印の名前。
+  // 1行に並べ、入りきらないときは札の行だけを横にスクロールする(高さは決めず、文字の大きさに合わせる)
   Widget _tobuFuda(List<(String, String)> l) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Wrap(
-        spacing: 6,
-        runSpacing: 6,
+    if (l.isEmpty) return const SizedBox.shrink();
+    // (札が少ないときも、記録と同じく左に寄せる)
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Row(
         children: [
           for (final (String, String) x in l)
-            InkWell(
-              onTap: () {
-                final BuildContext? c = _tobuKagi(x.$2).currentContext;
-                if (c == null) return;
-                Scrollable.ensureVisible(
-                  c,
-                  duration: const Duration(milliseconds: 300),
-                );
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.white38, width: 0.5),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Text(
-                  x.$1,
-                  style: const TextStyle(
-                    color: HENSUU.LinkColor,
-                    fontSize: HENSUU.fontsize_honbun - 2,
+            Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: InkWell(
+                onTap: () {
+                  final BuildContext? c = _tobuKagi(x.$2).currentContext;
+                  if (c == null) return;
+                  Scrollable.ensureVisible(
+                    c,
+                    duration: const Duration(milliseconds: 300),
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.white38, width: 0.5),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    x.$1,
+                    style: const TextStyle(
+                      color: HENSUU.LinkColor,
+                      fontSize: HENSUU.fontsize_honbun - 2,
+                    ),
                   ),
                 ),
               ),
             ),
         ],
       ),
+      ),
     );
+  }
+
+  // 個人記録・夏のTTの記録の、種目の枠の目印の名前
+  static String _tobuKojinNamae(bool zentai, int k) =>
+      '${zentai ? 'zentai' : 'univ'}_kojin_$k';
+
+  // 選択肢[sentaku]の札の並び(個人記録・夏のTTの記録は種目、駅伝は総合・往路・復路・各区間)
+  // [oufukuAri] 正月駅伝の往路記録・復路記録の枠を出しているか
+  List<(String, String)> _tobuIchiran(
+    bool zentai,
+    int sentaku,
+    Ghensuu ghensuu,
+    bool oufukuAri,
+  ) {
+    if (sentaku == 0 || sentaku == 5) {
+      return [
+        for (final int k in _kojinSentakuBangou(sentaku))
+          (_kojinShumokuRyaku[k], _tobuKojinNamae(zentai, k)),
+      ];
+    }
+    if (sentaku >= 1 && sentaku <= 4) {
+      final int race = _ekidenRacebangou[sentaku - 1];
+      return _ekidenTobu(
+        zentai,
+        race,
+        _ekidenKukansuu(sentaku, ghensuu),
+        race == 2 && oufukuAri,
+      );
+    }
+    return const [];
   }
 
   // 駅伝の記録の札の並び(総合・往路・復路・各区間)
@@ -2500,7 +2540,16 @@ class _RecordScreenState extends State<RecordScreen>
           items: _sentakushi(),
         ),
 
-        const SizedBox(height: 20),
+        // 種目・区間へ移る札(2.1.4。記録の並びのスクロールの外に置き、上に残す)
+        _tobuFuda(
+          _tobuIchiran(
+            false,
+            _recordTypes.indexOf(_selectedUnivRecordType),
+            _ghensuuBox.get('global_ghensuu', defaultValue: Ghensuu.initial())!,
+            true,
+          ),
+        ),
+        const SizedBox(height: 8),
 
         // 記録表示部分
         Expanded(
@@ -2555,7 +2604,16 @@ class _RecordScreenState extends State<RecordScreen>
           items: _sentakushi(),
         ),
 
-        const SizedBox(height: 20),
+        // 種目・区間へ移る札(2.1.4。記録の並びのスクロールの外に置き、上に残す)
+        _tobuFuda(
+          _tobuIchiran(
+            true,
+            _recordTypes.indexOf(_selectedOverallRecordType),
+            _ghensuuBox.get('global_ghensuu', defaultValue: Ghensuu.initial())!,
+            sortedUnivData.isNotEmpty,
+          ),
+        ),
+        const SizedBox(height: 8),
 
         // 記録表示部分
         Expanded(
@@ -2655,6 +2713,7 @@ class _RecordScreenState extends State<RecordScreen>
           // 種目ごとに1枚の枠(2.1.4)
           for (final int k in shumoku)
             _buildAwaseSections(
+              key: _tobuKagi(_tobuKojinNamae(false, k)),
               kagi: 'univ_kojin_$k',
               titles: [
                 _kojinShumoku[k],
@@ -2688,10 +2747,6 @@ class _RecordScreenState extends State<RecordScreen>
         children: [
           Text(_ekidenMidashi(sentaku, sortedUnivData), style: moji),
           const SizedBox(height: 5),
-          // 総合・往路・復路・各区間へ移る札(2.1.4)
-          _tobuFuda(
-            _ekidenTobu(false, race, _ekidenKukansuu(sentaku, ghensuu), race == 2),
-          ),
           // 総合記録
           _buildRekidaiSection(
             key: _tobuKagi(_tobuKagiNamae(false, race, 'sougou')),
@@ -2798,6 +2853,7 @@ class _RecordScreenState extends State<RecordScreen>
           // 種目ごとに1枚の枠(2.1.4)
           for (final int k in shumoku)
             _buildAwaseSections(
+              key: _tobuKagi(_tobuKojinNamae(true, k)),
               kagi: 'zentai_kojin_$k',
               titles: [
                 _kojinShumoku[k],
@@ -2831,15 +2887,6 @@ class _RecordScreenState extends State<RecordScreen>
         children: [
           Text(_ekidenMidashi(sentaku, sortedUnivData), style: moji),
           const SizedBox(height: 5),
-          // 総合・往路・復路・各区間へ移る札(2.1.4)
-          _tobuFuda(
-            _ekidenTobu(
-              true,
-              race,
-              _ekidenKukansuu(sentaku, ghensuu),
-              race == 2 && sortedUnivData.isNotEmpty,
-            ),
-          ),
           // 総合記録
           _buildRekidaiSection(
             key: _tobuKagi(_tobuKagiNamae(true, race, 'sougou')),

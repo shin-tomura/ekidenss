@@ -255,7 +255,8 @@ void gakurenSenshuShousaiKaku(
     }
     final int renJuni = gakurenNaiJuni(s, idx, konki: true);
     if (renJuni > 0) juniList.add('学連選抜内$renJuni位');
-    if (showRank) juniList.add('全体${konki.zentai(time, idx)}位');
+    // 夏の学内タイムトライアルの4種目も全体順位を書く(2.1.4。どの大学も同じ条件で走るため)
+    juniList.add('全体${konki.zentai(time, idx)}位');
     if (juniList.isNotEmpty) base += " [${juniList.join(' ')}]";
     return base;
   }
@@ -291,7 +292,10 @@ void gakurenSenshuShousaiKaku(
     }
     final int renJuni = gakurenNaiJuni(s, idx);
     if (renJuni > 0) juniList.add('学連選抜内$renJuni位');
-    if (showRank) juniList.add('全体${s.zentaijuni_bestkiroku[idx] + 1}位');
+    // 夏の学内タイムトライアルの4種目も全体順位を書く(2.1.4)
+    if (s.zentaijuni_bestkiroku.length > idx) {
+      juniList.add('全体${s.zentaijuni_bestkiroku[idx] + 1}位');
+    }
     if (juniList.isNotEmpty) base += " [${juniList.join(' ')}]";
     return base;
   }

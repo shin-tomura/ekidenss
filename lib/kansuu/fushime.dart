@@ -252,12 +252,40 @@ const Map<int, List<int>> fushimeShumokuRace = {
   7: [16],
 };
 
+/// 学内記録を付け始めた年度を残す KantokuData.yobiint4 の番号(2.1.4)
+/// 学内記録は総監督をしている大学の分しか残さないので、大学を移ると、移った大学の学内記録はそこから付き始める。
+/// 選手の前の自己ベストのうち、この年度より前のものは学内記録に載っていないので、「自身の記録」と見なさない
+/// (年度で区切るので、移った年度のうち移る前に走った記録は、載っていたものとして扱う)
+const int gakunaiKirokuHajimeBangou = 79;
+
+/// 今日の年度(4月〜12月はその年、1月〜3月は前の年。学年は4月に上がる)
+int _nendo(Ghensuu gh) => gh.month >= 4 ? gh.year : gh.year - 1;
+
+/// 総監督の大学を移ったときに、移った大学の学内記録を付け始めた年度を残す(大学画面から。保存もする)
+Future<void> gakunaiKirokuHajimeNendoKaku(Ghensuu gh) async {
+  final KantokuData? kantoku = _kantoku();
+  if (kantoku == null || kantoku.yobiint4.length <= gakunaiKirokuHajimeBangou) return;
+  kantoku.yobiint4[gakunaiKirokuHajimeBangou] = _nendo(gh);
+  await kantoku.save();
+}
+
+/// 今の大学の学内記録を付け始めた年度(分からなければ0。今の年度より後の値は、前のゲームの残りとみなして0)
+int _gakunaiHajimeNendo(Ghensuu gh) {
+  final KantokuData? kantoku = _kantoku();
+  if (kantoku == null || kantoku.yobiint4.length <= gakunaiKirokuHajimeBangou) return 0;
+  final int n = kantoku.yobiint4[gakunaiKirokuHajimeBangou];
+  if (n <= 0 || n > _nendo(gh)) return 0;
+  return n;
+}
+
 /// 選手[s]の個人記録[k]の、今回(今の学年の大会[race])より前の自己ベスト(なければnull)
-double? _maeBest(SenshuData s, int k, int race) {
+/// [hajimeNendo] これより前の年度の記録は見ない(学内記録を付け始めた年度。0なら全部見る)
+double? _maeBest(Ghensuu gh, SenshuData s, int k, int race, {int hajimeNendo = 0}) {
   double? best;
   for (final int r in fushimeShumokuRace[k] ?? const <int>[]) {
     for (int g = 1; g <= s.gakunen; g++) {
       if (r == race && g == s.gakunen) continue;
+      if (hajimeNendo > 0 && _nendo(gh) - (s.gakunen - g) < hajimeNendo) continue;
       if (_entry(s, r, g) < 0) continue;
       final double t = _time(s, r, g);
       if (!_timeAri(t)) continue;
@@ -572,6 +600,8 @@ class KojinKoushin {
   bool Function(RekidaiKiroku) kondo,
   String univname,
 ) {
+  // 並びに前からの記録が1つもなければ(記録を付け始めたばかり・リセットした直後)、出さない
+  if (!l.any((x) => !kondo(x))) return null;
   // 今回の記録より下の、前からの記録で一番速いもの(本人の前の記録は、一人1件なので並びにはない)
   RekidaiKiroku? hoka;
   for (int i = ichi + 1; i < l.length; i++) {
@@ -624,6 +654,8 @@ List<KojinKoushin> fushimeKojinKoushin(
     final List<RekidaiKiroku> nihonjin = rekidaiHitoriIkken(
       rekidaiUnivKojin(kiroku, false, u.id, k).yomu(),
     );
+    // 学内記録を付け始めた年度(大学を移ったあと。それより前の自己ベストは学内記録に載っていない)
+    final int hajime = _gakunaiHajimeNendo(gh);
 
     // 走った自分の大学の選手(速い順)
     final List<SenshuData> soushasha = [
@@ -638,12 +670,14 @@ List<KojinKoushin> fushimeKojinKoushin(
     final List<KojinKoushin> l = [];
     for (final SenshuData s in soushasha) {
       final double t = _time(s, race, s.gakunen);
-      final double? maeBest = _maeBest(s, k, race);
+      // 前の自己ベスト(全体の記録は全大学の分を残しているので全部、学内の記録は付け始めた年度から)
+      final double? maeBestZentai = _maeBest(gh, s, k, race);
+      final double? maeBest = _maeBest(gh, s, k, race, hajimeNendo: hajime);
 
       // 歴代新(全体の歴代1位)
       if (ichiDoko(zentai, s, t) == 0) {
         final ({RekidaiKiroku? mae, bool jishin, int sa})? mae =
-            _maeKojin(gh, zentai, 0, s, t, maeBest, kondo, u.name);
+            _maeKojin(gh, zentai, 0, s, t, maeBestZentai, kondo, u.name);
         if (mae != null) {
           l.add(
             KojinKoushin(
@@ -746,7 +780,7 @@ KojinKoushin? fushimeZentaiShin(
       if ((t - ichiban.time).abs() >= 0.05) continue;
       if (s.univid < 0 || s.univid >= univ.length) continue;
       final ({RekidaiKiroku? mae, bool jishin, int sa})? mae =
-          _maeKojin(gh, zentai, 0, s, t, _maeBest(s, k, race), kondo, univ[s.univid].name);
+          _maeKojin(gh, zentai, 0, s, t, _maeBest(gh, s, k, race), kondo, univ[s.univid].name);
       if (mae == null) return null;
       return KojinKoushin(
         s: s,

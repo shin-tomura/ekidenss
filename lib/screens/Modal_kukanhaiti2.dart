@@ -1071,10 +1071,12 @@ class _ModalKukanHaitiViewState extends State<ModalKukanHaitiView> {
                     " [区間内${s.kukannaijuni[idx] + 1}位 学内${s.gakunaijuni_bestkiroku[idx] + 1}位 全体${s.zentaijuni_bestkiroku[idx] + 1}位]";
               } else {
                 // 夏の学内タイムトライアルの4種目は、区間を走る選手全員に記録があるときだけ区間内順位も書く
+                // (2.1.4から全体順位も書く。どの大学も同じ条件で走るため)
                 final int ttKukanJuni = kukannaiJuni(s, idx, raceIdx);
+                final String ttZentai = " 全体${s.zentaijuni_bestkiroku[idx] + 1}位";
                 base += ttKukanJuni > 0
-                    ? " [区間内$ttKukanJuni位 学内${s.gakunaijuni_bestkiroku[idx] + 1}位]"
-                    : " [学内${s.gakunaijuni_bestkiroku[idx] + 1}位]";
+                    ? " [区間内$ttKukanJuni位 学内${s.gakunaijuni_bestkiroku[idx] + 1}位$ttZentai]"
+                    : " [学内${s.gakunaijuni_bestkiroku[idx] + 1}位$ttZentai]";
               }
             }
             return base;
@@ -1135,9 +1137,11 @@ String _konkiRec(
     base +=
         " [区間内$kukanJuni位 学内$gakunai位 全体${konki.zentai(time, idx)}位]";
   } else {
+    // 夏の学内タイムトライアルの4種目も全体順位を書く(2.1.4)
+    final String ttZentai = " 全体${konki.zentai(time, idx)}位";
     base += kukanJuni > 0
-        ? " [区間内$kukanJuni位 学内$gakunai位]"
-        : " [学内$gakunai位]";
+        ? " [区間内$kukanJuni位 学内$gakunai位$ttZentai]"
+        : " [学内$gakunai位$ttZentai]";
   }
   return base;
 }
@@ -1274,14 +1278,16 @@ String kukanZenDaigakuText(int targetKukanIdx, {KonkiBestJuni? konkiJuni}) {
           } else {
             // 夏の学内タイムトライアルの4種目は、区間を走る選手全員に記録があるときだけ区間内順位も書く
             // (なければ学内順位のみ。1.8.8)
+            // (2.1.4から全体順位も書く。どの大学も同じ条件で走るため)
             final int ttKukanJuni = ttKukannaiJuni(
               s.time_bestkiroku[idx],
               idx,
               kukanSenshu,
             );
+            final String ttZentai = " 全体${s.zentaijuni_bestkiroku[idx] + 1}位";
             base += ttKukanJuni > 0
-                ? " [区間内$ttKukanJuni位 学内${s.gakunaijuni_bestkiroku[idx] + 1}位]"
-                : " [学内${s.gakunaijuni_bestkiroku[idx] + 1}位]";
+                ? " [区間内$ttKukanJuni位 学内${s.gakunaijuni_bestkiroku[idx] + 1}位$ttZentai]"
+                : " [学内${s.gakunaijuni_bestkiroku[idx] + 1}位$ttZentai]";
           }
           return base;
         }

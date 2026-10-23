@@ -63,6 +63,8 @@ import 'package:ekiden/kansuu/kingin_kiroku.dart'
         kinginNatsuHyou,
         kinginNatsuChuu,
         kinginNatsuNashi; // 金特訓・銀特訓の記録の一覧表(2.0.0)と、直近の夏合宿の分(2.1.3)
+import 'package:ekiden/kansuu/fushime.dart'
+    show gakunaiKirokuHajimeNendoKaku; // 学内記録を付け始めた年度(2.1.4)
 import 'package:ekiden/kansuu/taikai_chouki.dart'
     show
         ChoukiKiroku,
@@ -1937,6 +1939,12 @@ class _ModalKantokuUnivHenkouState extends State<ModalKantokuUnivHenkou> {
                                           });
 
                                           try {
+                                            // 移った大学の学内記録を付け始めた年度を残す(2.1.4。KantokuData.yobiint4[79]。
+                                            // 結果画面の一言と記事で、前の自己ベストが学内記録に載っていたかを見るのに使う。
+                                            // kansuu/fushime.dart の gakunaiKirokuHajimeNendoKaku)
+                                            if (i != currentGhensuu.MYunivid) {
+                                              await gakunaiKirokuHajimeNendoKaku(currentGhensuu);
+                                            }
                                             currentGhensuu.MYunivid = i;
                                             currentGhensuu.hyojiunivnum =
                                                 currentGhensuu.MYunivid;

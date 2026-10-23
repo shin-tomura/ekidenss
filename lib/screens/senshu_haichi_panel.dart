@@ -196,7 +196,8 @@ Widget _gakurenKirokuGyou(
                 // タイムトライアルの4種目も、区間を走る大学の選手全員に記録があれば出す(1.8.8)
                 if (kukanJuni > 0) _juniFudaBun("区", "$kukanJuni相当"),
                 if (renJuni > 0) _juniFuda("連", renJuni),
-                if (showRank) _juniFuda("全", zentaiJuni),
+                // 夏の学内タイムトライアルの4種目も、全選手の中での順位を出す(2.1.4。どの大学も同じ条件で走るため)
+                _juniFuda("全", zentaiJuni),
               ],
             ),
           ),
@@ -512,6 +513,8 @@ Widget senshuKirokuRan(
   );
 }
 
+/// [showRank] がfalseの行は夏の学内タイムトライアルの4種目(「区」は、その区間を走る選手全員に記録があるときだけ
+/// 出す)。2.1.3までは「全」も出さなかったが、2.1.4から、どの種目も「全」を出す
 Widget _kirokuGyou(
   Ghensuu gh,
   SenshuData s,
@@ -579,6 +582,8 @@ Widget _kirokuGyou(
                 ] else ...[
                   if (ttKukanJuni > 0) _juniFuda("区", ttKukanJuni),
                   _juniFuda("学", s.gakunaijuni_bestkiroku[idx] + 1),
+                  // 夏の学内タイムトライアルの4種目も、全選手の中での順位を出す(2.1.4)
+                  _juniFuda("全", s.zentaijuni_bestkiroku[idx] + 1),
                 ],
               ],
             ),
@@ -656,7 +661,8 @@ Widget _konkiKirokuGyou(
               children: [
                 if (kukanJuni > 0) _juniFuda("区", kukanJuni),
                 _juniFuda("学", konki.gakunai(time, idx, s.univid)),
-                if (showRank) _juniFuda("全", konki.zentai(time, idx)),
+                // 夏の学内タイムトライアルの4種目も、全選手の中での順位を出す(2.1.4)
+                _juniFuda("全", konki.zentai(time, idx)),
               ],
             ),
           ),

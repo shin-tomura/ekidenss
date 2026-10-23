@@ -253,7 +253,7 @@ class _ModalAceHaichiState extends State<ModalAceHaichi> {
       Text(bamenChuu, style: _futsuu),
       const SizedBox(height: 6),
       const Text(
-        '5000m・1万m・ハーフ・ロード1万の持ちタイムを全選手の中での偏差値にし、得意な2種目の平均が学内で一番高い選手を'
+        '1万m・ハーフ・ロード1万の3種目の持ちタイムを全選手の中での偏差値にし、その平均が学内で一番高い選手を'
         'エース、2番目を準エースとしています(記事の「エース」とは決め方が違うことがあります)。',
         style: _chuu,
       ),

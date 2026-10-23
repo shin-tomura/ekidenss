@@ -9,42 +9,46 @@ import 'package:ekiden/kansuu/konki_best.dart' show hikakuMochiTime, hikakuMochi
 // 「スキップして統計データ取得」のエース・準エースが走った区間(toukei_ace.dart)と、
 // レース前の画面の「エースの配置」(screens/Modal_aceHaichi.dart)で同じ決め方を使う。
 //
-// ・5000m・1万m・ハーフ・ロード1万の4種目(time_bestkiroku の0・1・2・6)の持ちタイムを、
+// ・1万m・ハーフ・ロード1万の3種目(time_bestkiroku の1・2・6)の持ちタイムを、
 //   それぞれ全選手(全大学・全学年。留学生も含む)の中での偏差値にする(AceKijun。求め方はレーダーチャートと同じで、
 //   1〜10点への換算と頭打ちはしない)
-// ・選手ごとに、偏差値の高い2種目の平均(得意な2種目の平均)を点数にし、高い順に並べる
-//   ・記録のある種目だけで比べる(記録のある種目が1つなら、その1つ。1つもなければ一番下)
-//   ・点数が同じなら1万mの持ちタイムの速いほう、それも同じなら選手のidの順
+// ・選手ごとに、3種目の偏差値の平均を点数にし、高い順に並べる
+//   ・トラック(1万m)が3分の1、ロード(ハーフ・ロード1万)が3分の2で効く(トラックは1区、ロードは2区以降に効くため。
+//     5000mはトラックの短い種目で、1区のほかでは活躍の場が限られるので入れない)
+//   ・記録のある種目だけで平均する(対校戦と夏のタイムトライアルは全員が走るので、駅伝のころには、ふつうは3種目そろう。
+//     1つもなければ一番下)
+//   ・点数が同じならロード1万の持ちタイムの速いほう(全員が走るので)、それも同じなら選手のidの順
 //   ・エース・準エース: 1つの大学の全選手(区間エントリーされていない選手も、留学生も含む)の中での1番手・2番手
 //   ・全体の上位10人: その駅伝に区間エントリーされた全選手(補欠・当日変更で外れた選手と、
 //     正月駅伝は学連選抜の選手も含む)の中での上位10人
 // ・持ちタイムは、コンピュータの大学が区間配置で比べるのと同じ今季ベスト(なければ自己ベスト。hikakuMochiTime)
-// ・タイム差がそのまま偏差値の差になり、得意な2種目で見るので、抜けた選手がエースになりやすい
-//   (2.1.3の開発中は、4種目の学内順位の平均で決めていたが、どの種目でも2〜3番手のバランス型の選手が
-//    エースになりやすく、タイム差も見られなかったので変えた。記録のない種目の換算もやめた)
+// ・タイム差がそのまま偏差値の差になるので、大きく引き離している選手は平均しても上に来る
+//   (2.1.3の開発中は、5000mも入れた4種目の学内順位の平均で決めていたが、どの種目でも2〜3番手のバランス型の選手が
+//    エースになりやすく、タイム差も見られなかったので偏差値にした。記録のない種目の換算もやめた。
+//    いったん得意な2種目の平均にしたが、トラックだけ速い選手もエースになるので、3種目の平均にした)
 // ・体調・調子は使わない(持ちタイムと区間エントリーは、ほかの画面でも見られる)
 // ------------------------------------------------------------
 
-/// 4種目(time_bestkiroku の番号。5000m・1万m・ハーフ・ロード1万)
-const List<int> aceShumoku = [0, 1, 2, 6];
+/// 3種目(time_bestkiroku の番号。1万m・ハーフ・ロード1万)
+const List<int> aceShumoku = [1, 2, 6];
 
-/// 1万m(点数が同じときに比べる種目。aceShumoku の中の位置)
-const int _ichiman = 1;
+/// ロード1万(点数が同じときに比べる種目。aceShumoku の中の位置)
+const int _road = 2;
 
 /// 有効な持ちタイムか(記録がなければnull)
 double? _yuukou(double t) => (t > 0 && t < TEISUU.DEFAULTTIME) ? t : null;
 
-/// 選手[s]の4種目の持ちタイム(記録がなければnull)
+/// 選手[s]の3種目の持ちタイム(記録がなければnull)
 List<double?> aceMochiTimesSenshu(SenshuData s) => [
   for (final int idx in aceShumoku) _yuukou(hikakuMochiTime(s, idx)),
 ];
 
-/// 学連選抜の選手[g]の4種目の持ちタイム(記録がなければnull)
+/// 学連選抜の選手[g]の3種目の持ちタイム(記録がなければnull)
 List<double?> aceMochiTimesGakuren(Senshu_Gakuren_Data g) => [
   for (final int idx in aceShumoku) _yuukou(hikakuMochiTimeGakuren(g, idx)),
 ];
 
-/// 偏差値の物差し(4種目それぞれの、全選手の持ちタイムの平均と標準偏差)
+/// 偏差値の物差し(3種目それぞれの、全選手の持ちタイムの平均と標準偏差)
 class AceKijun {
   final List<double> heikin;
   final List<double> hensa;
@@ -80,20 +84,19 @@ class AceKijun {
   double hensachi(int j, double t) =>
       hensa[j] == 0 ? 50.0 : 50.0 + 10.0 * (heikin[j] - t) / hensa[j];
 
-  /// 4種目の持ちタイム[times]の点数(偏差値の高い2種目の平均。記録が1つならその1つ、なければnull)
+  /// 3種目の持ちタイム[times]の点数(記録のある種目の偏差値の平均。1つもなければnull)
   double? tensuu(List<double?> times) {
     final List<double> h = [
       for (int j = 0; j < times.length && j < aceShumoku.length; j++)
         if (times[j] != null) hensachi(j, times[j]!),
-    ]..sort((a, b) => b.compareTo(a));
+    ];
     if (h.isEmpty) return null;
-    if (h.length == 1) return h[0];
-    return (h[0] + h[1]) / 2;
+    return h.reduce((a, b) => a + b) / h.length;
   }
 }
 
-/// 選手ごとの4種目の持ちタイム[times]を、点数の高い順に並べた番号([times]の添字)
-/// [ids] は点数も1万mも同じときに比べる選手のid
+/// 選手ごとの3種目の持ちタイム[times]を、点数の高い順に並べた番号([times]の添字)
+/// [ids] は点数もロード1万も同じときに比べる選手のid
 List<int> aceJun(AceKijun kijun, List<List<double?>> times, List<int> ids) {
   final List<double?> ten = [for (final List<double?> t in times) kijun.tensuu(t)];
   return List.generate(times.length, (i) => i)
@@ -102,8 +105,8 @@ List<int> aceJun(AceKijun kijun, List<List<double?>> times, List<int> ids) {
       final double tb = ten[b] ?? double.negativeInfinity;
       final int c = tb.compareTo(ta);
       if (c != 0) return c;
-      final double ia = times[a][_ichiman] ?? TEISUU.DEFAULTTIME;
-      final double ib = times[b][_ichiman] ?? TEISUU.DEFAULTTIME;
+      final double ia = times[a][_road] ?? TEISUU.DEFAULTTIME;
+      final double ib = times[b][_road] ?? TEISUU.DEFAULTTIME;
       final int c2 = ia.compareTo(ib);
       if (c2 != 0) return c2;
       return ids[a].compareTo(ids[b]);

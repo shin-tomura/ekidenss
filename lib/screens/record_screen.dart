@@ -2051,6 +2051,7 @@ class _RecordScreenState extends State<RecordScreen>
   // ・[zentai] 全体の記録か(falseなら総監督をしている大学の学内記録。[kijunUniv]はその大学)
   // ・往路・復路の記録は2.0.0から取り始めたので、それより前から遊んでいるデータは、記録を始めた年度を添える
   //   (年度はどの大学も同じなので、全体の記録では[kijunUniv]にどの大学を渡してもよい)
+  // ・2.1.4から、往路・復路をそれぞれ1枚の枠にし、上の札から移れるようにした(_tobuKagiNamae)
   List<Widget> _buildOufukuSections({
     required bool zentai,
     required Ghensuu ghensuu,
@@ -2060,8 +2061,9 @@ class _RecordScreenState extends State<RecordScreen>
       color: Colors.white,
       fontSize: HENSUU.fontsize_honbun - 2,
     );
-    Widget ran(int race, String title) {
+    Widget ran(int race, String title, String tobu) {
       return _buildRekidaiSection(
+        key: _tobuKagi(_tobuKagiNamae(zentai, 2, tobu)),
         kagi: '${zentai ? 'zentai' : 'univ'}_taikai_$race',
         title: title,
         rekidai: zentai
@@ -2092,14 +2094,155 @@ class _RecordScreenState extends State<RecordScreen>
 
     final int kaishi = choukiOufukuKaishi(kijunUniv);
     return [
-      ran(ouroRace, '往路記録(1〜5区)'),
-      const SizedBox(height: 5),
-      ran(fukuroRace, '復路記録(6〜10区)'),
-      const SizedBox(height: 5),
+      ran(ouroRace, '往路記録(1〜5区)', 'ouro'),
+      ran(fukuroRace, '復路記録(6〜10区)', 'fukuro'),
       if (kaishi > 1) ...[
         Text('(往路記録・復路記録は$kaishi年度から記録しています)', style: chuu),
-        const SizedBox(height: 5),
+        const SizedBox(height: 10),
       ],
+    ];
+  }
+
+  // ---- 記録の欄の見た目(2.1.4。種目・区間ごとの区切りを分かりやすくした) ----
+  // ・種目(駅伝は区間・総合・往路・復路)ごとに、少し明るい枠(_kirokuWaku)に1枚ずつまとめ、見出しは枠の上に1回だけ書く
+  // ・個人記録と区間記録は、枠の中を「すべて」(日本人と留学生を合わせた並び)・「日本人」・「留学生」の3行に分け、
+  //   行の頭に札を付ける(_fudaGyou。学内記録の画面で「全体」と書くと全体記録と紛らわしいので「すべて」にした)
+  // ・リセットは、目立ちすぎないように、1位の記録の年月の横の小さな文字にした(押したあとの確かめ方は今までどおり)
+  // ・駅伝の記録は、上に総合・往路・復路・各区間の札(_tobuFuda)を並べ、押すとその枠まで移る
+
+  // 「すべて」「日本人」「留学生」の札の文字(_buildAwaseSections の行の順)
+  static const List<String> _awaseFuda = ['すべて', '日本人', '留学生'];
+
+  // 札から移る先の枠の目印(大学記録と全体記録のタブ、大会ごとに分ける。同じ目印を2つの枠に付けないため)
+  final Map<String, GlobalKey> _tobuKagiIchiran = <String, GlobalKey>{};
+  GlobalKey _tobuKagi(String namae) =>
+      _tobuKagiIchiran.putIfAbsent(namae, () => GlobalKey());
+  static String _tobuKagiNamae(bool zentai, int race, String basho) =>
+      '${zentai ? 'zentai' : 'univ'}_${race}_$basho';
+
+  // 記録の枠(見出しと中身)
+  Widget _kirokuWaku({
+    Key? key,
+    required String title,
+    required List<Widget> naka,
+  }) {
+    return Container(
+      key: key,
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.07),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white24, width: 0.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: HENSUU.fontsize_honbun,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 4),
+          ...naka,
+        ],
+      ),
+    );
+  }
+
+  // 行の頭に札を付けた行(文字を大きくしても入るように、札の幅は決めず、中身は残りの幅で折り返す)
+  Widget _fudaGyou(String fuda, Widget naka) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          constraints: const BoxConstraints(minWidth: 52),
+          margin: const EdgeInsets.only(right: 8, top: 2),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+            color: const Color(0xFF2B3B52),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Text(
+            fuda,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Color(0xFFB8CCE8), fontSize: 12),
+          ),
+        ),
+        Expanded(child: naka),
+      ],
+    );
+  }
+
+  // 1位の記録の年月の横に置く「リセット」(小さな灰色の文字)
+  Widget _resetMoji(VoidCallback onReset) {
+    return InkWell(
+      onTap: onReset,
+      child: const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+        child: Text(
+          'リセット',
+          style: TextStyle(
+            color: Colors.white54,
+            fontSize: 12,
+            decoration: TextDecoration.underline,
+            decorationColor: Colors.white54,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // 駅伝の記録の上に並べる札(押すと、その枠まで移る)。[l] は札の文字と、移る先の目印の名前
+  Widget _tobuFuda(List<(String, String)> l) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Wrap(
+        spacing: 6,
+        runSpacing: 6,
+        children: [
+          for (final (String, String) x in l)
+            InkWell(
+              onTap: () {
+                final BuildContext? c = _tobuKagi(x.$2).currentContext;
+                if (c == null) return;
+                Scrollable.ensureVisible(
+                  c,
+                  duration: const Duration(milliseconds: 300),
+                );
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  border: Border.all(color: Colors.white38, width: 0.5),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  x.$1,
+                  style: const TextStyle(
+                    color: HENSUU.LinkColor,
+                    fontSize: HENSUU.fontsize_honbun - 2,
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // 駅伝の記録の札の並び(総合・往路・復路・各区間)
+  List<(String, String)> _ekidenTobu(bool zentai, int race, int kukansuu, bool oufuku) {
+    return [
+      ('総合', _tobuKagiNamae(zentai, race, 'sougou')),
+      if (oufuku) ('往路', _tobuKagiNamae(zentai, race, 'ouro')),
+      if (oufuku) ('復路', _tobuKagiNamae(zentai, race, 'fukuro')),
+      for (int i = 0; i < kukansuu; i++)
+        ('${i + 1}区', _tobuKagiNamae(zentai, race, 'ku$i')),
     ];
   }
 
@@ -2109,9 +2252,9 @@ class _RecordScreenState extends State<RecordScreen>
   // ・[daigaku] 大学名を出すか(学内記録は出さない)
   // ・選手名は、開ける選手(現役の選手・残っている卒業生)ならリンクにする(2.1.4。screens/kiroku_link.dart。
   //   記録と選手は通算の番号だけで結びつけるので、2.1.4より前に出た記録はリンクにしない)
-  Widget _buildRekidaiSection({
+  // ・2.1.4から、見出しは枠(_kirokuWaku)の側で書き、ここは記録の並びだけにした。リセットは1位の年月の横
+  Widget _buildRekidaiNaka({
     required String kagi,
-    required String title,
     required List<RekidaiKiroku> rekidai,
     required bool isOverallTime,
     required bool senshu,
@@ -2140,11 +2283,14 @@ class _RecordScreenState extends State<RecordScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Wrap(
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 Text('$juni$timeString', style: moji),
                 Text(' (${k.year}年${k.month}月記録)', style: moji),
                 // 総合記録は、大学名を同じ行に出す
                 if (!senshu && daigaku) Text(' ${k.univname}', style: moji),
+                // リセットは、その行の歴代10位までをまとめて消すので、1位の記録の横に1つだけ置く
+                if (r == 0) _resetMoji(onReset),
               ],
             ),
             if (senshu)
@@ -2160,72 +2306,73 @@ class _RecordScreenState extends State<RecordScreen>
       );
     }
 
+    if (!aru) return const Text('記録なし', style: moji);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Text(title, style: moji),
-            const Text("  "),
-            // 記録がある場合のみリセットボタンを表示
-            if (aru)
-              ElevatedButton(
-                onPressed: onReset,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.grey, // 目立たない色に変更
-                  foregroundColor: Colors.black,
-                  minimumSize: Size.zero,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: const Text(
-                  'リセット',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                ),
-              ),
-          ],
-        ),
-        if (!aru)
-          const Text('記録なし', style: moji)
-        else ...[
-          for (int r = 0; r < (hiraiteru ? rekidai.length : 1); r++) ikken(r),
-          // 開いたり閉じたりするのは、この文字を押したときだけ
-          // (記録の部分は押しても反応しない。スクロールのつもりで触れたときに開閉しないように)
-          if (hirakeru)
-            InkWell(
-              onTap: () {
-                setState(() {
-                  if (!_hiraitaKiroku.remove(kagi)) {
-                    _hiraitaKiroku.add(kagi);
-                  }
-                });
-              },
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Text(
-                  hiraiteru ? '▲ 閉じる' : '▼ 2位以下を見る',
-                  style: const TextStyle(
-                    color: HENSUU.LinkColor,
-                    fontSize: HENSUU.fontsize_honbun,
-                  ),
+        for (int r = 0; r < (hiraiteru ? rekidai.length : 1); r++) ikken(r),
+        // 開いたり閉じたりするのは、この文字を押したときだけ
+        // (記録の部分は押しても反応しない。スクロールのつもりで触れたときに開閉しないように)
+        if (hirakeru)
+          InkWell(
+            onTap: () {
+              setState(() {
+                if (!_hiraitaKiroku.remove(kagi)) {
+                  _hiraitaKiroku.add(kagi);
+                }
+              });
+            },
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Text(
+                hiraiteru ? '▲ 閉じる' : '▼ 2位以下を見る',
+                style: const TextStyle(
+                  color: HENSUU.LinkColor,
+                  fontSize: HENSUU.fontsize_honbun,
                 ),
               ),
             ),
-        ],
-        const SizedBox(height: 5),
+          ),
+      ],
+    );
+  }
+
+  // 1つの並びを1枚の枠で出す(総合記録・往路記録・復路記録)
+  Widget _buildRekidaiSection({
+    Key? key,
+    required String kagi,
+    required String title,
+    required List<RekidaiKiroku> rekidai,
+    required bool isOverallTime,
+    required bool senshu,
+    required bool daigaku,
+    required VoidCallback onReset,
+  }) {
+    return _kirokuWaku(
+      key: key,
+      title: title,
+      naka: [
+        _buildRekidaiNaka(
+          kagi: kagi,
+          rekidai: rekidai,
+          isOverallTime: isOverallTime,
+          senshu: senshu,
+          daigaku: daigaku,
+          onReset: onReset,
+        ),
       ],
     );
   }
 
   // 日本人と留学生を分けない行・日本人・留学生の3行(個人記録・区間記録。1.8.8)
-  // [titles] 3行の見出し(分けない行、日本人、留学生の順)
+  // 2.1.4から、3行を1枚の枠にまとめ、見出しは[titles]の1つ目(「5000m」「1区」)を枠の上に1回だけ書き、
+  // 行の頭に「すべて」「日本人」「留学生」の札を付ける([titles]はリセットの確かめの画面に出す名前)
+  // [titles] 3行の名前(分けない行、日本人、留学生の順)
   // [ichii] 分けない行の1位の置き場所(区間新などの判定に使う記録)
-  // [onReset] 押したリセットボタンの行(_resetAwase の shurui)と見出しを受け取る
+  // [onReset] 押したリセットの行(_resetAwase の shurui)と名前を受け取る
   // [hitoriIkken] 一人につき一番速い記録だけを出すか(個人記録)
-  List<Widget> _buildAwaseSections({
+  Widget _buildAwaseSections({
+    Key? key,
     required String kagi,
     required List<String> titles,
     required RekidaiOkiba ichii,
@@ -2253,18 +2400,27 @@ class _RecordScreenState extends State<RecordScreen>
       j,
       r,
     ];
-    return [
-      for (int shurui = 0; shurui < 3; shurui++)
-        _buildRekidaiSection(
-          kagi: '${kagi}_$shurui',
-          title: titles[shurui],
-          rekidai: gyou[shurui],
-          isOverallTime: isOverallTime,
-          senshu: true,
-          daigaku: daigaku,
-          onReset: () => onReset(shurui, titles[shurui]),
-        ),
-    ];
+    return _kirokuWaku(
+      key: key,
+      title: titles[0],
+      naka: [
+        for (int shurui = 0; shurui < 3; shurui++) ...[
+          if (shurui > 0)
+            const Divider(color: Colors.white24, height: 13, thickness: 0.5),
+          _fudaGyou(
+            _awaseFuda[shurui],
+            _buildRekidaiNaka(
+              kagi: '${kagi}_$shurui',
+              rekidai: gyou[shurui],
+              isOverallTime: isOverallTime,
+              senshu: true,
+              daigaku: daigaku,
+              onReset: () => onReset(shurui, titles[shurui]),
+            ),
+          ),
+        ],
+      ],
+    );
   }
 
   // MARK: - 大学記録タブのコンテンツ
@@ -2461,9 +2617,9 @@ class _RecordScreenState extends State<RecordScreen>
           Text('${myUnivData.name}大学学内記録', style: moji),
           if (sentaku == 5) const Text(_ttSetsumei, style: moji),
           const SizedBox(height: 10),
-          for (final int k in shumoku) ...[
-            if (k != shumoku.first) const SizedBox(height: 10),
-            ..._buildAwaseSections(
+          // 種目ごとに1枚の枠(2.1.4)
+          for (final int k in shumoku)
+            _buildAwaseSections(
               kagi: 'univ_kojin_$k',
               titles: [
                 _kojinShumoku[k],
@@ -2487,7 +2643,6 @@ class _RecordScreenState extends State<RecordScreen>
                 hosoku: _resetHosoku(shurui),
               ),
             ),
-          ],
         ],
       );
     } else if (sentaku >= 1 && sentaku <= 4) {
@@ -2498,8 +2653,13 @@ class _RecordScreenState extends State<RecordScreen>
         children: [
           Text(_ekidenMidashi(sentaku, sortedUnivData), style: moji),
           const SizedBox(height: 5),
+          // 総合・往路・復路・各区間へ移る札(2.1.4)
+          _tobuFuda(
+            _ekidenTobu(false, race, _ekidenKukansuu(sentaku, ghensuu), race == 2),
+          ),
           // 総合記録
           _buildRekidaiSection(
+            key: _tobuKagi(_tobuKagiNamae(false, race, 'sougou')),
             kagi: 'univ_taikai_$race',
             title: '総合記録',
             rekidai: rekidaiUnivTaikai(myUnivData, race).yomu(),
@@ -2517,7 +2677,6 @@ class _RecordScreenState extends State<RecordScreen>
               hosoku: _resetHosoku(null),
             ),
           ),
-          const SizedBox(height: 5),
           // 正月駅伝の往路記録・復路記録(2.0.0。kansuu/oufuku_kiroku.dart)
           if (race == 2)
             ..._buildOufukuSections(
@@ -2531,10 +2690,9 @@ class _RecordScreenState extends State<RecordScreen>
             index < _ekidenKukansuu(sentaku, ghensuu);
             index++
           )
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ..._buildAwaseSections(
+            // 区間ごとに1枚の枠(2.1.4。上の札から移れる)
+            _buildAwaseSections(
+                  key: _tobuKagi(_tobuKagiNamae(false, race, 'ku$index')),
                   kagi: 'univ_kukan_${race}_$index',
                   titles: [
                     '${index + 1}区',
@@ -2570,9 +2728,6 @@ class _RecordScreenState extends State<RecordScreen>
                     hosoku: _resetHosoku(shurui),
                   ),
                 ),
-                const SizedBox(height: 10),
-              ],
-            ),
         ],
       );
     } else {
@@ -2605,9 +2760,9 @@ class _RecordScreenState extends State<RecordScreen>
           const Text('全体歴代記録', style: moji),
           if (sentaku == 5) const Text(_ttSetsumei, style: moji),
           const SizedBox(height: 15),
-          for (final int k in shumoku) ...[
-            if (k != shumoku.first) const SizedBox(height: 10),
-            ..._buildAwaseSections(
+          // 種目ごとに1枚の枠(2.1.4)
+          for (final int k in shumoku)
+            _buildAwaseSections(
               kagi: 'zentai_kojin_$k',
               titles: [
                 _kojinShumoku[k],
@@ -2631,7 +2786,6 @@ class _RecordScreenState extends State<RecordScreen>
                 hosoku: _resetHosoku(shurui),
               ),
             ),
-          ],
         ],
       );
     } else if (sentaku >= 1 && sentaku <= 4) {
@@ -2642,8 +2796,18 @@ class _RecordScreenState extends State<RecordScreen>
         children: [
           Text(_ekidenMidashi(sentaku, sortedUnivData), style: moji),
           const SizedBox(height: 5),
+          // 総合・往路・復路・各区間へ移る札(2.1.4)
+          _tobuFuda(
+            _ekidenTobu(
+              true,
+              race,
+              _ekidenKukansuu(sentaku, ghensuu),
+              race == 2 && sortedUnivData.isNotEmpty,
+            ),
+          ),
           // 総合記録
           _buildRekidaiSection(
+            key: _tobuKagi(_tobuKagiNamae(true, race, 'sougou')),
             kagi: 'zentai_taikai_$race',
             title: '総合記録',
             rekidai: rekidaiZentaiTaikai(ghensuu, race).yomu(),
@@ -2661,7 +2825,6 @@ class _RecordScreenState extends State<RecordScreen>
               hosoku: _resetHosoku(null),
             ),
           ),
-          const SizedBox(height: 5),
           // 正月駅伝の往路記録・復路記録(2.0.0。kansuu/oufuku_kiroku.dart)
           if (race == 2 && sortedUnivData.isNotEmpty)
             ..._buildOufukuSections(
@@ -2675,10 +2838,9 @@ class _RecordScreenState extends State<RecordScreen>
             index < _ekidenKukansuu(sentaku, ghensuu);
             index++
           )
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ..._buildAwaseSections(
+            // 区間ごとに1枚の枠(2.1.4。上の札から移れる)
+            _buildAwaseSections(
+                  key: _tobuKagi(_tobuKagiNamae(true, race, 'ku$index')),
                   kagi: 'zentai_kukan_${race}_$index',
                   titles: [
                     '${index + 1}区',
@@ -2702,9 +2864,6 @@ class _RecordScreenState extends State<RecordScreen>
                     hosoku: _resetHosoku(shurui),
                   ),
                 ),
-                const SizedBox(height: 10),
-              ],
-            ),
         ],
       );
     } else {

@@ -872,25 +872,25 @@ class _Senshu_R_ScreenState extends State<Senshu_R_Screen> {
                           '登り1万best',
                           currentSenshu.time_bestkiroku[4],
                           currentSenshu.gakunaijuni_bestkiroku[4],
-                          null,
+                          currentSenshu.zentaijuni_bestkiroku[4], // 夏のTTも全体順位を出す(2.1.4)
                         ),
                         _buildBestRecordRowr(
                           '下り1万best',
                           currentSenshu.time_bestkiroku[5],
                           currentSenshu.gakunaijuni_bestkiroku[5],
-                          null,
+                          currentSenshu.zentaijuni_bestkiroku[5],
                         ),
                         _buildBestRecordRowr(
                           'ロード1万best',
                           currentSenshu.time_bestkiroku[6],
                           currentSenshu.gakunaijuni_bestkiroku[6],
-                          null,
+                          currentSenshu.zentaijuni_bestkiroku[6],
                         ),
                         _buildBestRecordRowr(
                           'クロカン1万best',
                           currentSenshu.time_bestkiroku[7],
                           currentSenshu.gakunaijuni_bestkiroku[7],
-                          null,
+                          currentSenshu.zentaijuni_bestkiroku[7],
                         ),
 
                         const SizedBox(height: 16),

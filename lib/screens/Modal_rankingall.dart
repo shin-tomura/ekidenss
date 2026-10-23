@@ -63,6 +63,15 @@ class _ModalAllUnivSenshuRankingViewState
     DisplayEvent.bestHalf,
   ];
 
+  // 夏のタイムトライアルの種目(2.1.4。どの大学も同じコース・同じ条件で走るので、全体でも並べる。
+  // ボタンは2段目に置く)
+  static const List<DisplayEvent> _ttEvents = [
+    DisplayEvent.bestUp10000m,
+    DisplayEvent.bestDown10000m,
+    DisplayEvent.bestRoad10000m,
+    DisplayEvent.bestXC10000m,
+  ];
+
   // 学年のラベル取得
   String _getGakunenLabel(int gakunen) {
     if (gakunen == 0) return '全学年';
@@ -100,8 +109,15 @@ class _ModalAllUnivSenshuRankingViewState
         return 'ハーフ';
       case DisplayEvent.bestFull:
         return 'フル';
-      default:
-        return 'その他';
+      // 夏のタイムトライアル(2.1.4。学内のランキングと同じ名前)
+      case DisplayEvent.bestUp10000m:
+        return '登り10km';
+      case DisplayEvent.bestDown10000m:
+        return '下り10km';
+      case DisplayEvent.bestRoad10000m:
+        return 'ロード10km';
+      case DisplayEvent.bestXC10000m:
+        return 'クロカン10km';
     }
   }
 
@@ -346,9 +362,19 @@ class _ModalAllUnivSenshuRankingViewState
         color: HENSUU.backgroundcolor,
         border: Border(top: BorderSide(color: Colors.grey.shade800)),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: _availableEvents.map((e) => _buildEventButton(e)).toList(),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: _availableEvents.map((e) => _buildEventButton(e)).toList(),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: _ttEvents.map((e) => _buildEventButton(e)).toList(),
+          ),
+        ],
       ),
     );
   }

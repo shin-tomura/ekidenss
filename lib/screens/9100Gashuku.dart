@@ -423,25 +423,33 @@ class _GashukuScreenState extends State<GashukuScreen> {
                             '登り1万best',
                             player.time_bestkiroku[4],
                             player.gakunaijuni_bestkiroku[4],
-                            null,
+                            player.zentaijuni_bestkiroku.length > 4
+                                ? player.zentaijuni_bestkiroku[4] // 夏のTTも全体順位を出す(2.1.4)
+                                : null,
                           ),
                           _buildBestRecordRow(
                             '下り1万best',
                             player.time_bestkiroku[5],
                             player.gakunaijuni_bestkiroku[5],
-                            null,
+                            player.zentaijuni_bestkiroku.length > 5
+                                ? player.zentaijuni_bestkiroku[5]
+                                : null,
                           ),
                           _buildBestRecordRow(
                             'ロード1万best',
                             player.time_bestkiroku[6],
                             player.gakunaijuni_bestkiroku[6],
-                            null,
+                            player.zentaijuni_bestkiroku.length > 6
+                                ? player.zentaijuni_bestkiroku[6]
+                                : null,
                           ),
                           _buildBestRecordRow(
                             'クロカン1万best',
                             player.time_bestkiroku[7],
                             player.gakunaijuni_bestkiroku[7],
-                            null,
+                            player.zentaijuni_bestkiroku.length > 7
+                                ? player.zentaijuni_bestkiroku[7]
+                                : null,
                           ),
                           const SizedBox(height: 16),
                           const Text(

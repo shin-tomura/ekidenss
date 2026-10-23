@@ -10,9 +10,9 @@ class Album extends HiveObject {
   @HiveField(1)
   int hyojisenshunum = 0;
   @HiveField(2)
-  int yobiint0 = 0; //学内記録の表示種類用(0個人記録、110月駅伝、211月駅伝、3正月駅伝、4カスタム駅伝)
+  int yobiint0 = 0; //学内記録の表示種類用(0個人記録、110月駅伝、211月駅伝、3正月駅伝、4カスタム駅伝、5夏のTTの記録(2.1.4))
   @HiveField(3)
-  int yobiint1 = 0; //全体記録の表示種類用(0個人記録、110月駅伝、211月駅伝、3正月駅伝、4カスタム駅伝)
+  int yobiint1 = 0; //全体記録の表示種類用(0個人記録、110月駅伝、211月駅伝、3正月駅伝、4カスタム駅伝、5夏のTTの記録(2.1.4))
   @HiveField(4)
   int yobiint2 = 0; //記録画面の表示タブのindex保存用
   @HiveField(5)

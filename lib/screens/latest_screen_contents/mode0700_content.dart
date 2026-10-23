@@ -2443,13 +2443,21 @@ class _Mode0700ContentState extends State<Mode0700Content> {
                       ),
                       style: TextStyle(color: HENSUU.textcolor),
                     ),
+              // 2.1.4から、夏のTT(13〜16)にも学内新・歴代新を付ける(記録画面の「夏のTTの記録」に
+              // 歴代10位まで残すようにしたため)。TTは年に1度で、自己ベストの更新がほとんどの選手に
+              // 付いてしまうので、PBは付けない。最初の年は記録がなく全員が新記録になるので付けない
               if ((currentGhensuu.hyojiracebangou >= 6 &&
                       currentGhensuu.hyojiracebangou <= 8 &&
                       currentGhensuu.year != 1) ||
                   (currentGhensuu.hyojiracebangou >= 10 &&
                       currentGhensuu.hyojiracebangou <= 12) ||
+                  (currentGhensuu.hyojiracebangou >= 13 &&
+                      currentGhensuu.hyojiracebangou <= 16 &&
+                      currentGhensuu.year != 1) ||
                   currentGhensuu.hyojiracebangou == 17) ...[
-                if (senshu.chokuzentaikai_pbflag == 1)
+                if (senshu.chokuzentaikai_pbflag == 1 &&
+                    !(currentGhensuu.hyojiracebangou >= 13 &&
+                        currentGhensuu.hyojiracebangou <= 16))
                   Text(
                     " PB", // 先頭にスペースを入れて、他のテキストと区切る
                     style: TextStyle(

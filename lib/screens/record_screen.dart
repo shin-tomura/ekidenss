@@ -144,12 +144,15 @@ class _RecordScreenState extends State<RecordScreen>
     _customEkidenName = allUnivData[0].name_tanshuku;
 
     // 6. _recordTypes に組み込む
+    // (番号は監督データではなくアルバムの yobiint0・yobiint1 に保存している番号。2.1.4で足した
+    // 「夏のTTの記録」は5番にし、選択肢の並び(_hyojiJun)だけ個人記録のすぐ下にする)
     _recordTypes = [
       '個人記録',
       '10月駅伝の記録',
       '11月駅伝の記録',
       '正月駅伝の記録',
       _customEkidenName,
+      '夏のTTの記録',
     ];
 
     // 2. 前回保存されたタブインデックスを取得。
@@ -171,8 +174,27 @@ class _RecordScreenState extends State<RecordScreen>
     //_selectedUnivRecordType = _recordTypes.first;
     //_selectedOverallRecordType = _recordTypes.first;
 
-    _selectedUnivRecordType = _recordTypes[album.yobiint0];
-    _selectedOverallRecordType = _recordTypes[album.yobiint1];
+    _selectedUnivRecordType = _recordTypes[_bangouNaiHani(album.yobiint0)];
+    _selectedOverallRecordType = _recordTypes[_bangouNaiHani(album.yobiint1)];
+  }
+
+  /// 保存してある選択肢の番号(範囲の外なら個人記録)
+  int _bangouNaiHani(int bangou) =>
+      (bangou >= 0 && bangou < _recordTypes.length) ? bangou : 0;
+
+  /// 選択肢に並べる順(番号は _recordTypes の番号。2.1.4)
+  static const List<int> _hyojiJun = [0, 5, 1, 2, 3, 4];
+
+  /// 選択肢の項目
+  List<DropdownMenuItem<String>> _sentakushi() {
+    return [
+      for (final int i in _hyojiJun)
+        if (i < _recordTypes.length)
+          DropdownMenuItem<String>(
+            value: _recordTypes[i],
+            child: Text(_recordTypes[i]),
+          ),
+    ];
   }
 
   @override
@@ -2271,28 +2293,14 @@ class _RecordScreenState extends State<RecordScreen>
           onChanged: (String? newValue) async {
             if (newValue != null) {
               final Album album = _albumBox.get('AlbumData')!;
-              if (newValue == _recordTypes[0]) {
-                album.yobiint0 = 0;
-              } else if (newValue == _recordTypes[1]) {
-                album.yobiint0 = 1;
-              } else if (newValue == _recordTypes[2]) {
-                album.yobiint0 = 2;
-              } else if (newValue == _recordTypes[3]) {
-                album.yobiint0 = 3;
-              } else if (newValue == _recordTypes[4]) {
-                album.yobiint0 = 4;
-              } else {
-                album.yobiint0 = 0;
-              }
+              album.yobiint0 = _bangouNaiHani(_recordTypes.indexOf(newValue));
               await album.save();
               setState(() {
                 _selectedUnivRecordType = newValue; // 選択されたらStateを更新
               });
             }
           },
-          items: _recordTypes.map<DropdownMenuItem<String>>((String value) {
-            return DropdownMenuItem<String>(value: value, child: Text(value));
-          }).toList(),
+          items: _sentakushi(),
         ),
 
         const SizedBox(height: 20),
@@ -2340,28 +2348,14 @@ class _RecordScreenState extends State<RecordScreen>
           onChanged: (String? newValue) async {
             if (newValue != null) {
               final Album album = _albumBox.get('AlbumData')!;
-              if (newValue == _recordTypes[0]) {
-                album.yobiint1 = 0;
-              } else if (newValue == _recordTypes[1]) {
-                album.yobiint1 = 1;
-              } else if (newValue == _recordTypes[2]) {
-                album.yobiint1 = 2;
-              } else if (newValue == _recordTypes[3]) {
-                album.yobiint1 = 3;
-              } else if (newValue == _recordTypes[4]) {
-                album.yobiint1 = 4;
-              } else {
-                album.yobiint1 = 0;
-              }
+              album.yobiint1 = _bangouNaiHani(_recordTypes.indexOf(newValue));
               await album.save();
               setState(() {
                 _selectedOverallRecordType = newValue; // 選択されたらStateを更新
               });
             }
           },
-          items: _recordTypes.map<DropdownMenuItem<String>>((String value) {
-            return DropdownMenuItem<String>(value: value, child: Text(value));
-          }).toList(),
+          items: _sentakushi(),
         ),
 
         const SizedBox(height: 20),
@@ -2380,19 +2374,44 @@ class _RecordScreenState extends State<RecordScreen>
     );
   }
 
-  // 記録画面に出す個人記録の種目(番号は個人記録の番号。1.8.8でまとめた)
+  // 記録画面に出す個人記録の種目の名前(番号は個人記録の番号。1.8.8でまとめた。2.1.4から夏のTTの4種目も)
   static const List<String> _kojinShumoku = [
     '5000m',
     '10000m',
     'ハーフマラソン',
     'フルマラソン',
+    '登り1万',
+    '下り1万',
+    'ロード1万',
+    'クロカン1万',
   ];
   static const List<String> _kojinShumokuRyaku = [
     '5000m',
     '10000m',
     'ハーフ',
     'フル',
+    '登り1万',
+    '下り1万',
+    'ロード1万',
+    'クロカン1万',
   ];
+
+  // 「個人記録」に出す種目の番号
+  static const List<int> _kojinBangou = [0, 1, 2, 3];
+
+  // 「夏のTTの記録」に出す種目の番号(2.1.4。学内TT特集と同じく、ロード・登り・下り・クロカンの順)
+  static const List<int> _ttBangou = [6, 4, 5, 7];
+
+  /// 選択肢[sentaku]で出す個人記録の種目の番号(個人記録・夏のTTの記録でなければ空)
+  static List<int> _kojinSentakuBangou(int sentaku) {
+    if (sentaku == 0) return _kojinBangou;
+    if (sentaku == 5) return _ttBangou;
+    return const [];
+  }
+
+  /// 夏のTTの記録の見出しの下に添える文(2.1.4)
+  static const String _ttSetsumei =
+      'どの大学も同じコース・同じ条件で走る、夏の学内タイムトライアルの記録です。';
 
   // 駅伝の記録の選択肢(_recordTypes の1〜4)の大会番号
   static const List<int> _ekidenRacebangou = [0, 1, 2, 5];
@@ -2426,15 +2445,17 @@ class _RecordScreenState extends State<RecordScreen>
     );
     final int sentaku = _recordTypes.indexOf(recordType);
 
-    if (sentaku == 0) {
-      // 個人記録
+    if (sentaku == 0 || sentaku == 5) {
+      // 個人記録・夏のTTの記録(2.1.4)
+      final List<int> shumoku = _kojinSentakuBangou(sentaku);
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start, // 左寄せを維持
         children: [
           Text('${myUnivData.name}大学学内記録', style: moji),
+          if (sentaku == 5) const Text(_ttSetsumei, style: moji),
           const SizedBox(height: 10),
-          for (int k = 0; k < _kojinShumoku.length; k++) ...[
-            if (k > 0) const SizedBox(height: 10),
+          for (final int k in shumoku) ...[
+            if (k != shumoku.first) const SizedBox(height: 10),
             ..._buildAwaseSections(
               kagi: 'univ_kojin_$k',
               titles: [
@@ -2567,15 +2588,17 @@ class _RecordScreenState extends State<RecordScreen>
     );
     final int sentaku = _recordTypes.indexOf(recordType);
 
-    if (sentaku == 0) {
-      // 個人記録
+    if (sentaku == 0 || sentaku == 5) {
+      // 個人記録・夏のTTの記録(2.1.4)
+      final List<int> shumoku = _kojinSentakuBangou(sentaku);
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start, // 左寄せを維持
         children: [
           const Text('全体歴代記録', style: moji),
+          if (sentaku == 5) const Text(_ttSetsumei, style: moji),
           const SizedBox(height: 15),
-          for (int k = 0; k < _kojinShumoku.length; k++) ...[
-            if (k > 0) const SizedBox(height: 10),
+          for (final int k in shumoku) ...[
+            if (k != shumoku.first) const SizedBox(height: 10),
             ..._buildAwaseSections(
               kagi: 'zentai_kojin_$k',
               titles: [

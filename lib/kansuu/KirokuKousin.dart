@@ -1707,7 +1707,7 @@ Future<void> kirokuKousin({
     if (racebangou == 17) {
       kirokubangou = 3;
     }
-    // 日本人・留学生の個人記録を残す順位の数(記録画面に出す種目は歴代10位まで。1.8.8)
+    // 日本人・留学生の個人記録を残す順位の数(記録画面に出す種目は歴代10位まで。1.8.8。2.1.4から夏のTTの4種目も)
     final int kojinRekidaiSaidai = rekidaiTaishouKojin(kirokubangou)
         ? TEISUU.SUU_REKIDAIKIROKUJUNISUU
         : TEISUU.SUU_BESTKIROKUHOZONJUNISUU;
@@ -1821,7 +1821,7 @@ Future<void> kirokuKousin({
           Chousa.lastGapTime = DateTime.now();
         }
       }
-      // 全体の留学生・日本人(5000m・10000m・ハーフ・フルは歴代10位まで。一人1件。保存はまとめて1回。1.8.8)
+      // 全体の留学生・日本人(5000m・10000m・ハーフ・フルと夏のTTの4種目は歴代10位まで。一人1件。保存はまとめて1回。1.8.8)
       if (kiroku != null) {
         bool kawatta = false;
         for (final bool ryuugakusei in [true, false]) {
@@ -1945,7 +1945,7 @@ Future<void> kirokuKousin({
           Chousa.lastGapTime = DateTime.now();
         }
       }
-      // 学内の留学生・日本人(5000m・10000m・ハーフ・フルは歴代10位まで。一人1件。保存はまとめて1回。1.8.8)
+      // 学内の留学生・日本人(5000m・10000m・ハーフ・フルと夏のTTの4種目は歴代10位まで。一人1件。保存はまとめて1回。1.8.8)
       if (kiroku != null) {
         bool kawatta = false;
         for (final bool ryuugakusei in [true, false]) {

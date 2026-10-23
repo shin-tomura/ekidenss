@@ -16,6 +16,7 @@ import 'package:ekiden/screens/Modal_senshu.dart';
 import 'package:ekiden/screens/Modal_kukanresult350.dart';
 import 'package:ekiden/screens/Modal_tuukajuni.dart';
 import 'package:ekiden/screens/kukan_haiti_button.dart'; // 区間配置確認を開くボタン(1.9.9)
+import 'package:ekiden/screens/Modal_aceHaichi.dart' show AceBamen; // エースの配置(2.1.3)
 import 'package:ekiden/screens/Modal_TodayChangeList.dart';
 import 'package:ekiden/screens/Modal_courseshoukai.dart';
 import 'package:ekiden/screens/Modal_siji.dart';
@@ -1701,6 +1702,8 @@ class _Mode0350ContentState extends State<Mode0350Content> {
         KakuninButtons(
           targetUnivid: gh!.MYunivid,
           kukanHaiti: gh!.hyojiracebangou != 4,
+          // エースの配置(2.1.3。当日変更のあとの配置。駅伝だけ。学連選抜の監督の年もこの画面で見られる)
+          aceBamen: AceBamen.race,
         ),
         if (!gakurenKantoku &&
             kantoku.yobiint2[17] == 1 &&

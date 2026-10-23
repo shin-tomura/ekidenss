@@ -13,7 +13,7 @@ import 'package:ekiden/screens/Modal_senshu.dart' show ModalSenshuDetailView; //
 
 // ------------------------------------------------------------
 // エースの配置(2.1.3。集計は kansuu/ace_haichi.dart)
-// 駅伝のレース前の画面(直前順位予想・当日変更・スタート前)で、各大学のエース・準エースと、
+// 駅伝のレース前の画面(直前順位予想・当日変更・スタート前)と、レースの指示の画面(2.1.3)で、各大学のエース・準エースと、
 // 全体の上位10人が、どの区間(と補欠など)に入っているかの人数を出す。
 // ・開いた時点の配置で数える(保存はしない)。当日変更の画面で選んでいる途中の変更は入らない
 //   (確定した区間エントリーで数える)
@@ -39,6 +39,9 @@ enum AceBamen {
 
   /// スタート前(当日変更のあと)
   start,
+
+  /// レースの指示の画面(各区間のスタート前。2.1.3。学連選抜の監督の年は、目標もこの画面で決める)
+  race,
 }
 
 /// エースの配置を出す駅伝か(10月駅伝・11月駅伝・正月駅伝・カスタム駅伝)
@@ -171,10 +174,20 @@ class _ModalAceHaichiState extends State<ModalAceHaichi> {
             ? '当日変更のあとの配置です。復路(6〜10区)は、復路の当日変更の前の配置です。'
             : '当日変更のあとの配置です。';
         break;
+      case AceBamen.race:
+        // これから走る区間(nowracecalckukan は0が1区)
+        bamenMei = gh.nowracecalckukan >= 0 && gh.nowracecalckukan < k.kukansuu
+            ? '${gh.nowracecalckukan + 1}区のスタート前'
+            : 'レース中';
+        bamenChuu = fukuroAri && !fukuroStart
+            ? '当日変更のあとの配置です。復路(6〜10区)は、復路の当日変更の前の配置です。'
+            : '当日変更のあとの配置です。';
+        break;
     }
 
     // 区間ごとの人数の表(当日変更で外れた選手の行は、当日変更のあとの画面か、外れた選手がいるときだけ)
     final bool hazuretaGyou = bamen == AceBamen.start ||
+        bamen == AceBamen.race ||
         bamen == AceBamen.fukuroToujitsu ||
         k.hazureta.any((n) => n > 0);
     final KijiHyou ninzuuHyou = KijiHyou('区間ごとの人数', [

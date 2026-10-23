@@ -2,6 +2,7 @@
 //import 'dart:math';
 import 'package:ekiden/album.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // 記録のコピー(2.1.4)
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ekiden/ghensuu.dart';
 import 'package:ekiden/senshu_data.dart';
@@ -2439,6 +2440,253 @@ class _RecordScreenState extends State<RecordScreen>
     );
   }
 
+  // 「すべて」「日本人」「留学生」の3行の並び(画面と記録のコピーで同じものを使う。2.1.4で関数に分けた)
+  List<List<RekidaiKiroku>> _awaseNarabi({
+    required RekidaiOkiba ichii,
+    required RekidaiOkiba nihonjin,
+    required RekidaiOkiba ryuugakusei,
+    required bool hitoriIkken,
+  }) {
+    List<RekidaiKiroku> j = nihonjin.yomu();
+    List<RekidaiKiroku> r = ryuugakusei.yomu();
+    if (hitoriIkken) {
+      // 前から同じ選手の記録が重なって残っていても、一番速い記録だけを出す
+      j = rekidaiHitoriIkken(j);
+      r = rekidaiHitoriIkken(r);
+    }
+    return [
+      rekidaiAwaseru(
+        ichii: ichii.yomu(),
+        nihonjin: j,
+        ryuugakusei: r,
+        hitoriIkken: hitoriIkken,
+      ),
+      j,
+      r,
+    ];
+  }
+
+  // ---- 記録のコピー(2.1.4) ----
+  // ・記録の並びの一番上(見出しのすぐ下)に「この記録をコピー」と「全部の記録をコピー」を置く(_kopiBotan)。
+  //   上に残る部分(選択肢と札)を高くしないため、スクロールする側に置く
+  // ・「この記録」は今のタブの今の選択肢、「全部」は今のタブの選択肢をまとめて(選択肢の並びの順)
+  // ・各行の1位だけを写し、「2位以下を見る」で開いている行は2位以下も写す(画面に出ている通り)
+  // ・1つの記録を1行にする。学内記録は大学名を省く(画面と同じ)
+
+  /// 1つの並び[rekidai]の文([label]は「1区 すべて」「総合記録」など、[kagi]は開いているかを見る印)
+  List<String> _kopiGyou(
+    String label,
+    String kagi,
+    List<RekidaiKiroku> rekidai, {
+    required bool isOverallTime,
+    required bool senshu,
+    required bool daigaku,
+  }) {
+    if (rekidai.isEmpty) return ['$label 記録なし'];
+    final bool hiraiteru = rekidai.length >= 2 && _hiraitaKiroku.contains(kagi);
+    return [
+      for (int r = 0; r < (hiraiteru ? rekidai.length : 1); r++)
+        [
+          label,
+          '${r + 1}位',
+          isOverallTime
+              ? _timeToHourMinuteSecondString(rekidai[r].time)
+              : _timeToMinuteSecondString(rekidai[r].time),
+          if (senshu) '${rekidai[r].name}(${rekidai[r].gakunen}年)',
+          if (daigaku) rekidai[r].univname,
+          '${rekidai[r].year}年${rekidai[r].month}月',
+        ].join(' '),
+    ];
+  }
+
+  /// 「すべて」「日本人」「留学生」の3行の文
+  List<String> _kopiAwase(
+    String kagi,
+    String midashi,
+    List<List<RekidaiKiroku>> gyou, {
+    required bool isOverallTime,
+    required bool daigaku,
+  }) {
+    return [
+      for (int shurui = 0; shurui < 3; shurui++)
+        ..._kopiGyou(
+          '$midashi ${_awaseFuda[shurui]}',
+          '${kagi}_$shurui',
+          gyou[shurui],
+          isOverallTime: isOverallTime,
+          senshu: true,
+          daigaku: daigaku,
+        ),
+    ];
+  }
+
+  /// 選択肢[sentaku]の記録の文([zentai] 全体記録のタブか。作れなければ空)
+  String _kopiMoji(bool zentai, int sentaku) {
+    final Ghensuu ghensuu = _ghensuuBox.get(
+      'global_ghensuu',
+      defaultValue: Ghensuu.initial(),
+    )!;
+    final List<UnivData> sortedUnivData = _univBox.values.toList()
+      ..sort((a, b) => a.id.compareTo(b.id));
+    final Kiroku? kiroku = _kirokuBox.get('KirokuData');
+    final int myUnivId = ghensuu.MYunivid;
+    final UnivData? myUnivData = _univBox.get(myUnivId);
+    if (kiroku == null || myUnivData == null) return '';
+    final String daimei;
+    if (sentaku == 0) {
+      daimei = '個人記録';
+    } else if (sentaku == 5) {
+      daimei = '夏のTTの記録';
+    } else if (sentaku >= 1 && sentaku <= 4) {
+      daimei = _ekidenMidashi(sentaku, sortedUnivData);
+    } else {
+      return '';
+    }
+    final String atama = zentai ? '【全体記録】' : '【${myUnivData.name}大学 学内記録】';
+    final List<String> l = [
+      '$atama$daimei(${ghensuu.year}年${ghensuu.month}月${_dayToString(ghensuu.day)}時点)',
+    ];
+    final String tab = zentai ? 'zentai' : 'univ';
+    if (sentaku == 0 || sentaku == 5) {
+      // 個人記録・夏のTTの記録
+      for (final int k in _kojinSentakuBangou(sentaku)) {
+        final List<List<RekidaiKiroku>> gyou = zentai
+            ? _awaseNarabi(
+                ichii: ichiiZentaiKojin(ghensuu, k),
+                nihonjin: rekidaiZentaiKojin(kiroku, false, k),
+                ryuugakusei: rekidaiZentaiKojin(kiroku, true, k),
+                hitoriIkken: true,
+              )
+            : _awaseNarabi(
+                ichii: ichiiUnivKojin(myUnivData, k),
+                nihonjin: rekidaiUnivKojin(kiroku, false, myUnivId, k),
+                ryuugakusei: rekidaiUnivKojin(kiroku, true, myUnivId, k),
+                hitoriIkken: true,
+              );
+        l.addAll(
+          _kopiAwase(
+            '${tab}_kojin_$k',
+            _kojinShumoku[k],
+            gyou,
+            isOverallTime: k == 3, // フルマラソンは時間で表示
+            daigaku: zentai,
+          ),
+        );
+      }
+    } else {
+      // 駅伝の記録(総合記録・正月駅伝の往路記録と復路記録・区間記録)
+      final int race = _ekidenRacebangou[sentaku - 1];
+      List<RekidaiKiroku> taikai(int r) => zentai
+          ? rekidaiZentaiTaikai(ghensuu, r).yomu()
+          : rekidaiUnivTaikai(myUnivData, r).yomu();
+      l.addAll(
+        _kopiGyou(
+          '総合記録',
+          '${tab}_taikai_$race',
+          taikai(race),
+          isOverallTime: true,
+          senshu: false,
+          daigaku: zentai,
+        ),
+      );
+      if (race == 2 && sortedUnivData.isNotEmpty) {
+        l.addAll(
+          _kopiGyou(
+            '往路記録',
+            '${tab}_taikai_$ouroRace',
+            taikai(ouroRace),
+            isOverallTime: true,
+            senshu: false,
+            daigaku: zentai,
+          ),
+        );
+        l.addAll(
+          _kopiGyou(
+            '復路記録',
+            '${tab}_taikai_$fukuroRace',
+            taikai(fukuroRace),
+            isOverallTime: true,
+            senshu: false,
+            daigaku: zentai,
+          ),
+        );
+      }
+      for (int index = 0; index < _ekidenKukansuu(sentaku, ghensuu); index++) {
+        final List<List<RekidaiKiroku>> gyou = zentai
+            ? _awaseNarabi(
+                ichii: ichiiZentaiKukan(ghensuu, race, index),
+                nihonjin: rekidaiZentaiKukan(kiroku, false, race, index),
+                ryuugakusei: rekidaiZentaiKukan(kiroku, true, race, index),
+                hitoriIkken: false,
+              )
+            : _awaseNarabi(
+                ichii: ichiiUnivKukan(myUnivData, race, index),
+                nihonjin: rekidaiUnivKukan(kiroku, false, myUnivId, race, index),
+                ryuugakusei: rekidaiUnivKukan(kiroku, true, myUnivId, race, index),
+                hitoriIkken: false,
+              );
+        l.addAll(
+          _kopiAwase(
+            '${tab}_kukan_${race}_$index',
+            '${index + 1}区',
+            gyou,
+            isOverallTime: false,
+            daigaku: zentai,
+          ),
+        );
+      }
+    }
+    return l.join('\n');
+  }
+
+  /// 今のタブの選択肢をまとめた記録の文(選択肢の並びの順。1つずつ空行で区切る)
+  String _kopiZenbu(bool zentai) {
+    return [
+      for (final int i in _hyojiJun)
+        if (i < _recordTypes.length) _kopiMoji(zentai, i),
+    ].where((x) => x.isNotEmpty).join('\n\n');
+  }
+
+  /// 「この記録をコピー」「全部の記録をコピー」(文字を大きくしても入るように、折り返して並べる)
+  Widget _kopiBotan(bool zentai, int sentaku) {
+    Widget botan(String moji, String Function() tsukuru, String tsuuchi) {
+      return TextButton.icon(
+        style: TextButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+          minimumSize: Size.zero,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+        onPressed: () async {
+          final String text = tsukuru();
+          if (text.isEmpty) return;
+          await Clipboard.setData(ClipboardData(text: text));
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(tsuuchi)));
+        },
+        icon: const Icon(Icons.copy, size: 18, color: HENSUU.LinkColor),
+        label: Text(
+          moji,
+          style: const TextStyle(
+            color: HENSUU.LinkColor,
+            fontSize: HENSUU.fontsize_honbun - 2,
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Wrap(
+        spacing: 12,
+        runSpacing: 4,
+        children: [
+          botan('この記録をコピー', () => _kopiMoji(zentai, sentaku), '記録をコピーしました'),
+          botan('全部の記録をコピー', () => _kopiZenbu(zentai), '全部の記録をコピーしました'),
+        ],
+      ),
+    );
+  }
+
   // 日本人と留学生を分けない行・日本人・留学生の3行(個人記録・区間記録。1.8.8)
   // 2.1.4から、3行を1枚の枠にまとめ、見出しは[titles]の1つ目(「5000m」「1区」)を枠の上に1回だけ書き、
   // 行の頭に「すべて」「日本人」「留学生」の札を付ける([titles]はリセットの確かめの画面に出す名前)
@@ -2458,23 +2706,12 @@ class _RecordScreenState extends State<RecordScreen>
     required bool hitoriIkken,
     required void Function(int shurui, String title) onReset,
   }) {
-    List<RekidaiKiroku> j = nihonjin.yomu();
-    List<RekidaiKiroku> r = ryuugakusei.yomu();
-    if (hitoriIkken) {
-      // 前から同じ選手の記録が重なって残っていても、一番速い記録だけを出す
-      j = rekidaiHitoriIkken(j);
-      r = rekidaiHitoriIkken(r);
-    }
-    final List<List<RekidaiKiroku>> gyou = [
-      rekidaiAwaseru(
-        ichii: ichii.yomu(),
-        nihonjin: j,
-        ryuugakusei: r,
-        hitoriIkken: hitoriIkken,
-      ),
-      j,
-      r,
-    ];
+    final List<List<RekidaiKiroku>> gyou = _awaseNarabi(
+      ichii: ichii,
+      nihonjin: nihonjin,
+      ryuugakusei: ryuugakusei,
+      hitoriIkken: hitoriIkken,
+    );
     return _kirokuWaku(
       key: key,
       title: titles[0],
@@ -2709,6 +2946,7 @@ class _RecordScreenState extends State<RecordScreen>
         children: [
           Text('${myUnivData.name}大学学内記録', style: moji),
           if (sentaku == 5) const Text(_ttSetsumei, style: moji),
+          _kopiBotan(false, sentaku), // 記録のコピー(2.1.4)
           const SizedBox(height: 10),
           // 種目ごとに1枚の枠(2.1.4)
           for (final int k in shumoku)
@@ -2746,6 +2984,7 @@ class _RecordScreenState extends State<RecordScreen>
         crossAxisAlignment: CrossAxisAlignment.start, // 左寄せを維持
         children: [
           Text(_ekidenMidashi(sentaku, sortedUnivData), style: moji),
+          _kopiBotan(false, sentaku), // 記録のコピー(2.1.4)
           const SizedBox(height: 5),
           // 総合記録
           _buildRekidaiSection(
@@ -2849,6 +3088,7 @@ class _RecordScreenState extends State<RecordScreen>
         children: [
           const Text('全体歴代記録', style: moji),
           if (sentaku == 5) const Text(_ttSetsumei, style: moji),
+          _kopiBotan(true, sentaku), // 記録のコピー(2.1.4)
           const SizedBox(height: 15),
           // 種目ごとに1枚の枠(2.1.4)
           for (final int k in shumoku)
@@ -2886,6 +3126,7 @@ class _RecordScreenState extends State<RecordScreen>
         crossAxisAlignment: CrossAxisAlignment.start, // 左寄せを維持
         children: [
           Text(_ekidenMidashi(sentaku, sortedUnivData), style: moji),
+          _kopiBotan(true, sentaku), // 記録のコピー(2.1.4)
           const SizedBox(height: 5),
           // 総合記録
           _buildRekidaiSection(

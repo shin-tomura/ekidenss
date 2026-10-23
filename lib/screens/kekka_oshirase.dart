@@ -4,7 +4,7 @@ import 'package:ekiden/constants.dart';
 import 'package:ekiden/ghensuu.dart';
 import 'package:ekiden/univ_data.dart';
 import 'package:ekiden/skip.dart';
-import 'package:ekiden/kansuu/kiji/kiji_kihon.dart' show juniKaisuu, shutsujouKaisuu;
+import 'package:ekiden/kansuu/kiji/kiji_kihon.dart' show juniKaisuu, shutsujouKaisuu, saByou, saMoji;
 
 // ------------------------------------------------------------
 // 結果画面のお知らせの枠(2.1.0)
@@ -17,6 +17,10 @@ import 'package:ekiden/kansuu/kiji/kiji_kihon.dart' show juniKaisuu, shutsujouKa
 //   大学の過去最高順位(落ちたときも出す)。予選は目標順位が突破の線と同じなので、目標の一言は付けない
 // ・過去最高順位の決め方は、ニュース記事(kiji_kekka.dart の kakoSaikou)と同じ
 //   (初めての出場ではなく、この順位は今回が初めてで、これより上の順位を取ったこともない)
+// ・良い結果がなかったとき(2.1.3): 枠を付けず、白の文字の1行で順位を知らせる(KekkaHitokoto)
+//   ・駅伝は目標順位を添える(「(目標は8位)」。届いていれば「(目標の12位を達成)」。お祝いは目標達成の画面で出す)
+//   ・シード権(11月駅伝8位・正月駅伝10位)と予選突破(11月駅伝予選7位・正月駅伝予選10位)の線がある大会では、
+//     線の順位の大学との総合タイム(UnivData.time_race)の差も添える(差の書き方はニュース記事と同じ)
 // ・セーブ済みの順位と回数(UnivData の juni_race・taikaibetujunibetukaisuu など)から画面を描くたびに作る
 //   (セーブデータは増やさない)。自分の大学が走っていない大会と、スキップ中は出さない
 // ------------------------------------------------------------
@@ -108,7 +112,8 @@ class EkidenKekkaOshirase extends StatelessWidget {
     final bool kako = _kakoSaikou(u, race, r);
     final ({String midashi, List<String> bun})? n =
         (race == 3 || race == 4) ? _yosen(race, r, kako) : _ekiden(u, race, r, kako);
-    if (n == null) return const SizedBox.shrink();
+    // 良い結果がなかったときも、順位を1行で知らせる(2.1.3)
+    if (n == null) return KekkaHitokoto(_hitokoto(u, race, r));
     return OshiraseWaku(
       midashi: n.midashi,
       naka: [Text(n.bun.join(), style: oshiraseHonbun)],
@@ -151,6 +156,78 @@ class EkidenKekkaOshirase extends StatelessWidget {
     return (midashi: midashi, bun: bun);
   }
 
+  /// 大会の名前(カスタム駅伝は大学id 0 の短縮名に入っている名前)
+  String _taikaiMei(int race) {
+    switch (race) {
+      case 0:
+        return '10月駅伝';
+      case 1:
+        return '11月駅伝';
+      case 2:
+        return '正月駅伝';
+      case 3:
+        return '11月駅伝予選';
+      case 4:
+        return '正月駅伝予選';
+      default:
+        final String mei = univ.isNotEmpty ? univ[0].name_tanshuku.trim() : '';
+        return mei.isEmpty ? 'カスタム駅伝' : mei;
+    }
+  }
+
+  /// 大会[race]で順位[juni](0が1位)だった大学(いなければnull)
+  UnivData? _juniDaigaku(int race, int juni) {
+    for (final UnivData w in univ) {
+      if (w.taikaientryflag.length <= race || w.taikaientryflag[race] != 1) continue;
+      if (w.juni_race.length <= race || w.juni_race[race].isEmpty) continue;
+      if (w.juni_race[race][0] == juni) return w;
+    }
+    return null;
+  }
+
+  /// 大学[w]の大会[race]の総合タイム(なければnull)
+  double? _sougouTime(UnivData w, int race) {
+    if (w.time_race.length <= race || w.time_race[race].isEmpty) return null;
+    final double t = w.time_race[race][0];
+    return (t > 0 && t < TEISUU.DEFAULTTIME) ? t : null;
+  }
+
+  /// 良い結果がなかったときの1行(2.1.3。「11月駅伝は12位でした(目標は8位)。シード権の8位まで1分23秒でした。」)
+  String _hitokoto(UnivData u, int race, int r) {
+    final StringBuffer sb = StringBuffer('${_taikaiMei(race)}は${r + 1}位でした');
+    // 駅伝は目標順位を添える(予選は目標順位が突破の線と同じなので書かない。達成の決め方は目標達成の画面と同じ)
+    if (race != 3 && race != 4) {
+      final int mokuhyou = u.mokuhyojuni.length > race ? u.mokuhyojuni[race] : -1;
+      if (mokuhyou >= 0) {
+        sb.write(r <= mokuhyou ? '(目標の${mokuhyou + 1}位を達成)' : '(目標は${mokuhyou + 1}位)');
+      }
+    }
+    sb.write('。');
+    // シード権・予選突破の線の順位の大学との総合タイムの差
+    final int? sen = race == 1
+        ? 8
+        : race == 2
+        ? 10
+        : race == 3
+        ? 7
+        : race == 4
+        ? 10
+        : null;
+    if (sen != null && r >= sen) {
+      final UnivData? w = _juniDaigaku(race, sen - 1);
+      final double? jibunTime = _sougouTime(u, race);
+      final double? senTime = w == null ? null : _sougouTime(w, race);
+      if (jibunTime != null && senTime != null) {
+        final int sa = saByou(jibunTime, senTime);
+        final String senMei = (race == 3 || race == 4) ? '予選突破' : 'シード権';
+        sb.write(
+          sa <= 0 ? '$senMeiの$sen位とは1秒に満たない差でした。' : '$senMeiの$sen位まで${saMoji(sa)}でした。',
+        );
+      }
+    }
+    return sb.toString();
+  }
+
   /// 駅伝予選(11月駅伝予選・正月駅伝予選)
   ({String midashi, List<String> bun})? _yosen(int race, int r, bool kako) {
     final int tsuukaSuu = race == 3 ? 7 : 10;
@@ -169,6 +246,26 @@ class EkidenKekkaOshirase extends StatelessWidget {
         '${r + 1}位で、$honsenの出場権を手にしました。',
         if (kako) r == 0 ? 'この予選で、大学として初めてのトップ通過です。' : 'この予選での大学の過去最高の順位です。',
       ],
+    );
+  }
+}
+
+/// 良い結果がなかったときの、順位の1行(2.1.3。枠を付けず白の文字にし、下に細い区切りの線を引く)
+class KekkaHitokoto extends StatelessWidget {
+  const KekkaHitokoto(this.bun, {super.key});
+
+  final String bun;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 4, bottom: 12),
+      padding: const EdgeInsets.only(bottom: 8),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: Colors.white24)),
+      ),
+      child: Text(bun, style: oshiraseHonbun),
     );
   }
 }

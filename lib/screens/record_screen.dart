@@ -12,6 +12,7 @@ import 'package:ekiden/kantoku_data.dart';
 import 'package:ekiden/kansuu/rekidai_kiroku.dart'; // 歴代10位までの記録(1.8.8)
 import 'package:ekiden/kansuu/taikai_chouki.dart'
     show ouroRace, fukuroRace, choukiOufukuKaishi; // 正月駅伝の往路記録・復路記録(2.0.0)
+import 'package:ekiden/screens/kiroku_link.dart'; // 選手名のリンク(2.1.4)
 
 String _getCombinedDifficultyText(KantokuData kantoku, Ghensuu currentGhensuu) {
   // 難易度モードを取得 (0:通常, 1:極, 2:天)
@@ -121,6 +122,8 @@ class _RecordScreenState extends State<RecordScreen>
   late final String _customEkidenName;
   // 2位以下を開いている記録の行(1.8.8。画面を閉じると、また閉じた状態に戻る)
   final Set<String> _hiraitaKiroku = <String>{};
+  // 選手名から開く選手を引く一覧(2.1.4。記録の中身を描くたびに作り直す)
+  KirokuLinkJisho? _linkJisho;
 
   @override
   void initState() {
@@ -2104,6 +2107,8 @@ class _RecordScreenState extends State<RecordScreen>
   // ・ふだんは1位だけを出し、2位以下があるときは、記録の下の「2位以下を見る」「閉じる」で開いたり閉じたりする
   // ・[senshu] 選手名と学年を出すか(総合記録は出さない)
   // ・[daigaku] 大学名を出すか(学内記録は出さない)
+  // ・選手名は、開ける選手(現役の選手・残っている卒業生)ならリンクにする(2.1.4。screens/kiroku_link.dart。
+  //   記録と選手は通算の番号だけで結びつけるので、2.1.4より前に出た記録はリンクにしない)
   Widget _buildRekidaiSection({
     required String kagi,
     required String title,
@@ -2120,6 +2125,7 @@ class _RecordScreenState extends State<RecordScreen>
     final bool aru = rekidai.isNotEmpty;
     final bool hirakeru = rekidai.length >= 2;
     final bool hiraiteru = hirakeru && _hiraitaKiroku.contains(kagi);
+    final KirokuLinkJisho jisho = _linkJisho ??= KirokuLinkJisho();
 
     // r位の記録(0が1位)
     Widget ikken(int r) {
@@ -2144,7 +2150,7 @@ class _RecordScreenState extends State<RecordScreen>
             if (senshu)
               Wrap(
                 children: [
-                  Text(k.name, style: moji),
+                  jisho.namae(context, k.name, k.bangou, moji),
                   Text(' ${k.gakunen}年', style: moji),
                   if (daigaku) Text(' ${k.univname}', style: moji),
                 ],
@@ -2443,6 +2449,7 @@ class _RecordScreenState extends State<RecordScreen>
       color: Colors.white,
       fontSize: HENSUU.fontsize_honbun,
     );
+    _linkJisho = KirokuLinkJisho(); // 選手名のリンク(2.1.4)
     final int sentaku = _recordTypes.indexOf(recordType);
 
     if (sentaku == 0 || sentaku == 5) {
@@ -2586,6 +2593,7 @@ class _RecordScreenState extends State<RecordScreen>
       color: Colors.white,
       fontSize: HENSUU.fontsize_honbun,
     );
+    _linkJisho = KirokuLinkJisho(); // 選手名のリンク(2.1.4)
     final int sentaku = _recordTypes.indexOf(recordType);
 
     if (sentaku == 0 || sentaku == 5) {

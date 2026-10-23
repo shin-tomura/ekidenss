@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart'; // 選手名のリンク(2.1.4)
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ekiden/constants.dart';
@@ -7,6 +8,7 @@ import 'package:ekiden/skip.dart';
 import 'package:ekiden/kansuu/kiji/kiji_kihon.dart' show juniKaisuu, shutsujouKaisuu, saByou, saMoji;
 import 'package:ekiden/senshu_data.dart';
 import 'package:ekiden/kansuu/fushime.dart'; // 選手の節目と記録の更新(2.1.4)
+import 'package:ekiden/screens/kiroku_link.dart'; // 選手名のリンク(2.1.4)
 
 // ------------------------------------------------------------
 // 結果画面のお知らせの枠(2.1.0)
@@ -28,6 +30,7 @@ import 'package:ekiden/kansuu/fushime.dart'; // 選手の節目と記録の更�
 // ・お知らせの下に、自分の大学の選手の節目と記録の更新を、1人1行で3行まで出す(2.1.4。FushimeOshirase。
 //   3行を超えるときは「すべて見る」で別窓に全部を出す。中身は kansuu/fushime.dart。
 //   駅伝・対校戦・記録会・夏のTT・フルマラソンの結果画面)
+//   行の中の選手名(走った選手と、前の記録の持ち主)は、開ける選手ならリンクにする(screens/kiroku_link.dart)
 // ------------------------------------------------------------
 
 /// お知らせの枠と見出しの色(情報集約パネルの自分の大学と同じ)
@@ -280,6 +283,7 @@ class KekkaHitokoto extends StatelessWidget {
 /// ・3行を超えるときは「すべて見る(全○件)」を置き、押すと別窓で全部の行を同じ順で出す
 ///   (長すぎると結果画面が読みにくくなるため)
 /// ・出すことがないときと、スキップ中は何も出さない
+/// ・行の中の選手名は、押すとその選手を開く(現役の選手は選手の詳細の小窓、残っている卒業生は卒業生の画面。2.1.4)
 class FushimeOshirase extends StatelessWidget {
   const FushimeOshirase({
     super.key,
@@ -301,6 +305,7 @@ class FushimeOshirase extends StatelessWidget {
     if (oshiraseSkipChuu()) return const SizedBox.shrink();
     final List<Fushime> l = fushimeIchiran(gh, univ, senshu);
     if (l.isEmpty) return const SizedBox.shrink();
+    final KirokuLinkJisho jisho = KirokuLinkJisho();
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(top: 4, bottom: 12),
@@ -311,14 +316,14 @@ class FushimeOshirase extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          for (final Fushime f in l.take(fushimeGyousuu)) _FushimeGyou(f),
+          for (final Fushime f in l.take(fushimeGyousuu)) _FushimeGyou(f, jisho),
           if (l.length > fushimeGyousuu)
             TextButton(
               style: TextButton.styleFrom(
                 padding: EdgeInsets.zero,
                 alignment: Alignment.centerLeft,
               ),
-              onPressed: () => _zenbuMiru(context, l),
+              onPressed: () => _zenbuMiru(context, l, jisho),
               child: Text(
                 'すべて見る(全${l.length}件)',
                 style: const TextStyle(
@@ -335,7 +340,7 @@ class FushimeOshirase extends StatelessWidget {
   }
 
   /// 全部の行を別窓で出す
-  void _zenbuMiru(BuildContext context, List<Fushime> l) {
+  void _zenbuMiru(BuildContext context, List<Fushime> l, KirokuLinkJisho jisho) {
     showDialog<void>(
       context: context,
       builder: (BuildContext c) => AlertDialog(
@@ -350,7 +355,7 @@ class FushimeOshirase extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [for (final Fushime f in l) _FushimeGyou(f)],
+              children: [for (final Fushime f in l) _FushimeGyou(f, jisho)],
             ),
           ),
         ),
@@ -369,10 +374,83 @@ class FushimeOshirase extends StatelessWidget {
 }
 
 /// 節目・記録の更新の1行(頭の言葉をお知らせの色にする)
-class _FushimeGyou extends StatelessWidget {
-  const _FushimeGyou(this.f);
+/// ・行の中の選手名([Fushime.link])は、開ける選手なら緑の下線の文字にして、押すとその選手を開く(2.1.4)
+///   (文の途中で折り返せるように、文字の一部として押せるようにする。押した印は、この行を作り直すときに捨てる)
+class _FushimeGyou extends StatefulWidget {
+  const _FushimeGyou(this.f, this.jisho);
 
   final Fushime f;
+
+  /// 選手名から開く選手を引く一覧
+  final KirokuLinkJisho jisho;
+
+  @override
+  State<_FushimeGyou> createState() => _FushimeGyouState();
+}
+
+class _FushimeGyouState extends State<_FushimeGyou> {
+  /// 中身を、ふつうの文字とリンクの文字に分けたもの
+  List<InlineSpan> _bun = const [];
+
+  /// リンクの文字の、押した印(作り直すときと、画面を閉じるときに捨てる)
+  final List<TapGestureRecognizer> _oshi = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _tsukuru();
+  }
+
+  @override
+  void didUpdateWidget(covariant _FushimeGyou oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.f != widget.f || oldWidget.jisho != widget.jisho) _tsukuru();
+  }
+
+  @override
+  void dispose() {
+    _suteru();
+    super.dispose();
+  }
+
+  void _suteru() {
+    for (final TapGestureRecognizer r in _oshi) {
+      r.dispose();
+    }
+    _oshi.clear();
+  }
+
+  /// 中身を、前から順にリンクの文字で区切る(開けない選手と、文の中に見つからない文字は、ふつうの文字のまま)
+  void _tsukuru() {
+    _suteru();
+    final String bun = widget.f.bun;
+    final List<InlineSpan> l = [];
+    int ima = 0;
+    for (final FushimeLink k in widget.f.link) {
+      if (k.moji.isEmpty || !widget.jisho.aru(k.bangou)) continue;
+      final int i = bun.indexOf(k.moji, ima);
+      if (i < 0) continue;
+      if (i > ima) l.add(TextSpan(text: bun.substring(ima, i)));
+      final int bangou = k.bangou;
+      final TapGestureRecognizer r = TapGestureRecognizer()
+        ..onTap = () => widget.jisho.hiraku(context, bangou);
+      _oshi.add(r);
+      l.add(
+        TextSpan(
+          text: k.moji,
+          style: const TextStyle(
+            color: HENSUU.LinkColor,
+            decoration: TextDecoration.underline,
+            decorationColor: HENSUU.LinkColor,
+          ),
+          recognizer: r,
+        ),
+      );
+      ima = i + k.moji.length;
+    }
+    if (ima < bun.length) l.add(TextSpan(text: bun.substring(ima)));
+    _bun = l;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -382,10 +460,10 @@ class _FushimeGyou extends StatelessWidget {
         TextSpan(
           children: [
             TextSpan(
-              text: '${f.midashi}　',
+              text: '${widget.f.midashi}　',
               style: const TextStyle(color: oshiraseIro, fontWeight: FontWeight.bold),
             ),
-            TextSpan(text: f.bun),
+            ..._bun,
           ],
         ),
         style: oshiraseHonbun,

@@ -50,12 +50,22 @@ import 'package:ekiden/kansuu/kiji/kiji_kihon.dart'
 //   (chokuzentaikai_〜)も使い、個人の種目は記録の年月で見る(記事でも同じ判定を使うため)
 // ・記事(学内メディアの対校戦の結果号・学内TT特集)には、今までどおり、歴代新・学内新・日本人学内新・
 //   学内歴代2位と3位だけを渡す(fushimeKojinKoushin)
+// ・行の中の選手名(走った選手と、前の記録の持ち主)は、押すとその選手を開けるようにする(2.1.4。[Fushime.link]。
+//   開けるかどうかと開き方は、画面の側(screens/kiroku_link.dart)で決める。番号のない記録の持ち主はリンクにしない)
 // ・思わぬデータに当たっても画面が止まらないよう、失敗したら何も出さない
 // ------------------------------------------------------------
 
+/// 行の中の、押すと選手を開く文字(2.1.4。[moji]は[Fushime.bun]の中の「田中 蓮(3年)」、[bangou]は通算の番号)
+typedef FushimeLink = ({String moji, int bangou});
+
 /// 結果画面の1行(1人、またはチームの総合・往路・復路を1行にまとめたもの)
 class Fushime {
-  const Fushime({required this.midashi, required this.bun, required this.juuyou});
+  const Fushime({
+    required this.midashi,
+    required this.bun,
+    required this.juuyou,
+    this.link = const [],
+  });
 
   /// 頭に色を付けて出す短い言葉(「学内新」「駅伝デビュー」)
   final String midashi;
@@ -65,6 +75,9 @@ class Fushime {
 
   /// 大きいほど先に出す
   final int juuyou;
+
+  /// [bun]の中の、押すと選手を開く文字(前から順に。走った選手、前の記録の持ち主。チームの行はなし)
+  final List<FushimeLink> link;
 }
 
 /// 結果画面に、すぐに出す行の数(これを超えるときは「すべて見る」で別窓に全部を出す)
@@ -78,6 +91,7 @@ class _Koto {
     required this.midashi,
     required this.bun,
     required this.soe,
+    this.link = const [],
   });
 
   /// まとめる単位(選手は「S」+選手の番号、チームは「総合」「往路」「復路」)
@@ -90,6 +104,9 @@ class _Koto {
 
   /// ほかの出来事に添えるときの短い言葉(「学内区間新」)
   final String soe;
+
+  /// [bun]の中の、押すと選手を開く文字(行の頭の出来事にしたときに使う)
+  final List<FushimeLink> link;
 }
 
 // ---- 大きさ(段ごと。同じ段の中は順位の高い順) ----
@@ -139,6 +156,7 @@ List<Fushime> _matomeru(List<_Koto> l) {
         midashi: atama.midashi,
         bun: soe.isEmpty ? atama.bun : '${atama.bun}${soe.join('・')}も。',
         juuyou: atama.juuyou,
+        link: atama.link,
       ),
     );
   }
@@ -176,6 +194,17 @@ bool _honnin(Ghensuu gh, RekidaiKiroku k, SenshuData s) {
 
 /// 選手の名前と学年(「田中 蓮(3年)」)
 String _namae(SenshuData s) => '${s.name}(${s.gakunen}年)';
+
+/// 走った選手[s]のリンク(行の中の「田中 蓮(3年)」)
+FushimeLink _linkHonnin(Ghensuu gh, SenshuData s) => (moji: _namae(s), bangou: _bangou(gh, s));
+
+/// 前の記録の持ち主のリンク(行の中の「山本 翔(4年)」。本人のときと、番号のない記録はなし)
+List<FushimeLink> _linkMae(RekidaiKiroku? mae, bool jishin) {
+  if (mae == null || jishin) return const [];
+  final int? b = mae.bangou;
+  if (b == null) return const [];
+  return [(moji: '${mae.name}(${mae.gakunen}年)', bangou: b)];
+}
 
 /// 更新した差の文(「18秒更新しました」。1秒に満たないときは「わずかに更新しました」)
 String _koushinMoji(int sa) => sa <= 0 ? 'わずかに更新しました' : '${saMoji(sa)}更新しました';
@@ -596,6 +625,7 @@ List<_Koto> _ekidenSenshu(
   final double t = _time(s, race, g);
   if (!_timeAri(t)) return l;
   final String kagi = 'S${s.id}';
+  final FushimeLink honnin = _linkHonnin(gh, s);
   final String basho = '${_namae(s)} ${kk + 1}区';
   final String naka = '$basho ${jikanMoji(t)}。';
   bool kondo(RekidaiKiroku x) => _kondo(gh, x);
@@ -609,11 +639,14 @@ List<_Koto> _ekidenSenshu(
   if (s.chokuzentaikai_zentaikukansinflag == 1 && juraiZentai != null) {
     kukanShin = true;
     String dare = '区間記録';
+    List<FushimeLink> maeLink = const [];
     final RekidaiKiroku? maeK = _maeIchiban(gh, zentai);
     if (maeK != null && (byou(maeK.time) - juraiZentai).abs() <= 1) {
-      dare = _honnin(gh, maeK, s)
+      final bool jishin = _honnin(gh, maeK, s);
+      dare = jishin
           ? '${fushimeItsu(gh, maeK)}に自身が出した区間記録'
           : '${fushimeItsu(gh, maeK)}に${maeK.univname}大学の${maeK.name}(${maeK.gakunen}年)が出した区間記録';
+      maeLink = _linkMae(maeK, jishin);
     }
     l.add(
       _Koto(
@@ -622,6 +655,7 @@ List<_Koto> _ekidenSenshu(
         midashi: '区間新',
         bun: '$naka$dareを${_koushinMoji(juraiZentai - byou(t))}。',
         soe: '区間新',
+        link: [honnin, ...maeLink],
       ),
     );
   } else {
@@ -634,6 +668,7 @@ List<_Koto> _ekidenSenshu(
           midashi: '区間歴代${zIchi + 1}位',
           bun: '$naka${kk + 1}区の歴代${zIchi + 1}位の記録です。',
           soe: '区間歴代${zIchi + 1}位',
+          link: [honnin],
         ),
       );
     }
@@ -644,6 +679,7 @@ List<_Koto> _ekidenSenshu(
   if (s.chokuzentaikai_univkukansinflag == 1 && juraiGakunai != null) {
     if (!kukanShin) {
       String dare = '学内の区間記録';
+      List<FushimeLink> maeLink = const [];
       final ({RekidaiKiroku mae, bool jishin})? maeK = fushimeGakunaiKukanMae(
         gh,
         u,
@@ -656,6 +692,7 @@ List<_Koto> _ekidenSenshu(
         dare = maeK.jishin
             ? '${fushimeItsu(gh, maeK.mae)}に自身が出した学内記録'
             : '${fushimeItsu(gh, maeK.mae)}に${maeK.mae.name}(${maeK.mae.gakunen}年)が出した学内記録';
+        maeLink = _linkMae(maeK.mae, maeK.jishin);
       }
       l.add(
         _Koto(
@@ -664,6 +701,7 @@ List<_Koto> _ekidenSenshu(
           midashi: '学内区間新',
           bun: '$naka$dareを${_koushinMoji(juraiGakunai - byou(t))}。',
           soe: '学内区間新',
+          link: [honnin, ...maeLink],
         ),
       );
     }
@@ -678,6 +716,7 @@ List<_Koto> _ekidenSenshu(
           midashi: '学内区間歴代${gIchi + 1}位',
           bun: '$naka学内の${kk + 1}区の歴代${gIchi + 1}位の記録です。',
           soe: '学内区間歴代${gIchi + 1}位',
+          link: [honnin],
         ),
       );
     }
@@ -696,6 +735,7 @@ List<_Koto> _ekidenSenshu(
         midashi: '初の区間賞',
         bun: '$basho。初めての区間賞です。',
         soe: '初の区間賞',
+        link: [honnin],
       ),
     );
   }
@@ -719,6 +759,7 @@ List<_Koto> _ekidenSenshu(
           midashi: '12回出走',
           bun: '${_namae(s)}。三大駅伝の12回をすべて走りました。',
           soe: '三大駅伝12回出走',
+          link: [honnin],
         ),
       );
     }
@@ -738,6 +779,7 @@ List<_Koto> _ekidenSenshu(
         midashi: '$renzoku年連続',
         bun: '${_namae(s)}。$renzoku年続けて${kk + 1}区を走りました。',
         soe: '$renzoku年連続の${kk + 1}区',
+        link: [honnin],
       ),
     );
   }
@@ -751,6 +793,7 @@ List<_Koto> _ekidenSenshu(
         midashi: '駅伝デビュー',
         bun: '$basho。初めての駅伝です。',
         soe: '駅伝デビュー',
+        link: [honnin],
       ),
     );
   }
@@ -1049,6 +1092,9 @@ KojinKoushin? fushimeZentaiShin(
   }
 }
 
+/// 前の記録の持ち主のリンク(結果画面。[_dare]で名前を書くときだけ)
+List<FushimeLink> _linkMaeKojin(KojinKoushin x) => _linkMae(x.mae, x.jishin);
+
 /// 前の記録の言い方(結果画面。「昨年に山本 翔(4年)が出した記録」)
 String _dare(Ghensuu gh, KojinKoushin x) {
   final RekidaiKiroku? mae = x.mae;
@@ -1063,6 +1109,7 @@ List<_Koto> _kojin(Ghensuu gh, UnivData u, List<SenshuData> senshu, int race) {
   final List<_Koto> l = [];
   for (final _KojinKekka x in _kojinBunseki(gh, u, senshu, race)) {
     final String kagi = 'S${x.s.id}';
+    final FushimeLink honnin = _linkHonnin(gh, x.s);
     final String naka = '${_namae(x.s)} ${jikanMoji(x.t)}。';
     final KojinKoushin? rs = x.rekidaiShin;
     if (rs != null) {
@@ -1073,6 +1120,7 @@ List<_Koto> _kojin(Ghensuu gh, UnivData u, List<SenshuData> senshu, int race) {
           midashi: '歴代新',
           bun: '$naka${_dare(gh, rs)}を${_koushinMoji(rs.sa)}。',
           soe: '歴代新',
+          link: [honnin, ..._linkMaeKojin(rs)],
         ),
       );
     } else if (x.zentaiJuni >= 1) {
@@ -1083,6 +1131,7 @@ List<_Koto> _kojin(Ghensuu gh, UnivData u, List<SenshuData> senshu, int race) {
           midashi: '歴代${x.zentaiJuni + 1}位',
           bun: '$naka全体の歴代${x.zentaiJuni + 1}位の記録です。',
           soe: '歴代${x.zentaiJuni + 1}位',
+          link: [honnin],
         ),
       );
     }
@@ -1097,6 +1146,7 @@ List<_Koto> _kojin(Ghensuu gh, UnivData u, List<SenshuData> senshu, int race) {
             midashi: '学内新',
             bun: '$naka${_dare(gh, gs)}を${_koushinMoji(gs.sa)}。',
             soe: '学内新',
+            link: [honnin, ..._linkMaeKojin(gs)],
           ),
         );
       }
@@ -1108,6 +1158,7 @@ List<_Koto> _kojin(Ghensuu gh, UnivData u, List<SenshuData> senshu, int race) {
           midashi: '学内歴代${x.gakunaiJuni + 1}位',
           bun: '$naka学内の歴代${x.gakunaiJuni + 1}位の記録です。',
           soe: '学内歴代${x.gakunaiJuni + 1}位',
+          link: [honnin],
         ),
       );
     }
@@ -1120,6 +1171,7 @@ List<_Koto> _kojin(Ghensuu gh, UnivData u, List<SenshuData> senshu, int race) {
           midashi: '日本人学内新',
           bun: '$naka${_dare(gh, ns)}を${_koushinMoji(ns.sa)}。',
           soe: '日本人学内新',
+          link: [honnin, ..._linkMaeKojin(ns)],
         ),
       );
     }

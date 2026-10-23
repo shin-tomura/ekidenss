@@ -2107,7 +2107,7 @@ class _RecordScreenState extends State<RecordScreen>
   // ・種目(駅伝は区間・総合・往路・復路)ごとに、少し明るい枠(_kirokuWaku)に1枚ずつまとめ、見出しは枠の上に1回だけ書く
   // ・個人記録と区間記録は、枠の中を「すべて」(日本人と留学生を合わせた並び)・「日本人」・「留学生」の3行に分け、
   //   行の頭に札を付ける(_fudaGyou。学内記録の画面で「全体」と書くと全体記録と紛らわしいので「すべて」にした)
-  // ・リセットは、目立ちすぎないように、1位の記録の年月の横の小さな文字にした(押したあとの確かめ方は今までどおり)
+  // ・リセットは、目立ちすぎないように、1位の記録のタイムの横の小さな文字にした(押したあとの確かめ方は今までどおり)
   // ・駅伝の記録は、上に総合・往路・復路・各区間の札(_tobuFuda)を並べ、押すとその枠まで移る
 
   // 「すべて」「日本人」「留学生」の札の文字(_buildAwaseSections の行の順)
@@ -2178,7 +2178,7 @@ class _RecordScreenState extends State<RecordScreen>
     );
   }
 
-  // 1位の記録の年月の横に置く「リセット」(小さな灰色の文字)
+  // 1位の記録のタイムの横に置く「リセット」(小さな灰色の文字)
   Widget _resetMoji(VoidCallback onReset) {
     return InkWell(
       onTap: onReset,
@@ -2252,7 +2252,7 @@ class _RecordScreenState extends State<RecordScreen>
   // ・[daigaku] 大学名を出すか(学内記録は出さない)
   // ・選手名は、開ける選手(現役の選手・残っている卒業生)ならリンクにする(2.1.4。screens/kiroku_link.dart。
   //   記録と選手は通算の番号だけで結びつけるので、2.1.4より前に出た記録はリンクにしない)
-  // ・2.1.4から、見出しは枠(_kirokuWaku)の側で書き、ここは記録の並びだけにした。リセットは1位の年月の横
+  // ・2.1.4から、見出しは枠(_kirokuWaku)の側で書き、ここは記録の並びだけにした。リセットは1位のタイムの横
   Widget _buildRekidaiNaka({
     required String kagi,
     required List<RekidaiKiroku> rekidai,
@@ -2270,39 +2270,74 @@ class _RecordScreenState extends State<RecordScreen>
     final bool hiraiteru = hirakeru && _hiraitaKiroku.contains(kagi);
     final KirokuLinkJisho jisho = _linkJisho ??= KirokuLinkJisho();
 
+    // 年月(灰色の小さな文字。タイムと名前が目立つように。2.1.4)
+    const TextStyle usui = TextStyle(color: Colors.white60, fontSize: 12);
+
     // r位の記録(0が1位)
+    // ・2.1.4から、順位を左の列に出し(閉じているときも「1」)、2位からは1件ごとに細い線で区切る。
+    //   年月は2行目の後ろ(2行目がない学内の総合記録などは、タイムの後ろ)に灰色の小さな文字で書く
+    // ・文字を大きくしても入るように、順位の列の幅は決めず、中身は残りの幅で折り返す
     Widget ikken(int r) {
       final RekidaiKiroku k = rekidai[r];
       final String timeString = isOverallTime
           ? _timeToHourMinuteSecondString(k.time)
           : _timeToMinuteSecondString(k.time);
-      final String juni = hiraiteru ? '${r + 1}位 ' : '';
-      return Padding(
-        padding: EdgeInsets.only(top: r == 0 ? 0 : 6),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Wrap(
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                Text('$juni$timeString', style: moji),
-                Text(' (${k.year}年${k.month}月記録)', style: moji),
-                // 総合記録は、大学名を同じ行に出す
-                if (!senshu && daigaku) Text(' ${k.univname}', style: moji),
-                // リセットは、その行の歴代10位までをまとめて消すので、1位の記録の横に1つだけ置く
-                if (r == 0) _resetMoji(onReset),
-              ],
-            ),
-            if (senshu)
-              Wrap(
-                children: [
-                  jisho.namae(context, k.name, k.bangou, moji),
-                  Text(' ${k.gakunen}年', style: moji),
-                  if (daigaku) Text(' ${k.univname}', style: moji),
-                ],
+      final Widget nengetsu = Text(' ${k.year}年${k.month}月', style: usui);
+      // 2行目(選手名と学年・大学名。総合記録は大学名だけ。学内の総合記録はなし)
+      final bool nigyoume = senshu || daigaku;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (r > 0)
+            const Divider(color: Colors.white12, height: 9, thickness: 0.5),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                constraints: const BoxConstraints(minWidth: 24),
+                margin: const EdgeInsets.only(right: 10),
+                child: Text(
+                  '${r + 1}',
+                  textAlign: TextAlign.right,
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: HENSUU.fontsize_honbun,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
-          ],
-        ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        Text(timeString, style: moji),
+                        if (!nigyoume) nengetsu,
+                        // リセットは、その行の歴代10位までをまとめて消すので、1位の記録の横に1つだけ置く
+                        if (r == 0) _resetMoji(onReset),
+                      ],
+                    ),
+                    if (nigyoume)
+                      Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          if (senshu) ...[
+                            jisho.namae(context, k.name, k.bangou, moji),
+                            Text(' ${k.gakunen}年', style: moji),
+                            if (daigaku) Text(' ${k.univname}', style: moji),
+                          ] else
+                            Text(k.univname, style: moji),
+                          nengetsu,
+                        ],
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       );
     }
 

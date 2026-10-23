@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // 調整値のコピーと貼り付け(2.1.4)
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:ekiden/constants.dart'; // 💡 HENSUUなどの定数用
 import 'package:ekiden/kantoku_data.dart'; // 💡 KantokuDataクラス用
 import 'package:ekiden/ghensuu.dart'; // 💡 Ghensuuクラス用 (区間数取得用)
 import 'package:ekiden/univ_data.dart';
+import 'package:ekiden/kansuu/time_chousei_moji.dart'; // 調整値を1本の行で写す・読む(2.1.4)
 
 class ModalTimeAdjustmentSettings extends StatefulWidget {
   const ModalTimeAdjustmentSettings({super.key});
@@ -79,6 +81,172 @@ class _ModalTimeAdjustmentSettingsState
     });
 
     await kantoku.save();
+  }
+
+  // ---- 調整値のコピーと貼り付け(2.1.4。行の形は kansuu/time_chousei_moji.dart) ----
+  // ・「今の調整値をコピー」: 全体・区間ごとタイム調整と長距離タイム抑制設定を1本の行で写す
+  // ・「貼り付けて設定」: コピーしてきた文の中の行を読み、変わる値を確かめてから変える
+  //   (区間の数が違う駅伝は変えない。読み取れなければ何も変えない。長距離タイム抑制は行にあるときだけ変える)
+
+  /// 駅伝ごと(10月・11月・正月・カスタム)の今の区間数(画面と同じ。0〜10)
+  List<int> _kukansuuIchiran() {
+    return [
+      for (final int racebangou in _raceBangou)
+        () {
+          int n = 0;
+          try {
+            n = currentGhensuu?.kukansuu_taikaigoto[racebangou] ?? 0;
+          } catch (_) {
+            n = 0;
+          }
+          return n < 0 ? 0 : (n > 10 ? 10 : n);
+        }(),
+    ];
+  }
+
+  /// 長距離タイム抑制設定のオン・オフを持つ大学データ(大学id 9。なければnull)
+  UnivData? _univ9() {
+    for (final UnivData u in univDataBox.values) {
+      if (u.id == 9) return u;
+    }
+    return null;
+  }
+
+  void _shiraseru(String moji) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(moji)));
+  }
+
+  /// 今の調整値を1本の行でコピーする
+  Future<void> _kopiSuru() async {
+    final String moji = timeChouseiMoji(
+      kantoku,
+      _kukansuuIchiran(),
+      _univ9()?.name_tanshuku == '1',
+    );
+    await Clipboard.setData(ClipboardData(text: moji));
+    _shiraseru('今の調整値をコピーしました');
+  }
+
+  /// コピーしてきた文の中の行を読み、確かめてから設定する
+  Future<void> _haritsukeru() async {
+    final ClipboardData? data = await Clipboard.getData(Clipboard.kTextPlain);
+    final TimeChouseiYomi? y = timeChouseiYomu(data?.text ?? '');
+    if (y == null) {
+      _shiraseru('読み取れませんでした(「$timeChouseiAtama」の行がないか、値が範囲の外です)');
+      return;
+    }
+    final List<int> kukansuu = _kukansuuIchiran();
+    final UnivData? u9 = _univ9();
+    final bool imaOn = u9?.name_tanshuku == '1';
+    final List<String> naiyou = [];
+    int kawaruKazu = 0;
+    // 全体
+    final int imaZentai = kantoku.yobiint5[timeChouseiZentaiBangou];
+    if (imaZentai != y.zentai) {
+      kawaruKazu++;
+      naiyou.add('全体: ${timeChouseiAtaiMoji(imaZentai)}% → ${timeChouseiAtaiMoji(y.zentai)}%');
+    } else {
+      naiyou.add('全体: ${timeChouseiAtaiMoji(imaZentai)}%(変わりません)');
+    }
+    // 駅伝ごと(区間の数が違う駅伝は変えない)
+    final List<bool> kaeru = [];
+    for (int r = 0; r < timeChouseiRaceMidashi.length; r++) {
+      final String mei = _raceNames[r];
+      if (y.race[r].length != kukansuu[r]) {
+        kaeru.add(false);
+        naiyou.add('$mei: 区間の数が違うので変えません(行は${y.race[r].length}区間、今は${kukansuu[r]}区間)');
+        continue;
+      }
+      int n = 0;
+      for (int i = 0; i < kukansuu[r]; i++) {
+        if (kantoku.yobiint5[timeChouseiRaceHajime[r] + i] != y.race[r][i]) n++;
+      }
+      kaeru.add(n > 0);
+      kawaruKazu += n;
+      naiyou.add(n > 0 ? '$mei: ${kukansuu[r]}区間のうち$n区間が変わります' : '$mei: 変わりません');
+    }
+    // 長距離タイム抑制設定(行にあるときだけ)
+    bool yokuseiKawaru = false;
+    final bool? on = y.yokuseiOn;
+    if (on != null && u9 != null && on != imaOn) {
+      yokuseiKawaru = true;
+      naiyou.add('長距離タイム抑制補正: ${imaOn ? 'オン' : 'オフ'} → ${on ? 'オン' : 'オフ'}');
+    }
+    final int? atai = y.yokuseiAtai;
+    if (atai != null && atai != kantoku.yobiint2[13]) {
+      yokuseiKawaru = true;
+      naiyou.add('長距離全体タイム抑制値: ${kantoku.yobiint2[13]} → $atai');
+    }
+    if (on == null && atai == null) {
+      naiyou.add('長距離タイム抑制設定: 行にないので変えません');
+    } else if (!yokuseiKawaru) {
+      naiyou.add('長距離タイム抑制設定: 変わりません');
+    }
+    if (kawaruKazu == 0 && !yokuseiKawaru) {
+      _shiraseru('貼り付けた行と今の設定は同じなので、変わる値はありません');
+      return;
+    }
+    if (!mounted) return;
+    final bool? hai = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext c) => AlertDialog(
+        backgroundColor: HENSUU.backgroundcolor,
+        title: const Text(
+          '貼り付けた値に変えますか？',
+          style: TextStyle(color: Colors.white, fontSize: HENSUU.fontsize_honbun),
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (final String g in naiyou)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text(
+                    g,
+                    style: const TextStyle(color: Colors.white, fontSize: HENSUU.fontsize_honbun - 2),
+                  ),
+                ),
+              if (yokuseiKawaru)
+                const Padding(
+                  padding: EdgeInsets.only(top: 4),
+                  child: Text(
+                    '長距離タイム抑制設定(別の画面の設定)も変わります。',
+                    style: TextStyle(color: Colors.orangeAccent, fontSize: HENSUU.fontsize_honbun - 2),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(c).pop(false),
+            child: const Text('やめる', style: TextStyle(color: HENSUU.LinkColor)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(c).pop(true),
+            child: const Text('変える', style: TextStyle(color: HENSUU.LinkColor)),
+          ),
+        ],
+      ),
+    );
+    if (hai != true) return;
+    setState(() {
+      kantoku.yobiint5[timeChouseiZentaiBangou] = y.zentai;
+      for (int r = 0; r < timeChouseiRaceMidashi.length; r++) {
+        if (!kaeru[r]) continue;
+        for (int i = 0; i < kukansuu[r]; i++) {
+          kantoku.yobiint5[timeChouseiRaceHajime[r] + i] = y.race[r][i];
+        }
+      }
+      if (atai != null) kantoku.yobiint2[13] = atai;
+      if (on != null && u9 != null) u9.name_tanshuku = on ? '1' : '0';
+    });
+    await kantoku.save();
+    if (on != null && u9 != null) await u9.save();
+    _shiraseru('貼り付けた値に変えました');
   }
 
   /// タイム調整設定項目のスライダーウィジェットを生成
@@ -283,6 +451,40 @@ class _ModalTimeAdjustmentSettingsState
                         fontSize: HENSUU.fontsize_honbun,
                       ),
                       textAlign: TextAlign.left,
+                    ),
+                  ),
+
+                  // 今の調整値のコピーと、貼り付けて設定(2.1.4。文字を大きくしても入るように折り返して並べる)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 16.0),
+                    child: Wrap(
+                      spacing: 12,
+                      runSpacing: 4,
+                      children: [
+                        TextButton.icon(
+                          onPressed: _kopiSuru,
+                          icon: const Icon(Icons.copy, size: 18, color: HENSUU.LinkColor),
+                          label: Text(
+                            '今の調整値をコピー',
+                            style: TextStyle(color: HENSUU.LinkColor, fontSize: HENSUU.fontsize_honbun - 2),
+                          ),
+                        ),
+                        TextButton.icon(
+                          onPressed: _haritsukeru,
+                          icon: const Icon(Icons.content_paste, size: 18, color: HENSUU.LinkColor),
+                          label: Text(
+                            '貼り付けて設定',
+                            style: TextStyle(color: HENSUU.LinkColor, fontSize: HENSUU.fontsize_honbun - 2),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 24.0),
+                    child: Text(
+                      '全体・区間ごとタイム調整と長距離タイム抑制設定を、1本の行で写せます。写した行(前後に文が付いていてもかまいません)をコピーしてから「貼り付けて設定」を押すと、確かめてから同じ設定にできます。区間の数が違う駅伝は変わりません。',
+                      style: TextStyle(color: HENSUU.textcolor, fontSize: HENSUU.fontsize_honbun - 2),
                     ),
                   ),
 

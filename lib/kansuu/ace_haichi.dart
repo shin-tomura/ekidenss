@@ -8,6 +8,8 @@ import 'package:ekiden/kansuu/konki_best.dart' show hikakuMochiTime, hikakuMochi
 // エース・準エースと、全体の上位10人の決め方(2.1.3)
 // 「スキップして統計データ取得」のエース・準エースが走った区間(toukei_ace.dart)と、
 // レース前の画面の「エースの配置」(screens/Modal_aceHaichi.dart)で同じ決め方を使う。
+// 展望記事・スタート直前号・学連選抜通信の展望号の「エース」(kiji/kiji_tenbou.dart・kiji/kiji_gakuren.dart)も
+// 同じ決め方(記事は走る予定の選手の中から選ぶ。予選の記事は別の決め方)。
 //
 // ・物差しは駅伝ごとに、その駅伝の区間の距離で決める(AceOmomi)
 //   ・区間ごとに合う種目(aceKukanShumoku): 1〜3区は距離の種目(7.5km以下は5000m、15km以下は1万m、

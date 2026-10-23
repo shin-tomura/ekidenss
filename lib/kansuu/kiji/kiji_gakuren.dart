@@ -10,6 +10,8 @@ import 'package:ekiden/kansuu/kiji/kiji_kihon.dart';
 import 'package:ekiden/kansuu/kiji/kiji_comment.dart';
 import 'package:ekiden/kansuu/kiji/kiji_tokuchou.dart'; // 選手の特徴の文(1.9.7)
 import 'package:ekiden/kansuu/kiji/kiji_kimochi.dart'; // 駅伝男・平常心の持ち味(1.9.7)
+import 'package:ekiden/kansuu/ace_haichi.dart'
+    show AceKijun, AceOmomi, aceShumoku, aceJun, aceMochiTimesGakuren; // エース(エースの配置と同じ決め方。2.1.3)
 
 // ------------------------------------------------------------
 // 学連選抜を追う専門メディア「学連選抜通信」(1.9.7。正月駅伝だけ)
@@ -425,18 +427,22 @@ Kiji _tenbouTop(KijiKankyou k, List<_GSenshu> list) {
   final bool kantoku = _kantokuChuu(k) && my != null;
   final int mk = _mokuhyou(k);
   final int kousuu = {for (final _GSenshu x in list) x.g.univid}.length;
-  // エース(ハーフの持ちタイムが一番速い選手。ハーフの記録がそろわなければ1万m、5000m)
+  // エース(レース前の画面の「エースの配置」と同じ決め方。正月駅伝の区間の距離で決めた物差しの点数が
+  // 一番高い走者。偏差値の物差しは大学の全選手で作る。添える持ちタイムは、物差しの重みが一番大きい種目の
+  // 自己ベスト。2.1.3。それまではハーフの持ちタイムが一番速い選手だった)
+  final AceOmomi aceOmomi = AceOmomi.tsukuru(k.gh.kyori_taikai_kukangoto[_race], ks);
+  final int aceIdx = aceShumoku[aceOmomi.hikaku];
   _GSenshu? ace;
-  int aceIdx = 2;
-  for (final int idx in const [2, 1, 0]) {
-    for (final _GSenshu x in list) {
-      final double t = _best(k, x, idx);
-      if (t >= TEISUU.DEFAULTTIME) continue;
-      if (ace == null || t < _best(k, ace, idx)) ace = x;
-    }
-    if (ace != null) {
-      aceIdx = idx;
-      break;
+  {
+    final AceKijun aceKijun = AceKijun.tsukuru(k.senshu);
+    final List<List<double?>> times = [
+      for (final _GSenshu x in list) aceMochiTimesGakuren(x.g),
+    ];
+    final List<int> jun = aceJun(aceKijun, aceOmomi, times, [
+      for (final _GSenshu x in list) x.g.id,
+    ]);
+    if (jun.isNotEmpty && aceKijun.tensuu(times[jun.first], aceOmomi) != null) {
+      ace = list[jun.first];
     }
   }
   // 予選会で一番上位だった選手
@@ -487,12 +493,16 @@ Kiji _tenbouTop(KijiKankyou k, List<_GSenshu> list) {
   if (uchiwake.isNotEmpty) kb.write('$n人の内訳は、${uchiwake.join('、')}。');
   if (ace != null) {
     final double t = _best(k, ace, aceIdx);
-    kb.write(
-      '持ちタイムで一番速いのは${_mei(w, ace, daigaku: true)}で、'
-      '${kijiShumokuMei[aceIdx]}${jikanMoji(t)}。',
-    );
-    final int? zj = _zentaiJuni(ace, aceIdx);
-    if (zj != null && zj < 100) kb.write('学生全体でも${zj + 1}番目の記録だ。');
+    if (t < TEISUU.DEFAULTTIME) {
+      kb.write(
+        'エースは${_mei(w, ace, daigaku: true)}で、'
+        '${kijiShumokuMei[aceIdx]}の持ちタイムは${jikanMoji(t)}。',
+      );
+      final int? zj = _zentaiJuni(ace, aceIdx);
+      if (zj != null && zj < 100) kb.write('学生全体で${zj + 1}番目の記録だ。');
+    } else {
+      kb.write('エースは${_mei(w, ace, daigaku: true)}。');
+    }
   }
   if (yosenTop != null && (ace == null || yosenTop.g.id != ace.g.id)) {
     kb.write('予選会で最も上位だったのは${_mei(w, yosenTop, daigaku: true)}で、全体${juniMoji(yosenTopJ)}だった。');

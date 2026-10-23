@@ -7,6 +7,8 @@ import 'package:ekiden/kansuu/kiji/kiji_kihon.dart';
 import 'package:ekiden/kansuu/taikai_chouki.dart'; // 大会の長い記録の出来事(2.0.0)
 import 'package:ekiden/kansuu/kiji/kiji_comment.dart';
 import 'package:ekiden/kansuu/kiji/kiji_kimochi.dart' show kimochiTokuhitsu; // 駅伝男の特集(1.9.7)
+import 'package:ekiden/kansuu/ace_haichi.dart'
+    show AceKijun, AceOmomi, aceShumoku, aceJunSenshu, aceMochiTimesSenshu; // 駅伝のエース(エースの配置と同じ決め方。2.1.3)
 
 // ------------------------------------------------------------
 // 展望の記事(1.9.2。直前順位予想の画面の「展望記事」)
@@ -44,6 +46,10 @@ import 'package:ekiden/kansuu/kiji/kiji_kimochi.dart' show kimochiTokuhitsu; // 
 //  注目選手・エースのコメント・各区間の持ちタイム1位の紹介に入れる。当日変更の記事と自分の大学の
 //  当日変更には、外れた理由(体調不良・調子)と温存していたエースの投入(ToujituJijou)を書く。
 //  自分の大学の記事の最後に、記者の型で見方が変わる「本紙の見立て」を付ける
+//
+// 2.1.3: 駅伝(展望とスタート直前号)の「エース」を、レース前の画面の「エースの配置」(ace_haichi.dart)と
+//  同じ決め方にした(その駅伝の区間の距離で決めた物差しの点数が一番高い選手。選ぶのは今までどおり走る予定の選手から)。
+//  エースに添える持ちタイムは、物差しの重みが一番大きい種目の自己ベスト。予選は今までどおり(チームの平均と同じ持ちタイム)
 // ------------------------------------------------------------
 
 /// 予想陣(直前順位予想の画面の3人)の予想
@@ -375,8 +381,25 @@ class Tenbou {
   double? sougou(SenshuData s) =>
       tenbouSougouTime(k, s, omomi, heikinShumoku);
 
-  /// 大学のエース(走る予定の選手で、区間の距離に合わせた持ちタイムが一番いい選手)
+  /// 駅伝のエースの物差しの重み(その駅伝の区間の距離で決める。エースの配置と同じ。2.1.3)
+  late final AceOmomi aceOmomi = AceOmomi.tsukuru(
+    k.gh.kyori_taikai_kukangoto[k.race],
+    ks,
+  );
+
+  /// 駅伝のエースの偏差値の物差し(全選手で作る。エースの配置と同じ。2.1.3)
+  late final AceKijun aceKijun = AceKijun.tsukuru(k.senshu);
+
+  /// 大学のエース(走る予定の選手から選ぶ)
+  /// ・駅伝: レース前の画面の「エースの配置」と同じ決め方(区間の距離で決めた物差しの点数が一番高い選手。2.1.3)
+  /// ・予選: 区間の距離に合わせた持ちタイム(チームの平均と同じ値)が一番いい選手
   SenshuData? ace(TenbouUniv x) {
+    if (k.ekiden) {
+      if (x.hashiru.isEmpty) return null;
+      final SenshuData s = aceJunSenshu(aceKijun, aceOmomi, x.hashiru).first;
+      // 物差しの種目の記録が1つもなければ、エースとして書かない
+      return aceKijun.tensuu(aceMochiTimesSenshu(s), aceOmomi) == null ? null : s;
+    }
     SenshuData? best;
     double bt = TEISUU.DEFAULTTIME;
     for (final SenshuData s in x.hashiru) {
@@ -388,6 +411,11 @@ class Tenbou {
     }
     return best;
   }
+
+  /// エースに添える持ちタイムの文(駅伝は物差しの重みが一番大きい種目、予選はチームの平均の種目の自己ベスト。
+  /// 記録がなければ空。2.1.3)
+  String aceMochiMoji(SenshuData s) =>
+      mochiMoji(s, k.ekiden ? aceShumoku[aceOmomi.hikaku] : heikinShumoku);
 
   /// 区間(組)の呼び方
   String kukanMei(int kk) => kukanYobikata(k.gh, k.race, kk, ks);
@@ -782,7 +810,7 @@ Kiji _yuushouTenbou(Tenbou t, List<KijiYosouJin> yosou) {
     }
     if (a != null) {
       final int kk = k.entry(a);
-      final String m = t.mochiMoji(a, t.heikinShumoku);
+      final String m = t.aceMochiMoji(a);
       sb.write(
         'エースの${w.senshu(a)}${m.isEmpty ? '' : '($m)'}を${t.kukanMei(kk)}に置いた。',
       );
@@ -1464,7 +1492,7 @@ Kiji? _seedTenbou(Tenbou t, List<KijiYosouJin> yosou) {
     }
     final SenshuData? a = t.ace(x);
     if (a != null) {
-      final String m1 = t.mochiMoji(a, t.heikinShumoku);
+      final String m1 = t.aceMochiMoji(a);
       sb.write(
         'エースの${w.senshu(a)}${m1.isEmpty ? '' : '($m1)'}を${t.kukanMei(k.entry(a))}に置いた。',
       );
@@ -2314,7 +2342,7 @@ Kiji? _jibunTenbou(Tenbou t, List<KijiYosouJin> yosou) {
   w.koMidashi('布陣');
   if (a != null) {
     final int kk = k.entry(a);
-    final String m1 = t.mochiMoji(a, t.heikinShumoku);
+    final String m1 = t.aceMochiMoji(a);
     w.danraku(
       'エースの${w.senshu(a)}${m1.isEmpty ? '' : '($m1)'}は'
       '${race == 4 ? '個人でも上位を狙う。' : '${t.kukanMei(kk)}に入った。'}'
@@ -2721,7 +2749,7 @@ Kiji _tsuukaTenbou(Tenbou t, List<KijiYosouJin> yosou) {
     sb.write('トップ通過候補の${hon.mei}は');
     final SenshuData? a = t.ace(hon);
     if (a != null) {
-      final String m1 = t.mochiMoji(a, t.heikinShumoku);
+      final String m1 = t.aceMochiMoji(a);
       sb.write('エースの${w.senshu(a)}${m1.isEmpty ? '' : '($m1)'}を中心に、');
     }
     sb.write(w.erabu(['選手層の厚さで他校を上回る。', '大きな穴のない布陣を組んだ。']));

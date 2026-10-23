@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:ekiden/kansuu/kiji/kiji.dart';
 import 'package:ekiden/screens/ai_copy_matome.dart';
 import 'package:ekiden/screens/kiji_hyou_view.dart'; // 表の部品(1.9.8)
+import 'package:ekiden/screens/album_tsuika_botan.dart'; // 卒業生特集の「この選手をアルバムに追加」(2.1.4)
 import 'package:ekiden/kansuu/koukou.dart' show koukouKenMijikai, koukouOkiniiriYomu, koukouMeiboGenzai; // 地方版(2.0.4)
 import 'package:ekiden/kansuu/koukou_meibo.dart' show KoukouMei, koukouChikuMei, koukouKenChiku; // 地方版(2.0.4)
 
@@ -944,7 +945,7 @@ class KijiGamen extends StatelessWidget {
   Widget _block(KijiBlock b, Color iro) {
     switch (b.shurui) {
       case KijiBlockShurui.koMidashi:
-        return Padding(
+        final Widget midashi = Padding(
           padding: const EdgeInsets.only(top: 22, bottom: 6),
           child: Row(
             children: [
@@ -962,6 +963,13 @@ class KijiGamen extends StatelessWidget {
               ),
             ],
           ),
+        );
+        // 卒業生特集は、小見出しのすぐ下に「この選手をアルバムに追加」を出す(2.1.4。出せない日は何も出さない)
+        final int? albumSenshu = b.albumSenshu;
+        if (albumSenshu == null) return midashi;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [midashi, AlbumTsuikaBotan(senshuId: albumSenshu)],
         );
       case KijiBlockShurui.comment:
         return Container(

@@ -1635,7 +1635,8 @@ List<Kiji> gakunaiSotsugyouKiji(KijiKankyou k) {
   for (final SenshuData s in yonen) {
     final String yobi = myouji(s.name);
     final String? ken = k.shusshin(s);
-    w.koMidashi(w.senshu(s));
+    // 小見出しの下に「この選手をアルバムに追加」を出す(2.1.4。選手画面のボタンと同じ処理)
+    w.koMidashi(w.senshu(s), albumSenshu: s.id);
     // 主将を務めた選手は、最初にそのことを書く(2.0.2。卒業アルバムの経歴と同じ見方。shushou.dart)
     // (3年生の年度の主将は2.0.2から記録するので、分からないこともある。4年生だけのときの文は、
     //  3年生のときに主将でなかったとは言い切らない)

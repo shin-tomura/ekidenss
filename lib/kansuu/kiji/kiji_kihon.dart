@@ -88,7 +88,11 @@ class KijiBlock {
   /// 表(種類が hyou のときだけ。1.9.7)
   final KijiHyou? hyou;
 
-  const KijiBlock(this.shurui, this.bun, {this.hyou});
+  /// この小見出しの選手の番号(枠の番号。学内メディアの卒業生特集で、小見出しの下に「この選手をアルバムに追加」の
+  /// ボタンを出す(screens/album_tsuika_botan.dart)。生成AIに渡すテキストには使わない。2.1.4)
+  final int? albumSenshu;
+
+  const KijiBlock(this.shurui, this.bun, {this.hyou, this.albumSenshu});
 }
 
 /// 記事に付ける表(成績欄)
@@ -2510,8 +2514,9 @@ class KijiKakite {
     danraku(bun);
   }
 
-  void koMidashi(String bun) {
-    honbun.add(KijiBlock(KijiBlockShurui.koMidashi, bun));
+  /// [albumSenshu] 小見出しの下に「この選手をアルバムに追加」を出す選手の番号(卒業生特集だけ。2.1.4)
+  void koMidashi(String bun, {int? albumSenshu}) {
+    honbun.add(KijiBlock(KijiBlockShurui.koMidashi, bun, albumSenshu: albumSenshu));
   }
 
   /// 本文の途中に表を置く(選手の三大駅伝の成績など。1.9.7)

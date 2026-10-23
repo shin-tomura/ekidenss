@@ -33,6 +33,7 @@ import 'package:ekiden/screens/kiji_hyou_view.dart'; // 表の部品(1.9.8)
 import 'package:ekiden/screens/Modal_nameedit.dart'
     show ModalSenshuNameHenkou_modalsenshugamen; // 他大学の選手の名前の変更(箱庭モード。1.9.9)
 import 'package:ekiden/kansuu/shushou.dart'; // 主将(2.0.1)
+import 'package:ekiden/kansuu/album_tsuika.dart' show albumNiTsuika; // アルバムに追加(2.1.4)
 import 'package:ekiden/kansuu/kingin_rireki.dart'; // 金銀の内訳(2.1.1)
 import 'package:ekiden/screens/setsumei_mado.dart'; // 主将の説明のリンク(2.0.1)
 
@@ -3314,8 +3315,7 @@ class _SenshuScreenState extends State<SenshuScreen> {
             onPressed: () async {
               // 1. 必要なBoxを定義（Stateクラスの initState で初期化済みと仮定）
               //final Box<SenshuData> senshuBox = Hive.box<SenshuData>('senshuBox');
-              final Box<Senshu_R_Data> retiredSenshuBox =
-                  Hive.box<Senshu_R_Data>('retiredSenshuBox');
+              // (アルバムに足す処理は、2.1.4から kansuu/album_tsuika.dart にまとめた。卒業生特集のボタンと同じ)
               //final Box<Ghensuu> ghensuuBox = Hive.box<Ghensuu>('ghensuuBox');
 
               //final Ghensuu ghensuu = ghensuuBox.get(
@@ -3385,23 +3385,12 @@ class _SenshuScreenState extends State<SenshuScreen> {
               // ★ 5. 保存処理（確認が取れた場合のみ実行）
               // ----------------------------------------------------
 
-              //print("処理前ID ${currentSenshu.id}");
-              // 現役選手データを卒業選手データに変換 (fromSenshuDataファクトリを使用)
-              final Senshu_R_Data retiredSenshu = Senshu_R_Data.fromSenshuData(
+              // 卒業選手データにして、自分で追加した印を付けて保存する(2.1.4から album_tsuika.dart。
+              // 経歴の最初に、卒業の処理と同じく主将を務めた年度を書くようにした)
+              final Senshu_R_Data retiredSenshu = await albumNiTsuika(
+                currentGhensuu,
                 currentSenshu,
               );
-
-              // sijiflag（卒業年）idを設定
-              final int currentYear = currentGhensuu.year;
-              retiredSenshu.sijiflag = currentYear;
-              retiredSenshu.id += currentYear * 1000;
-              retiredSenshu.string_racesetumei = "";
-              retiredSenshu.sijiseikouflag = 100; //プレイヤーが自分でアルバムに追加した印
-
-              //print("処理後ID ${currentSenshu.id}");
-
-              // Hive Boxに保存
-              await retiredSenshuBox.put(retiredSenshu.id, retiredSenshu);
 
               // 完了メッセージを表示
               ScaffoldMessenger.of(context).showSnackBar(

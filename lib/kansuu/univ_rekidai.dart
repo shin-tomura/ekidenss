@@ -23,9 +23,9 @@ import 'package:ekiden/kansuu/kiji/kiji_kihon.dart' show jikanMoji;
 //     残っていないので、何回前かで書く。11回より前のタイムは残っていないので「大学最高」とは書かない
 //   ・大会記録の並びがない予選と対校戦には出さない
 // ・「この大学の歴代記録」の表(univRekidaiIchiran): 全体の歴代10位以内(日本人と留学生を合わせた並び。
-//   個人記録は一人1件。記録画面の「すべて」の行と同じ)に入っている、この大学の区間記録と個人記録。
+//   個人記録は一人1件。記録画面の「すべて」の行と同じ)に入っている、この大学の個人記録と区間記録(個人記録が先)。
 //   1つの並びに何件もあるときは、一番上の1件を出し、ほかの件数を添える
-// ・同じ窓の学内記録の表(univGakunaiIchiran): 区間・種目ごとの学内記録の1位(2.1.4から全大学で付ける)。
+// ・同じ窓の学内記録の表(univGakunaiIchiran): 種目・区間ごとの学内記録の1位(2.1.4から全大学で付ける。個人記録が先)。
 //   1位が留学生のときは、日本人の1位の行も添える
 // ・思わぬデータに当たっても画面が止まらないよう、失敗したら何も出さない
 // ------------------------------------------------------------
@@ -124,7 +124,7 @@ const Map<int, String> _kojinMei = {
   7: 'クロカン1万',
 };
 
-/// 大学[u]の、全体の歴代10位以内に入っている区間記録と個人記録(なければ空)
+/// 大学[u]の、全体の歴代10位以内に入っている個人記録と区間記録(なければ空。個人記録が先)
 List<UnivRekidaiGyou> univRekidaiIchiran(Ghensuu gh, UnivData u) {
   try {
     if (!Hive.isBoxOpen('kirokuBox') || !Hive.isBoxOpen('univBox')) return const [];
@@ -151,6 +151,18 @@ List<UnivRekidaiGyou> univRekidaiIchiran(Ghensuu gh, UnivData u) {
       );
     }
 
+    // 個人記録(一人1件。選手画面の歴代記録の表と同じく、個人記録を先にする)
+    for (final int k in _kojinJun) {
+      ireru(
+        _kojinMei[k] ?? '',
+        rekidaiAwaseru(
+          ichii: ichiiZentaiKojin(gh, k).yomu(),
+          nihonjin: rekidaiHitoriIkken(rekidaiZentaiKojin(kiroku, false, k).yomu()),
+          ryuugakusei: rekidaiHitoriIkken(rekidaiZentaiKojin(kiroku, true, k).yomu()),
+          hitoriIkken: true,
+        ),
+      );
+    }
     // 駅伝の区間記録(記録画面と同じ区間の数)
     final UnivData? custom = Hive.box<UnivData>('univBox').get(0);
     for (final int race in const [0, 1, 2, customRaceBangou]) {
@@ -167,18 +179,6 @@ List<UnivRekidaiGyou> univRekidaiIchiran(Ghensuu gh, UnivData u) {
           ),
         );
       }
-    }
-    // 個人記録(一人1件)
-    for (final int k in _kojinJun) {
-      ireru(
-        _kojinMei[k] ?? '',
-        rekidaiAwaseru(
-          ichii: ichiiZentaiKojin(gh, k).yomu(),
-          nihonjin: rekidaiHitoriIkken(rekidaiZentaiKojin(kiroku, false, k).yomu()),
-          ryuugakusei: rekidaiHitoriIkken(rekidaiZentaiKojin(kiroku, true, k).yomu()),
-          hitoriIkken: true,
-        ),
-      );
     }
     return gyou;
   } catch (_) {
@@ -226,7 +226,7 @@ class UnivGakunaiGyou {
   final String nen;
 }
 
-/// 大学[u]の、区間・種目ごとの学内記録の1位(記録がなければ空。1位が留学生なら、日本人の1位の行も添える)
+/// 大学[u]の、種目・区間ごとの学内記録の1位(記録がなければ空。個人記録が先。1位が留学生なら、日本人の1位の行も添える)
 List<UnivGakunaiGyou> univGakunaiIchiran(Ghensuu gh, UnivData u) {
   try {
     if (!Hive.isBoxOpen('kirokuBox') || !Hive.isBoxOpen('univBox')) return const [];
@@ -257,6 +257,22 @@ List<UnivGakunaiGyou> univGakunaiIchiran(Ghensuu gh, UnivData u) {
       gyou.add(gyouNi('$shumoku(日本人)', n));
     }
 
+    // 個人記録(一人1件。選手画面の歴代記録の表と同じく、個人記録を先にする)
+    for (final int k in _kojinJun) {
+      if (u.time_univkojinkiroku.length <= k) continue;
+      final List<RekidaiKiroku> nihonjin =
+          rekidaiHitoriIkken(rekidaiUnivKojin(kiroku, false, u.id, k).yomu());
+      ireru(
+        _kojinMei[k] ?? '',
+        rekidaiAwaseru(
+          ichii: ichiiUnivKojin(u, k).yomu(),
+          nihonjin: nihonjin,
+          ryuugakusei: rekidaiHitoriIkken(rekidaiUnivKojin(kiroku, true, u.id, k).yomu()),
+          hitoriIkken: true,
+        ),
+        nihonjin,
+      );
+    }
     // 駅伝の区間記録(記録画面と同じ区間の数)
     final UnivData? custom = Hive.box<UnivData>('univBox').get(0);
     for (final int race in const [0, 1, 2, customRaceBangou]) {
@@ -277,22 +293,6 @@ List<UnivGakunaiGyou> univGakunaiIchiran(Ghensuu gh, UnivData u) {
           nihonjin,
         );
       }
-    }
-    // 個人記録(一人1件)
-    for (final int k in _kojinJun) {
-      if (u.time_univkojinkiroku.length <= k) continue;
-      final List<RekidaiKiroku> nihonjin =
-          rekidaiHitoriIkken(rekidaiUnivKojin(kiroku, false, u.id, k).yomu());
-      ireru(
-        _kojinMei[k] ?? '',
-        rekidaiAwaseru(
-          ichii: ichiiUnivKojin(u, k).yomu(),
-          nihonjin: nihonjin,
-          ryuugakusei: rekidaiHitoriIkken(rekidaiUnivKojin(kiroku, true, u.id, k).yomu()),
-          hitoriIkken: true,
-        ),
-        nihonjin,
-      );
     }
     return gyou;
   } catch (_) {

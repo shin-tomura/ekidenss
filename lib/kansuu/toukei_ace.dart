@@ -1,14 +1,14 @@
 import 'package:ekiden/constants.dart';
 import 'package:ekiden/senshu_data.dart';
-import 'package:ekiden/kansuu/ace_haichi.dart' show aceJunSenshu; // エース・準エースの決め方(2.1.3)
+import 'package:ekiden/kansuu/ace_haichi.dart' show AceKijun, aceJunSenshu; // エース・準エースの決め方(2.1.3)
 
 // ------------------------------------------------------------
 // 「スキップして統計データ取得」の、エース・準エースが走った区間(2.1.3)
 // 各大学のエースや準エースが、駅伝のどの区間に配置されたかを見るため。
 // ・エース・準エースの決め方: その大学の全選手(区間エントリーされていない選手も、留学生も含む)を、
-//   5000m・1万m・ハーフ・ロード1万の学内順位の平均で並べた1番手と2番手
+//   5000m・1万m・ハーフ・ロード1万の持ちタイムの全選手の中での偏差値のうち、得意な2種目の平均で並べた1番手と2番手
 //   (決め方は、レース前の画面の「エースの配置」と同じ ace_haichi.dart の aceJunSenshu。持ちタイムは今季ベスト、
-//    なければ自己ベストで、記録のない種目は近い種目から換算する)
+//    なければ自己ベスト。偏差値の物差しは、駅伝ごとにその時点の全選手で作る)
 // ・数えるのは10月駅伝・11月駅伝・正月駅伝・カスタム駅伝の、当日変更のあとに実際に走った区間
 //   (KirokuKousin.dart の区間別タイム統計と同じところで数える)。走らなかったら「走らず」
 // ・学連選抜は数えない(いくつもの大学の寄せ集めなので)。KirokuKousin で学連選抜の選手の結果を
@@ -73,10 +73,12 @@ void toukeiAceAtsumeru(int racebangou, int kukansuu, Iterable<SenshuData> senshu
     univBetsu.putIfAbsent(s.univid, () => []).add(s);
   }
   t.kaisuu++;
+  // 偏差値の物差し(その時点の全選手で作る)
+  final AceKijun kijun = AceKijun.tsukuru(senshuList);
   for (final List<SenshuData> list in univBetsu.values) {
     // 走った選手がいない大学は、出場していないので数えない
     if (!list.any((s) => _hashittaKukan(s, racebangou, kukansuu) >= 0)) continue;
-    final List<SenshuData> narabi = aceJunSenshu(list);
+    final List<SenshuData> narabi = aceJunSenshu(kijun, list);
     for (int i = 0; i < 2 && i < narabi.length; i++) {
       t.teamSuu[i]++;
       final int k = _hashittaKukan(narabi[i], racebangou, kukansuu);
@@ -103,8 +105,8 @@ String toukeiAceBun({
 }) {
   final StringBuffer sb = StringBuffer();
   sb.write('\n\n\n==エース・準エースが走った区間==\n');
-  sb.write('(各大学の全選手を、5000m・1万m・ハーフ・ロード1万の学内順位の平均で並べた1番手と2番手。');
-  sb.write('持ちタイムは今季ベスト、なければ自己ベストで、記録のない種目は近い種目から換算します。');
+  sb.write('(5000m・1万m・ハーフ・ロード1万の持ちタイムを全選手の中での偏差値にし、');
+  sb.write('得意な2種目の平均が学内で1番目・2番目の選手。持ちタイムは今季ベスト、なければ自己ベスト。');
   sb.write('留学生も含み、学連選抜は数えません)\n');
   for (final int r in _aceRace) {
     final _AceToukei t = _toukei[r]!;

@@ -253,12 +253,12 @@ class _ModalAceHaichiState extends State<ModalAceHaichi> {
       Text(bamenChuu, style: _futsuu),
       const SizedBox(height: 6),
       const Text(
-        '各大学の全選手を、5000m・1万m・ハーフ・ロード1万の学内順位の平均で並べた1番手をエース、2番手を準エースとしています'
-        '(記事の「エース」とは決め方が違うことがあります)。',
+        '5000m・1万m・ハーフ・ロード1万の持ちタイムを全選手の中での偏差値にし、得意な2種目の平均が学内で一番高い選手を'
+        'エース、2番目を準エースとしています(記事の「エース」とは決め方が違うことがあります)。',
         style: _chuu,
       ),
       const Text(
-        '持ちタイムは今季ベスト、なければ自己ベストで、記録のない種目は近い種目から換算します。',
+        '持ちタイムは今季ベスト(なければ自己ベスト)で、記録のある種目だけで比べます。',
         style: _chuu,
       ),
       KijiHyouView(ninzuuHyou, ue: 12),

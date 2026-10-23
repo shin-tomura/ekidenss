@@ -1,4 +1,4 @@
-import 'dart:math' as math; // 持ちタイムの換算(距離の比の1.06乗)
+import 'dart:math' as math; // 偏差値(標準偏差)
 import 'package:ekiden/constants.dart';
 import 'package:ekiden/senshu_data.dart';
 import 'package:ekiden/senshu_gakuren_data.dart';
@@ -9,105 +9,112 @@ import 'package:ekiden/kansuu/konki_best.dart' show hikakuMochiTime, hikakuMochi
 // 「スキップして統計データ取得」のエース・準エースが走った区間(toukei_ace.dart)と、
 // レース前の画面の「エースの配置」(screens/Modal_aceHaichi.dart)で同じ決め方を使う。
 //
-// ・5000m・1万m・ハーフ・ロード1万の4種目で、それぞれ持ちタイムの順位を付け、4つの順位の平均の良い順に並べる
+// ・5000m・1万m・ハーフ・ロード1万の4種目(time_bestkiroku の0・1・2・6)の持ちタイムを、
+//   それぞれ全選手(全大学・全学年。留学生も含む)の中での偏差値にする(AceKijun。求め方はレーダーチャートと同じで、
+//   1〜10点への換算と頭打ちはしない)
+// ・選手ごとに、偏差値の高い2種目の平均(得意な2種目の平均)を点数にし、高い順に並べる
+//   ・記録のある種目だけで比べる(記録のある種目が1つなら、その1つ。1つもなければ一番下)
+//   ・点数が同じなら1万mの持ちタイムの速いほう、それも同じなら選手のidの順
 //   ・エース・準エース: 1つの大学の全選手(区間エントリーされていない選手も、留学生も含む)の中での1番手・2番手
 //   ・全体の上位10人: その駅伝に区間エントリーされた全選手(補欠・当日変更で外れた選手と、
 //     正月駅伝は学連選抜の選手も含む)の中での上位10人
 // ・持ちタイムは、コンピュータの大学が区間配置で比べるのと同じ今季ベスト(なければ自己ベスト。hikakuMochiTime)
-// ・記録のない種目は、近い種目の記録から換算する(記事の tenbouMochiTime や区間配置の見積もりと同じく、
-//   距離の比の1.06乗を掛ける)
-//   ・5000m・1万m・ハーフは、ほかの2つのうち距離の近いほうから。どちらもなければ、ロード1万を1万mとみなして換算する
-//   ・ロード1万がなければ、1万m(換算したものも)をそのまま使う(距離が同じなので)
-//   ・4種目とも記録がなければ、その種目の最下位(記録のある人数+1位)
-//   (2.1.3の開発中は、記録のない種目を最下位にしていた。1万mやハーフの記録がまだない1年生が、
-//    強くても上位に入れなかったので換算にした)
-// ・同じタイムは同じ順位。平均が同じなら1万m(換算したものも)の速いほう、それも同じなら選手のidの順
+// ・タイム差がそのまま偏差値の差になり、得意な2種目で見るので、抜けた選手がエースになりやすい
+//   (2.1.3の開発中は、4種目の学内順位の平均で決めていたが、どの種目でも2〜3番手のバランス型の選手が
+//    エースになりやすく、タイム差も見られなかったので変えた。記録のない種目の換算もやめた)
 // ・体調・調子は使わない(持ちタイムと区間エントリーは、ほかの画面でも見られる)
 // ------------------------------------------------------------
 
-/// 4種目の距離(m)。並びは aceMochiTimes の並び(5000m・1万m・ハーフ・ロード1万)
-const List<double> _kyori = [5000.0, 10000.0, 21097.5, 10000.0];
+/// 4種目(time_bestkiroku の番号。5000m・1万m・ハーフ・ロード1万)
+const List<int> aceShumoku = [0, 1, 2, 6];
+
+/// 1万m(点数が同じときに比べる種目。aceShumoku の中の位置)
+const int _ichiman = 1;
 
 /// 有効な持ちタイムか(記録がなければnull)
 double? _yuukou(double t) => (t > 0 && t < TEISUU.DEFAULTTIME) ? t : null;
 
-/// 4種目(5000m・1万m・ハーフ・ロード1万)の持ちタイム(記録がなければ換算。換算もできなければnull)
-/// [mochi] は time_bestkiroku の番号の種目の持ちタイム(記録がなければnull)
-List<double?> aceMochiTimes(double? Function(int idx) mochi) {
-  final List<double?> track = [mochi(0), mochi(1), mochi(2)];
-  final double? road = mochi(6);
-  double? kansan(int i) {
-    final double? t = track[i];
-    if (t != null) return t;
-    final List<int> kouho = [0, 1, 2]
-      ..remove(i)
-      ..sort((a, b) => (_kyori[a] - _kyori[i]).abs().compareTo((_kyori[b] - _kyori[i]).abs()));
-    for (final int c in kouho) {
-      final double? tc = track[c];
-      if (tc != null) return tc * math.pow(_kyori[i] / _kyori[c], 1.06).toDouble();
+/// 選手[s]の4種目の持ちタイム(記録がなければnull)
+List<double?> aceMochiTimesSenshu(SenshuData s) => [
+  for (final int idx in aceShumoku) _yuukou(hikakuMochiTime(s, idx)),
+];
+
+/// 学連選抜の選手[g]の4種目の持ちタイム(記録がなければnull)
+List<double?> aceMochiTimesGakuren(Senshu_Gakuren_Data g) => [
+  for (final int idx in aceShumoku) _yuukou(hikakuMochiTimeGakuren(g, idx)),
+];
+
+/// 偏差値の物差し(4種目それぞれの、全選手の持ちタイムの平均と標準偏差)
+class AceKijun {
+  final List<double> heikin;
+  final List<double> hensa;
+  const AceKijun._(this.heikin, this.hensa);
+
+  /// 全選手[zen]から作る(学連選抜の選手は元の大学の選手と同じ人なので、大学の選手のデータだけで作る)
+  factory AceKijun.tsukuru(Iterable<SenshuData> zen) {
+    final List<List<double>> pool = [for (int j = 0; j < aceShumoku.length; j++) <double>[]];
+    for (final SenshuData s in zen) {
+      final List<double?> t = aceMochiTimesSenshu(s);
+      for (int j = 0; j < aceShumoku.length; j++) {
+        final double? x = t[j];
+        if (x != null) pool[j].add(x);
+      }
     }
-    // トラックの記録がなければ、ロード1万を1万mとみなして換算する
-    if (road != null) return road * math.pow(_kyori[i] / 10000.0, 1.06).toDouble();
-    return null;
+    final List<double> heikin = [];
+    final List<double> hensa = [];
+    for (final List<double> l in pool) {
+      if (l.isEmpty) {
+        heikin.add(0.0);
+        hensa.add(0.0);
+        continue;
+      }
+      final double m = l.reduce((a, b) => a + b) / l.length;
+      final double v = l.map((x) => (x - m) * (x - m)).reduce((a, b) => a + b) / l.length;
+      heikin.add(m);
+      hensa.add(math.sqrt(v));
+    }
+    return AceKijun._(heikin, hensa);
   }
 
-  final double? ichiman = kansan(1);
-  return [kansan(0), ichiman, kansan(2), road ?? ichiman];
+  /// 種目[j](aceShumoku の中の位置)のタイム[t]の偏差値(速いほど高い。標準偏差が0なら50)
+  double hensachi(int j, double t) =>
+      hensa[j] == 0 ? 50.0 : 50.0 + 10.0 * (heikin[j] - t) / hensa[j];
+
+  /// 4種目の持ちタイム[times]の点数(偏差値の高い2種目の平均。記録が1つならその1つ、なければnull)
+  double? tensuu(List<double?> times) {
+    final List<double> h = [
+      for (int j = 0; j < times.length && j < aceShumoku.length; j++)
+        if (times[j] != null) hensachi(j, times[j]!),
+    ]..sort((a, b) => b.compareTo(a));
+    if (h.isEmpty) return null;
+    if (h.length == 1) return h[0];
+    return (h[0] + h[1]) / 2;
+  }
 }
 
-/// 選手[s]の4種目の持ちタイム
-List<double?> aceMochiTimesSenshu(SenshuData s) =>
-    aceMochiTimes((int idx) => _yuukou(hikakuMochiTime(s, idx)));
-
-/// 学連選抜の選手[g]の4種目の持ちタイム
-List<double?> aceMochiTimesGakuren(Senshu_Gakuren_Data g) =>
-    aceMochiTimes((int idx) => _yuukou(hikakuMochiTimeGakuren(g, idx)));
-
-/// 並んだタイム[narabi](速い順)のうち、[t]より速いものの数
-int _hayaiKazu(List<double> narabi, double t) {
-  int lo = 0;
-  int hi = narabi.length;
-  while (lo < hi) {
-    final int mid = (lo + hi) >> 1;
-    if (narabi[mid] < t) {
-      lo = mid + 1;
-    } else {
-      hi = mid;
-    }
-  }
-  return lo;
-}
-
-/// 選手ごとの4種目の持ちタイム[times]を、順位の平均の良い順に並べた番号([times]の添字)
-/// [ids] は平均も1万mも同じときに比べる選手のid
-List<int> aceJuniJun(List<List<double?>> times, List<int> ids) {
-  final int n = times.length;
-  final List<double> goukei = List.filled(n, 0.0);
-  for (int j = 0; j < 4; j++) {
-    final List<double> ari = [
-      for (final List<double?> l in times)
-        if (l[j] != null) l[j]!,
-    ]..sort();
-    for (int i = 0; i < n; i++) {
-      final double? t = times[i][j];
-      goukei[i] += t == null ? ari.length + 1 : _hayaiKazu(ari, t) + 1;
-    }
-  }
-  return List.generate(n, (i) => i)
+/// 選手ごとの4種目の持ちタイム[times]を、点数の高い順に並べた番号([times]の添字)
+/// [ids] は点数も1万mも同じときに比べる選手のid
+List<int> aceJun(AceKijun kijun, List<List<double?>> times, List<int> ids) {
+  final List<double?> ten = [for (final List<double?> t in times) kijun.tensuu(t)];
+  return List.generate(times.length, (i) => i)
     ..sort((a, b) {
-      final int c = goukei[a].compareTo(goukei[b]);
+      final double ta = ten[a] ?? double.negativeInfinity;
+      final double tb = ten[b] ?? double.negativeInfinity;
+      final int c = tb.compareTo(ta);
       if (c != 0) return c;
-      final double ta = times[a][1] ?? TEISUU.DEFAULTTIME;
-      final double tb = times[b][1] ?? TEISUU.DEFAULTTIME;
-      final int c2 = ta.compareTo(tb);
+      final double ia = times[a][_ichiman] ?? TEISUU.DEFAULTTIME;
+      final double ib = times[b][_ichiman] ?? TEISUU.DEFAULTTIME;
+      final int c2 = ia.compareTo(ib);
       if (c2 != 0) return c2;
       return ids[a].compareTo(ids[b]);
     });
 }
 
-/// 1つの大学の選手[list]を、学内順位の平均の良い順に並べる(1番手がエース、2番手が準エース)
-List<SenshuData> aceJunSenshu(List<SenshuData> list) {
-  final List<int> jun = aceJuniJun(
+/// 1つの大学の選手[list]を、点数の高い順に並べる(1番手がエース、2番手が準エース)
+/// [kijun] は全選手で作った偏差値の物差し
+List<SenshuData> aceJunSenshu(AceKijun kijun, List<SenshuData> list) {
+  final List<int> jun = aceJun(
+    kijun,
     [for (final SenshuData s in list) aceMochiTimesSenshu(s)],
     [for (final SenshuData s in list) s.id],
   );
@@ -251,6 +258,8 @@ AceHaichiKekka aceHaichiKeisan({
     }
   }
 
+  // 偏差値の物差し(全選手で作る)
+  final AceKijun kijun = AceKijun.tsukuru(senshu);
   // 大学ごとに分ける
   final Map<int, List<SenshuData>> univBetsu = {};
   for (final SenshuData s in senshu) {
@@ -272,7 +281,7 @@ AceHaichiKekka aceHaichiKeisan({
     if (!list.any((s) => _code(s.entrykukan_race, s.gakunen, race) != -2)) continue;
     univSuu++;
     final String mei = univMei[u] ?? '';
-    final List<SenshuData> narabi = aceJunSenshu(list);
+    final List<SenshuData> narabi = aceJunSenshu(kijun, list);
     final List<AceSenshu> ace = [];
     for (int i = 0; i < 2 && i < narabi.length; i++) {
       final SenshuData s = narabi[i];
@@ -300,7 +309,7 @@ AceHaichiKekka aceHaichiKeisan({
     taishouTime.add(aceMochiTimesGakuren(g));
     taishouId.add(g.id);
   }
-  final List<int> jun = aceJuniJun(taishouTime, taishouId);
+  final List<int> jun = aceJun(kijun, taishouTime, taishouId);
   final List<AceSenshu> joui = [
     for (int i = 0; i < 10 && i < jun.length; i++) taishou[jun[i]],
   ];

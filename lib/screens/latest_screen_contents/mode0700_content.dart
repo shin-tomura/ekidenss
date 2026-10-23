@@ -1284,6 +1284,9 @@ class _Mode0700ContentState extends State<Mode0700Content> {
                                                     idJunSenshuData,
                                                     currentGhensuu,
                                                     idJunUnivData,
+                                                    // 秋の記録会とフルマラソンも、上位10人の中の自分の大学の選手をオレンジにする
+                                                    // (2.1.3。対校戦と同じ。お知らせの枠は出さない)
+                                                    jibunIro: true,
                                                   ),
                                                 ],
                                               ),
@@ -2488,7 +2491,7 @@ class _Mode0700ContentState extends State<Mode0700Content> {
     Ghensuu currentGhensuu,
     List<UnivData> idJunUnivData, {
     int? limit,
-    // 自分の大学の選手の行をオレンジにするか(2.1.0。対校戦の結果画面だけ)
+    // 自分の大学の選手の行をオレンジにするか(2.1.0。対校戦の結果画面。2.1.3から秋の記録会とフルマラソンも)
     bool jibunIro = false,
   }) {
     final displayLimit = limit ?? 10; // デフォルトは上位10名

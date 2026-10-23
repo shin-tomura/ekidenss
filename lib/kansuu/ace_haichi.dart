@@ -293,7 +293,7 @@ AceHaichiKekka aceHaichiKeisan({
   for (final Senshu_Gakuren_Data g in gakuren) {
     final int code = _code(g.entrykukan_race, g.gakunen, race);
     if (aceBasho(code, ks) == AceBasho.entryGai) continue;
-    final String moto = univMei[g.univid];
+    final String? moto = univMei[g.univid];
     taishou.add(
       AceSenshu(g.name, g.gakunen, moto == null || moto.isEmpty ? '学連選抜' : '学連選抜($moto)', code, g.id),
     );

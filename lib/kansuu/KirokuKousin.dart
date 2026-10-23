@@ -2586,6 +2586,7 @@ Future<void> kirokuKousin({
     toukeiAceAtsumeru(
       racebangou,
       gh[0].kukansuu_taikaigoto[racebangou],
+      gh[0].kyori_taikai_kukangoto[racebangou],
       sortedsenshudata,
     );
   }

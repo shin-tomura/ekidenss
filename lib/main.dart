@@ -3987,6 +3987,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
           // エース・準エースが走った区間(2.1.3。kansuu/toukei_ace.dart)
           sortedUnivsById[12].name_tanshuku += toukeiAceBun(
             kukansuuTaikaigoto: ghensuu.kukansuu_taikaigoto,
+            kyoriTaikaigoto: ghensuu.kyori_taikai_kukangoto,
             customMei: sortedUnivsById[0].name_tanshuku,
           );
           await sortedUnivsById[12].save();

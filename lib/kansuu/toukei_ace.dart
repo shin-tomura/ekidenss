@@ -1,12 +1,13 @@
 import 'package:ekiden/constants.dart';
 import 'package:ekiden/senshu_data.dart';
-import 'package:ekiden/kansuu/ace_haichi.dart' show AceKijun, aceJunSenshu; // エース・準エースの決め方(2.1.3)
+import 'package:ekiden/kansuu/ace_haichi.dart' show AceKijun, AceOmomi, aceJunSenshu; // エース・準エースの決め方(2.1.3)
 
 // ------------------------------------------------------------
 // 「スキップして統計データ取得」の、エース・準エースが走った区間(2.1.3)
 // 各大学のエースや準エースが、駅伝のどの区間に配置されたかを見るため。
 // ・エース・準エースの決め方: その大学の全選手(区間エントリーされていない選手も、留学生も含む)を、
-//   1万m・ハーフ・ロード1万の3種目の持ちタイムの、全選手の中での偏差値の平均で並べた1番手と2番手
+//   その駅伝の区間の距離に合う種目の持ちタイムの、全選手の中での偏差値を、区間の距離で重み付けした平均で並べた
+//   1番手と2番手(物差しの重みは、駅伝ごとにその駅伝のコースで決める)
 //   (決め方は、レース前の画面の「エースの配置」と同じ ace_haichi.dart の aceJunSenshu。持ちタイムは今季ベスト、
 //    なければ自己ベスト。偏差値の物差しは、駅伝ごとにその時点の全選手で作る)
 // ・数えるのは10月駅伝・11月駅伝・正月駅伝・カスタム駅伝の、当日変更のあとに実際に走った区間
@@ -63,8 +64,14 @@ int _hashittaKukan(SenshuData s, int racebangou, int kukansuu) {
 }
 
 /// 駅伝[racebangou]で、各大学のエース・準エースが走った区間を数える
-/// ([kukansuu]はその駅伝の区間数、[senshuList]は全選手。KirokuKousin.dart の区間別タイム統計と同じところで呼ぶ)
-void toukeiAceAtsumeru(int racebangou, int kukansuu, Iterable<SenshuData> senshuList) {
+/// ([kukansuu]はその駅伝の区間数、[kukanKyori]は区間の距離、[senshuList]は全選手。
+///  KirokuKousin.dart の区間別タイム統計と同じところで呼ぶ)
+void toukeiAceAtsumeru(
+  int racebangou,
+  int kukansuu,
+  List<double> kukanKyori,
+  Iterable<SenshuData> senshuList,
+) {
   final _AceToukei? t = _toukei[racebangou];
   if (t == null) return;
   final Map<int, List<SenshuData>> univBetsu = {};
@@ -75,10 +82,12 @@ void toukeiAceAtsumeru(int racebangou, int kukansuu, Iterable<SenshuData> senshu
   t.kaisuu++;
   // 偏差値の物差し(その時点の全選手で作る)
   final AceKijun kijun = AceKijun.tsukuru(senshuList);
+  // その駅伝の区間の距離で決める重み
+  final AceOmomi omomi = AceOmomi.tsukuru(kukanKyori, kukansuu);
   for (final List<SenshuData> list in univBetsu.values) {
     // 走った選手がいない大学は、出場していないので数えない
     if (!list.any((s) => _hashittaKukan(s, racebangou, kukansuu) >= 0)) continue;
-    final List<SenshuData> narabi = aceJunSenshu(kijun, list);
+    final List<SenshuData> narabi = aceJunSenshu(kijun, omomi, list);
     for (int i = 0; i < 2 && i < narabi.length; i++) {
       t.teamSuu[i]++;
       final int k = _hashittaKukan(narabi[i], racebangou, kukansuu);
@@ -98,15 +107,18 @@ String _wariai(int kazu, int bunbo) {
 }
 
 /// 統計の文(スキップの最後に、区間別タイム統計のあとに書き足す)
-/// [kukansuuTaikaigoto]は大会ごとの区間数(Ghensuu.kukansuu_taikaigoto)、[customMei]はカスタム駅伝の名前
+/// [kukansuuTaikaigoto]は大会ごとの区間数(Ghensuu.kukansuu_taikaigoto)、[kyoriTaikaigoto]は大会ごとの区間の距離
+/// (Ghensuu.kyori_taikai_kukangoto。物差しの重みを書くのに使う)、[customMei]はカスタム駅伝の名前
 String toukeiAceBun({
   required List<int> kukansuuTaikaigoto,
+  required List<List<double>> kyoriTaikaigoto,
   required String customMei,
 }) {
   final StringBuffer sb = StringBuffer();
   sb.write('\n\n\n==エース・準エースが走った区間==\n');
-  sb.write('(1万m・ハーフ・ロード1万の3種目の持ちタイムを全選手の中での偏差値にし、');
-  sb.write('その平均が学内で1番目・2番目の選手。持ちタイムは今季ベスト、なければ自己ベスト。');
+  sb.write('(その駅伝の区間の距離に合う種目の持ちタイムを全選手の中での偏差値にし、区間の距離で重み付けした平均が');
+  sb.write('学内で1番目・2番目の選手。1〜3区は5000m・1万m・ハーフのうち距離に合う種目、4区以降は15km以下ならロード1万、');
+  sb.write('15km超ならハーフで見ます。持ちタイムは今季ベスト、なければ自己ベスト。');
   sb.write('留学生も含み、学連選抜は数えません)\n');
   for (final int r in _aceRace) {
     final _AceToukei t = _toukei[r]!;
@@ -118,6 +130,10 @@ String toukeiAceBun({
     sb.write('開催 ${t.kaisuu}回・のべ${t.teamSuu[0]}チーム\n');
     final int kukansuu = (r < kukansuuTaikaigoto.length ? kukansuuTaikaigoto[r] : _kukanMax)
         .clamp(1, _kukanMax);
+    // 物差しの重み(今のコースで書く。統計をとっている間はコースを変えられない)
+    if (r < kyoriTaikaigoto.length) {
+      sb.write('物差し ${AceOmomi.tsukuru(kyoriTaikaigoto[r], kukansuu).moji()}\n');
+    }
     for (int k = 0; k < kukansuu; k++) {
       sb.write(
         '${k + 1}区 エース ${_wariai(t.kukan[0][k], t.teamSuu[0])} '

@@ -142,6 +142,9 @@ class _ModalAceHaichiState extends State<ModalAceHaichi> {
     final AceHaichiKekka k = aceHaichiKeisan(
       race: race,
       kukansuu: kukansuu,
+      kukanKyori: race < gh.kyori_taikai_kukangoto.length
+          ? gh.kyori_taikai_kukangoto[race]
+          : const <double>[],
       senshu: Hive.box<SenshuData>('senshuBox').values,
       gakuren: gakuren,
       univMei: univMei,
@@ -253,14 +256,17 @@ class _ModalAceHaichiState extends State<ModalAceHaichi> {
       Text(bamenChuu, style: _futsuu),
       const SizedBox(height: 6),
       const Text(
-        '1万m・ハーフ・ロード1万の3種目の持ちタイムを全選手の中での偏差値にし、その平均が学内で一番高い選手を'
-        'エース、2番目を準エースとしています(記事の「エース」とは決め方が違うことがあります)。',
+        'この駅伝の区間の距離に合う種目の持ちタイムを全選手の中での偏差値にし、区間の距離で重み付けした平均が'
+        '学内で一番高い選手をエース、2番目を準エースとしています(記事の「エース」とは決め方が違うことがあります)。',
         style: _chuu,
       ),
       const Text(
-        '持ちタイムは今季ベスト(なければ自己ベスト)で、記録のある種目だけで比べます。',
+        '1〜3区は5000m・1万m・ハーフのうち距離に合う種目、4区以降は15km以下ならロード1万、15km超ならハーフで見ます。'
+        '持ちタイムは今季ベスト(なければ自己ベスト)です。',
         style: _chuu,
       ),
+      // この駅伝の物差しの重み(2.1.3)
+      Text('この駅伝の物差し: ${k.omomi.moji()}', style: _chuu),
       KijiHyouView(ninzuuHyou, ue: 12),
       const SizedBox(height: 6),
       Text(

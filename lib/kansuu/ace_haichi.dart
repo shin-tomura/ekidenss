@@ -9,46 +9,102 @@ import 'package:ekiden/kansuu/konki_best.dart' show hikakuMochiTime, hikakuMochi
 // 「スキップして統計データ取得」のエース・準エースが走った区間(toukei_ace.dart)と、
 // レース前の画面の「エースの配置」(screens/Modal_aceHaichi.dart)で同じ決め方を使う。
 //
-// ・1万m・ハーフ・ロード1万の3種目(time_bestkiroku の1・2・6)の持ちタイムを、
-//   それぞれ全選手(全大学・全学年。留学生も含む)の中での偏差値にする(AceKijun。求め方はレーダーチャートと同じで、
-//   1〜10点への換算と頭打ちはしない)
-// ・選手ごとに、3種目の偏差値の平均を点数にし、高い順に並べる
-//   ・トラック(1万m)が3分の1、ロード(ハーフ・ロード1万)が3分の2で効く(トラックは1区、ロードは2区以降に効くため。
-//     5000mはトラックの短い種目で、1区のほかでは活躍の場が限られるので入れない)
-//   ・記録のある種目だけで平均する(対校戦と夏のタイムトライアルは全員が走るので、駅伝のころには、ふつうは3種目そろう。
-//     1つもなければ一番下)
-//   ・点数が同じならロード1万の持ちタイムの速いほう(全員が走るので)、それも同じなら選手のidの順
+// ・物差しは駅伝ごとに、その駅伝の区間の距離で決める(AceOmomi)
+//   ・区間ごとに合う種目(aceKukanShumoku): 1〜3区は距離の種目(7.5km以下は5000m、15km以下は1万m、
+//     それより長いとハーフ。記事の kukanKihonShumoku と同じ区切り)、4区以降は15km以下ならロード1万、
+//     15km超ならハーフ(区間適性の見立ての tekiseiNarabiShumoku と同じ。4区以降は単独走でロード適性がまるごと効くため)
+//   ・山登り・山下り・アップダウンの区間も距離の種目で見る(山の適性は区間適性の見立てで見る。
+//     エースは、ふつうに思う「その駅伝の主力」に近づけるため)
+//   ・種目ごとの重みは、その種目で見る区間の距離の合計の割合(初期のコースなら、正月駅伝はハーフだけ、
+//     11月駅伝は1万m・ロード1万・ハーフがほぼ3分の1ずつ、10月駅伝はロード1万が半分・1万mと5000m)
+// ・持ちタイム(今季ベスト。なければ自己ベスト。hikakuMochiTime)を、種目ごとに全選手(全大学・全学年。留学生も含む)の
+//   中での偏差値にし(AceKijun。求め方はレーダーチャートと同じで、1〜10点への換算と頭打ちはしない)、
+//   重みで平均した点数の高い順に並べる
+//   ・記録のない種目は除き、残りの重みで平均する(対校戦と夏のタイムトライアルは全員が走るので、ふつうはそろう。
+//     重みのある種目の記録が1つもなければ一番下)
+//   ・点数が同じなら、重みが一番大きい種目の持ちタイムの速いほう(正月駅伝ならハーフ)、それも同じなら選手のidの順
 //   ・エース・準エース: 1つの大学の全選手(区間エントリーされていない選手も、留学生も含む)の中での1番手・2番手
 //   ・全体の上位10人: その駅伝に区間エントリーされた全選手(補欠・当日変更で外れた選手と、
 //     正月駅伝は学連選抜の選手も含む)の中での上位10人
-// ・持ちタイムは、コンピュータの大学が区間配置で比べるのと同じ今季ベスト(なければ自己ベスト。hikakuMochiTime)
-// ・タイム差がそのまま偏差値の差になるので、大きく引き離している選手は平均しても上に来る
-//   (2.1.3の開発中は、5000mも入れた4種目の学内順位の平均で決めていたが、どの種目でも2〜3番手のバランス型の選手が
-//    エースになりやすく、タイム差も見られなかったので偏差値にした。記録のない種目の換算もやめた。
-//    いったん得意な2種目の平均にしたが、トラックだけ速い選手もエースになるので、3種目の平均にした)
+// ・2.1.3の開発中のいきさつ: はじめは5000m・1万m・ハーフ・ロード1万の学内順位の平均で決めていたが、
+//   バランス型の選手がエースになりやすく、タイム差も見られなかったので偏差値にした(記録のない種目の換算もやめた)。
+//   そのあと、得意な2種目の平均、1万m・ハーフ・ロード1万の平均と試したが、どの駅伝でも同じ物差しだと、
+//   長い区間ばかりの正月駅伝で10kmが得意な選手がエースになるので、駅伝ごとの物差しにした
 // ・体調・調子は使わない(持ちタイムと区間エントリーは、ほかの画面でも見られる)
 // ------------------------------------------------------------
 
-/// 3種目(time_bestkiroku の番号。1万m・ハーフ・ロード1万)
-const List<int> aceShumoku = [1, 2, 6];
+/// 使う種目(time_bestkiroku の番号。5000m・1万m・ハーフ・ロード1万)
+const List<int> aceShumoku = [0, 1, 2, 6];
 
-/// ロード1万(点数が同じときに比べる種目。aceShumoku の中の位置)
-const int _road = 2;
+/// 種目の呼び方(aceShumoku の並び)
+const List<String> aceShumokuMei = ['5000m', '1万m', 'ハーフ', 'ロード1万'];
+
+/// 重みが同じときに、点数が同じ選手を比べる種目を選ぶ順(長い種目から。aceShumoku の中の位置)
+const List<int> _hikakuJun = [2, 3, 1, 0];
+
+/// 区間[k](0が1区)の距離[kyori](m)に合う種目(time_bestkiroku の番号)
+int aceKukanShumoku(int k, double kyori) {
+  final int kihon = kyori <= 7500 ? 0 : (kyori <= 15000 ? 1 : 2);
+  if (kihon <= 1 && k >= 3) return 6;
+  return kihon;
+}
+
+/// 駅伝ごとの物差しの重み(aceShumoku の並び。合計1)と、点数が同じときに比べる種目
+class AceOmomi {
+  final List<double> omomi;
+
+  /// 点数が同じときに比べる種目(aceShumoku の中の位置。重みが一番大きい種目)
+  final int hikaku;
+
+  const AceOmomi._(this.omomi, this.hikaku);
+
+  /// 区間の距離[kukanKyori](m。0が1区)の最初の[kukansuu]区間から作る
+  factory AceOmomi.tsukuru(List<double> kukanKyori, int kukansuu) {
+    final List<double> w = List.filled(aceShumoku.length, 0.0);
+    double goukei = 0.0;
+    for (int k = 0; k < kukansuu && k < kukanKyori.length; k++) {
+      final double d = kukanKyori[k];
+      if (d <= 0) continue;
+      final int j = aceShumoku.indexOf(aceKukanShumoku(k, d));
+      if (j < 0) continue;
+      w[j] += d;
+      goukei += d;
+    }
+    if (goukei <= 0) {
+      // 区間の距離が読めなければ、1万mだけで見る
+      w[1] = 1.0;
+      goukei = 1.0;
+    }
+    final List<double> omomi = [for (final double v in w) v / goukei];
+    int hikaku = _hikakuJun.first;
+    for (final int j in _hikakuJun) {
+      if (omomi[j] > omomi[hikaku]) hikaku = j;
+    }
+    return AceOmomi._(omomi, hikaku);
+  }
+
+  /// 重みの文(「ハーフ 61%・ロード1万 35%…」。重みの大きい順。重みのない種目は書かない)
+  String moji() {
+    final List<int> jun = [for (int j = 0; j < omomi.length; j++) if (omomi[j] > 0) j]
+      ..sort((a, b) => omomi[b].compareTo(omomi[a]));
+    return [for (final int j in jun) '${aceShumokuMei[j]} ${(omomi[j] * 100).round()}%'].join('・');
+  }
+}
 
 /// 有効な持ちタイムか(記録がなければnull)
 double? _yuukou(double t) => (t > 0 && t < TEISUU.DEFAULTTIME) ? t : null;
 
-/// 選手[s]の3種目の持ちタイム(記録がなければnull)
+/// 選手[s]の4種目の持ちタイム(aceShumoku の並び。記録がなければnull)
 List<double?> aceMochiTimesSenshu(SenshuData s) => [
   for (final int idx in aceShumoku) _yuukou(hikakuMochiTime(s, idx)),
 ];
 
-/// 学連選抜の選手[g]の3種目の持ちタイム(記録がなければnull)
+/// 学連選抜の選手[g]の4種目の持ちタイム(aceShumoku の並び。記録がなければnull)
 List<double?> aceMochiTimesGakuren(Senshu_Gakuren_Data g) => [
   for (final int idx in aceShumoku) _yuukou(hikakuMochiTimeGakuren(g, idx)),
 ];
 
-/// 偏差値の物差し(3種目それぞれの、全選手の持ちタイムの平均と標準偏差)
+/// 偏差値の物差し(4種目それぞれの、全選手の持ちタイムの平均と標準偏差)
 class AceKijun {
   final List<double> heikin;
   final List<double> hensa;
@@ -84,40 +140,46 @@ class AceKijun {
   double hensachi(int j, double t) =>
       hensa[j] == 0 ? 50.0 : 50.0 + 10.0 * (heikin[j] - t) / hensa[j];
 
-  /// 3種目の持ちタイム[times]の点数(記録のある種目の偏差値の平均。1つもなければnull)
-  double? tensuu(List<double?> times) {
-    final List<double> h = [
-      for (int j = 0; j < times.length && j < aceShumoku.length; j++)
-        if (times[j] != null) hensachi(j, times[j]!),
-    ];
-    if (h.isEmpty) return null;
-    return h.reduce((a, b) => a + b) / h.length;
+  /// 持ちタイム[times](aceShumoku の並び)の点数(重み[o]で平均した偏差値。記録のない種目は除き、
+  /// 残りの重みで平均する。重みのある種目の記録が1つもなければnull)
+  double? tensuu(List<double?> times, AceOmomi o) {
+    double wa = 0.0;
+    double omomi = 0.0;
+    for (int j = 0; j < times.length && j < o.omomi.length; j++) {
+      final double? t = times[j];
+      if (t == null || o.omomi[j] <= 0) continue;
+      wa += o.omomi[j] * hensachi(j, t);
+      omomi += o.omomi[j];
+    }
+    if (omomi <= 0) return null;
+    return wa / omomi;
   }
 }
 
-/// 選手ごとの3種目の持ちタイム[times]を、点数の高い順に並べた番号([times]の添字)
-/// [ids] は点数もロード1万も同じときに比べる選手のid
-List<int> aceJun(AceKijun kijun, List<List<double?>> times, List<int> ids) {
-  final List<double?> ten = [for (final List<double?> t in times) kijun.tensuu(t)];
+/// 選手ごとの持ちタイム[times]を、駅伝の物差し[o]での点数の高い順に並べた番号([times]の添字)
+/// [ids] は点数も比べる種目のタイムも同じときに比べる選手のid
+List<int> aceJun(AceKijun kijun, AceOmomi o, List<List<double?>> times, List<int> ids) {
+  final List<double?> ten = [for (final List<double?> t in times) kijun.tensuu(t, o)];
   return List.generate(times.length, (i) => i)
     ..sort((a, b) {
       final double ta = ten[a] ?? double.negativeInfinity;
       final double tb = ten[b] ?? double.negativeInfinity;
       final int c = tb.compareTo(ta);
       if (c != 0) return c;
-      final double ia = times[a][_road] ?? TEISUU.DEFAULTTIME;
-      final double ib = times[b][_road] ?? TEISUU.DEFAULTTIME;
+      final double ia = times[a][o.hikaku] ?? TEISUU.DEFAULTTIME;
+      final double ib = times[b][o.hikaku] ?? TEISUU.DEFAULTTIME;
       final int c2 = ia.compareTo(ib);
       if (c2 != 0) return c2;
       return ids[a].compareTo(ids[b]);
     });
 }
 
-/// 1つの大学の選手[list]を、点数の高い順に並べる(1番手がエース、2番手が準エース)
+/// 1つの大学の選手[list]を、駅伝の物差し[o]での点数の高い順に並べる(1番手がエース、2番手が準エース)
 /// [kijun] は全選手で作った偏差値の物差し
-List<SenshuData> aceJunSenshu(AceKijun kijun, List<SenshuData> list) {
+List<SenshuData> aceJunSenshu(AceKijun kijun, AceOmomi o, List<SenshuData> list) {
   final List<int> jun = aceJun(
     kijun,
+    o,
     [for (final SenshuData s in list) aceMochiTimesSenshu(s)],
     [for (final SenshuData s in list) s.id],
   );
@@ -207,6 +269,9 @@ class AceHaichiKekka {
   /// 全体の上位10人(並びの順)
   final List<AceSenshu> joui;
 
+  /// この駅伝の物差しの重み
+  final AceOmomi omomi;
+
   /// 出場した大学ごとのエース・準エース(大学のidの順。区間配置確認と同じ並び)
   final List<AceUniv> univAce;
 
@@ -220,6 +285,7 @@ class AceHaichiKekka {
     required this.jibun,
     required this.joui,
     required this.univAce,
+    required this.omomi,
   });
 }
 
@@ -231,9 +297,11 @@ int _code(List<List<int>> entry, int gakunen, int race) {
 
 /// 駅伝[race]の「エースの配置」を集計する
 /// [univMei] は大学idから呼び方を引く表、[gakuren] は学連選抜の選手(出場しないときは空)
+/// [kukanKyori] はその駅伝の区間の距離(m。0が1区。物差しの重みを決める)
 AceHaichiKekka aceHaichiKeisan({
   required int race,
   required int kukansuu,
+  required List<double> kukanKyori,
   required Iterable<SenshuData> senshu,
   required Iterable<Senshu_Gakuren_Data> gakuren,
   required Map<int, String> univMei,
@@ -261,8 +329,9 @@ AceHaichiKekka aceHaichiKeisan({
     }
   }
 
-  // 偏差値の物差し(全選手で作る)
+  // 偏差値の物差し(全選手で作る)と、駅伝の区間の距離で決める重み
   final AceKijun kijun = AceKijun.tsukuru(senshu);
+  final AceOmomi omomi = AceOmomi.tsukuru(kukanKyori, ks);
   // 大学ごとに分ける
   final Map<int, List<SenshuData>> univBetsu = {};
   for (final SenshuData s in senshu) {
@@ -284,7 +353,7 @@ AceHaichiKekka aceHaichiKeisan({
     if (!list.any((s) => _code(s.entrykukan_race, s.gakunen, race) != -2)) continue;
     univSuu++;
     final String mei = univMei[u] ?? '';
-    final List<SenshuData> narabi = aceJunSenshu(kijun, list);
+    final List<SenshuData> narabi = aceJunSenshu(kijun, omomi, list);
     final List<AceSenshu> ace = [];
     for (int i = 0; i < 2 && i < narabi.length; i++) {
       final SenshuData s = narabi[i];
@@ -312,7 +381,7 @@ AceHaichiKekka aceHaichiKeisan({
     taishouTime.add(aceMochiTimesGakuren(g));
     taishouId.add(g.id);
   }
-  final List<int> jun = aceJun(kijun, taishouTime, taishouId);
+  final List<int> jun = aceJun(kijun, omomi, taishouTime, taishouId);
   final List<AceSenshu> joui = [
     for (int i = 0; i < 10 && i < jun.length; i++) taishou[jun[i]],
   ];
@@ -329,5 +398,6 @@ AceHaichiKekka aceHaichiKeisan({
     jibun: jibun,
     joui: joui,
     univAce: univAce,
+    omomi: omomi,
   );
 }

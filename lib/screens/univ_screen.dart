@@ -49,6 +49,8 @@ import 'package:ekiden/screens/meisei_yokonarabi_settei.dart'
     show meiseiYokonarabiSetteiHiraku; // 名声の横並び設定を開く(2.0.3。入学時名声影響度設定の画面の案内から)
 import 'package:ekiden/screens/setsumei_mado.dart'; // 主将・母校パイプの説明のリンク(2.0.1)
 import 'package:ekiden/screens/Modal_kinginRireki.dart'; // 金銀の内訳(2.1.1)
+import 'package:ekiden/kansuu/univ_rekidai.dart' show univTaikaiKirokuGyou; // 大会記録の1行(2.1.4)
+import 'package:ekiden/screens/univ_rekidai_mado.dart' show univRekidaiHiraku; // この大学の歴代記録(2.1.4)
 import 'package:ekiden/kansuu/mokuhyou_kimekata.dart'
     show
         mokuhyouKimekataKoujoushin,
@@ -3690,6 +3692,9 @@ class _UnivScreenState extends State<UnivScreen> {
         ),
         // 最後の優勝(直近5回の欄に優勝がないときだけ。2.0.0)
         _buildSaigoNoYuushou(univData, raceIndex, ghensuu),
+        // 一番良い総合記録(全体の歴代10位以内ならその順位、なければ学内記録か直近10回の最高。2.1.4。
+        // 駅伝と往路・復路だけ。kansuu/univ_rekidai.dart)
+        _buildTaikaiKiroku(univData, raceIndex, ghensuu),
         TextButton(
           onPressed: () {
             // Navigator.push を使用して Senshu_R_Screen へ遷移
@@ -3717,6 +3722,17 @@ class _UnivScreenState extends State<UnivScreen> {
 
         const SizedBox(height: 16), // 各レースの間にスペース
       ],
+    );
+  }
+
+  // 一番良い総合記録の行(2.1.4。出せなければ何も出さない。kansuu/univ_rekidai.dart)
+  Widget _buildTaikaiKiroku(UnivData univData, int raceIndex, Ghensuu ghensuu) {
+    final String? text = univTaikaiKirokuGyou(ghensuu, univData, raceIndex);
+    if (text == null) return const SizedBox.shrink();
+    return Text(
+      text,
+      textAlign: TextAlign.center,
+      style: const TextStyle(color: HENSUU.textcolor),
     );
   }
 
@@ -4768,6 +4784,18 @@ class _UnivScreenState extends State<UnivScreen> {
                           onPressed: () => kinginRirekiHiraku(context, currentUnivData.id),
                           child: const Text(
                             "金銀の内訳",
+                            style: TextStyle(
+                              color: Color.fromARGB(255, 0, 255, 0),
+                              decoration: TextDecoration.underline,
+                              decorationColor: HENSUU.textcolor,
+                            ),
+                          ),
+                        ),
+                        // 全体の歴代10位以内に入っている、この大学の区間記録と個人記録(2.1.4。univ_rekidai_mado.dart)
+                        TextButton(
+                          onPressed: () => univRekidaiHiraku(context, currentUnivData),
+                          child: const Text(
+                            "この大学の歴代記録",
                             style: TextStyle(
                               color: Color.fromARGB(255, 0, 255, 0),
                               decoration: TextDecoration.underline,

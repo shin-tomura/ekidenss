@@ -3675,6 +3675,11 @@ class _MatomeNarabi {
 
 /// まとめてリセットの2回目の確かめ(2.1.5。画面に出した4桁の数字を入れたときだけ true で閉じる)
 /// (入力の欄の後始末を窓が閉じきってから行うため、窓を1つの部品にした)
+/// ・キーボードが出ると、窓はその上に縮んで収まる(Flutter の窓の決まり)。題名も中身と一緒にスクロールさせ、
+///   動かないのは下のボタンだけにした(文字を大きくした小さい画面でも、はみ出さないように)
+/// ・欄をキーボードの上に出すときに、欄の上も広めに見えるようにして(scrollPadding)、4桁の数字が一緒に残るようにした
+///   (広げすぎると、窓がとても低いときに欄のほうが隠れるので、数字と案内の1行が入るくらいにした)
+/// ・キーボードは、欄を押したときに出す(先に説明を読んでもらうため)。全角の数字は半角に直して入れる
 class _SuujiKakuninDialog extends StatefulWidget {
   const _SuujiKakuninDialog({required this.setsumei, required this.bangou});
 
@@ -3704,44 +3709,47 @@ class _SuujiKakuninDialogState extends State<_SuujiKakuninDialog> {
   Widget build(BuildContext context) {
     const TextStyle kuro = TextStyle(color: Colors.black);
     return AlertDialog(
+      // 題名も中身と一緒にスクロールする(キーボードで窓が低くなっても、はみ出さないように。動かないのは下のボタンだけ)
+      scrollable: true,
       title: const Text('本当にリセットしますか？', style: TextStyle(color: Colors.red)),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(widget.setsumei, style: kuro),
-            const Text('この操作は元に戻せません。', style: TextStyle(color: Colors.red)),
-            const SizedBox(height: 8),
-            const Text('確かめのため、次の4桁の数字を入れてください。', style: kuro),
-            const SizedBox(height: 4),
-            Text(
-              '${widget.bangou}',
-              style: const TextStyle(
-                color: Colors.black,
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 6,
-              ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(widget.setsumei, style: kuro),
+          const Text('この操作は元に戻せません。', style: TextStyle(color: Colors.red)),
+          const SizedBox(height: 8),
+          const Text('確かめのため、次の4桁の数字を入れてください。', style: kuro),
+          const SizedBox(height: 4),
+          Text(
+            '${widget.bangou}',
+            style: const TextStyle(
+              color: Colors.black,
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 6,
             ),
-            TextField(
-              controller: _nyuuryoku,
-              keyboardType: TextInputType.number,
-              inputFormatters: <TextInputFormatter>[
-                FilteringTextInputFormatter.digitsOnly,
-                LengthLimitingTextInputFormatter(4),
-              ],
-              style: kuro,
-              decoration: InputDecoration(
-                hintText: '4桁の数字',
-                errorText: _machigai,
-              ),
-              onChanged: (_) {
-                if (_machigai != null) setState(() => _machigai = null);
-              },
+          ),
+          TextField(
+            controller: _nyuuryoku,
+            keyboardType: TextInputType.number,
+            // キーボードの上に出すときに、欄の上も広めに見えるようにして、4桁の数字と案内が一緒に残るようにする
+            scrollPadding: const EdgeInsets.fromLTRB(20, 120, 20, 20),
+            inputFormatters: <TextInputFormatter>[
+              const _ZenkakuSuujiFormatter(), // 全角の数字は半角に直す
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(4),
+            ],
+            style: kuro,
+            decoration: InputDecoration(
+              hintText: '4桁の数字',
+              errorText: _machigai,
             ),
-          ],
-        ),
+            onChanged: (_) {
+              if (_machigai != null) setState(() => _machigai = null);
+            },
+          ),
+        ],
       ),
       actions: <Widget>[
         TextButton(
@@ -3760,5 +3768,30 @@ class _SuujiKakuninDialogState extends State<_SuujiKakuninDialog> {
         ),
       ],
     );
+  }
+}
+
+/// 全角の数字(０〜９)を半角に直す(2.1.5。日本語のキーボードの設定によって全角の数字が来ても入るように。
+/// 1文字を1文字に直すので、選んでいる位置や変換中の範囲はそのまま使える)
+class _ZenkakuSuujiFormatter extends TextInputFormatter {
+  const _ZenkakuSuujiFormatter();
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final StringBuffer buf = StringBuffer();
+    bool kawatta = false;
+    for (final int c in newValue.text.codeUnits) {
+      if (c >= 0xFF10 && c <= 0xFF19) {
+        buf.writeCharCode(c - 0xFF10 + 0x30);
+        kawatta = true;
+      } else {
+        buf.writeCharCode(c);
+      }
+    }
+    if (!kawatta) return newValue;
+    return newValue.copyWith(text: buf.toString());
   }
 }

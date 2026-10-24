@@ -1,5 +1,6 @@
 // lib/screens/record_screen.dart
 //import 'dart:math';
+import 'dart:math' show Random; // まとめてリセットの確かめの数字(2.1.5)
 import 'package:ekiden/album.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // 記録のコピー(2.1.4)
@@ -14,6 +15,7 @@ import 'package:ekiden/kansuu/rekidai_kiroku.dart'; // 歴代10位までの記�
 import 'package:ekiden/kansuu/taikai_chouki.dart'
     show ouroRace, fukuroRace, choukiOufukuKaishi; // 正月駅伝の往路記録・復路記録(2.0.0)
 import 'package:ekiden/screens/kiroku_link.dart'; // 選手名のリンク(2.1.4)
+import 'package:ekiden/kansuu/ShoriGuard.dart'; // まとめてリセットの途中で終了しても戻せるように(2.1.5)
 
 String _getCombinedDifficultyText(KantokuData kantoku, Ghensuu currentGhensuu) {
   // 難易度モードを取得 (0:通常, 1:極, 2:天)
@@ -317,6 +319,13 @@ class _RecordScreenState extends State<RecordScreen>
       // 全体大会総合記録
       rekidaiZentaiTaikai(ghensuu, index1).kaku([]);
       await ghensuu.save();
+      // レース分析チャートで大会記録と比べる、途中の区間の経過タイムも消す(2.1.5。往路記録・復路記録にはない)
+      final KantokuData? kantoku = Hive.box<KantokuData>(
+        'kantokuBox',
+      ).get('KantokuData');
+      if (kantoku != null && _keikaKesu(kantoku, index1)) {
+        await kantoku.save();
+      }
     } else if (recordType == 0) {
       // 全体個人記録
       _resetAwase(
@@ -402,6 +411,439 @@ class _RecordScreenState extends State<RecordScreen>
           ],
         );
       },
+    );
+  }
+
+  // MARK: - 記録のまとめてリセット(2.1.5)
+  // ・記録の並びの一番下に「記録をまとめてリセット」を置く(めったに使わないので、上のコピーのボタンから離した)
+  // ・範囲は3つから選ぶ(_matomeHani。0:今見ているタブの今の選択肢だけ(初め)、1:今見ているタブの全部、
+  //   2:大学記録と全体記録の全部)。今の選択肢は、押したときに画面に出ているタブと選択肢
+  // ・確かめは2回。1回目で範囲を選んで消える件数を見せ、2回目は画面に出した4桁の数字を入れたときだけ消す
+  //   (数字は毎回変わるので、読まずに押すことができない。日本語入力の切り替えも要らない)
+  // ・消し方は、1つずつのリセットの「すべて」の行と同じ(すべて・日本人・留学生の行をまとめて消す)。
+  //   学内記録は、1つずつのリセットと同じく、今総監督をしている大学の分だけ消す
+  // ・カスタム駅伝の区間記録は、区間数を減らして画面に出ていない区間の分も消す(区間数を戻したときに古い記録が出ないように)
+  // ・全体の総合記録を消すときは、レース分析チャートで大会記録と比べる途中の区間の経過タイムも消す(_keikaKesu)
+  // ・件数は、すべての行の2位以下を開いたときに画面に出る記録の数(すべて・日本人・留学生の行をそれぞれ数える)
+  // ・途中で終了しても消す前に戻せるように、ShoriGuard で囲む
+
+  /// 範囲[hani]の名前([zentai] 今見ているのが全体記録のタブか)
+  static String _matomeHaniMidashi(int hani, bool zentai) {
+    if (hani == 0) return '今の選択肢だけ';
+    if (hani == 1) return zentai ? '全体記録の全部' : '大学記録の全部';
+    return '大学記録と全体記録の全部';
+  }
+
+  /// 選択肢の番号の並び(選択肢の並びの順)
+  List<int> _matomeSentakuZenbu() => [
+    for (final int i in _hyojiJun)
+      if (i < _recordTypes.length) i,
+  ];
+
+  /// 範囲[hani]に入る(全体記録のタブか, 選択肢の番号)の組
+  List<(bool, int)> _matomeHani(int hani, bool zentai, int sentaku) {
+    if (hani == 0) return [(zentai, sentaku)];
+    if (hani == 1) {
+      return [for (final int i in _matomeSentakuZenbu()) (zentai, i)];
+    }
+    return [
+      for (final bool z in const [false, true])
+        for (final int i in _matomeSentakuZenbu()) (z, i),
+    ];
+  }
+
+  /// 選択肢[sentaku]の名前(カスタム駅伝は大会名に「の記録」を付ける)
+  String _matomeSentakuNamae(int sentaku) {
+    if (sentaku < 0 || sentaku >= _recordTypes.length) return '';
+    return sentaku == 4 ? '${_recordTypes[4]}の記録' : _recordTypes[sentaku];
+  }
+
+  /// 範囲[hani]の中身の説明([univMei] 今の大学の名前)
+  String _matomeHaniNaiyou(int hani, bool zentai, int sentaku, String univMei) {
+    final String univTab = '大学記録(${univMei}大学)';
+    final String tab = zentai ? '全体記録' : univTab;
+    final int suu = _matomeSentakuZenbu().length;
+    if (hani == 0) return '${tab}の${_matomeSentakuNamae(sentaku)}';
+    if (hani == 1) return '${tab}の${suu}つの選択肢';
+    return '${univTab}と全体記録の、それぞれ${suu}つの選択肢';
+  }
+
+  /// 選択肢[sentaku]の消す記録の並び([zentai] 全体記録か。学内記録は今の大学[myUniv]の分)
+  List<_MatomeNarabi> _matomeNarabi(
+    bool zentai,
+    int sentaku,
+    Ghensuu gh,
+    Kiroku kiroku,
+    UnivData myUniv,
+    int myUnivId,
+  ) {
+    final List<_MatomeNarabi> l = [];
+    if (sentaku == 0 || sentaku == 5) {
+      // 個人記録・夏のTTの記録
+      for (final int k in _kojinSentakuBangou(sentaku)) {
+        l.add(
+          zentai
+              ? _MatomeNarabi(
+                  ichiiZentaiKojin(gh, k),
+                  nihonjin: rekidaiZentaiKojin(kiroku, false, k),
+                  ryuugakusei: rekidaiZentaiKojin(kiroku, true, k),
+                  hitoriIkken: true,
+                )
+              : _MatomeNarabi(
+                  ichiiUnivKojin(myUniv, k),
+                  nihonjin: rekidaiUnivKojin(kiroku, false, myUnivId, k),
+                  ryuugakusei: rekidaiUnivKojin(kiroku, true, myUnivId, k),
+                  hitoriIkken: true,
+                ),
+        );
+      }
+      return l;
+    }
+    if (sentaku < 1 || sentaku > 4) return l;
+    // 駅伝の記録
+    final int race = _ekidenRacebangou[sentaku - 1];
+    // 総合記録(正月駅伝は往路記録・復路記録も)
+    for (final int r in [
+      race,
+      if (race == 2) ouroRace,
+      if (race == 2) fukuroRace,
+    ]) {
+      l.add(
+        _MatomeNarabi(
+          zentai ? rekidaiZentaiTaikai(gh, r) : rekidaiUnivTaikai(myUniv, r),
+        ),
+      );
+    }
+    // 区間記録(カスタム駅伝は、区間数を減らして画面に出ていない区間の欄も)
+    int kukansuu = _ekidenKukansuu(sentaku, gh);
+    if (sentaku == 4) {
+      final RekidaiOkiba saisho = zentai
+          ? ichiiZentaiKukan(gh, race, 0)
+          : ichiiUnivKukan(myUniv, race, 0);
+      if (saisho.time.length > kukansuu) kukansuu = saisho.time.length;
+    }
+    for (int i = 0; i < kukansuu; i++) {
+      l.add(
+        zentai
+            ? _MatomeNarabi(
+                ichiiZentaiKukan(gh, race, i),
+                nihonjin: rekidaiZentaiKukan(kiroku, false, race, i),
+                ryuugakusei: rekidaiZentaiKukan(kiroku, true, race, i),
+              )
+            : _MatomeNarabi(
+                ichiiUnivKukan(myUniv, race, i),
+                nihonjin: rekidaiUnivKukan(kiroku, false, myUnivId, race, i),
+                ryuugakusei: rekidaiUnivKukan(kiroku, true, myUnivId, race, i),
+              ),
+      );
+    }
+    return l;
+  }
+
+  /// 並び[l]の記録の数(すべて・日本人・留学生の行をそれぞれ数える)
+  int _matomeKensuu(List<_MatomeNarabi> l) {
+    int n = 0;
+    for (final _MatomeNarabi x in l) {
+      final RekidaiOkiba? j = x.nihonjin;
+      final RekidaiOkiba? r = x.ryuugakusei;
+      if (j == null || r == null) {
+        n += x.ichii.yomu().length;
+        continue;
+      }
+      for (final List<RekidaiKiroku> g in _awaseNarabi(
+        ichii: x.ichii,
+        nihonjin: j,
+        ryuugakusei: r,
+        hitoriIkken: x.hitoriIkken,
+      )) {
+        n += g.length;
+      }
+    }
+    return n;
+  }
+
+  /// 範囲[hani]の記録の数
+  int _matomeHaniKensuu(
+    List<(bool, int)> hani,
+    Ghensuu gh,
+    Kiroku kiroku,
+    UnivData myUniv,
+    int myUnivId,
+  ) {
+    int n = 0;
+    for (final (bool, int) h in hani) {
+      n += _matomeKensuu(
+        _matomeNarabi(h.$1, h.$2, gh, kiroku, myUniv, myUnivId),
+      );
+    }
+    return n;
+  }
+
+  /// 置き場所[o]の欄が、配列の中にあるか(ない欄に書くと配列の外を指すので確かめる)
+  static bool _okibaAri(RekidaiOkiba o) {
+    final int i = o.i;
+    if (i < 0 ||
+        i >= o.time.length ||
+        i >= o.year.length ||
+        i >= o.month.length) {
+      return false;
+    }
+    final List<List<String>>? u = o.univname;
+    final List<List<String>>? n = o.name;
+    final List<List<int>>? g = o.gakunen;
+    if (u != null && i >= u.length) return false;
+    if (n != null && i >= n.length) return false;
+    if (g != null && i >= g.length) return false;
+    return true;
+  }
+
+  /// 置き場所[o]の記録を消す(記録のない欄は触らない。保存は呼び出し側で)
+  static void _okibaKesu(RekidaiOkiba o) {
+    if (!_okibaAri(o) || o.yomu().isEmpty) return;
+    o.kaku([]);
+  }
+
+  /// 全体の総合記録[race]を消したときに、レース分析チャートで大会記録と比べる途中の区間の経過タイムも消す
+  /// (大会記録を出したときに KirokuKousin.dart が監督データの yobiint4[大会番号×10+30]から10個に残すもの。
+  /// 10月・11月・正月・カスタム駅伝だけで、往路記録・復路記録にはない)。消したら true(保存は呼び出し側で)
+  static bool _keikaKesu(KantokuData kantoku, int race) {
+    if (!rekidaiTaishouRace(race)) return false;
+    for (int i = 0; i < 10; i++) {
+      final int b = race * 10 + 30 + i;
+      if (b < kantoku.yobiint4.length) kantoku.yobiint4[b] = 0;
+    }
+    return true;
+  }
+
+  /// 範囲[hani]の記録を消して保存する。消した記録の数を返す
+  Future<int> _matomeKesu(List<(bool, int)> hani) async {
+    final Ghensuu? gh = _ghensuuBox.get('global_ghensuu');
+    final Kiroku? kiroku = _kirokuBox.get('KirokuData');
+    if (gh == null || kiroku == null) return 0;
+    final int myUnivId = gh.MYunivid;
+    final UnivData? myUniv = _univBox.get(myUnivId);
+    if (myUniv == null) return 0;
+    final KantokuData? kantoku = Hive.box<KantokuData>(
+      'kantokuBox',
+    ).get('KantokuData');
+    int kensuu = 0;
+    bool zentaiAri = false;
+    bool univAri = false;
+    bool keikaAri = false;
+    for (final (bool, int) h in hani) {
+      final bool zentai = h.$1;
+      final int sentaku = h.$2;
+      final List<_MatomeNarabi> l = _matomeNarabi(
+        zentai,
+        sentaku,
+        gh,
+        kiroku,
+        myUniv,
+        myUnivId,
+      );
+      kensuu += _matomeKensuu(l);
+      for (final _MatomeNarabi x in l) {
+        _okibaKesu(x.ichii);
+        final RekidaiOkiba? j = x.nihonjin;
+        final RekidaiOkiba? r = x.ryuugakusei;
+        if (j != null) _okibaKesu(j);
+        if (r != null) _okibaKesu(r);
+      }
+      if (zentai) {
+        zentaiAri = true;
+        if (kantoku != null &&
+            sentaku >= 1 &&
+            sentaku <= 4 &&
+            _keikaKesu(kantoku, _ekidenRacebangou[sentaku - 1])) {
+          keikaAri = true;
+        }
+      } else {
+        univAri = true;
+      }
+    }
+    if (zentaiAri) await gh.save();
+    if (univAri) await myUniv.save();
+    await kiroku.save();
+    if (keikaAri && kantoku != null) await kantoku.save();
+    return kensuu;
+  }
+
+  /// 範囲[hani]の記録の文(先に記録をコピーするときに使う。どの行も歴代10位までを写す)
+  String _matomeKopi(List<(bool, int)> hani) {
+    return [
+      for (final (bool, int) h in hani) _kopiMoji(h.$1, h.$2, zenjuni: true),
+    ].where((x) => x.isNotEmpty).join('\n\n');
+  }
+
+  /// 記録の並びの一番下に置く「記録をまとめてリセット」
+  Widget _matomeResetBotan(bool zentai, int sentaku) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 16, bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Divider(color: Colors.white24, height: 1, thickness: 0.5),
+          const SizedBox(height: 12),
+          TextButton.icon(
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            onPressed: () => _matomeResetKakunin(zentai, sentaku),
+            icon: const Icon(
+              Icons.delete_outline,
+              size: 18,
+              color: Colors.redAccent,
+            ),
+            label: const Text(
+              '記録をまとめてリセット',
+              style: TextStyle(
+                color: Colors.redAccent,
+                fontSize: HENSUU.fontsize_honbun - 2,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 「記録をまとめてリセット」を押したとき(1回目で範囲を選び、2回目で4桁の数字を入れたら消す)
+  Future<void> _matomeResetKakunin(bool zentai, int sentaku) async {
+    final Ghensuu? gh = _ghensuuBox.get('global_ghensuu');
+    final Kiroku? kiroku = _kirokuBox.get('KirokuData');
+    if (gh == null || kiroku == null) return;
+    final int myUnivId = gh.MYunivid;
+    final UnivData? myUniv = _univBox.get(myUnivId);
+    if (myUniv == null) return;
+
+    // 範囲ごとの中身の説明と記録の数
+    final List<String> naiyou = [
+      for (int h = 0; h < 3; h++)
+        _matomeHaniNaiyou(h, zentai, sentaku, myUniv.name),
+    ];
+    final List<int> kensuu = [
+      for (int h = 0; h < 3; h++)
+        _matomeHaniKensuu(
+          _matomeHani(h, zentai, sentaku),
+          gh,
+          kiroku,
+          myUniv,
+          myUnivId,
+        ),
+    ];
+    const TextStyle kuro = TextStyle(color: Colors.black);
+
+    // 1回目: 範囲を選ぶ(初めは一番狭い「今の選択肢だけ」)
+    int hani = 0;
+    bool kopiShita = false;
+    final bool? tsugi = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false, // ダイアログの外を押しても閉じない
+      builder: (BuildContext dialogContext) {
+        return StatefulBuilder(
+          builder: (BuildContext builderContext, StateSetter setDialogState) {
+            return AlertDialog(
+              title: const Text('記録をまとめてリセット'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    const Text('消す範囲を選んでください。', style: kuro),
+                    for (int h = 0; h < 3; h++)
+                      RadioListTile<int>(
+                        value: h,
+                        groupValue: hani,
+                        onChanged: (int? v) {
+                          if (v == null) return;
+                          setDialogState(() {
+                            hani = v;
+                            kopiShita = false;
+                          });
+                        },
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(_matomeHaniMidashi(h, zentai), style: kuro),
+                        subtitle: Text(
+                          '${naiyou[h]}\n${kensuu[h]}件',
+                          style: const TextStyle(color: Colors.black54),
+                        ),
+                      ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'すべて・日本人・留学生の記録を、歴代10位までまとめて消します。この操作は元に戻せません。',
+                      style: TextStyle(color: Colors.red),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      '先にセーブしておくか、「先に記録をコピー」で記録を文字にして残しておけます(歴代10位までを写します)。',
+                      style: kuro,
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      '消したあとの大会では、区間新・大会新・学内新がたくさん出ます。',
+                      style: kuro,
+                    ),
+                  ],
+                ),
+              ),
+              actions: <Widget>[
+                TextButton(
+                  child: Text(kopiShita ? 'コピーしました' : '先に記録をコピー'),
+                  onPressed: () async {
+                    final String text = _matomeKopi(
+                      _matomeHani(hani, zentai, sentaku),
+                    );
+                    if (text.isEmpty) return;
+                    await Clipboard.setData(ClipboardData(text: text));
+                    if (!builderContext.mounted) return;
+                    setDialogState(() => kopiShita = true);
+                  },
+                ),
+                TextButton(
+                  child: const Text('キャンセル'),
+                  onPressed: () => Navigator.of(dialogContext).pop(false),
+                ),
+                TextButton(
+                  child: const Text('次へ'),
+                  onPressed: () => Navigator.of(dialogContext).pop(true),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    if (tsugi != true || !mounted) return;
+
+    // 2回目: 画面に出した4桁の数字を入れたときだけ消す(数字は毎回変わる)
+    final int bangou = 1000 + Random().nextInt(9000);
+    final bool? kesu = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext dialogContext) => _SuujiKakuninDialog(
+        setsumei:
+            '「${_matomeHaniMidashi(hani, zentai)}」(${naiyou[hani]})の記録${kensuu[hani]}件を消します。',
+        bangou: bangou,
+      ),
+    );
+    if (kesu != true || !mounted) return;
+
+    // 消す(途中で終了しても、消す前に戻せるように)
+    int keshita = 0;
+    try {
+      await ShoriGuard.begin('記録のまとめてリセット');
+      keshita = await _matomeKesu(_matomeHani(hani, zentai, sentaku));
+      await ShoriGuard.end();
+    } catch (e) {
+      ShoriGuard.reportError('記録のまとめてリセット', e);
+      return;
+    }
+    if (!mounted) return;
+    setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${keshita}件の記録をリセットしました')),
     );
   }
 
@@ -2481,9 +2923,11 @@ class _RecordScreenState extends State<RecordScreen>
     required bool isOverallTime,
     required bool senshu,
     required bool daigaku,
+    bool zenjuni = false, // 開いていない行も2位以下を写すか(まとめてリセットの前に写すとき。2.1.5)
   }) {
     if (rekidai.isEmpty) return ['$label 記録なし'];
-    final bool hiraiteru = rekidai.length >= 2 && _hiraitaKiroku.contains(kagi);
+    final bool hiraiteru =
+        rekidai.length >= 2 && (zenjuni || _hiraitaKiroku.contains(kagi));
     return [
       for (int r = 0; r < (hiraiteru ? rekidai.length : 1); r++)
         [
@@ -2506,6 +2950,7 @@ class _RecordScreenState extends State<RecordScreen>
     List<List<RekidaiKiroku>> gyou, {
     required bool isOverallTime,
     required bool daigaku,
+    bool zenjuni = false,
   }) {
     return [
       for (int shurui = 0; shurui < 3; shurui++)
@@ -2516,12 +2961,14 @@ class _RecordScreenState extends State<RecordScreen>
           isOverallTime: isOverallTime,
           senshu: true,
           daigaku: daigaku,
+          zenjuni: zenjuni,
         ),
     ];
   }
 
   /// 選択肢[sentaku]の記録の文([zentai] 全体記録のタブか。作れなければ空)
-  String _kopiMoji(bool zentai, int sentaku) {
+  /// [zenjuni] 開いていない行も2位以下を写すか(まとめてリセットの前に写すとき。2.1.5)
+  String _kopiMoji(bool zentai, int sentaku, {bool zenjuni = false}) {
     final Ghensuu ghensuu = _ghensuuBox.get(
       'global_ghensuu',
       defaultValue: Ghensuu.initial(),
@@ -2570,6 +3017,7 @@ class _RecordScreenState extends State<RecordScreen>
             gyou,
             isOverallTime: k == 3, // フルマラソンは時間で表示
             daigaku: zentai,
+            zenjuni: zenjuni,
           ),
         );
       }
@@ -2587,6 +3035,7 @@ class _RecordScreenState extends State<RecordScreen>
           isOverallTime: true,
           senshu: false,
           daigaku: zentai,
+          zenjuni: zenjuni,
         ),
       );
       if (race == 2 && sortedUnivData.isNotEmpty) {
@@ -2598,6 +3047,7 @@ class _RecordScreenState extends State<RecordScreen>
             isOverallTime: true,
             senshu: false,
             daigaku: zentai,
+            zenjuni: zenjuni,
           ),
         );
         l.addAll(
@@ -2608,6 +3058,7 @@ class _RecordScreenState extends State<RecordScreen>
             isOverallTime: true,
             senshu: false,
             daigaku: zentai,
+            zenjuni: zenjuni,
           ),
         );
       }
@@ -2632,6 +3083,7 @@ class _RecordScreenState extends State<RecordScreen>
             gyou,
             isOverallTime: false,
             daigaku: zentai,
+            zenjuni: zenjuni,
           ),
         );
       }
@@ -2975,6 +3427,8 @@ class _RecordScreenState extends State<RecordScreen>
                 hosoku: _resetHosoku(shurui),
               ),
             ),
+          // まとめてリセット(2.1.5。記録の並びの一番下)
+          _matomeResetBotan(false, sentaku),
         ],
       );
     } else if (sentaku >= 1 && sentaku <= 4) {
@@ -3057,6 +3511,8 @@ class _RecordScreenState extends State<RecordScreen>
                     hosoku: _resetHosoku(shurui),
                   ),
                 ),
+          // まとめてリセット(2.1.5。記録の並びの一番下)
+          _matomeResetBotan(false, sentaku),
         ],
       );
     } else {
@@ -3117,6 +3573,8 @@ class _RecordScreenState extends State<RecordScreen>
                 hosoku: _resetHosoku(shurui),
               ),
             ),
+          // まとめてリセット(2.1.5。記録の並びの一番下)
+          _matomeResetBotan(true, sentaku),
         ],
       );
     } else if (sentaku >= 1 && sentaku <= 4) {
@@ -3187,10 +3645,120 @@ class _RecordScreenState extends State<RecordScreen>
                     hosoku: _resetHosoku(shurui),
                   ),
                 ),
+          // まとめてリセット(2.1.5。記録の並びの一番下)
+          _matomeResetBotan(true, sentaku),
         ],
       );
     } else {
       return const Text('コンテンツがありません', style: TextStyle(color: Colors.white));
     }
+  }
+}
+
+/// まとめてリセットで消す1つの並び(2.1.5。総合記録・往路記録・復路記録は[ichii]だけ、
+/// 個人記録・区間記録は、日本人と留学生を分けない行の1位[ichii]と、日本人・留学生の行の3つ)
+class _MatomeNarabi {
+  const _MatomeNarabi(
+    this.ichii, {
+    this.nihonjin,
+    this.ryuugakusei,
+    this.hitoriIkken = false,
+  });
+
+  final RekidaiOkiba ichii;
+  final RekidaiOkiba? nihonjin;
+  final RekidaiOkiba? ryuugakusei;
+
+  /// 一人につき一番速い記録だけを出す並びか(個人記録。件数を画面と同じに数えるため)
+  final bool hitoriIkken;
+}
+
+/// まとめてリセットの2回目の確かめ(2.1.5。画面に出した4桁の数字を入れたときだけ true で閉じる)
+/// (入力の欄の後始末を窓が閉じきってから行うため、窓を1つの部品にした)
+class _SuujiKakuninDialog extends StatefulWidget {
+  const _SuujiKakuninDialog({required this.setsumei, required this.bangou});
+
+  /// 何を消すかの説明
+  final String setsumei;
+
+  /// 入れてもらう4桁の数字
+  final int bangou;
+
+  @override
+  State<_SuujiKakuninDialog> createState() => _SuujiKakuninDialogState();
+}
+
+class _SuujiKakuninDialogState extends State<_SuujiKakuninDialog> {
+  final TextEditingController _nyuuryoku = TextEditingController();
+
+  /// 数字が合わないときの知らせ
+  String? _machigai;
+
+  @override
+  void dispose() {
+    _nyuuryoku.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const TextStyle kuro = TextStyle(color: Colors.black);
+    return AlertDialog(
+      title: const Text('本当にリセットしますか？', style: TextStyle(color: Colors.red)),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(widget.setsumei, style: kuro),
+            const Text('この操作は元に戻せません。', style: TextStyle(color: Colors.red)),
+            const SizedBox(height: 8),
+            const Text('確かめのため、次の4桁の数字を入れてください。', style: kuro),
+            const SizedBox(height: 4),
+            Text(
+              '${widget.bangou}',
+              style: const TextStyle(
+                color: Colors.black,
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 6,
+              ),
+            ),
+            TextField(
+              controller: _nyuuryoku,
+              keyboardType: TextInputType.number,
+              inputFormatters: <TextInputFormatter>[
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(4),
+              ],
+              style: kuro,
+              decoration: InputDecoration(
+                hintText: '4桁の数字',
+                errorText: _machigai,
+              ),
+              onChanged: (_) {
+                if (_machigai != null) setState(() => _machigai = null);
+              },
+            ),
+          ],
+        ),
+      ),
+      actions: <Widget>[
+        TextButton(
+          child: const Text('キャンセル'),
+          onPressed: () => Navigator.of(context).pop(false),
+        ),
+        TextButton(
+          child: const Text('リセットする', style: TextStyle(color: Colors.red)),
+          onPressed: () {
+            if (_nyuuryoku.text.trim() != '${widget.bangou}') {
+              setState(() => _machigai = '数字が違います');
+              return;
+            }
+            Navigator.of(context).pop(true);
+          },
+        ),
+      ],
+    );
   }
 }

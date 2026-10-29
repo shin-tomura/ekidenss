@@ -26,6 +26,7 @@ import 'package:ekiden/screens/senryaku_entry_settei.dart'; // 戦略的エン�
 import 'package:ekiden/screens/yosen_com_siji_settei.dart'; // 正月駅伝予選の指示と集団走(1.9.9)
 import 'package:ekiden/screens/kyouka_project_settei.dart'; // 強化プロジェクト設定(2.0.1)
 import 'package:ekiden/screens/bokou_pipe_settei.dart'; // 監督の母校パイプ設定(2.0.1)
+import 'package:ekiden/screens/meimon_atsumari_settei.dart'; // 名門高校への集まりやすさ設定(2.1.6)
 import 'package:ekiden/screens/reset_ichiran_gamen.dart'
     show resetIchiranGamenHiraku; // リセット・ロード・QRで残るもの・変わるもの(2.0.3)
 import 'package:ekiden/screens/meisei_yokonarabi_settei.dart'
@@ -1768,6 +1769,42 @@ class _SettingScreenState extends State<SettingScreen>
             onPressed: () => meiseiYokonarabiSetteiHiraku(context),
             child: Text(
               "名声の横並び設定",
+              style: TextStyle(
+                color: const Color.fromARGB(255, 0, 255, 0),
+                decoration: TextDecoration.underline,
+                decorationColor: HENSUU.textcolor,
+              ),
+            ),
+          ),
+          // 名門高校への集まりやすさ設定(2.1.6。新入生の出身校の決まり方。koukou.dart・meimon_atsumari_settei.dart)
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: () {
+              showGeneralDialog(
+                context: context,
+                barrierColor: Colors.black.withOpacity(0.8), // モーダルの背景色
+                barrierDismissible: true, // 背景タップで閉じられるようにする
+                barrierLabel: '名門高校への集まりやすさ設定', // アクセシビリティ用ラベル
+                transitionDuration: const Duration(
+                  milliseconds: 300,
+                ), // アニメーション時間
+                pageBuilder: (context, animation, secondaryAnimation) {
+                  return const ModalMeimonAtsumariSettei();
+                },
+                transitionBuilder:
+                    (context, animation, secondaryAnimation, child) {
+                      return FadeTransition(
+                        opacity: CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOut,
+                        ),
+                        child: child,
+                      );
+                    },
+              );
+            },
+            child: Text(
+              "名門高校への集まりやすさ設定",
               style: TextStyle(
                 color: const Color.fromARGB(255, 0, 255, 0),
                 decoration: TextDecoration.underline,

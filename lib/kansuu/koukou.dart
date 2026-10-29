@@ -851,11 +851,13 @@ int _tokuiIro(_Kousei k) {
   return 1;
 }
 
-/// 新入生の高校を選ぶ(番号。名簿の並び)
+/// 新入生の高校を選ぶ(番号。名簿の並び。名門度の効き方は、名門高校への集まりやすさの設定で変わる。2.1.6)
 int _koukouErabu(_Kousei k, int ken, Random r) {
   // 今の名簿を一度だけ読む(getter の koukouMeibo を、この中だけ同じ名前で置き換える。1.9.5)
   final List<KoukouMei> koukouMeibo = koukouMeiboGenzai();
-  final int ekkyo = k.t5 < 840 ? 35 : (k.t5 < 860 ? 20 : 5);
+  // 名門高校への集まりやすさ(2.1.6。ふつう(初期値)は今まで通りの35%・20%・5%と係数0.9)
+  final int atsumariBan = koukouAtsumari() + 2;
+  final int ekkyo = _ekkyouWariai(k.t5, atsumariBan);
   final List<int> kouho = [];
   if (r.nextInt(100) < ekkyo) {
     for (int i = 0; i < koukouMeibo.length; i++) {
@@ -872,7 +874,7 @@ int _koukouErabu(_Kousei k, int ken, Random r) {
   final int tokui = _tokuiIro(k);
   final List<double> omomi = [
     for (final int i in kouho)
-      exp(0.9 * koukouMeibo[i].meimon * z) * (koukouMeibo[i].iro == tokui ? 1.5 : 1.0),
+      exp(_atsumariKeisuu[atsumariBan] * koukouMeibo[i].meimon * z) * (koukouMeibo[i].iro == tokui ? 1.5 : 1.0),
   ];
   final double goukei = omomi.fold<double>(0, (a, b) => a + b);
   double x = r.nextDouble() * goukei;
@@ -2452,7 +2454,8 @@ Future<void> _utsusuHontai() async {
 //     高校総体のその他の高校の選手にも、2.0.4から記録の中だけの番号を付ける(それより前の記録では-1)
 //   ・優勝回数: {z: [全国高校駅伝の優勝回数(名簿の並び)], k: [都道府県予選の優勝回数],
 //     c: [地区大会の優勝回数(1.9.5)], d: [出場回数], rn: [連続出場], ln: [最後に出た年度],
-//     lz: [最後に優勝した年度], h: 名簿の編集, f: [お気に入りの高校の番号(1.9.5)]}
+//     lz: [最後に優勝した年度], h: 名簿の編集, f: [お気に入りの高校の番号(1.9.5)],
+//     ma: 名門高校への集まりやすさ(2.1.6。ないときはふつう)}
 // ・大学に入った選手の大学は、見るときに選手のidと名前が合えば今の大学を出す(スカウトで変わるため)。
 //   卒業した選手は、毎年の保存のときに直した大学を出す(_kirokuHozon・_kaiIreru の _zaigakuNaosu)
 // ・新しいゲームの開始時に消す(ShokitiUnivdata.dart。年が1から始まり直すため)
@@ -2685,6 +2688,129 @@ String koukouOkiniiriMojiNiIreru(String t, List<int> l) {
     d['f'] = l;
   }
   return d.isEmpty ? '' : '$_kaisuuMidashi\n${jsonEncode(d)}';
+}
+
+// ------------------------------------------------------------
+// 名門高校への集まりやすさ(2.1.6。説明画面の設定タブの「名門高校への集まりやすさ設定」)
+// ・大学に入る日本人の新入生の高校を選ぶとき(_koukouErabu)の、名門度の効き方を5段階から選ぶ
+//   (散らばる・少し散らばる・ふつう(初期値。2.1.5までと同じ)・集まる・とても集まる)
+//   ・県外から名門に行く割合: 14分00秒より速い選手の35%と、14分20秒より速い選手の20%を、
+//     段階ごとに約0.5倍・0.75倍・1倍・1.5倍・2倍にする。それより遅い選手の5%は変えない
+//     (遅い選手まで名門に行きやすくならないように)
+//   ・地元の県の高校の選ばれやすさの寄り方(exp(係数×名門度×(880−入学時5000m)/25)の係数):
+//     0.3・0.6・0.9・1.35・1.8
+//   ・名前のない部員の強さ(_nanashi)と、留学生の高校(_ryuugakuseiKoukouErabu など)と、
+//     名前のない下級生から引き継ぐ新入生の高校(_hikitsugiKimeru)は変えない
+//   ・2.1.6の開発中に、名門度ごとの名前のない部員の強さを変える案も考えたが、名門を強くすると、
+//     名前のない部員が大学に入る新入生より強くなってしまうのでやめ、新入生の割り振りを変えることにした
+// ・保存は、優勝回数・名簿の編集と同じ大学id 29 のJSONの ma(-2散らばる〜0ふつう〜2とても集まる。
+//   ないときは0)。高校名鑑の編集と同じく、どちらのリセットでも新しいゲームでも残し、セーブデータを
+//   読み込むとセーブの値になる。QRコードには入れない(reset_ichiran.dart)
+// ・次に高校を決める計算(7月下旬の来年の新入生の分)から効く。もう高校が決まった世代は変えない
+// ------------------------------------------------------------
+
+/// 名門高校への集まりやすさの段階の名前(画面に並べる順。並びの番号は 段階のコード+2)
+const List<String> koukouAtsumariMei = ['散らばる', '少し散らばる', 'ふつう', '集まる', 'とても集まる'];
+
+/// 段階ごとの、地元の県の高校の選ばれやすさの寄り方の係数(ふつうは0.9)
+const List<double> _atsumariKeisuu = [0.3, 0.6, 0.9, 1.35, 1.8];
+
+/// 段階ごとの、県外から名門に行く割合(%。[14分00秒より速い選手, 14分20秒より速い選手]。ふつうは35と20)
+const List<List<int>> _atsumariEkkyou = [
+  [18, 10],
+  [26, 15],
+  [35, 20],
+  [53, 30],
+  [70, 40],
+];
+
+int? _atsumariCache;
+String? _atsumariCacheMoto;
+
+/// 今の名門高校への集まりやすさ(-2〜2。0がふつう(初期値))
+int koukouAtsumari() {
+  final UnivData? u = _kirokuUniv(_kaisuuUnivId);
+  final String moto = u?.name_tanshuku ?? '';
+  final int? c = _atsumariCache;
+  if (c != null && identical(moto, _atsumariCacheMoto)) return c;
+  final dynamic v = _kaisuuJsonKaidoku(moto)['ma'];
+  final int a = v is num ? v.toInt().clamp(-2, 2).toInt() : 0;
+  _atsumariCache = a;
+  _atsumariCacheMoto = moto;
+  return a;
+}
+
+/// 名門高校への集まりやすさを[a](-2〜2)にして保存する(ふつうなら消す)
+Future<void> koukouAtsumariHozon(int a) async {
+  final Map<String, dynamic> d = _kaisuuJsonYomu();
+  final int atai = a.clamp(-2, 2).toInt();
+  if (atai == 0) {
+    d.remove('ma');
+  } else {
+    d['ma'] = atai;
+  }
+  await _kaisuuJsonKaku(d);
+}
+
+/// 入学時5000mが[t5]秒の選手が、県外から名門に行く割合(%。[ban]は段階の並びの番号)
+int _ekkyouWariai(double t5, int ban) {
+  final List<int> w = _atsumariEkkyou[ban.clamp(0, _atsumariEkkyou.length - 1).toInt()];
+  if (t5 < 840) return w[0];
+  if (t5 < 860) return w[1];
+  return 5;
+}
+
+/// 名門高校への集まりやすさ[a](-2〜2)で、入学時5000mが[t5]秒の新入生が入る高校の名門度の割合の目安
+/// (名門度の番号の順。0〜1。今の名簿で、都道府県と得意な高校の色を同じ重みにして平均した見込み。
+/// _koukouErabu と同じ重みで計算する。設定の画面で使う)
+List<double> koukouAtsumariMeyasu(int a, double t5) {
+  final List<KoukouMei> meibo = koukouMeiboGenzai();
+  final List<double> wariai = List<double>.filled(koukouMeimonMei.length, 0);
+  if (meibo.isEmpty) return wariai;
+  final int ban = a.clamp(-2, 2).toInt() + 2;
+  final int kenSuu = LocationDatabase.allPrefectures.length;
+  final double z = (880 - t5) / 25.0;
+  final double ekkyo = _ekkyouWariai(t5, ban) / 100.0;
+  final List<int> meimonKou = [
+    for (int i = 0; i < meibo.length; i++)
+      if (meibo[i].meimon == 3) i,
+  ];
+  // [kouho]から重みどおりに選んだときの名門度の割合を、[w]倍して足す
+  void kuwaeru(List<int> kouho, int tokui, double w) {
+    final List<double> omomi = [
+      for (final int i in kouho)
+        exp(_atsumariKeisuu[ban] * meibo[i].meimon * z) * (meibo[i].iro == tokui ? 1.5 : 1.0),
+    ];
+    final double goukei = omomi.fold<double>(0, (p, q) => p + q);
+    if (goukei <= 0) return;
+    for (int j = 0; j < kouho.length; j++) {
+      final int m = meibo[kouho[j]].meimon.clamp(0, wariai.length - 1).toInt();
+      wariai[m] += w * omomi[j] / goukei;
+    }
+  }
+
+  final List<int> zenbu = [for (int i = 0; i < meibo.length; i++) i];
+  for (int ken = 0; ken < kenSuu; ken++) {
+    final List<int> jimoto = [
+      for (int i = 0; i < meibo.length; i++)
+        if (meibo[i].ken == ken) i,
+    ];
+    for (int tokui = 0; tokui < 3; tokui++) {
+      final double w = 1.0 / kenSuu / 3;
+      final double soto = meimonKou.isEmpty ? 0.0 : ekkyo;
+      if (soto > 0) kuwaeru(meimonKou, tokui, w * soto);
+      if (jimoto.isNotEmpty) {
+        kuwaeru(jimoto, tokui, w * (1 - soto));
+      } else {
+        // 地元に高校がなければ、全部の高校から同じ確率で選ぶ(_koukouErabu と同じ)
+        for (final int i in zenbu) {
+          final int m = meibo[i].meimon.clamp(0, wariai.length - 1).toInt();
+          wariai[m] += w * (1 - soto) / zenbu.length;
+        }
+      }
+    }
+  }
+  return wariai;
 }
 
 /// 大学id 29 のJSON(優勝回数と名簿の編集)を読む(読めなければ空)

@@ -34,6 +34,7 @@ import 'package:ekiden/screens/Modal_kukanHaichiHoushin.dart' show ModalKukanHai
 import 'package:ekiden/screens/yosen_com_siji_settei.dart' show ModalYosenComSijiSettei;
 import 'package:ekiden/screens/kyouka_project_settei.dart' show ModalKyoukaProjectSettei;
 import 'package:ekiden/screens/bokou_pipe_settei.dart' show ModalBokouPipeSettei;
+import 'package:ekiden/screens/meimon_atsumari_settei.dart' show ModalMeimonAtsumariSettei;
 import 'package:ekiden/screens/Modal_bairitu_goldsilver.dart' show ModalMoneySettings;
 import 'package:ekiden/screens/Modal_TrainingEffect.dart' show ModalTrainingEffectSettings;
 import 'package:ekiden/screens/seichou_type_settei.dart' show ModalSeichouTypeSettei;
@@ -83,6 +84,7 @@ final Map<String, Widget Function()> _gamen = {
   '名声変更': () => const ModalMeiseiHenkou(),
   '駅伝名声設定': () => const ModalEkidenFameSettings(),
   '入学時名声影響度設定': () => const ModalSpurtryokuseichousisuu3(),
+  '名門高校への集まりやすさ設定': () => const ModalMeimonAtsumariSettei(),
   '留学生受け入れ設定': () => const ModalRyugakuseiNinzu(),
   '持ちタイムの表示設定': () => const ModalKonkiBestSettei(),
   '趣味・高校時代の表示設定': () => const ModalHobbyDisplaySettings(),

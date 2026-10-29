@@ -455,6 +455,11 @@ List<ResetKoumoku> resetIchiran() {
     ResetKoumoku('名声の横並び設定(ブロック・グループ・名声の固定)', '育成と名声', ResetBunrui.seiryoku, [
       _kantoku(3, 86, 89),
     ], qr: ResetQr.atai),
+    // 名門高校への集まりやすさ設定(2.1.6)は、高校名鑑の編集と同じ大学id 29 の文字の欄のJSONの ma。
+    // 高校名鑑の編集と同じく、どちらのリセットでも残り(koukou.dart の koukouKirokuZenbuKesu が消さない)、
+    // セーブデータを読み込むとセーブの値になる
+    ResetKoumoku('名門高校への集まりやすさ設定', '育成と名声', ResetBunrui.tsukutta, [], qr: ResetQr.imanomama,
+        hosoku: '高校名鑑の編集と同じところに保存するので、どちらのリセットでも今のままです。'),
     // ---- 留学生 ----
     ResetKoumoku('留学生受け入れ設定', '留学生', ResetBunrui.rule, [
       ResetHozon(

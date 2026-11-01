@@ -13,7 +13,11 @@ Claude(Claude Code)と一緒に開発するときの決め事です。
 - 変更の見直しは、自分で差分(git diff)を読み直すだけにする。別の担当(サブエージェント)に見直しを頼むのは、開発者に頼まれたときだけにする。
 - 読み直しで見るのは、ビルドが通らなくなる間違い(名前・import・型・null)と、既存の動きを変えてしまっていないかに絞る。行の長さなどの書き方の好みは見ない。
 - ビルドと動作確認は開発者が行うので、見直しに時間をかけすぎず、早めに報告する。自信のないところは報告に書き、開発者のビルドで確かめてもらう。
-- コミットの前に、直したDartのファイルの文法を確かめる(ビルドの代わり)。pip install tree_sitter_language_pack --break-system-packages で入れ、get_parser('dart') で読み、ERROR や MISSING のノードがないかを見る。かっこやカンマの間違いしか分からないので、名前・型・import は差分の読み直しで見る。
+- コミットの前に、開発者と同じ Flutter 3.35.3(Dart 3.9.2)で `flutter analyze --no-pub` を走らせ、error が0件か、直したファイルに新しい warning が出ていないかを確かめる(ビルドの代わり。2.1.7から)。
+  - Flutterは storage.googleapis.com の flutter_infra_release から取る(展開すると2.4GB。作業場所はセッションごとに消えるので、毎回取り直す)。パッケージは `flutter pub get --enforce-lockfile` で入れ、pubspec.lock を変えない。
+  - 開発者がFlutterの版を上げたら、ここの版も直す(版は `flutter --version` で分かる)。
+  - 前からある warning と info(使っていない import、withOpacity が古い、など)は見ない。
+- Flutterを取れなかったときだけ、直したDartのファイルの文法を tree-sitter で確かめる。pip install tree_sitter_language_pack --break-system-packages で入れ、get_parser('dart') で読み、ERROR や MISSING のノードがないかを見る。かっこやカンマの間違いしか分からないので、名前・型・import は差分の読み直しで見る。
 - 置き換えで文を直したときは、直したあとに grep で直し残しがないかを確かめる。
 
 ## コミットとpush

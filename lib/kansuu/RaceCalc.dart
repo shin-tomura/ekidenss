@@ -21,6 +21,7 @@ import 'package:ekiden/kansuu/nouryoku_eikyodo.dart';
 import 'package:ekiden/kansuu/ikku_pace.dart'; // 1区の集団のペースの結果(1.9.2)
 import 'package:ekiden/kansuu/yosen_com_siji.dart'; // 正月駅伝予選のコンピュータの大学の指示と集団走(1.9.9)
 import 'package:ekiden/kansuu/shushou.dart'; // 主将の特典(2.0.1)
+import 'package:ekiden/kansuu/suii_hosei.dart'; // 推移の図のための補正の秒(2.1.7)
 
 String _timeToMinuteSecondString(double time) {
   if (time == TEISUU.DEFAULTTIME) {
@@ -815,6 +816,9 @@ Future<void> RaceCalc({
         tensuu[senshuid][11] = atai_hosei[senshuid][7];
         //}
       }
+      // 推移の図で、長距離粘りとスパート力の補正の秒を計算どおりの場所に置くため、使っていない speed の欄に残す
+      // (2.1.7。表示のためだけで、タイムには使わない。suii_hosei.dart)
+      sortedsenshudata[senshuid].speed = suiiHoseiTsumeru(choukyoriHosei, spurtHosei);
 
       //調子補正
       // 駅伝(10月・11月・正月・カスタム)で、調子のタイムへの影響度が0%でない場合のみ

@@ -18,6 +18,7 @@ import 'package:ekiden/kansuu/mokuhyou_hosei.dart';
 import 'package:ekiden/kansuu/nouryoku_eikyodo.dart';
 import 'package:ekiden/kansuu/gakuren_kantoku.dart';
 import 'package:ekiden/kansuu/ikku_pace.dart'; // 1区の集団のペースの結果(1.9.2)
+import 'package:ekiden/kansuu/suii_hosei.dart'; // 推移の図のための補正の秒(2.1.7)
 
 String _timeToMinuteSecondString(double time) {
   if (time == TEISUU.DEFAULTTIME) {
@@ -630,6 +631,8 @@ Future<void> RaceCalc_gakuren({
         atai_hosei[senshuid][7] = spurtHosei;
         //}
       }
+      // 推移の図のために、長距離粘りとスパート力の補正の秒を残す(2.1.7。RaceCalc.dart と同じ。suii_hosei.dart)
+      gakurensenshudata[senshuid].speed = suiiHoseiTsumeru(choukyoriHosei, spurtHosei);
 
       //調子補正
       // 駅伝(10月・11月・正月・カスタム)で、調子のタイムへの影響度が0%でない場合のみ

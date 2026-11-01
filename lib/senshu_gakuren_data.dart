@@ -107,7 +107,7 @@ class Senshu_Gakuren_Data extends HiveObject {
   @HiveField(45)
   double time_taikai_total;
   @HiveField(46)
-  double speed;
+  double speed; //2.1.7から、推移の図のための長距離粘りとスパート力の補正の秒を詰めて入れる(kansuu/suii_hosei.dart)。それまでは使っていなかった
 
   @HiveField(47)
   int sijiflag; //卒業年

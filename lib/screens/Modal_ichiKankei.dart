@@ -21,6 +21,24 @@
 //   中継所ごとの位置の図を、区間を5つに分けてつなぎ、コマ送りで見せる(_suiiKoma)。区間の中は、どの大学もその区間を
 //   同じペースで走ったとみなし、各地点を通ったときのタイム差を、位置の図と同じく区間の平均の速さ(前の区間の速さから
 //   この区間の速さへ少しずつ変える)で距離にする。区間の終わりで、位置の図とぴったり同じになる。
+//   ・2.1.7から、区間の中の速さに形をつける(_Katachi。上の「同じペース」は2.1.6までの形)。区間タイムは本物のままで、
+//     区間のどこでどれだけ時間を使うかだけを変えるので、中継所の位置と順位は今までと同じ。
+//     ・前半(区間の半分まで): 指示などがなかった場合の区間タイム(区間タイムから、指示などの補正の秒を引いたもの)で
+//       走ったときの前半の時間に対して、前半突っ込みの指示は3%、目標順位を下回っての焦り(突っ込み)は1.5%速く、
+//       前半抑えの指示は2%、目標順位を上回ってのほっと一息は1%遅く走る。残りの時間を後半で走るので、成功すれば
+//       後半も落ちず(抑えなら上がり)、失敗すれば損した秒が後半の失速になる。指示などの種類と補正の秒は、補正の説明
+//       (string_racesetumei)の行から読む(学連選抜も同じ書き方)
+//     ・長距離粘り(15kmを超える区間の、15km地点から先。ChoukyoriNebariHoseitime と同じ)とスパート力(区間の最後の1割)は、
+//       区間順位の画面の「分析」の値(racechuukakuseiflag。-7〜+7で、プラスほどその区間の中でタイムを損した)の1あたり1%、
+//       その部分の1mあたりの時間を増やす(減らす)。前半と後半の時間を、それぞれの中でこの重みどおりに配る
+//       (指示の形は崩れない)。分析は見抜く力に関係なく見えている値なので、新しく分かってしまう能力はない。
+//       分析のない選手(学連選抜など)は平ら
+//     ・1区の演出では、集団がばらけたあと(飛び出した選手は差が一番開いたあと)の時間を、同じ重みで配る
+//       (ばらける前は今まで通り同じタイムなので、結果が先に分からないようにする決まりは変わらない)
+//     ・作るのは、いま表示している大会(hyojiracebangou)のときだけ(補正の説明と分析は次の大会で書き換わる)。
+//       ほかの大会の記録では、2.1.6までと同じく同じペースでつなぐ
+//     ・コマの位置は、区間の始め・4分の1・半分・4分の3・9割・中継所(_suiiIchi。2.1.6までは5等分)。半分のコマで前半の
+//       差が一番開き、9割のコマの次でラストスパートが見える
 //   ・1区は、飛び出した選手と集団の記録をもとにした演出にする(_IkkuEnshutsu・_ikkuJikoku。2.1.1の開発中は、
 //     途中の動きを作れないので1区終了時点から再生していた)。スタートから、飛び出した選手は区間の4割まで集団の前で
 //     差を広げ(成功は集団のタイムの1%、失敗は0.5%)、そこからは1区のタイムに向かう。飛び出さなかった選手は、
@@ -53,7 +71,8 @@
 //   ・四角の中の順位は、そのコマの時点の順位(その地点を通った順)。順位の変化の出し方は、定数 suiiHendouKata で
 //     切り替える(どの形のコードも残してある。四角の欄の幅と説明書の文は、この値に合わせて変わる)。
 //     ・nukisuu(今の形): 前の中継所からこれまでに抜いた大学の数「↑3」(緑)と抜かれた数「↓1」(赤)。両方あれば「↑3↓1」。
-//       区間の中は同じペースとみなすので、2校の前後が入れ替わるのは1つの区間で多くても1回で、数は増えるだけ
+//       2.1.6までは区間の中は同じペースとみなしていたので、2校の前後が入れ替わるのは1つの区間で多くても1回で、数は増えるだけ
+//       だった(2.1.7からは、抜いて抜き返すことがあり、そのときは数が減る。欄の幅はどのコマの数も見て決める)
 //       (中継所での前後と今のコマの前後を比べて数える。同じタイムは数えない)。学連選抜は数えない(順位に数えないので、
 //       抜いただけのときは「↑の数=順位の上がった数」になる)。学連選抜の四角には、学連選抜が抜いた・抜かれた大学の数
 //     ・sashihiki: 前の中継所からの順位の変化の数「↑2」「↓3」(位置と同じ数え方)
@@ -220,8 +239,15 @@ const List<String> _bairitsuMei = ['×1/4', '×1/2', '×1', '×2', '×4', '×8']
 /// おまかせの倍率: 1位から最後尾までが、画面の高さのこの倍に収まる一番大きい倍率
 const double _omakaseGamen = 2.0;
 
-/// 推移(2.1.1)の、1つの区間のコマの数(区間を5つに分ける。0コマ目が区間の始め、5コマ目が中継所)
+/// 推移(2.1.1)の、1つの区間のコマの数(0コマ目が区間の始め、5コマ目が中継所)
 const int _suiiKomaSuu = 5;
+
+/// 推移の、コマごとの区間の進み具合(_suiiKomaSuu+1 個。2.1.7。2.1.1〜2.1.6は5等分(0・0.2・0.4・0.6・0.8・1))。
+/// 半分のコマで前半の指示の差が一番開き、9割のコマの次でラストスパートが見えるようにした
+const List<double> _suiiIchi = [0.0, 0.25, 0.5, 0.75, 0.9, 1.0];
+
+/// 推移の[ban]コマ目の区間の進み具合(2.1.7)
+double _suiiIchiKoma(int ban) => _suiiIchi[ban.clamp(0, _suiiKomaSuu).toInt()];
 
 /// 推移の速さ(ゆっくり・ふつう・はやい)の、1コマの時間(ミリ秒)と名前
 /// (四角の表示(suiiTen が false)では、中継所のコマはこの2倍止まる。点の表示は止めない。2.1.2)
@@ -269,6 +295,27 @@ const double _ikkuShissokuIchi = 0.5;
 const double _ikkuTobidashiIchi = 0.4;
 const double _ikkuTobidashiSeikou = 0.01;
 const double _ikkuTobidashiShippai = 0.005;
+
+/// 推移の区間の中の形(2.1.7。_Katachi): 前半(区間の半分まで)を、指示などがなかった場合よりどれだけ速く走るか
+/// (速さの割合。マイナスは遅く)。前半突っ込みの指示・目標順位を下回っての焦り・前半抑えの指示・目標順位を上回っての
+/// ほっと一息
+const double _katachiTsukkomi = 0.03;
+const double _katachiAseri = 0.015;
+const double _katachiOsae = -0.02;
+const double _katachiHitoiki = -0.01;
+
+/// 分析の値(-7〜+7)1あたりの、その部分の1mあたりの時間の増え方(長距離粘りは15km地点から先、スパート力は最後の1割)
+const double _katachiBunseki = 0.01;
+
+/// ラストスパートの始まり(区間の進み具合)
+const double _katachiRasuto = 0.9;
+
+/// 長距離粘りが効き始める距離(m。ChoukyoriNebariHoseitime と同じ)
+const double _katachiNebariKyori = 15000;
+
+/// 後半と前半の1mあたりの時間の比がこの範囲を外れたら(思わぬ値)、指示の形をつけない
+const double _katachiHiSaishou = 0.8;
+const double _katachiHiSaidai = 1.25;
 
 /// おまかせの倍率の下限(_bairitsu の番号。4は×4。四角どうしの一番小さい間隔が約24mになり、
 /// 数十mの差が見分けられる。2.1.0。開発中は3(×2)だった)
@@ -636,6 +683,10 @@ class _IchiKankei {
   /// 推移の1区の演出の材料(作れなければnull。2.1.1)
   final _IkkuEnshutsu? ikku;
 
+  /// 推移の区間の中の形(_Katachi)を、走った選手の補正の説明と分析から作るか(いま表示している大会のときだけ。
+  /// 補正の説明と分析は次の大会で書き換わるので、ほかの大会の記録では作らない。2.1.7)
+  final bool katachi;
+
   _IchiKankei._(
     this.kukan,
     this.seed,
@@ -644,6 +695,7 @@ class _IchiKankei {
     this.race,
     this.haichiDaigaku, {
     this.ikku,
+    this.katachi = false,
   });
 
   /// 大会[race]の結果から作る([made] を渡すと、レースの途中の1区から[made]区まで)
@@ -780,6 +832,7 @@ class _IchiKankei {
       race,
       haichiDaigaku,
       ikku: e == null ? null : _IkkuEnshutsu.tsukuru(k, race, kukan),
+      katachi: k.gh.hyojiracebangou == race,
     );
   }
 
@@ -1025,37 +1078,164 @@ class _IkkuEnshutsu {
   }
 }
 
+/// 推移の区間の中の形(2.1.7。上のヘッダーの説明を参照)。1人の走者が、区間の中のどこでどれだけ時間を使うか
+class _Katachi {
+  /// 前半(区間の半分まで)を、指示などがなかった場合よりどれだけ速く走るか(速さの割合。0なら指示の形なし)
+  final double zenhan;
+
+  /// 指示などで得をした(マイナス)・損をした(プラス)秒
+  final double sontoku;
+
+  /// 15km地点(区間の進み具合。15km以下の区間は1より大きい)
+  final double nebariIchi;
+
+  /// 15km地点から先と、最後の1割の、1mあたりの時間の重み(1が平ら)
+  final double nebari;
+  final double spurt;
+
+  const _Katachi({
+    this.zenhan = 0,
+    this.sontoku = 0,
+    this.nebariIchi = 2,
+    this.nebari = 1,
+    this.spurt = 1,
+  });
+
+  /// 平ら(区間を同じペースで走る。2.1.6までの形)
+  static const _Katachi taira = _Katachi();
+
+  /// 区間の進み具合[a]〜[b]の重みの合計
+  double omomi(double a, double b) {
+    if (b <= a) return 0;
+    final List<double> kiri = [a];
+    final List<double> sakai = [nebariIchi, _katachiRasuto]..sort();
+    for (final double c in sakai) {
+      if (c > a && c < b) kiri.add(c);
+    }
+    kiri.add(b);
+    double s = 0;
+    for (int i = 0; i + 1 < kiri.length; i++) {
+      final double m = (kiri[i] + kiri[i + 1]) / 2;
+      s += (kiri[i + 1] - kiri[i]) * (m >= nebariIchi ? nebari : 1.0) * (m >= _katachiRasuto ? spurt : 1.0);
+    }
+    return s;
+  }
+
+  /// 区間の[a]から中継所までを[jikan]秒で走るとき、進み具合[x]の地点までにかかる秒(重みどおりに配る。1区の演出)
+  double haibun(double a, double jikan, double x) {
+    if (x <= a) return 0;
+    if (x >= 1) return jikan;
+    final double zen = omomi(a, 1);
+    if (zen <= 0) return jikan * (x - a) / (1 - a);
+    return jikan * omomi(a, x) / zen;
+  }
+
+  /// 区間を[t]秒で走った走者が、進み具合[x]の地点を通るまでにかかる秒
+  double jikoku(double t, double x) {
+    if (x <= 0) return 0;
+    if (x >= 1) return t;
+    final double wf = omomi(0, 0.5);
+    final double wb = omomi(0.5, 1);
+    if (t <= 0 || wf <= 0 || wb <= 0) return t * x;
+    // 指示などがなかった場合の区間タイムを重みで分けたときの前半を、指示などの割合で速く(遅く)する
+    final double t0 = t - sontoku > t * 0.5 ? t - sontoku : t;
+    double f = t0 * wf / (wf + wb) / (1 + zenhan);
+    double b = t - f;
+    final double hi = (f > 0 && b > 0) ? (b / wb) / (f / wf) : 0;
+    if (hi < _katachiHiSaishou || hi > _katachiHiSaidai) {
+      // 思わぬ値のときは、指示の形をつけず、重みだけで配る
+      f = t * wf / (wf + wb);
+      b = t - f;
+    }
+    if (x <= 0.5) return f * omomi(0, x) / wf;
+    return f + b * omomi(0.5, x) / wb;
+  }
+}
+
+/// 分析の値(racechuukakuseiflag)から、種類[type]の影響度(-7〜+7。プラスほどタイムを損した)を読む(なければ0)
+int _katachiBunsekiYomu(int flag, int type) => flag == 0 ? 0 : ((flag >> (type * 4)) & 0xF) - 7;
+
+/// 補正の説明[setsumei]から、前半の速さの割合と、指示などの補正の秒を読む(なければnull。2.1.7)
+({double zenhan, double sontoku})? _katachiShijiYomu(String setsumei) {
+  for (final String gyou in setsumei.split('\n')) {
+    final double? zenhan = gyou.startsWith('指示(前半突っ込み)補正')
+        ? _katachiTsukkomi
+        : gyou.startsWith('指示(前半抑え)補正')
+        ? _katachiOsae
+        : gyou.startsWith('目標順位下回って突っ込み補正')
+        ? _katachiAseri
+        : gyou.startsWith('目標順位上回って一息補正')
+        ? _katachiHitoiki
+        : null;
+    if (zenhan == null) continue;
+    // 「…補正(根拠):+12.3秒」の最後の「:」と「秒」の間(根拠の中の「:」「秒」に引っかからないように最後を見る)
+    final int c = gyou.lastIndexOf(':');
+    final int b = gyou.lastIndexOf('秒');
+    if (c < 0 || b <= c) continue;
+    final double? sontoku = double.tryParse(gyou.substring(c + 1, b).trim());
+    if (sontoku == null) continue;
+    return (zenhan: zenhan, sontoku: sontoku);
+  }
+  return null;
+}
+
+/// 走った選手[x]の、推移の区間の中の形を作る([kyori] は区間の距離(m。分からなければ0)。[shiji] が false なら
+/// 指示などの形はつけない(1区。飛び出しは1区の演出で描く)。2.1.7)
+_Katachi _katachiTsukuru(_IchiDaigaku x, double kyori, {bool shiji = true}) {
+  // 分析は大学の選手だけ(学連選抜にはない)
+  final int flag = x.senshu?.racechuukakuseiflag ?? 0;
+  final int nebari = _katachiBunsekiYomu(flag, 10);
+  final int spurt = _katachiBunsekiYomu(flag, 11);
+  final String? setsumei = x.setsumei;
+  final ({double zenhan, double sontoku})? s = (shiji && setsumei != null) ? _katachiShijiYomu(setsumei) : null;
+  return _Katachi(
+    zenhan: s?.zenhan ?? 0,
+    sontoku: s?.sontoku ?? 0,
+    nebariIchi: kyori > _katachiNebariKyori ? _katachiNebariKyori / kyori : 2,
+    nebari: 1 + _katachiBunseki * nebari,
+    spurt: 1 + _katachiBunseki * spurt,
+  );
+}
+
 /// 推移の1区の演出で、1区の[x](0〜1)の地点を通る時刻(秒。2.1.1)。
-/// [t] はその大学の1区のタイム、[g] は集団のタイム、[tobi] は飛び出し(0: なし、1: 失敗、2: 成功)
-double _ikkuJikoku(double t, double g, int tobi, double x) {
+/// [t] はその大学の1区のタイム、[g] は集団のタイム、[tobi] は飛び出し(0: なし、1: 失敗、2: 成功)、
+/// [k] は長距離粘りとスパート力の重み(2.1.7。ばらけたあとの時間をこの重みで配る。2.1.6まではまっすぐ)
+double _ikkuJikoku(double t, double g, int tobi, double x, {_Katachi k = _Katachi.taira}) {
   if (tobi == 0) {
-    // 集団: 集団のペースで進み、ばらけ始めるところ(速すぎた選手は半分)からは、1区のタイムに向かってまっすぐ
+    // 集団: 集団のペースで進み、ばらけ始めるところ(速すぎた選手は半分)からは、1区のタイムに向かう
     final double b = t > g * _ikkuShissokuWariai ? _ikkuShissokuIchi : _ikkuBarakeIchi;
     final double tb = g * b;
     if (t <= tb) return t * x;
     if (x <= b) return g * x;
-    return tb + (t - tb) * (x - b) / (1 - b);
+    return tb + k.haibun(b, t - tb, x);
   }
-  // 飛び出し: 区間の4割で集団との差が一番開き、そこからは1区のタイムに向かってまっすぐ
+  // 飛び出し: 区間の4割で集団との差が一番開き、そこからは1区のタイムに向かう
   final double sa = g * (tobi == 2 ? _ikkuTobidashiSeikou : _ikkuTobidashiShippai);
   final double tp = g * _ikkuTobidashiIchi - sa;
   if (tp <= 0 || t <= tp) return t * x;
   if (x <= _ikkuTobidashiIchi) return tp * x / _ikkuTobidashiIchi;
-  return tp + (t - tp) * (x - _ikkuTobidashiIchi) / (1 - _ikkuTobidashiIchi);
+  return tp + k.haibun(_ikkuTobidashiIchi, t - tp, x);
 }
 
 /// 推移の1区の演出の、区間の途中の位置関係([ato] は1区の終了時点、[p] は進み具合(0〜1)。2.1.1)
 /// ・同じタイムの大学(集団)は同じ順位にし、並びは集団を引っ張った大学を先頭に、大学のID順(学連選抜は最後)
 ///   (結果の順に並べると、集団の中の並びで結果が先に分かってしまうため)
 /// ・1区なので、順位の変化(↑↓)は出さない。[p] が1なら、1区の終了時点の図と同じ中身
-_IchiKukan _suiiKomaIkku(_IchiKukan ato, double p, _IkkuEnshutsu e) {
+/// [kyori] は1区の距離(m。長距離粘りの15km地点に使う。2.1.7)
+_IchiKukan _suiiKomaIkku(_IchiKukan ato, double p, _IkkuEnshutsu e, {double kyori = 0}) {
   if (p >= 1) return _IchiKukan(ato.kk, ato.hayasa, ato.narabi, suii: true);
   final double x = p < 0 ? 0.0 : p;
   final double g = e.shuudanTime;
   final List<({_IchiDaigaku d, double t, int jun})> l = [];
   for (final _IchiDaigaku d in ato.narabi) {
     final int kagi = _daigakuKagi(d);
-    final double t = _ikkuJikoku(d.ruikei, g, e.tobidashi[kagi] ?? 0, x);
+    final double t = _ikkuJikoku(
+      d.ruikei,
+      g,
+      e.tobidashi[kagi] ?? 0,
+      x,
+      k: _katachiTsukuru(d, kyori, shiji: false),
+    );
     final int jun = kagi == e.hipparuKagi ? -1 : (d.op ? 1000000 : (d.univId ?? 999999));
     l.add((d: d, t: t, jun: jun));
   }
@@ -1095,37 +1275,82 @@ _IchiKukan _suiiKomaIkku(_IchiKukan ato, double p, _IkkuEnshutsu e) {
 }
 
 /// 推移(2.1.1)の、区間の途中の位置関係。[mae] は前の区間の終了時点、[ato] はこの区間の終了時点、
-/// [p] は区間の進み具合(0〜1)。
-/// ・どの大学も、この区間を同じペースで走ったとみなし、各地点を通ったときの累計タイムを、前の中継所と
-///   この中継所の累計タイムの間で直線でつなぐ(地点ごとの通過の差)
+/// [p] は区間の進み具合(0〜1)、[kyori] は区間の距離(m。分からなければ0)。
+/// ・各地点を通ったときの累計タイムを、前の中継所の累計タイムに、その地点までにかかった秒を足して出す
+///   (地点ごとの通過の差)。[katachi] が true なら、その秒を走った選手の指示・長距離粘り・スパート力で配る
+///   (_Katachi。2.1.7)。false(ほかの大会の記録)なら、2.1.6までと同じく、どの大学も区間を同じペースで
+///   走ったとみなし、前の中継所とこの中継所の累計タイムの間を直線でつなぐ
 /// ・距離に換算する速さも、前の区間の速さからこの区間の速さへ少しずつ変える(区間の境目で図が跳ねないように)
 /// ・順位は累計タイムの順(学連選抜は数えず、前にいる大学の数を順位相当にする)。同じタイムは、この区間の
 ///   終了時点の並びの順。順位の変化は、前の区間の終了時点から
 /// ・[p] が1なら、この区間の終了時点の図と同じ中身を、推移の描き方(途中を省略しないなど)で描く
 /// ・前の区間にいない大学(思わぬデータ)は、この区間の終了時点のタイムのまま
-_IchiKukan _suiiKoma(_IchiKukan mae, _IchiKukan ato, double p) {
-  // 前の中継所の累計タイム(抜いた数・抜かれた数を数えるため)と、この区間の終わりで出うる一番広い順位の変化の文
-  // (抜いた数・抜かれた数は増えるだけなので、区間の終わりの数で決まる)
+_IchiKukan _suiiKoma(
+  _IchiKukan mae,
+  _IchiKukan ato,
+  double p, {
+  double kyori = 0,
+  bool katachi = false,
+}) {
+  // 前の中継所の累計タイム(抜いた数・抜かれた数を数えるため)
   final Map<int, double> maeT = {
     for (final _IchiDaigaku x in mae.narabi) _daigakuKagi(x): x.ruikei,
   };
+  final Map<int, _IchiDaigaku> maeMap = {
+    for (final _IchiDaigaku x in mae.narabi) _daigakuKagi(x): x,
+  };
+  // 大学ごとの区間の中の形(2.1.7。作らないときは空で、どの大学も平ら)
+  final Map<int, _Katachi> katachiMap = {
+    if (katachi)
+      for (final _IchiDaigaku x in ato.narabi) _daigakuKagi(x): _katachiTsukuru(x, kyori),
+  };
+  // この区間で出うる一番広い順位の変化の文(2.1.7から、抜いて抜き返すことがあるので、区間の終わりだけでなく
+  // どのコマの数も見る。2.1.6までは数が増えるだけだったので、区間の終わりの数で決まっていた)
   final List<_IchiDaigaku> owari = _nukisuuTsukeru(ato.narabi, maeT);
-  final List<String> habaMoji = _suiiHendouHabaMoji(
-    owari,
-    ato.narabi.where((x) => !x.op).length,
-  );
+  final int daigakuSuu = ato.narabi.where((x) => !x.op).length;
+  final Set<String> habaSet = {..._suiiHendouHabaMoji(owari, daigakuSuu)};
+  for (final double q in _suiiIchi) {
+    if (q <= 0 || q >= 1) continue;
+    habaSet.addAll(
+      _suiiHendouHabaMoji(
+        _nukisuuTsukeru(_suiiTochuuNarabi(ato, q, maeMap, katachiMap), maeT),
+        daigakuSuu,
+      ),
+    );
+  }
+  final List<String> habaMoji = habaSet.toList();
   if (p >= 1) {
     return _IchiKukan(ato.kk, ato.hayasa, owari, suii: true, hendouHabaMoji: habaMoji);
   }
   final double t = p < 0 ? 0.0 : p;
-  final Map<int, _IchiDaigaku> maeMap = {
-    for (final _IchiDaigaku x in mae.narabi) _daigakuKagi(x): x,
-  };
+  final List<_IchiDaigaku> narabi = _suiiTochuuNarabi(ato, t, maeMap, katachiMap);
+  final double hayasa = mae.hayasa > 0
+      ? mae.hayasa + (ato.hayasa - mae.hayasa) * t
+      : ato.hayasa;
+  return _IchiKukan(
+    ato.kk,
+    hayasa,
+    _nukisuuTsukeru(narabi, maeT),
+    suii: true,
+    hendouHabaMoji: habaMoji,
+  );
+}
+
+/// 推移の区間の途中[t](区間の進み具合。0〜1未満)の並び(順位と前の中継所からの順位の変化を付けたもの。
+/// 抜いた数・抜かれた数はまだ付けない)。[maeMap] は前の中継所の図の大学、[katachiMap] は大学ごとの区間の中の形
+/// (ない大学は平ら)。前の区間にいない大学(思わぬデータ)は、この区間の終了時点のタイムのまま(2.1.7で _suiiKoma から分けた)
+List<_IchiDaigaku> _suiiTochuuNarabi(
+  _IchiKukan ato,
+  double t,
+  Map<int, _IchiDaigaku> maeMap,
+  Map<int, _Katachi> katachiMap,
+) {
   final List<({_IchiDaigaku x, double ruikei, int atoBan})> l = [];
   for (int i = 0; i < ato.narabi.length; i++) {
     final _IchiDaigaku x = ato.narabi[i];
     final _IchiDaigaku? m = maeMap[_daigakuKagi(x)];
-    final double ruikei = m == null ? x.ruikei : m.ruikei + (x.ruikei - m.ruikei) * t;
+    final _Katachi k = katachiMap[_daigakuKagi(x)] ?? _Katachi.taira;
+    final double ruikei = m == null ? x.ruikei : m.ruikei + k.jikoku(x.ruikei - m.ruikei, t);
     l.add((x: x, ruikei: ruikei, atoBan: i));
   }
   l.sort((a, b) {
@@ -1162,16 +1387,7 @@ _IchiKukan _suiiKoma(_IchiKukan mae, _IchiKukan ato, double p) {
     );
     if (!x.op) juni++;
   }
-  final double hayasa = mae.hayasa > 0
-      ? mae.hayasa + (ato.hayasa - mae.hayasa) * t
-      : ato.hayasa;
-  return _IchiKukan(
-    ato.kk,
-    hayasa,
-    _nukisuuTsukeru(narabi, maeT),
-    suii: true,
-    hendouHabaMoji: habaMoji,
-  );
+  return narabi;
 }
 
 /// 推移の図[ima]の大学ごとに、前の中継所からこれまでに抜いた大学の数と抜かれた大学の数を付ける(2.1.1)。
@@ -1821,8 +2037,10 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
   /// 推移の、並びの[i]番の区間の、進み具合[p]の図(1区は演出。_suiiDekiru のときだけ呼ぶ)
   _IchiKukan _suiiZu(_IchiKankei b, int i, double p) {
     final _IkkuEnshutsu? e = b.ikku;
-    if (b.kukan[i].kk == 0 && e != null) return _suiiKomaIkku(b.kukan[i], p, e);
-    return _suiiKoma(b.kukan[i - 1], b.kukan[i], p);
+    // 区間の距離(長距離粘りの15km地点に使う。2.1.7)
+    final double kyori = _suiiKyori(b.kukan[i].kk);
+    if (b.kukan[i].kk == 0 && e != null) return _suiiKomaIkku(b.kukan[i], p, e, kyori: kyori);
+    return _suiiKoma(b.kukan[i - 1], b.kukan[i], p, kyori: kyori, katachi: b.katachi);
   }
 
   /// 推移で見られる区間(並びの番号。1区の演出ができれば1区から、できなければ2区から)
@@ -2065,7 +2283,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     return _tenHabaHikae.putIfAbsent(i, () {
       double saidai = 0;
       for (int k = 0; k <= _suiiKomaSuu; k++) {
-        final _IchiKukan r = _suiiZu(b, i, k / _suiiKomaSuu);
+        final _IchiKukan r = _suiiZu(b, i, _suiiIchi[k]);
         if (r.narabi.isEmpty) continue;
         double hayai = r.narabi.first.ruikei;
         double osoi = r.narabi.first.ruikei;
@@ -2395,8 +2613,10 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
   void _tenSetsumeiHiraku(BuildContext context, _IchiKankei b, _IchiKukan r) {
     final bool jibunAri = r.narabi.any((x) => x.jibun);
     final List<String> bun = [
-      '中継所ごとの位置関係を、区間を5つに分けてつないだコマ送りです。',
+      '中継所ごとの位置関係を、区間の中を5コマに分けてつないだコマ送りです。',
       '区間の中の動きは、つなぐための推定です。区間の終わりで「位置」の図と同じになります。',
+      // 区間の中の速さの形(2.1.7。_Katachi)
+      '区間の中の速さには、指示やその成否、「分析」の長距離粘り・スパート力が表れます。',
       if (r.kk == 0) '1区は、飛び出した選手と集団の記録をもとにした演出です。',
       '縮尺は区間ごとに、その区間で一番広がったときに合わせています。',
       '図の上の「道の全長」は、道の上端(トップ)から下端までが何mに当たるかの目安です。',
@@ -2452,7 +2672,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     if (!mounted || b == null || _hyouji != 4 || !_suiiOuYoyaku || !_michiScroll.hasClients) return;
     if (w == null || scaler == null || px == null || ue == null) return;
     if (!_suiiDekiru(b, _suiiKukan)) return;
-    final _IchiKukan r = _suiiZu(b, _suiiKukan, _suiiKomaBan / _suiiKomaSuu);
+    final _IchiKukan r = _suiiZu(b, _suiiKukan, _suiiIchiKoma(_suiiKomaBan));
     final int shoten = _suiiShotenBan(r);
     if (shoten < 0) return;
     final _Haichi h = _haichi(b, r, w, scaler, px, double.infinity);
@@ -3328,7 +3548,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
     final bool suii = _hyouji == 4 && b != null && _suiiDekiru(b, _suiiKukan);
     if (b != null) {
       r = suii
-          ? _suiiZu(b, _suiiKukan, _suiiKomaBan / _suiiKomaSuu)
+          ? _suiiZu(b, _suiiKukan, _suiiIchiKoma(_suiiKomaBan))
           : b.kukan[_erabu.clamp(0, b.kukan.length - 1)];
     }
     final _IchiKukan? r0 = r;
@@ -4321,7 +4541,7 @@ class _ModalIchiKankeiViewState extends State<ModalIchiKankeiView> {
         // 説明の文は短くする(おまかせと集団の説明は、説明書に書く)
         if (r.suii) ...[
           // 推移(2.1.1。つないだ動きだと分かるように。地点は出さない)
-          const Text('中継所ごとの位置関係を、区間を5つに分けてつないだコマ送りです。', style: setsumei),
+          const Text('中継所ごとの位置関係を、区間の中を5コマに分けてつないだコマ送りです。', style: setsumei),
           if (r.kk == 0)
             const Text('1区は、飛び出した選手と集団の記録をもとにした演出です。', style: setsumei),
           const Text('水色の枠: 焦点の大学(大学の四角を押すと、その大学を追います)。', style: setsumei),

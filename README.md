@@ -3,6 +3,8 @@
 完全無料で広告なしの駅伝シミュレーションゲーム「箱庭小駅伝SS」のソースコードです。
 「みんなで駅伝ゲームを楽しみましょう！」という願いを込めて公開しています。
 
+※ここで公開しているのは、バージョン2.1.7（v2.1.7release）までのソースコードです。
+
 ## アプリ・関連リンク
 - **App Store:** [ダウンロードはこちら](https://apps.apple.com/app/%E7%AE%B1%E5%BA%AD%E5%B0%8F%E9%A7%85%E4%BC%9Dss/id6755650757)
 - **Google Play:** [ダウンロードはこちら](https://play.google.com/store/apps/details?id=jp.littlestar.hakoniwa.ekidenSS)
